@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """
-Steganography Web Service v3.1
-Flask + Bootstrap web UI for the hybrid Photo + Day-Phrase + PIN system
+Stegasoo: Stegonography portal, for security-mided messagin demo.
+
+    Aaron D. Lee (w/ vibes)
+    2025-12-27
+
+    Right Now: It's a stupid bootstrap looking portal that works.
+
+    Future: Socials, Slack, and Matrix server channel watcher function to encode/send/decode
+            messages in real-time from a configurable memes or photos channel.
+
+Built as a learning experience with a few LLMs to see if I can make something decent.
 """
 
 import os
