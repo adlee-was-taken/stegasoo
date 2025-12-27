@@ -25,7 +25,7 @@ from flask import Flask, render_template, request, send_file, jsonify, flash, re
 from werkzeug.utils import secure_filename
 from PIL import Image
 from secureDeleter import SecureDeleter
-from story_generator import generate_all_stories, HAS_ML
+#from story_generator import generate_all_stories, HAS_ML
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
