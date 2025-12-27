@@ -88,8 +88,12 @@
 
                 <div class="text-center mb-4">
                     <h6 class="text-muted mb-2">YOUR STATIC PIN</h6>
-                    <div class="pin-display">{{ pin }}</div>
-                    <small class="text-muted">Use this {{ pin_length }}-digit PIN every day</small>
+                    <div class="pin-container">
+                        <div class="pin-display">{{ pin }}</div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Use this {{ pin_length }}-digit PIN every day</small>
+                    </div>
                 </div>
                 
                 <hr class="my-4">
@@ -215,7 +219,7 @@ document.getElementById('pinSelect').addEventListener('change', updateEntropy);
 // Loading state for generate button
 document.querySelector('form').addEventListener('submit', function() {
     const btn = document.getElementById('generateBtn');
-    const storiesChecked = document.getElementById('generateStories').checked;
+    const storiesChecked = document.getElementById('generateStories')?.checked;
     btn.disabled = true;
     if (storiesChecked) {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating stories...';
