@@ -6,10 +6,44 @@
 <div class="text-center mb-5">
     <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="120" class="mb-3">
     <h1 class="display-4 fw-bold">Stegasoo</h1>
-    <p class="lead text-muted">Hide encrypted messages in plain sight using advanced steganography</p>
+    <p class="lead text-muted">Create hidden encrypted messages in images and photos using advanced steganography.</p>
 </div>
-
 <div class="row g-4 mb-5">
+
+    <div class="col-md-4">
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-lock-fill fs-1"></i>
+            </div>
+            <div class="card-body text-center">
+                <h5 class="card-title">Encode Message</h5>
+                <p class="card-text text-muted">
+                    Hide your secret message inside an innocent-looking image using your daily phrase + PIN.
+                </p>
+                <a href="/encode" class="btn btn-primary">
+                    <i class="bi bi-upload me-1"></i> Encode
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-unlock-fill fs-1"></i>
+            </div>
+            <div class="card-body text-center">
+                <h5 class="card-title">Decode Message</h5>
+                <p class="card-text text-muted">
+                    Extract and decrypt hidden messages from Stegasoo-encoded images using your credentials.
+                </p>
+                <a href="/decode" class="btn btn-primary">
+                    <i class="bi bi-download me-1"></i> Decode
+                </a>
+            </div>
+        </div>
+    </div>
+ 
     <div class="col-md-4">
         <div class="card h-100 feature-card">
             <div class="card-header text-center py-3">
@@ -22,40 +56,6 @@
                 </p>
                 <a href="/generate" class="btn btn-primary">
                     <i class="bi bi-plus-circle me-1"></i> Generate
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100 feature-card">
-            <div class="card-header text-center py-3">
-                <i class="bi bi-lock-fill fs-1"></i>
-            </div>
-            <div class="card-body text-center">
-                <h5 class="card-title">Encode Message</h5>
-                <p class="card-text text-muted">
-                    Hide your secret message inside an innocent-looking image using your phrase + PIN.
-                </p>
-                <a href="/encode" class="btn btn-primary">
-                    <i class="bi bi-upload me-1"></i> Encode
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card h-100 feature-card">
-            <div class="card-header text-center py-3">
-                <i class="bi bi-unlock-fill fs-1"></i>
-            </div>
-            <div class="card-body text-center">
-                <h5 class="card-title">Decode Message</h5>
-                <p class="card-text text-muted">
-                    Extract and decrypt hidden messages from stego images using your credentials.
-                </p>
-                <a href="/decode" class="btn btn-primary">
-                    <i class="bi bi-download me-1"></i> Decode
                 </a>
             </div>
         </div>
