@@ -87,11 +87,14 @@
         
         .phrase-display {
             font-family: 'Courier New', monospace;
-            font-size: 1.1rem;
+            font-size: 1rem;
             background: rgba(0, 0, 0, 0.3);
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 0.75rem;
             border-radius: 0.5rem;
             border-left: 4px solid var(--gradient-start);
+            display: inline-block;
+            line-height: 1.6;
+            word-spacing: 0.3rem;
         }
         
         .pin-display {
@@ -170,7 +173,7 @@
         <div class="container text-center text-muted">
             <small>
                 <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" height="16" class="me-1" style="vertical-align: text-bottom;">
-                Stegasoo v3.1 — Hybrid Photo + Day-Phrase + PIN Steganography
+                Stegasoo v1.1 — Hybrid Photo + Day-Phrase + PIN Steganography
             </small>
         </div>
     </footer>
