@@ -112,11 +112,11 @@ def cleanup_temp_files():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 def generate_pin(length=6):
     """Generate a random PIN of specified length (6-8 digits)."""
-    return ''.join(str(secrets.randbelow(10)) for _ in range(length))
-
+    first_digit = str(secrets.randbelow(9) + 1)  # 1-9
+    rest = ''.join(str(secrets.randbelow(10)) for _ in range(length - 1))  # 0-9
+    return first_digit + rest
 
 def generate_day_phrases(words_per_phrase=3):
     phrases = {}
