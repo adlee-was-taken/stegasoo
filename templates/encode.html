@@ -16,8 +16,14 @@
                             <label class="form-label">
                                 <i class="bi bi-image me-1"></i> Reference Photo
                             </label>
-                            <input type="file" name="reference_photo" class="form-control" 
-                                   accept="image/*" required>
+                            <div class="drop-zone" id="refDropZone">
+                                <input type="file" name="reference_photo" accept="image/*" required>
+                                <div class="drop-zone-label">
+                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                    <span class="text-muted">Drop image or click to browse</span>
+                                </div>
+                                <img class="drop-zone-preview d-none" id="refPreview">
+                            </div>
                             <div class="form-text">
                                 The secret photo both parties have (NOT transmitted)
                             </div>
@@ -27,8 +33,14 @@
                             <label class="form-label">
                                 <i class="bi bi-file-image me-1"></i> Carrier Image
                             </label>
-                            <input type="file" name="carrier" class="form-control" 
-                                   accept="image/*" required>
+                            <div class="drop-zone" id="carrierDropZone">
+                                <input type="file" name="carrier" accept="image/*" required>
+                                <div class="drop-zone-label">
+                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                    <span class="text-muted">Drop image or click to browse</span>
+                                </div>
+                                <img class="drop-zone-preview d-none" id="carrierPreview">
+                            </div>
                             <div class="form-text">
                                 The image to hide your message in (e.g., a meme)
                             </div>
@@ -39,8 +51,17 @@
                         <label class="form-label">
                             <i class="bi bi-chat-left-text me-1"></i> Secret Message
                         </label>
-                        <textarea name="message" class="form-control" rows="4" 
+                        <textarea name="message" class="form-control" rows="4" id="messageInput"
                                   placeholder="Enter your secret message here..." required></textarea>
+                        <div class="d-flex justify-content-between form-text">
+                            <span>
+                                <span id="charCount">0</span> / 50,000 characters
+                                <span id="charWarning" class="text-warning d-none ms-2">
+                                    <i class="bi bi-exclamation-triangle"></i> Getting long!
+                                </span>
+                            </span>
+                            <span id="charPercent" class="text-muted">0%</span>
+                        </div>
                     </div>
                     
                     <div class="row">
@@ -104,10 +125,81 @@
 
 {% block scripts %}
 <script>
+// Form submit loading state
 document.getElementById('encodeForm').addEventListener('submit', function(e) {
     const btn = document.getElementById('encodeBtn');
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
     btn.disabled = true;
+});
+
+// Character counter
+const messageInput = document.getElementById('messageInput');
+const charCount = document.getElementById('charCount');
+const charWarning = document.getElementById('charWarning');
+const charPercent = document.getElementById('charPercent');
+const maxChars = 50000;
+
+messageInput.addEventListener('input', function() {
+    const len = this.value.length;
+    charCount.textContent = len.toLocaleString();
+    
+    const pct = Math.round((len / maxChars) * 100);
+    charPercent.textContent = pct + '%';
+    
+    // Warning at 80%
+    charWarning.classList.toggle('d-none', len < maxChars * 0.8);
+    
+    // Red text when near/over limit
+    charCount.classList.toggle('text-danger', len > maxChars * 0.95);
+});
+
+// Drag & drop with preview
+document.querySelectorAll('.drop-zone').forEach(zone => {
+    const input = zone.querySelector('input[type="file"]');
+    const label = zone.querySelector('.drop-zone-label');
+    const preview = zone.querySelector('.drop-zone-preview');
+    
+    // Drag events
+    ['dragenter', 'dragover'].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+        });
+    });
+    
+    // Handle drop
+    zone.addEventListener('drop', e => {
+        if (e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            showPreview(e.dataTransfer.files[0]);
+        }
+    });
+    
+    // Handle click selection
+    input.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            showPreview(this.files[0]);
+        }
+    });
+    
+    function showPreview(file) {
+        if (!file.type.startsWith('image/')) return;
+        
+        const reader = new FileReader();
+        reader.onload = e => {
+            preview.src = e.target.result;
+            preview.classList.remove('d-none');
+            label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
+        };
+        reader.readAsDataURL(file);
+    }
 });
 </script>
 {% endblock %}

@@ -32,8 +32,14 @@
                             <label class="form-label">
                                 <i class="bi bi-image me-1"></i> Reference Photo
                             </label>
-                            <input type="file" name="reference_photo" class="form-control" 
-                                   accept="image/*" required>
+                            <div class="drop-zone">
+                                <input type="file" name="reference_photo" accept="image/*" required>
+                                <div class="drop-zone-label">
+                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                    <span class="text-muted">Drop image or click to browse</span>
+                                </div>
+                                <img class="drop-zone-preview d-none">
+                            </div>
                             <div class="form-text">
                                 The same reference photo used for encoding
                             </div>
@@ -43,8 +49,14 @@
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-image me-1"></i> Stego Image
                             </label>
-                            <input type="file" name="stego_image" class="form-control" 
-                                   accept="image/*" required>
+                            <div class="drop-zone">
+                                <input type="file" name="stego_image" accept="image/*" required>
+                                <div class="drop-zone-label">
+                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                    <span class="text-muted">Drop image or click to browse</span>
+                                </div>
+                                <img class="drop-zone-preview d-none">
+                            </div>
                             <div class="form-text">
                                 The image containing the hidden message
                             </div>
@@ -113,10 +125,60 @@
 
 {% block scripts %}
 <script>
+// Form submit loading state
 document.getElementById('decodeForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('decodeBtn');
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Decoding...';
     btn.disabled = true;
+});
+
+// Drag & drop with preview
+document.querySelectorAll('.drop-zone').forEach(zone => {
+    const input = zone.querySelector('input[type="file"]');
+    const label = zone.querySelector('.drop-zone-label');
+    const preview = zone.querySelector('.drop-zone-preview');
+    
+    // Drag events
+    ['dragenter', 'dragover'].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+        });
+    });
+    
+    // Handle drop
+    zone.addEventListener('drop', e => {
+        if (e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            showPreview(e.dataTransfer.files[0]);
+        }
+    });
+    
+    // Handle click selection
+    input.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            showPreview(this.files[0]);
+        }
+    });
+    
+    function showPreview(file) {
+        if (!file.type.startsWith('image/')) return;
+        
+        const reader = new FileReader();
+        reader.onload = e => {
+            preview.src = e.target.result;
+            preview.classList.remove('d-none');
+            label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
+        };
+        reader.readAsDataURL(file);
+    }
 });
 </script>
 {% endblock %}
