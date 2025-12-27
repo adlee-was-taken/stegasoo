@@ -59,18 +59,33 @@
                         </small>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <!--<div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="generate_stories" id="generateStories" checked>
+                        <label class="form-check-label" for="generateStories">
+                            <i class="bi bi-book me-2"></i>Generate memory aid stories
+                            {% if has_ml %}<span class="badge bg-success ms-2">AI-powered</span>{% else %}<span class="badge bg-secondary ms-2">Template-based</span>{% endif %}
+                        </label>
+                        <div class="form-text">Creates memorable stories to help you remember each day's phrase</div>
+                    </div>-->
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="generateBtn">
                         <i class="bi bi-shuffle me-2"></i>Generate New Credentials
                     </button>
                 </form>
                 {% else %}
                 
+                <div class="alert alert-info">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <strong>Credentials Generated!</strong> - Refresh to generate new credentials
+                </div>
+
                 <div class="alert alert-warning">
                     <i class="bi bi-exclamation-triangle me-2"></i>
-                    <strong>Memorize this information, then close this page!</strong>
-                    Do not save or screenshot. Refresh to generate new credentials.
+                    <strong>Memorize the information then close!</strong> - Do not save/screenshot
                 </div>
                 
+                <hr class="my-4">
+
                 <div class="text-center mb-4">
                     <h6 class="text-muted mb-2">YOUR STATIC PIN</h6>
                     <div class="pin-display">{{ pin }}</div>
@@ -135,6 +150,26 @@
                     </p>
                 </div>
                 
+                {% if stories %}
+                <hr class="my-4">
+                
+                <h6 class="text-muted mb-3">
+                    <i class="bi bi-book me-2"></i>MEMORY AID STORIES
+                    {% if has_ml %}<span class="badge bg-success ms-2">AI-generated</span>{% else %}<span class="badge bg-secondary ms-2">Template-based</span>{% endif %}
+                </h6>
+                <p class="text-muted small mb-3">
+                    Passphrase words are shown in <span class="story-word">RED CAPS</span>. 
+                    Read each story to help memorize your phrases.
+                </p>
+                
+                {% for day in days %}
+                <div class="story-card">
+                    <div class="day-label"><i class="bi bi-calendar3 me-2"></i>{{ day }}</div>
+                    <div>{{ stories[day].story_html|safe }}</div>
+                </div>
+                {% endfor %}
+                {% endif %}
+                
                 <a href="/generate" class="btn btn-outline-light btn-lg w-100 mt-3">
                     <i class="bi bi-arrow-repeat me-2"></i>Generate New Credentials
                 </a>
@@ -176,6 +211,18 @@ function updateEntropy() {
 
 document.getElementById('wordsSelect').addEventListener('change', updateEntropy);
 document.getElementById('pinSelect').addEventListener('change', updateEntropy);
+
+// Loading state for generate button
+document.querySelector('form').addEventListener('submit', function() {
+    const btn = document.getElementById('generateBtn');
+    const storiesChecked = document.getElementById('generateStories').checked;
+    btn.disabled = true;
+    if (storiesChecked) {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating stories...';
+    } else {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    }
+});
 </script>
 {% endif %}
 {% endblock %}

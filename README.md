@@ -1,4 +1,4 @@
-# StegoCrypt Web Service
+# Stegasoo Web Service
 
 A containerized Flask + Bootstrap web UI for hybrid Photo + Day-Phrase + PIN steganography.
 
@@ -12,10 +12,11 @@ A containerized Flask + Bootstrap web UI for hybrid Photo + Day-Phrase + PIN ste
 - 🔐 **AES-256-GCM** authenticated encryption
 - 🧠 **Argon2id** memory-hard key derivation (256MB)
 - 🎲 **Pseudo-random pixel selection** defeats steganalysis
-- 📅 **Daily key rotation** with 3-word phrases
-- 🔢 **Static PIN** for additional entropy
+- 📅 **Daily key rotation** with customizable phrases (3-12 words)
+- 🔢 **Static PIN** for additional entropy (6-8 digits)
 - 🖼️ **Reference photo** as "something you have"
 - 🌐 **Web UI** with Bootstrap 5 dark theme
+- 📖 **Memory aid stories** to help memorize phrases (template or AI-powered)
 
 ## Quick Start
 
@@ -39,6 +40,9 @@ source venv/bin/activate  # Linux/Mac
 # Install dependencies
 pip install -r requirements.txt
 
+# Optional: Enable AI-powered story generation
+pip install -r requirements-ml.txt
+
 # Run development server
 python app.py
 
@@ -51,8 +55,9 @@ gunicorn --bind 0.0.0.0:5000 app:app
 ### 1. Generate Credentials
 
 Visit `/generate` to create:
-- **7 three-word phrases** (one per day of week)
-- **1 six-digit PIN** (same every day)
+- **7 phrases** (one per day of week, 3-12 words each)
+- **1 PIN** (6-8 digits, same every day)
+- **Memory aid stories** (optional, helps memorize phrases)
 
 Memorize these! Don't save them.
 
@@ -62,8 +67,8 @@ Visit `/encode` and provide:
 - **Reference photo** - A photo both parties have (NOT transmitted)
 - **Carrier image** - The image to hide your message in
 - **Message** - Your secret text
-- **Day phrase** - Today's 3-word phrase
-- **PIN** - Your static 6-digit PIN
+- **Day phrase** - Today's phrase
+- **PIN** - Your static PIN
 
 Download the stego image and share it through any channel.
 
@@ -80,28 +85,30 @@ Visit `/decode` and provide:
 | Component | Entropy | Purpose |
 |-----------|---------|---------|
 | Reference Photo | ~80-256 bits | Something you have |
-| 3-Word Phrase | ~33 bits | Something you know (rotates daily) |
-| 6-Digit PIN | ~20 bits | Something you know (static) |
-| **Combined** | **133+ bits** | **Beyond brute force** |
+| Day Phrase | ~33-132 bits | Something you know (rotates daily) |
+| PIN | ~20-27 bits | Something you know (static) |
+| **Combined** | **133-415+ bits** | **Beyond brute force** |
 
 ### Attack Resistance
 
 | Attack | Result |
 |--------|--------|
-| Brute force | 2^133 combinations = impossible |
+| Brute force | 2^133+ combinations = impossible |
 | Rainbow tables | Random salt per message |
 | Steganalysis | Random pixel selection defeats detection |
 | GPU cracking | Argon2 requires 256MB RAM per attempt |
 
-## API Endpoints
+## Memory Aid Stories
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Home page |
-| `/generate` | GET/POST | Generate phrase card + PIN |
-| `/encode` | GET/POST | Encode message in image |
-| `/decode` | GET/POST | Decode message from image |
-| `/about` | GET | Security information |
+The generate page can create stories to help you memorize your phrases:
+
+**Template-based** (default):
+> Monday morning began when I discovered a **APPLE** near the **FOREST**. I had to **THUNDER** quickly, then grab the **CRYSTAL** before reaching the **BRAVE**.
+
+**AI-powered** (with `requirements-ml.txt`):
+- Uses DistilGPT-2 (~350MB model)
+- Generates more coherent, natural stories
+- Words highlighted in RED CAPS
 
 ## Configuration
 
@@ -120,25 +127,6 @@ For production, consider:
 2. **Rate limiting** - Prevent abuse
 3. **Logging** - Monitor for security events
 4. **Memory** - Allocate at least 512MB (Argon2 needs 256MB)
-
-Example nginx config:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name stegocrypt.example.com;
-    
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    location / {
-        proxy_pass http://stegocrypt:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        client_max_body_size 50M;
-    }
-}
-```
 
 ## License
 

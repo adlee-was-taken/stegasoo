@@ -1,0 +1,8 @@
+# ML dependencies for AI-powered story generation
+# Install with: pip install -r requirements-ml.txt
+# 
+# Note: These add ~1-2GB disk space for model downloads
+# The app works without these (falls back to template-based stories)
+
+transformers>=4.35.0
+torch>=2.0.0

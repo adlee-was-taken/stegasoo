@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  stegocrypt:
+  stegasoo:
     build: .
-    container_name: stegocrypt
+    container_name: stegasoo
     ports:
       - "5000:5000"
     environment:
@@ -29,5 +29,5 @@ services:
   #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
   #     - ./certs:/etc/nginx/certs:ro
   #   depends_on:
-  #     - stegocrypt
+  #     - stegasoo
   #   restart: unless-stopped

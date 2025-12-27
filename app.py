@@ -25,6 +25,7 @@ from flask import Flask, render_template, request, send_file, jsonify, flash, re
 from werkzeug.utils import secure_filename
 from PIL import Image
 from secureDeleter import SecureDeleter
+from story_generator import generate_all_stories, HAS_ML
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
@@ -445,6 +446,10 @@ def generate():
         words_per_phrase = int(request.form.get('words_per_phrase', 3))
         pin_length = int(request.form.get('pin_length', 6))
 
+        # Disable generate_stories for now (until much better)
+        #generate_stories = request.form.get('generate_stories') == 'on'
+        generate_stories = request.form.get('generate_stories') == 'off'
+
         # Clamp values to valid ranges
         words_per_phrase = max(3, min(12, words_per_phrase))
         pin_length = max(6, min(8, pin_length))
@@ -457,6 +462,11 @@ def generate():
         pin_entropy = int(pin_length * 3.32)    # log2(10) ≈ 3.32 bits per digit
         total_entropy = phrase_entropy + pin_entropy
 
+        # Generate memory aid stories if requested
+        stories = None
+        if generate_stories:
+            stories = generate_all_stories(phrases, use_ml=HAS_ML)
+
         return render_template('generate.html',
                              phrases=phrases,
                              pin=pin,
@@ -466,8 +476,10 @@ def generate():
                              pin_length=pin_length,
                              phrase_entropy=phrase_entropy,
                              pin_entropy=pin_entropy,
-                             total_entropy=total_entropy)
-    return render_template('generate.html', generated=False)
+                             total_entropy=total_entropy,
+                             stories=stories,
+                             has_ml=HAS_ML)
+    return render_template('generate.html', generated=False, has_ml=HAS_ML)
 
 
 @app.route('/encode', methods=['GET', 'POST'])
