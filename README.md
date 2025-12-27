@@ -1,4 +1,4 @@
-# Stegasoo Web Service
+# StegoCrypt Web Service
 
 A containerized Flask + Bootstrap web UI for hybrid Photo + Day-Phrase + PIN steganography.
 

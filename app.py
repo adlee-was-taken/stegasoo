@@ -18,6 +18,8 @@ import io
 import secrets
 import hashlib
 import struct
+import time
+import threading
 from datetime import datetime
 from flask import Flask, render_template, request, send_file, jsonify, flash, redirect, url_for
 from werkzeug.utils import secure_filename
@@ -52,6 +54,10 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif'}
 
+# Temporary file storage for sharing (file_id -> {data, timestamp, filename})
+TEMP_FILES = {}
+TEMP_FILE_EXPIRY = 300  # 5 minutes
+
 # ============================================================================
 # CRYPTO CONFIGURATION
 # ============================================================================
@@ -65,7 +71,7 @@ ARGON2_TIME_COST = 4
 ARGON2_MEMORY_COST = 256 * 1024
 ARGON2_PARALLELISM = 4
 
-DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 # BIP-39 wordlist (loaded from file)
 BIP39_FILE = os.path.join(os.path.dirname(__file__), 'bip39-words.txt')
@@ -89,6 +95,14 @@ def secure_cleanup_uploads():
                 except Exception as e:
                     # Fallback to regular delete
                     os.remove(filepath)
+
+
+def cleanup_temp_files():
+    """Remove expired temporary files."""
+    now = time.time()
+    expired = [fid for fid, info in TEMP_FILES.items() if now - info['timestamp'] > TEMP_FILE_EXPIRY]
+    for fid in expired:
+        TEMP_FILES.pop(fid, None)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -458,25 +472,21 @@ def generate():
 
 @app.route('/encode', methods=['GET', 'POST'])
 def encode():
-
-    # Get day of week
     day_of_week = datetime.now().strftime("%A")
 
     if request.method == 'POST':
         try:
-
-
             # Get files
             ref_photo = request.files.get('reference_photo')
             carrier = request.files.get('carrier')
 
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
-                return render_template('encode.html')
+                return render_template('encode.html', day_of_week=day_of_week)
 
             if not allowed_file(ref_photo.filename) or not allowed_file(carrier.filename):
                 flash('Invalid file type. Use PNG, JPG, or BMP', 'error')
-                return render_template('encode.html')
+                return render_template('encode.html', day_of_week=day_of_week)
 
             # Get form data
             message = request.form.get('message', '')
@@ -485,12 +495,12 @@ def encode():
 
             if not message or not day_phrase:
                 flash('Message and day phrase are required', 'error')
-                return render_template('encode.html')
+                return render_template('encode.html', day_of_week=day_of_week)
 
             # Check message size
             if len(message) > MAX_MESSAGE_SIZE:
                 flash(f'Message too long. Max {MAX_MESSAGE_SIZE // 1000}KB allowed.', 'error')
-                return render_template('encode.html')
+                return render_template('encode.html', day_of_week=day_of_week)
 
             # Read files
             ref_data = ref_photo.read()
@@ -507,10 +517,10 @@ def encode():
                     flash(f'Carrier image too large ({width}x{height} = {num_pixels:,} pixels). '
                           f'Max ~{MAX_IMAGE_PIXELS:,} pixels ({max_dim}x{max_dim}). '
                           f'Please resize your image.', 'error')
-                    return render_template('encode.html')
+                    return render_template('encode.html', day_of_week=day_of_week)
             except Exception as e:
                 flash(f'Could not read carrier image: {str(e)}', 'error')
-                return render_template('encode.html')
+                return render_template('encode.html', day_of_week=day_of_week)
 
             # Get date
             date_str = datetime.now().strftime('%Y-%m-%d')
@@ -524,20 +534,76 @@ def encode():
             # Embed
             stego_data, stats = embed_in_image(carrier_data, encrypted, pixel_key)
 
-            # Return as download
-            return send_file(
-                io.BytesIO(stego_data),
-                mimetype='image/png',
-                as_attachment=True,
-                #download_name='stego_image.png'
-                download_name=f'{secrets.token_hex(4)}_{datetime.now().strftime("%Y%m%d")}.png'
-            )
+            # Generate filename and file ID
+            filename = f'{secrets.token_hex(4)}_{datetime.now().strftime("%Y%m%d")}.png'
+            file_id = secrets.token_urlsafe(16)
+
+            # Store temporarily for download/share
+            cleanup_temp_files()  # Clean old files first
+            TEMP_FILES[file_id] = {
+                'data': stego_data,
+                'filename': filename,
+                'timestamp': time.time()
+            }
+
+            return redirect(url_for('encode_result', file_id=file_id))
 
         except Exception as e:
             flash(f'Error: {str(e)}', 'error')
             return render_template('encode.html', day_of_week=day_of_week)
 
     return render_template('encode.html', day_of_week=day_of_week)
+
+
+@app.route('/encode/result/<file_id>')
+def encode_result(file_id):
+    if file_id not in TEMP_FILES:
+        flash('File expired or not found. Please encode again.', 'error')
+        return redirect(url_for('encode'))
+
+    file_info = TEMP_FILES[file_id]
+    return render_template('encode_result.html',
+                         file_id=file_id,
+                         filename=file_info['filename'])
+
+
+@app.route('/encode/download/<file_id>')
+def encode_download(file_id):
+    if file_id not in TEMP_FILES:
+        flash('File expired or not found.', 'error')
+        return redirect(url_for('encode'))
+
+    file_info = TEMP_FILES[file_id]
+
+    return send_file(
+        io.BytesIO(file_info['data']),
+        mimetype='image/png',
+        as_attachment=True,
+        download_name=file_info['filename']
+    )
+
+
+@app.route('/encode/file/<file_id>')
+def encode_file(file_id):
+    """Serve file for Web Share API (inline, not attachment)."""
+    if file_id not in TEMP_FILES:
+        return "Not found", 404
+
+    file_info = TEMP_FILES[file_id]
+
+    return send_file(
+        io.BytesIO(file_info['data']),
+        mimetype='image/png',
+        as_attachment=False,
+        download_name=file_info['filename']
+    )
+
+
+@app.route('/encode/cleanup/<file_id>', methods=['POST'])
+def encode_cleanup(file_id):
+    """Manually cleanup a file after sharing."""
+    TEMP_FILES.pop(file_id, None)
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/decode', methods=['GET', 'POST'])

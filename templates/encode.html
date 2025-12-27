@@ -51,7 +51,7 @@
                             <input type="text" name="day_phrase" class="form-control" 
                                    placeholder="e.g., correct horse battery" required>
                             <div class="form-text">
-                                Your 3-word phrase for today (from your phrase card)
+                                Your phrase for <strong>today</strong> (based on your local timezone)
                             </div>
                         </div>
                         
@@ -68,7 +68,7 @@
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-lg w-100" id="encodeBtn">
-                        <i class="bi bi-lock me-2"></i>Encode & Download
+                        <i class="bi bi-lock me-2"></i>Encode Message
                     </button>
                 </form>
                 
@@ -106,25 +106,8 @@
 <script>
 document.getElementById('encodeForm').addEventListener('submit', function(e) {
     const btn = document.getElementById('encodeBtn');
-    
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
     btn.disabled = true;
-    
-    // Argon2 key derivation can take a few seconds
-    // Reset button after encoding completes (file downloads don't navigate)
-    setTimeout(function() {
-        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Done! Encode Another?';
-        btn.disabled = false;
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-success');
-        
-        // Reset to original state after a moment
-        setTimeout(function() {
-            btn.innerHTML = '<i class="bi bi-lock me-2"></i>Encode & Download';
-            btn.classList.remove('btn-success');
-            btn.classList.add('btn-primary');
-        }, 2000);
-    }, 4000);  // 4 seconds for Argon2 + embedding
 });
 </script>
 {% endblock %}

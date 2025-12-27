@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Generate Phrase Card - Stegasoo{% endblock %}
+{% block title %}Generate Phrase Card - StegoCrypt{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -85,15 +85,15 @@
                     <table class="table table-dark table-hover">
                         <thead>
                             <tr>
-                                <th style="width: 120px;">Day</th>
+                                <th style="width: 140px;">Day</th>
                                 <th>Phrase</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for day in days %}
                             <tr>
-                                <td>
-                                    <i class="bi bi-calendar-day me-2"></i>{{ day }}
+                                <td class="text-nowrap">
+                                    <i class="bi bi-calendar3 me-2"></i>{{ day }}
                                 </td>
                                 <td>
                                     <span class="phrase-display">{{ phrases[day] }}</span>
