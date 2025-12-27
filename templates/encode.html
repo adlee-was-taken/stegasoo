@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Encode Message - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lock-fill me-2"></i>Encode Secret Message</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="encodeForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-image me-1"></i> Reference Photo
+                            </label>
+                            <input type="file" name="reference_photo" class="form-control" 
+                                   accept="image/*" required>
+                            <div class="form-text">
+                                The secret photo both parties have (NOT transmitted)
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-file-image me-1"></i> Carrier Image
+                            </label>
+                            <input type="file" name="carrier" class="form-control" 
+                                   accept="image/*" required>
+                            <div class="form-text">
+                                The image to hide your message in (e.g., a meme)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-chat-left-text me-1"></i> Secret Message
+                        </label>
+                        <textarea name="message" class="form-control" rows="4" 
+                                  placeholder="Enter your secret message here..." required></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-chat-quote me-1"></i> {{ day_of_week }}'s Phrase
+                            </label>
+                            <input type="text" name="day_phrase" class="form-control" 
+                                   placeholder="e.g., correct horse battery" required>
+                            <div class="form-text">
+                                Your 3-word phrase for today (from your phrase card)
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-123 me-1"></i> PIN
+                            </label>
+                            <input type="password" name="pin" class="form-control" 
+                                   placeholder="123456" maxlength="10">
+                            <div class="form-text">
+                                Your static 6-digit PIN
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="encodeBtn">
+                        <i class="bi bi-lock me-2"></i>Encode & Download
+                    </button>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="row text-center text-muted small">
+                    <div class="col-4">
+                        <i class="bi bi-shield-check fs-4 d-block mb-1 text-success"></i>
+                        AES-256-GCM Encryption
+                    </div>
+                    <div class="col-4">
+                        <i class="bi bi-shuffle fs-4 d-block mb-1 text-info"></i>
+                        Random Pixel Embedding
+                    </div>
+                    <div class="col-4">
+                        <i class="bi bi-eye-slash fs-4 d-block mb-1 text-warning"></i>
+                        Undetectable by Analysis
+                    </div>
+                </div>
+                
+                <div class="alert alert-secondary mt-4 small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <strong>Limits:</strong> 
+                    Carrier image max ~4 megapixels (2000×2000). 
+                    Files max 5MB each. 
+                    Message max 50KB.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('encodeForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('encodeBtn');
+    
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+    btn.disabled = true;
+    
+    // Argon2 key derivation can take a few seconds
+    // Reset button after encoding completes (file downloads don't navigate)
+    setTimeout(function() {
+        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Done! Encode Another?';
+        btn.disabled = false;
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+        
+        // Reset to original state after a moment
+        setTimeout(function() {
+            btn.innerHTML = '<i class="bi bi-lock me-2"></i>Encode & Download';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
+        }, 2000);
+    }, 4000);  // 4 seconds for Argon2 + embedding
+});
+</script>
+{% endblock %}

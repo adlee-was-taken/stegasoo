@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Uploads
+uploads/*
+
+# Docs
+README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore

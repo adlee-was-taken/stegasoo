@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Decode Message - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-unlock-fill me-2"></i>Decode Secret Message</h5>
+            </div>
+            <div class="card-body">
+                {% if decoded_message %}
+                <div class="alert alert-success">
+                    <h6><i class="bi bi-check-circle me-2"></i>Message Decrypted Successfully!</h6>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-muted">Decoded Message:</label>
+                    <div class="alert-message">{{ decoded_message }}</div>
+                </div>
+                
+                <a href="/decode" class="btn btn-outline-light w-100">
+                    <i class="bi bi-arrow-repeat me-2"></i>Decode Another Message
+                </a>
+                
+                {% else %}
+                
+                <form method="POST" enctype="multipart/form-data" id="decodeForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-image me-1"></i> Reference Photo
+                            </label>
+                            <input type="file" name="reference_photo" class="form-control" 
+                                   accept="image/*" required>
+                            <div class="form-text">
+                                The same reference photo used for encoding
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-file-earmark-image me-1"></i> Stego Image
+                            </label>
+                            <input type="file" name="stego_image" class="form-control" 
+                                   accept="image/*" required>
+                            <div class="form-text">
+                                The image containing the hidden message
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-chat-quote me-1"></i> Day Phrase
+                            </label>
+                            <input type="text" name="day_phrase" class="form-control" 
+                                   placeholder="e.g., correct horse battery" required>
+                            <div class="form-text">
+                                The phrase for the day the message was encoded
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-123 me-1"></i> PIN
+                            </label>
+                            <input type="password" name="pin" class="form-control" 
+                                   placeholder="123456" maxlength="10">
+                            <div class="form-text">
+                                Your static 6-digit PIN
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="decodeBtn">
+                        <i class="bi bi-unlock me-2"></i>Decode Message
+                    </button>
+                </form>
+                
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="text-muted mb-3"><i class="bi bi-question-circle me-2"></i>Troubleshooting</h6>
+                <ul class="list-unstyled text-muted small mb-0">
+                    <li class="mb-2">
+                        <i class="bi bi-dot"></i>
+                        Make sure you're using the <strong>exact same reference photo</strong> file
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-dot"></i>
+                        Use the phrase for the <strong>day the message was encoded</strong>, not today
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-dot"></i>
+                        Ensure the stego image hasn't been <strong>resized or recompressed</strong>
+                    </li>
+                    <li class="mb-0">
+                        <i class="bi bi-dot"></i>
+                        Double-check your <strong>PIN</strong> is correct
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('decodeForm')?.addEventListener('submit', function() {
+    const btn = document.getElementById('decodeBtn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Decoding...';
+    btn.disabled = true;
+});
+</script>
+{% endblock %}
