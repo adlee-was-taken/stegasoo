@@ -144,7 +144,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
                 encrypted_pem = export_rsa_key_pem(private_key, password)
                 Path(output).write_bytes(encrypted_pem)
                 click.secho(f"    Saved to: {output}", fg='bright_white')
-                click.secho(f"    Password: {'*' * len(password)}", fg='dim')
+                click.secho(f"    Password: {'*' * len(password)}", dim=True)
             else:
                 click.echo(creds.rsa_key_pem)
             click.echo()
@@ -156,7 +156,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         if creds.rsa_key_pem:
             click.echo(f"    RSA entropy:     {creds.rsa_entropy} bits")
         click.echo(f"    Combined:        {creds.total_entropy} bits")
-        click.secho(f"    + photo entropy: 80-256 bits", fg='dim')
+        click.secho(f"    + photo entropy: 80-256 bits", dim=True)
         click.echo()
         
     except Exception as e:
