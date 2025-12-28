@@ -1,0 +1,257 @@
+/* ============================================================================
+   Stegasoo - Main Stylesheet
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   CSS Variables
+   ---------------------------------------------------------------------------- */
+:root {
+    --gradient-start: #667eea;
+    --gradient-end: #764ba2;
+    --bg-dark-1: #1a1a2e;
+    --bg-dark-2: #16213e;
+    --bg-dark-3: #0f3460;
+    --text-muted: rgba(255, 255, 255, 0.5);
+    --border-light: rgba(255, 255, 255, 0.1);
+    --overlay-dark: rgba(0, 0, 0, 0.3);
+    --overlay-light: rgba(255, 255, 255, 0.05);
+}
+
+/* ----------------------------------------------------------------------------
+   Base Styles
+   ---------------------------------------------------------------------------- */
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--bg-dark-1) 0%, var(--bg-dark-2) 50%, var(--bg-dark-3) 100%);
+}
+
+/* ----------------------------------------------------------------------------
+   Navigation
+   ---------------------------------------------------------------------------- */
+.navbar {
+    background: var(--overlay-dark) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* ----------------------------------------------------------------------------
+   Cards
+   ---------------------------------------------------------------------------- */
+.card {
+    background: var(--overlay-light);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-light);
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border-bottom: none;
+}
+
+.feature-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
+}
+
+/* ----------------------------------------------------------------------------
+   Buttons
+   ---------------------------------------------------------------------------- */
+.btn-primary {
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--gradient-end), var(--gradient-start));
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* ----------------------------------------------------------------------------
+   Forms
+   ---------------------------------------------------------------------------- */
+.form-control,
+.form-select {
+    background: var(--overlay-light);
+    border: 1px solid var(--border-light);
+    color: #fff;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--gradient-start);
+    box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+    color: #fff;
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
+}
+
+/* Fix dropdown options for dark theme */
+.form-select option {
+    background: var(--bg-dark-1);
+    color: #fff;
+}
+
+/* ----------------------------------------------------------------------------
+   Hero & Icons
+   ---------------------------------------------------------------------------- */
+.hero-icon {
+    font-size: 4rem;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ----------------------------------------------------------------------------
+   Phrase Display
+   ---------------------------------------------------------------------------- */
+.phrase-display {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    background: var(--overlay-dark);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    border-left: 4px solid var(--gradient-start);
+    display: inline-block;
+    line-height: 1.6;
+    word-spacing: 0.3rem;
+}
+
+/* ----------------------------------------------------------------------------
+   PIN Display
+   ---------------------------------------------------------------------------- */
+.pin-display {
+    font-family: 'Courier New', monospace;
+    font-size: 3rem;
+    font-weight: bold;
+    letter-spacing: 0.75rem;
+    background: linear-gradient(135deg, #fef08a, #fcd34d, #fb923c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    line-height: 1;
+}
+
+.pin-container {
+    background: var(--overlay-dark);
+    border: 1px solid var(--border-light);
+    border-radius: 0.75rem;
+    padding: 1.5rem 2rem;
+    display: inline-block;
+}
+
+/* ----------------------------------------------------------------------------
+   Story Cards (Memory Aid)
+   ---------------------------------------------------------------------------- */
+.story-word {
+    color: #ff6b6b;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.story-card {
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid var(--gradient-start);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.story-card .day-label {
+    font-weight: bold;
+    color: var(--gradient-start);
+    margin-bottom: 0.5rem;
+}
+
+/* ----------------------------------------------------------------------------
+   Alert / Message Display
+   ---------------------------------------------------------------------------- */
+.alert-message {
+    background: var(--overlay-dark);
+    border: 1px solid var(--border-light);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+}
+
+/* ----------------------------------------------------------------------------
+   Drop Zone (Drag & Drop File Upload)
+   ---------------------------------------------------------------------------- */
+.drop-zone {
+    position: relative;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.drop-zone.drag-over {
+    border-color: var(--gradient-start);
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.drop-zone-label {
+    pointer-events: none;
+}
+
+.drop-zone-preview {
+    max-height: 120px;
+    border-radius: 0.375rem;
+    margin-top: 0.75rem;
+}
+
+/* ----------------------------------------------------------------------------
+   Footer
+   ---------------------------------------------------------------------------- */
+footer {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* ----------------------------------------------------------------------------
+   Custom Alert Variants
+   ---------------------------------------------------------------------------- */
+.alert-success-bright {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: #22c55e;
+    color: #4ade80;
+}
+
+/* ----------------------------------------------------------------------------
+   Utility Classes
+   ---------------------------------------------------------------------------- */
+.bg-dark-subtle {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.status-box {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+.result-icon {
+    font-size: 4rem;
+}
+
+.footer-icon {
+    vertical-align: text-bottom;
+}

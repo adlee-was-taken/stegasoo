@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}About - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>About Stegasoo</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    Stegasoo is a hybrid steganography system that hides encrypted messages inside 
+                    ordinary images. It combines multiple security layers to create a system that is 
+                    both highly secure and practical to use.
+                </p>
+                
+                <h6 class="mt-4 mb-3">System Status</h6>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3 rounded status-box">
+                            {% if has_argon2 %}
+                            <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                            <div>
+                                <strong>Argon2id Available</strong>
+                                <div class="small text-muted">Memory-hard key derivation (256MB)</div>
+                            </div>
+                            {% else %}
+                            <i class="bi bi-exclamation-triangle-fill text-warning fs-4 me-3"></i>
+                            <div>
+                                <strong>Using PBKDF2 Fallback</strong>
+                                <div class="small text-muted">Install argon2-cffi for better security</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center p-3 rounded status-box">
+                            <i class="bi bi-shield-fill-check text-success fs-4 me-3"></i>
+                            <div>
+                                <strong>AES-256-GCM</strong>
+                                <div class="small text-muted">Authenticated encryption enabled</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Security Model</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Entropy</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><i class="bi bi-image text-info me-2"></i>Reference Photo</td>
+                                <td>~80-256 bits</td>
+                                <td>Something you have (plausible deniability)</td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-chat-quote text-info me-2"></i>3-Word Phrase</td>
+                                <td>~33 bits</td>
+                                <td>Something you know (changes daily)</td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-123 text-info me-2"></i>6-Digit PIN</td>
+                                <td>~20 bits</td>
+                                <td>Something you know (static)</td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-calendar text-info me-2"></i>Date</td>
+                                <td>N/A</td>
+                                <td>Automatic key rotation</td>
+                            </tr>
+                            <tr class="table-active">
+                                <td><strong>Combined</strong></td>
+                                <td><strong>133+ bits</strong></td>
+                                <td><strong>Beyond brute force</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Attack Resistance</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6 class="text-danger"><i class="bi bi-x-circle me-2"></i>What Attackers Can't Do</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-shield-x text-muted me-2"></i>
+                                Brute force the passphrase (2<sup>133</sup> combinations)
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-shield-x text-muted me-2"></i>
+                                Use rainbow tables (random salt per message)
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-shield-x text-muted me-2"></i>
+                                Detect hidden data (random pixel selection)
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-shield-x text-muted me-2"></i>
+                                Use GPU farms (Argon2 requires 256MB RAM per attempt)
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Real Threats</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-person-x text-muted me-2"></i>
+                                Social engineering (someone tricks you)
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-door-open text-muted me-2"></i>
+                                Physical access to your devices
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-bug text-muted me-2"></i>
+                                Malware/keyloggers on your system
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-camera-video text-muted me-2"></i>
+                                Shoulder surfing while you type
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-book me-2"></i>Best Practices</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-success"><i class="bi bi-check-lg me-2"></i>Do</h6>
+                        <ul>
+                            <li>Memorize your phrases and PIN, never write them down</li>
+                            <li>Use a reference photo that both parties already have</li>
+                            <li>Use different carrier images for each message</li>
+                            <li>Share stego images through normal channels (looks innocent)</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-danger"><i class="bi bi-x-lg me-2"></i>Don't</h6>
+                        <ul>
+                            <li>Don't transmit the reference photo</li>
+                            <li>Don't reuse the same carrier image</li>
+                            <li>Don't store phrases or PIN digitally</li>
+                            <li>Don't resize or recompress stego images</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

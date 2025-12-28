@@ -1,132 +1,268 @@
-# Stegasoo Web Service
+# Stegasoo
 
-A containerized Flask + Bootstrap web UI for hybrid Photo + Day-Phrase + PIN steganography.
+A secure steganography system for hiding encrypted messages in images using hybrid authentication.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![Flask](https://img.shields.io/badge/Flask-3.0+-green)
-![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 ![Security](https://img.shields.io/badge/Security-AES--256--GCM-red)
 
 ## Features
 
 - 🔐 **AES-256-GCM** authenticated encryption
-- 🧠 **Argon2id** memory-hard key derivation (256MB)
+- 🧠 **Argon2id** memory-hard key derivation (256MB RAM requirement)
 - 🎲 **Pseudo-random pixel selection** defeats steganalysis
-- 📅 **Daily key rotation** with customizable phrases (3-12 words)
-- 🔢 **Static PIN** for additional entropy (6-8 digits)
+- 📅 **Daily key rotation** with BIP-39 passphrases
+- 🔑 **Multi-factor authentication**: PIN, RSA key, or both
 - 🖼️ **Reference photo** as "something you have"
-- 🌐 **Web UI** with Bootstrap 5 dark theme
-- 📖 **Memory aid stories** to help memorize phrases (template or AI-powered)
+- 🌐 **Multiple interfaces**: CLI, Web UI, REST API
+
+## Installation
+
+### From PyPI (coming soon)
+
+```bash
+# Core library only
+pip install stegasoo
+
+# With CLI
+pip install stegasoo[cli]
+
+# With Web UI
+pip install stegasoo[web]
+
+# With REST API
+pip install stegasoo[api]
+
+# Everything
+pip install stegasoo[all]
+```
+
+### From Source
+
+```bash
+git clone https://github.com/example/stegasoo.git
+cd stegasoo
+
+# Install with all extras
+pip install -e ".[all]"
+```
+
+### Docker
+
+```bash
+# Web UI only
+docker-compose up web
+
+# REST API only
+docker-compose up api
+
+# Both
+docker-compose up
+```
 
 ## Quick Start
 
-### Docker (Recommended)
+### Python Library
 
-```bash
-# Build and run
-docker-compose up -d
+```python
+import stegasoo
 
-# Access at http://localhost:5000
+# Generate credentials
+creds = stegasoo.generate_credentials(use_pin=True, use_rsa=False)
+print(f"Today's phrase: {creds.phrases['Monday']}")
+print(f"PIN: {creds.pin}")
+
+# Encode a message
+with open('secret_photo.jpg', 'rb') as f:
+    ref_photo = f.read()
+with open('meme.png', 'rb') as f:
+    carrier = f.read()
+
+result = stegasoo.encode(
+    message="Meet at midnight",
+    reference_photo=ref_photo,
+    carrier_image=carrier,
+    day_phrase="apple forest thunder",
+    pin="123456"
+)
+
+with open('stego.png', 'wb') as f:
+    f.write(result.stego_image)
+
+# Decode a message
+message = stegasoo.decode(
+    stego_image=result.stego_image,
+    reference_photo=ref_photo,
+    day_phrase="apple forest thunder",
+    pin="123456"
+)
+print(message)  # "Meet at midnight"
 ```
 
-### Manual Installation
+### CLI
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or: venv\Scripts\activate  # Windows
+# Generate credentials
+stegasoo generate --pin --words 3
 
-# Install dependencies
-pip install -r requirements.txt
+# With RSA key
+stegasoo generate --rsa --rsa-bits 4096 -o mykey.pem -p "secretpassword"
 
-# Optional: Enable AI-powered story generation
-pip install -r requirements-ml.txt
+# Encode
+stegasoo encode \
+  --ref photo.jpg \
+  --carrier meme.png \
+  --phrase "apple forest thunder" \
+  --pin 123456 \
+  --message "Secret message"
 
-# Run development server
+# Decode
+stegasoo decode \
+  --ref photo.jpg \
+  --stego stego.png \
+  --phrase "apple forest thunder" \
+  --pin 123456
+
+# Pipe-friendly
+echo "secret" | stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 > stego.png
+stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 -q
+```
+
+### Web UI
+
+```bash
+# Development
+cd frontends/web
 python app.py
 
-# Or production with gunicorn
+# Production
 gunicorn --bind 0.0.0.0:5000 app:app
 ```
 
-## Usage
+Visit http://localhost:5000
 
-### 1. Generate Credentials
+### REST API
 
-Visit `/generate` to create:
-- **7 phrases** (one per day of week, 3-12 words each)
-- **1 PIN** (6-8 digits, same every day)
-- **Memory aid stories** (optional, helps memorize phrases)
+```bash
+# Development
+cd frontends/api
+python main.py
 
-Memorize these! Don't save them.
+# Production
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-### 2. Encode a Message
+API docs at http://localhost:8000/docs
 
-Visit `/encode` and provide:
-- **Reference photo** - A photo both parties have (NOT transmitted)
-- **Carrier image** - The image to hide your message in
-- **Message** - Your secret text
-- **Day phrase** - Today's phrase
-- **PIN** - Your static PIN
+#### Example API Calls
 
-Download the stego image and share it through any channel.
+```bash
+# Generate credentials
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"use_pin": true, "use_rsa": false}'
 
-### 3. Decode a Message
+# Encode (multipart)
+curl -X POST http://localhost:8000/encode/multipart \
+  -F "message=Secret" \
+  -F "day_phrase=apple forest thunder" \
+  -F "pin=123456" \
+  -F "reference_photo=@photo.jpg" \
+  -F "carrier=@meme.png" \
+  --output stego.png
 
-Visit `/decode` and provide:
-- **Reference photo** - Same photo used for encoding
-- **Stego image** - The image containing the hidden message
-- **Day phrase** - The phrase for the day it was encoded
-- **PIN** - Your static PIN
+# Decode (multipart)
+curl -X POST http://localhost:8000/decode/multipart \
+  -F "day_phrase=apple forest thunder" \
+  -F "pin=123456" \
+  -F "reference_photo=@photo.jpg" \
+  -F "stego_image=@stego.png"
+```
 
 ## Security Model
 
 | Component | Entropy | Purpose |
 |-----------|---------|---------|
 | Reference Photo | ~80-256 bits | Something you have |
-| Day Phrase | ~33-132 bits | Something you know (rotates daily) |
-| PIN | ~20-27 bits | Something you know (static) |
-| **Combined** | **133-415+ bits** | **Beyond brute force** |
+| Day Phrase (3 words) | ~33 bits | Something you know (rotates daily) |
+| PIN (6 digits) | ~20 bits | Something you know (static) |
+| RSA Key (2048-bit) | ~128 bits | Something you have |
+| **Combined** | **133-400+ bits** | **Beyond brute force** |
 
 ### Attack Resistance
 
-| Attack | Result |
-|--------|--------|
-| Brute force | 2^133+ combinations = impossible |
+| Attack | Protection |
+|--------|------------|
+| Brute force | 2^133+ combinations |
 | Rainbow tables | Random salt per message |
-| Steganalysis | Random pixel selection defeats detection |
-| GPU cracking | Argon2 requires 256MB RAM per attempt |
+| Steganalysis | Random pixel selection |
+| GPU cracking | Argon2id requires 256MB RAM per attempt |
+| Side-channel | Constant-time operations in crypto |
 
-## Memory Aid Stories
+## Project Structure
 
-The generate page can create stories to help you memorize your phrases:
-
-**Template-based** (default):
-> Monday morning began when I discovered a **APPLE** near the **FOREST**. I had to **THUNDER** quickly, then grab the **CRYSTAL** before reaching the **BRAVE**.
-
-**AI-powered** (with `requirements-ml.txt`):
-- Uses DistilGPT-2 (~350MB model)
-- Generates more coherent, natural stories
-- Words highlighted in RED CAPS
+```
+stegasoo/
+├── src/stegasoo/           # Core library
+│   ├── __init__.py         # Public API
+│   ├── constants.py        # Configuration
+│   ├── crypto.py           # Encryption/decryption
+│   ├── steganography.py    # Image embedding
+│   ├── keygen.py           # Credential generation
+│   ├── validation.py       # Input validation
+│   ├── models.py           # Data classes
+│   ├── exceptions.py       # Custom exceptions
+│   └── utils.py            # Utilities
+│
+├── frontends/
+│   ├── web/                # Flask web UI
+│   ├── cli/                # Command-line interface
+│   └── api/                # FastAPI REST API
+│
+├── data/
+│   └── bip39-words.txt     # BIP-39 wordlist
+│
+├── pyproject.toml          # Package configuration
+├── Dockerfile              # Multi-stage Docker build
+└── docker-compose.yml      # Container orchestration
+```
 
 ## Configuration
 
-Environment variables:
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FLASK_ENV` | production | Flask environment |
-| `SECRET_KEY` | random | Session secret (auto-generated) |
+| `PYTHONPATH` | - | Include src/ for development |
 
-## Production Deployment
+### Limits
 
-For production, consider:
+| Limit | Value |
+|-------|-------|
+| Max image size | 4 megapixels |
+| Max message size | 50 KB |
+| Max file upload | 5 MB |
+| PIN length | 6-9 digits |
+| Phrase length | 3-12 words |
+| RSA key sizes | 2048, 3072, 4096 bits |
 
-1. **HTTPS** - Use nginx reverse proxy with SSL
-2. **Rate limiting** - Prevent abuse
-3. **Logging** - Monitor for security events
-4. **Memory** - Allocate at least 512MB (Argon2 needs 256MB)
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Format code
+black src/ frontends/
+ruff check src/ frontends/
+
+# Type checking
+mypy src/
+```
 
 ## License
 

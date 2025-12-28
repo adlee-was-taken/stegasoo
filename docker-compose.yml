@@ -1,16 +1,18 @@
 version: '3.8'
 
 services:
-  stegasoo:
-    build: .
-    container_name: stegasoo
+  # ============================================================================
+  # Web UI (Flask)
+  # ============================================================================
+  web:
+    build:
+      context: .
+      target: web
+    container_name: stegasoo-web
     ports:
       - "5000:5000"
     environment:
       - FLASK_ENV=production
-    # Uncomment to persist uploads between restarts:
-    # volumes:
-    #   - ./uploads:/tmp/stego_uploads
     restart: unless-stopped
     deploy:
       resources:
@@ -19,9 +21,30 @@ services:
         reservations:
           memory: 256M
 
-  # Optional: Add nginx reverse proxy for production
+  # ============================================================================
+  # REST API (FastAPI)
+  # ============================================================================
+  api:
+    build:
+      context: .
+      target: api
+    container_name: stegasoo-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ============================================================================
+  # Nginx Reverse Proxy (optional, for production)
+  # ============================================================================
   # nginx:
   #   image: nginx:alpine
+  #   container_name: stegasoo-nginx
   #   ports:
   #     - "80:80"
   #     - "443:443"
@@ -29,5 +52,11 @@ services:
   #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
   #     - ./certs:/etc/nginx/certs:ro
   #   depends_on:
-  #     - stegasoo
+  #     - web
+  #     - api
   #   restart: unless-stopped
+
+# ============================================================================
+# Development overrides
+# ============================================================================
+# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up

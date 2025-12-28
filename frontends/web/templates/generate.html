@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Credentials - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-key-fill me-2"></i>Generate Credentials</h5>
+            </div>
+            <div class="card-body">
+                {% if not generated %}
+                <p class="text-muted mb-4">
+                    Generate your weekly phrase card and security factors. You must choose at least one: PIN or RSA Key.
+                </p>
+                
+                <form method="POST" id="generateForm">
+                    <div class="mb-4">
+                        <label class="form-label">Words per phrase</label>
+                        <select name="words_per_phrase" class="form-select" id="wordsSelect">
+                            <option value="3" selected>3 words (~33 bits)</option>
+                            <option value="4">4 words (~44 bits)</option>
+                            <option value="5">5 words (~55 bits)</option>
+                            <option value="6">6 words (~66 bits)</option>
+                            <option value="7">7 words (~77 bits)</option>
+                            <option value="8">8 words (~88 bits)</option>
+                            <option value="9">9 words (~99 bits)</option>
+                            <option value="10">10 words (~110 bits)</option>
+                            <option value="11">11 words (~121 bits)</option>
+                            <option value="12">12 words (~132 bits)</option>
+                        </select>
+                        <div class="form-text">More words = more security, harder to memorize</div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <h6 class="text-muted mb-3">SECURITY FACTORS <span class="text-warning">(select at least one)</span></h6>
+                    
+                    <!-- PIN Option -->
+                    <div class="card mb-3" style="background: rgba(0,0,0,0.2);">
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="use_pin" id="usePin" checked>
+                                <label class="form-check-label fw-bold" for="usePin">
+                                    <i class="bi bi-123 me-1"></i> PIN
+                                </label>
+                            </div>
+                            <div id="pinOptions">
+                                <label class="form-label">PIN length</label>
+                                <select name="pin_length" class="form-select" id="pinSelect">
+                                    <option value="6" selected>6 digits (~20 bits)</option>
+                                    <option value="7">7 digits (~23 bits)</option>
+                                    <option value="8">8 digits (~27 bits)</option>
+                                    <option value="9">9 digits (~30 bits)</option>
+                                </select>
+                                <div class="form-text">Memorizable, same PIN used every day</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- RSA Key Option -->
+                    <div class="card mb-3" style="background: rgba(0,0,0,0.2);">
+                        <div class="card-body">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="use_rsa" id="useRsa">
+                                <label class="form-check-label fw-bold" for="useRsa">
+                                    <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
+                                </label>
+                            </div>
+                            <div id="rsaOptions" class="d-none">
+                                <label class="form-label">Key size</label>
+                                <select name="rsa_bits" class="form-select" id="rsaSelect">
+                                    <option value="2048" selected>2048-bit (~128 bits effective)</option>
+                                    <option value="3072">3072-bit (~128 bits effective)</option>
+                                    <option value="4096">4096-bit (~128 bits effective)</option>
+                                </select>
+                                <div class="form-text">File-based key, both parties need the same .pem file</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-calculator me-2"></i>Estimated entropy:</span>
+                            <strong id="entropyDisplay">~53 bits</strong>
+                        </div>
+                        <div class="progress mt-2" style="height: 8px;">
+                            <div class="progress-bar bg-success" id="entropyBar" style="width: 40%"></div>
+                        </div>
+                        <small class="text-muted mt-1 d-block">
+                            <span id="entropyDesc">Good for most use cases</span>
+                            • Reference photo adds ~80-256 bits more
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-warning d-none" id="noFactorWarning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        You must select at least one security factor (PIN or RSA Key)
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-lg w-100" id="generateBtn">
+                        <i class="bi bi-shuffle me-2"></i>Generate Credentials
+                    </button>
+                </form>
+                
+                {% else %}
+                
+                <!-- Generated Results -->
+                <div class="alert alert-success-bright alert-dismissible fade show">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>Credentials Generated!</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+
+                <div class="alert alert-warning alert-dismissible fade show">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Memorize phrases, save key securely, then close!</strong> - Do not screenshot
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                
+                {% if pin %}
+                <hr class="my-4">
+                <div class="text-center mb-4">
+                    <h6 class="text-muted mb-2">YOUR STATIC PIN</h6>
+                    <div class="pin-container">
+                        <div class="pin-display">{{ pin }}</div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Use this {{ pin_length }}-digit PIN every day</small>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if rsa_key_pem %}
+                <hr class="my-4">
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3">
+                        <i class="bi bi-file-earmark-lock me-2"></i>YOUR RSA KEY ({{ rsa_bits }}-bit)
+                    </h6>
+                    
+                    <div class="alert alert-danger small">
+                        <i class="bi bi-shield-exclamation me-1"></i>
+                        <strong>Save this key securely!</strong> Share it with your recipient through a secure channel. You cannot recover it later.
+                    </div>
+                    
+                    <!-- Key Display -->
+                    <div class="mb-3">
+                        <textarea class="form-control font-monospace" id="rsaKeyText" rows="6" readonly style="font-size: 0.75rem;">{{ rsa_key_pem }}</textarea>
+                    </div>
+                    
+                    <!-- Copy to Clipboard -->
+                    <button type="button" class="btn btn-outline-light me-2" id="copyKeyBtn">
+                        <i class="bi bi-clipboard me-1"></i> Copy to Clipboard
+                    </button>
+                    
+                    <!-- Download with Password -->
+                    <button type="button" class="btn btn-outline-light" data-bs-toggle="collapse" data-bs-target="#downloadKeyForm">
+                        <i class="bi bi-download me-1"></i> Download as .pem
+                    </button>
+                    
+                    <div class="collapse mt-3" id="downloadKeyForm">
+                        <div class="card" style="background: rgba(0,0,0,0.2);">
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('download_key') }}">
+                                    <input type="hidden" name="key_pem" value="{{ rsa_key_pem }}">
+                                    <div class="mb-3">
+                                        <label class="form-label">Password to protect key file</label>
+                                        <input type="password" name="key_password" class="form-control" 
+                                               placeholder="Minimum 8 characters" minlength="8" required>
+                                        <div class="form-text">You'll need this password when using the key</div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-file-earmark-lock me-1"></i> Download Protected Key
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <hr class="my-4">
+                
+                <h6 class="text-muted mb-3">DAILY PHRASES ({{ words_per_phrase }} words each)</h6>
+                
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 140px;">Day</th>
+                                <th>Phrase</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for day in days %}
+                            <tr>
+                                <td class="text-nowrap">
+                                    <i class="bi bi-calendar3 me-2"></i>{{ day }}
+                                </td>
+                                <td>
+                                    <span class="phrase-display">{{ phrases[day] }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="alert alert-success mt-4">
+                    <h6><i class="bi bi-shield-check me-2"></i>Security Summary</h6>
+                    <div class="row text-center mt-3">
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">{{ phrase_entropy }}</div>
+                            <small class="text-muted">bits/phrase</small>
+                        </div>
+                        {% if pin %}
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">{{ pin_entropy }}</div>
+                            <small class="text-muted">bits/PIN</small>
+                        </div>
+                        {% endif %}
+                        {% if rsa_key_pem %}
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold">{{ rsa_entropy }}</div>
+                            <small class="text-muted">bits/RSA</small>
+                        </div>
+                        {% endif %}
+                        <div class="col-3">
+                            <div class="fs-4 fw-bold text-success">{{ total_entropy }}</div>
+                            <small class="text-muted">bits total</small>
+                        </div>
+                    </div>
+                    <small class="d-block mt-2 text-center text-muted">
+                        + reference photo (~80-256 bits) = <strong>{{ total_entropy + 80 }}+ bits combined</strong>
+                    </small>
+                </div>
+                
+                <a href="/generate" class="btn btn-outline-light btn-lg w-100 mt-3">
+                    <i class="bi bi-arrow-repeat me-2"></i>Generate New Credentials
+                </a>
+                
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if not generated %}
+const usePinCheckbox = document.getElementById('usePin');
+const useRsaCheckbox = document.getElementById('useRsa');
+const pinOptions = document.getElementById('pinOptions');
+const rsaOptions = document.getElementById('rsaOptions');
+const noFactorWarning = document.getElementById('noFactorWarning');
+const generateBtn = document.getElementById('generateBtn');
+
+// Toggle option visibility
+usePinCheckbox.addEventListener('change', function() {
+    pinOptions.classList.toggle('d-none', !this.checked);
+    validateFactors();
+    updateEntropy();
+});
+
+useRsaCheckbox.addEventListener('change', function() {
+    rsaOptions.classList.toggle('d-none', !this.checked);
+    validateFactors();
+    updateEntropy();
+});
+
+function validateFactors() {
+    const hasPin = usePinCheckbox.checked;
+    const hasRsa = useRsaCheckbox.checked;
+    const valid = hasPin || hasRsa;
+    
+    noFactorWarning.classList.toggle('d-none', valid);
+    generateBtn.disabled = !valid;
+}
+
+function updateEntropy() {
+    const words = parseInt(document.getElementById('wordsSelect').value);
+    const usePin = usePinCheckbox.checked;
+    const useRsa = useRsaCheckbox.checked;
+    const pinLen = parseInt(document.getElementById('pinSelect').value);
+    
+    const phraseEntropy = words * 11;
+    const pinEntropy = usePin ? Math.floor(pinLen * 3.32) : 0;
+    const rsaEntropy = useRsa ? 128 : 0;
+    const total = phraseEntropy + pinEntropy + rsaEntropy;
+    
+    document.getElementById('entropyDisplay').textContent = '~' + total + ' bits';
+    
+    // Update progress bar
+    const pct = Math.min(100, Math.max(10, (total - 30) * 0.5));
+    document.getElementById('entropyBar').style.width = pct + '%';
+    
+    // Update description
+    let desc;
+    if (total < 50) desc = 'Basic security';
+    else if (total < 80) desc = 'Good for most use cases';
+    else if (total < 120) desc = 'Strong security';
+    else if (total < 180) desc = 'Very strong security';
+    else desc = 'Maximum security';
+    
+    document.getElementById('entropyDesc').textContent = desc;
+}
+
+document.getElementById('wordsSelect').addEventListener('change', updateEntropy);
+document.getElementById('pinSelect').addEventListener('change', updateEntropy);
+document.getElementById('rsaSelect').addEventListener('change', updateEntropy);
+
+// Form submit
+document.getElementById('generateForm').addEventListener('submit', function(e) {
+    if (!usePinCheckbox.checked && !useRsaCheckbox.checked) {
+        e.preventDefault();
+        noFactorWarning.classList.remove('d-none');
+        return;
+    }
+    
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+});
+
+// Initial state
+validateFactors();
+updateEntropy();
+
+{% else %}
+
+// Copy RSA key to clipboard
+document.getElementById('copyKeyBtn')?.addEventListener('click', function() {
+    const keyText = document.getElementById('rsaKeyText');
+    navigator.clipboard.writeText(keyText.value).then(() => {
+        this.innerHTML = '<i class="bi bi-check me-1"></i> Copied!';
+        setTimeout(() => {
+            this.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copy to Clipboard';
+        }, 2000);
+    });
+});
+
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Stegasoo - Secure Steganography{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="120" class="mb-3">
+    <h1 class="display-4 fw-bold">Stegasoo</h1>
+    <p class="lead text-muted">Create hidden encrypted messages in images and photos using advanced steganography.</p>
+</div>
+<div class="row g-4 mb-5">
+
+    <div class="col-md-4">
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-lock-fill fs-1"></i>
+            </div>
+            <div class="card-body text-center">
+                <h5 class="card-title">Encode Message</h5>
+                <p class="card-text text-muted">
+                    Hide your secret message inside an innocent-looking image using your daily phrase + PIN.
+                </p>
+                <a href="/encode" class="btn btn-primary">
+                    <i class="bi bi-upload me-1"></i> Encode
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-unlock-fill fs-1"></i>
+            </div>
+            <div class="card-body text-center">
+                <h5 class="card-title">Decode Message</h5>
+                <p class="card-text text-muted">
+                    Extract and decrypt hidden messages from Stegasoo-encoded images using your credentials.
+                </p>
+                <a href="/decode" class="btn btn-primary">
+                    <i class="bi bi-download me-1"></i> Decode
+                </a>
+            </div>
+        </div>
+    </div>
+ 
+    <div class="col-md-4">
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-key-fill fs-1"></i>
+            </div>
+            <div class="card-body text-center">
+                <h5 class="card-title">Generate Keys</h5>
+                <p class="card-text text-muted">
+                    Create your weekly phrase card and PIN. Memorize 21 words + 6 digits for maximum security.
+                </p>
+                <a href="/generate" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i> Generate
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>How It Works</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-primary"><i class="bi bi-1-circle me-2"></i>Key Components</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-image text-info me-2"></i>
+                        <strong>Reference Photo</strong> — Any photo you and recipient both have
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-chat-quote text-info me-2"></i>
+                        <strong>Day Phrase</strong> — 3 words, different each day of the week
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-123 text-info me-2"></i>
+                        <strong>Static PIN</strong> — 6 digits, same every day
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary"><i class="bi bi-2-circle me-2"></i>Security Features</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-shield-check text-success me-2"></i>
+                        Argon2id memory-hard key derivation (256MB)
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-shuffle text-success me-2"></i>
+                        Pseudo-random pixel selection (defeats steganalysis)
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-lock text-success me-2"></i>
+                        AES-256-GCM authenticated encryption
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
