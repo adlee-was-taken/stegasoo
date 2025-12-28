@@ -107,7 +107,7 @@ Host: localhost:8000
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "has_argon2": true,
   "day_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 }
@@ -271,7 +271,8 @@ Content-Type: application/json
   "stego_image_base64": "iVBORw0KGgo...",
   "filename": "a1b2c3d4_20251227.png",
   "capacity_used_percent": 12.4,
-  "date_used": "2025-12-27"
+  "date_used": "2025-12-27",
+  "day_of_week": "Saturday"
 }
 ```
 
@@ -282,7 +283,8 @@ Content-Type: application/json
 | `stego_image_base64` | string | Base64-encoded stego PNG |
 | `filename` | string | Suggested filename |
 | `capacity_used_percent` | float | Percentage of capacity used |
-| `date_used` | string | Date embedded in image |
+| `date_used` | string | Date embedded in image (YYYY-MM-DD) |
+| `day_of_week` | string | Day name for passphrase rotation |
 
 #### cURL Example
 
@@ -360,6 +362,9 @@ Content-Type: image/png
 Returns the PNG image directly with headers:
 - `Content-Type: image/png`
 - `Content-Disposition: attachment; filename=<generated_filename>.png`
+- `X-Stegasoo-Date: 2025-12-27` (date used for encoding)
+- `X-Stegasoo-Day: Saturday` (day of week for passphrase rotation)
+- `X-Stegasoo-Capacity-Percent: 12.4` (capacity used)
 
 #### cURL Examples
 
@@ -624,7 +629,8 @@ curl -X POST http://localhost:8000/image/info \
   "stego_image_base64": "string",
   "filename": "string",
   "capacity_used_percent": 12.4,
-  "date_used": "YYYY-MM-DD"
+  "date_used": "YYYY-MM-DD",
+  "day_of_week": "Saturday"
 }
 ```
 

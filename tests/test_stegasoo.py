@@ -208,7 +208,7 @@ class TestVersion:
     
     def test_version_exists(self):
         assert hasattr(stegasoo, '__version__')
-        assert stegasoo.__version__ == "2.0.0"
+        assert stegasoo.__version__ == "2.0.1"
     
     def test_day_names(self):
         assert len(stegasoo.DAY_NAMES) == 7

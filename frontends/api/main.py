@@ -24,6 +24,7 @@ import stegasoo
 from stegasoo import (
     encode, decode, generate_credentials,
     validate_image, calculate_capacity,
+    get_day_from_date,
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
@@ -83,6 +84,7 @@ class EncodeResponse(BaseModel):
     filename: str
     capacity_used_percent: float
     date_used: str
+    day_of_week: str
 
 
 class DecodeRequest(BaseModel):
@@ -193,11 +195,15 @@ async def api_encode(request: EncodeRequest):
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
         
+        # Get day of week from the date used
+        day_of_week = get_day_from_date(result.date_used)
+        
         return EncodeResponse(
             stego_image_base64=stego_b64,
             filename=result.filename,
             capacity_used_percent=result.capacity_percent,
-            date_used=result.date_used
+            date_used=result.date_used,
+            day_of_week=day_of_week
         )
         
     except CapacityError as e:
@@ -253,7 +259,7 @@ async def api_encode_multipart(
     """
     Encode using multipart form data (file uploads).
     
-    Returns the stego image directly as PNG.
+    Returns the stego image directly as PNG with metadata headers.
     """
     try:
         ref_data = await reference_photo.read()
@@ -271,10 +277,18 @@ async def api_encode_multipart(
             date_str=date_str if date_str else None
         )
         
+        # Get day of week from the date used
+        day_of_week = get_day_from_date(result.date_used)
+        
         return Response(
             content=result.stego_image,
             media_type="image/png",
-            headers={"Content-Disposition": f"attachment; filename={result.filename}"}
+            headers={
+                "Content-Disposition": f"attachment; filename={result.filename}",
+                "X-Stegasoo-Date": result.date_used,
+                "X-Stegasoo-Day": day_of_week,
+                "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}"
+            }
         )
         
     except CapacityError as e:
