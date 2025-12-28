@@ -79,8 +79,7 @@ def get_data_dir() -> Path:
     """Get the data directory path."""
     # Check multiple locations
     candidates = [
-        Path(__file__).parent.parent.parent.parent / 'data',   # Development
-        Path(__file__).parent.parent / 'data',                 # Development
+        Path(__file__).parent.parent.parent/ 'data',           # Development
         Path(__file__).parent / 'data',                        # Installed package
         Path('/app/data'),                                     # Docker
         Path.cwd() / 'data',                                   # Current directory
