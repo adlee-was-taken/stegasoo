@@ -37,6 +37,17 @@ from stegasoo.constants import (
     VALID_RSA_SIZES,
 )
 
+# QR Code utilities
+try:
+    from stegasoo.qr_utils import (
+        extract_key_from_qr,
+        has_qr_read,
+    )
+    HAS_QR_READ = has_qr_read()
+except ImportError:
+    HAS_QR_READ = False
+    extract_key_from_qr = None
+
 
 # ============================================================================
 # FASTAPI APP
@@ -132,8 +143,15 @@ class ImageInfoResponse(BaseModel):
 class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
+    has_qrcode_read: bool
     day_names: list[str]
     max_payload_kb: int
+
+
+class QrExtractResponse(BaseModel):
+    success: bool
+    key_pem: Optional[str] = None
+    error: Optional[str] = None
 
 
 class ErrorResponse(BaseModel):
@@ -151,9 +169,41 @@ async def root():
     return StatusResponse(
         version=__version__,
         has_argon2=has_argon2(),
+        has_qrcode_read=HAS_QR_READ,
         day_names=list(DAY_NAMES),
         max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
     )
+
+
+@app.post("/extract-key-from-qr", response_model=QrExtractResponse)
+async def api_extract_key_from_qr(
+    qr_image: UploadFile = File(..., description="QR code image containing RSA key")
+):
+    """
+    Extract RSA key from a QR code image.
+    
+    Supports both compressed (STEGASOO-Z: prefix) and uncompressed keys.
+    Returns the PEM-encoded key if found.
+    """
+    if not HAS_QR_READ:
+        raise HTTPException(
+            501,
+            "QR code reading not available. Install pyzbar and libzbar."
+        )
+    
+    try:
+        image_data = await qr_image.read()
+        key_pem = extract_key_from_qr(image_data)
+        
+        if key_pem:
+            return QrExtractResponse(success=True, key_pem=key_pem)
+        else:
+            return QrExtractResponse(
+                success=False,
+                error="No valid RSA key found in QR code"
+            )
+    except Exception as e:
+        return QrExtractResponse(success=False, error=str(e))
 
 
 @app.post("/generate", response_model=GenerateResponse)
@@ -335,6 +385,7 @@ async def api_encode_multipart(
     payload_file: Optional[UploadFile] = File(None),
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
+    rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
     date_str: str = Form("")
 ):
@@ -342,12 +393,34 @@ async def api_encode_multipart(
     Encode using multipart form data (file uploads).
     
     Provide either 'message' (text) or 'payload_file' (binary file).
+    RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns the stego image directly as PNG with metadata headers.
     """
     try:
         ref_data = await reference_photo.read()
         carrier_data = await carrier.read()
-        rsa_key_data = await rsa_key.read() if rsa_key else None
+        
+        # Handle RSA key from .pem file or QR code image
+        rsa_key_data = None
+        rsa_key_from_qr = False
+        
+        if rsa_key and rsa_key.filename:
+            rsa_key_data = await rsa_key.read()
+        elif rsa_key_qr and rsa_key_qr.filename:
+            if not HAS_QR_READ:
+                raise HTTPException(
+                    501,
+                    "QR code reading not available. Install pyzbar and libzbar."
+                )
+            qr_image_data = await rsa_key_qr.read()
+            key_pem = extract_key_from_qr(qr_image_data)
+            if not key_pem:
+                raise HTTPException(400, "Could not extract RSA key from QR code image")
+            rsa_key_data = key_pem.encode('utf-8')
+            rsa_key_from_qr = True
+        
+        # QR code keys are never password-protected
+        effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
         
         # Determine payload
         if payload_file and payload_file.filename:
@@ -369,7 +442,7 @@ async def api_encode_multipart(
             day_phrase=day_phrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
-            rsa_password=rsa_password if rsa_password else None,
+            rsa_password=effective_password,
             date_str=date_str if date_str else None
         )
         
@@ -401,17 +474,40 @@ async def api_decode_multipart(
     stego_image: UploadFile = File(...),
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
+    rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form("")
 ):
     """
     Decode using multipart form data (file uploads).
     
+    RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns JSON with payload_type indicating text or file.
     """
     try:
         ref_data = await reference_photo.read()
         stego_data = await stego_image.read()
-        rsa_key_data = await rsa_key.read() if rsa_key else None
+        
+        # Handle RSA key from .pem file or QR code image
+        rsa_key_data = None
+        rsa_key_from_qr = False
+        
+        if rsa_key and rsa_key.filename:
+            rsa_key_data = await rsa_key.read()
+        elif rsa_key_qr and rsa_key_qr.filename:
+            if not HAS_QR_READ:
+                raise HTTPException(
+                    501,
+                    "QR code reading not available. Install pyzbar and libzbar."
+                )
+            qr_image_data = await rsa_key_qr.read()
+            key_pem = extract_key_from_qr(qr_image_data)
+            if not key_pem:
+                raise HTTPException(400, "Could not extract RSA key from QR code image")
+            rsa_key_data = key_pem.encode('utf-8')
+            rsa_key_from_qr = True
+        
+        # QR code keys are never password-protected
+        effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
         
         result = decode(
             stego_image=stego_data,
@@ -419,7 +515,7 @@ async def api_decode_multipart(
             day_phrase=day_phrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
-            rsa_password=rsa_password if rsa_password else None
+            rsa_password=effective_password
         )
         
         if result.is_file:

@@ -1,16 +1,36 @@
-# Core dependencies
-pillow>=10.0.0
+# Stegasoo Requirements
+# ====================
+
+# Core Dependencies
 cryptography>=41.0.0
-argon2-cffi>=23.0.0
+Pillow>=10.0.0
 
-# CLI (optional)
-click>=8.0.0
+# Key Derivation (recommended for stronger security)
+argon2-cffi>=23.1.0
 
-# Web UI (optional)
-flask>=3.0.0
-gunicorn>=21.0.0
+# QR Code Generation & Reading
+qrcode[pil]>=7.4.0
+pyzbar>=0.1.9
 
-# REST API (optional)
-# fastapi>=0.100.0
-# uvicorn[standard]>=0.20.0
-# python-multipart>=0.0.6
+# Web Frontend (Flask)
+Flask>=3.0.0
+
+# API Frontend (FastAPI)
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# CLI Frontend
+click>=8.1.0
+
+# Development & Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Optional: Better performance for Pillow
+# pillow-simd>=9.0.0  # Uncomment if available for your platform
+
+# Note: pyzbar requires system library:
+#   Ubuntu/Debian: sudo apt-get install libzbar0
+#   macOS: brew install zbar
+#   Windows: Included in pyzbar wheel

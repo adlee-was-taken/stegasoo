@@ -51,3 +51,6 @@ htmlcov/
 # Distribution
 *.manifest
 *.spec
+
+# Output test files.
+*.png

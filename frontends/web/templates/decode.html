@@ -133,10 +133,33 @@
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
-                            <input type="file" name="rsa_key" class="form-control" id="rsaKeyInput"
-                                   accept=".pem,.key">
+                            {% if has_qrcode_read %}
+                            <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaFileTabDec" type="button">
+                                        <i class="bi bi-file-earmark me-1"></i>.pem File
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaQrTabDec" type="button">
+                                        <i class="bi bi-qr-code me-1"></i>QR Code
+                                    </button>
+                                </li>
+                            </ul>
+                            <div class="tab-content">
+                                <div class="tab-pane fade show active" id="rsaFileTabDec" role="tabpanel">
+                                    <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
+                                </div>
+                                <div class="tab-pane fade" id="rsaQrTabDec" role="tabpanel">
+                                    <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp">
+                                    <div class="form-text small">PNG, JPG, or other image of QR code</div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <input type="file" name="rsa_key" class="form-control" id="rsaKeyInput" accept=".pem,.key">
+                            {% endif %}
                             <div class="form-text">
-                                If RSA key was used during encoding
+                                If RSA key was used during encoding (file or QR image)
                             </div>
                         </div>
                     </div>
@@ -204,13 +227,32 @@ document.getElementById('decodeForm')?.addEventListener('submit', function() {
     btn.disabled = true;
 });
 
-// Show RSA password field when key is selected
+// Show RSA password field when key is selected (only for .pem files, not QR)
 const rsaKeyInput = document.getElementById('rsaKeyInput');
+const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
 const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
 
-rsaKeyInput?.addEventListener('change', function() {
-    rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
-});
+if (rsaKeyInput) {
+    rsaKeyInput.addEventListener('change', function() {
+        // Show password field only for .pem files
+        rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
+        // Clear QR input if file is selected
+        if (rsaKeyQrInput && this.files.length) {
+            rsaKeyQrInput.value = '';
+        }
+    });
+}
+
+if (rsaKeyQrInput) {
+    rsaKeyQrInput.addEventListener('change', function() {
+        // Hide password field for QR codes (they're unencrypted)
+        rsaPasswordGroup.classList.add('d-none');
+        // Clear file input if QR is selected
+        if (rsaKeyInput && this.files.length) {
+            rsaKeyInput.value = '';
+        }
+    });
+}
 
 // Day names for date detection
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

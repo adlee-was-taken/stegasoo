@@ -149,6 +149,29 @@ from .utils import (
     format_file_size,
 )
 
+# QR Code utilities (optional, depends on qrcode and pyzbar)
+try:
+    from .qr_utils import (
+        generate_qr_code,
+        read_qr_code,
+        read_qr_code_from_file,
+        extract_key_from_qr,
+        extract_key_from_qr_file,
+        compress_data,
+        decompress_data,
+        auto_decompress,
+        normalize_pem,
+        is_compressed,
+        can_fit_in_qr,
+        needs_compression,
+        has_qr_read,
+        has_qr_write,
+        has_qr_support,
+    )
+    HAS_QR_UTILS = True
+except ImportError:
+    HAS_QR_UTILS = False
+
 from datetime import date
 from pathlib import Path
 from typing import Optional, Union
