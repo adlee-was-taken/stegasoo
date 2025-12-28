@@ -3,7 +3,7 @@
 Stegasoo REST API
 
 FastAPI-based REST API for steganography operations.
-Designed for integration with other services and automation.
+Supports both text messages and file embedding.
 """
 
 import io
@@ -28,6 +28,8 @@ from stegasoo import (
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
+    FilePayload,
+    MAX_FILE_PAYLOAD_SIZE,
 )
 from stegasoo.constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
@@ -42,7 +44,7 @@ from stegasoo.constants import (
 
 app = FastAPI(
     title="Stegasoo API",
-    description="Secure steganography with hybrid authentication",
+    description="Secure steganography with hybrid authentication. Supports text messages and file embedding.",
     version=__version__,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -79,6 +81,20 @@ class EncodeRequest(BaseModel):
     date_str: Optional[str] = None
 
 
+class EncodeFileRequest(BaseModel):
+    """Request for embedding a file (base64-encoded)."""
+    file_data_base64: str
+    filename: str
+    mime_type: Optional[str] = None
+    reference_photo_base64: str
+    carrier_image_base64: str
+    day_phrase: str
+    pin: str = ""
+    rsa_key_base64: Optional[str] = None
+    rsa_password: Optional[str] = None
+    date_str: Optional[str] = None
+
+
 class EncodeResponse(BaseModel):
     stego_image_base64: str
     filename: str
@@ -97,7 +113,12 @@ class DecodeRequest(BaseModel):
 
 
 class DecodeResponse(BaseModel):
-    message: str
+    """Response for decode - can be text or file."""
+    payload_type: str  # 'text' or 'file'
+    message: Optional[str] = None  # For text
+    file_data_base64: Optional[str] = None  # For file (base64-encoded)
+    filename: Optional[str] = None  # For file
+    mime_type: Optional[str] = None  # For file
 
 
 class ImageInfoResponse(BaseModel):
@@ -112,6 +133,7 @@ class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
     day_names: list[str]
+    max_payload_kb: int
 
 
 class ErrorResponse(BaseModel):
@@ -129,7 +151,8 @@ async def root():
     return StatusResponse(
         version=__version__,
         has_argon2=has_argon2(),
-        day_names=list(DAY_NAMES)
+        day_names=list(DAY_NAMES),
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
     )
 
 
@@ -173,7 +196,7 @@ async def api_generate(request: GenerateRequest):
 @app.post("/encode", response_model=EncodeResponse)
 async def api_encode(request: EncodeRequest):
     """
-    Encode a secret message into an image.
+    Encode a text message into an image.
     
     Images must be base64-encoded. Returns base64-encoded stego image.
     """
@@ -194,8 +217,55 @@ async def api_encode(request: EncodeRequest):
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
+        day_of_week = get_day_from_date(result.date_used)
         
-        # Get day of week from the date used
+        return EncodeResponse(
+            stego_image_base64=stego_b64,
+            filename=result.filename,
+            capacity_used_percent=result.capacity_percent,
+            date_used=result.date_used,
+            day_of_week=day_of_week
+        )
+        
+    except CapacityError as e:
+        raise HTTPException(400, str(e))
+    except StegasooError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/encode/file", response_model=EncodeResponse)
+async def api_encode_file(request: EncodeFileRequest):
+    """
+    Encode a file into an image (JSON with base64).
+    
+    File data must be base64-encoded.
+    """
+    try:
+        file_data = base64.b64decode(request.file_data_base64)
+        ref_photo = base64.b64decode(request.reference_photo_base64)
+        carrier = base64.b64decode(request.carrier_image_base64)
+        rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
+        
+        payload = FilePayload(
+            data=file_data,
+            filename=request.filename,
+            mime_type=request.mime_type
+        )
+        
+        result = encode(
+            message=payload,
+            reference_photo=ref_photo,
+            carrier_image=carrier,
+            day_phrase=request.day_phrase,
+            pin=request.pin,
+            rsa_key_data=rsa_key,
+            rsa_password=request.rsa_password,
+            date_str=request.date_str
+        )
+        
+        stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
         day_of_week = get_day_from_date(result.date_used)
         
         return EncodeResponse(
@@ -217,16 +287,16 @@ async def api_encode(request: EncodeRequest):
 @app.post("/decode", response_model=DecodeResponse)
 async def api_decode(request: DecodeRequest):
     """
-    Decode a secret message from a stego image.
+    Decode a message or file from a stego image.
     
-    Images must be base64-encoded.
+    Returns payload_type to indicate if result is text or file.
     """
     try:
         stego = base64.b64decode(request.stego_image_base64)
         ref_photo = base64.b64decode(request.reference_photo_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
         
-        message = decode(
+        result = decode(
             stego_image=stego,
             reference_photo=ref_photo,
             day_phrase=request.day_phrase,
@@ -235,7 +305,18 @@ async def api_decode(request: DecodeRequest):
             rsa_password=request.rsa_password
         )
         
-        return DecodeResponse(message=message)
+        if result.is_file:
+            return DecodeResponse(
+                payload_type='file',
+                file_data_base64=base64.b64encode(result.file_data).decode('utf-8'),
+                filename=result.filename,
+                mime_type=result.mime_type
+            )
+        else:
+            return DecodeResponse(
+                payload_type='text',
+                message=result.message
+            )
         
     except DecryptionError as e:
         raise HTTPException(401, "Decryption failed. Check credentials.")
@@ -247,10 +328,11 @@ async def api_decode(request: DecodeRequest):
 
 @app.post("/encode/multipart")
 async def api_encode_multipart(
-    message: str = Form(...),
     day_phrase: str = Form(...),
     reference_photo: UploadFile = File(...),
     carrier: UploadFile = File(...),
+    message: str = Form(""),
+    payload_file: Optional[UploadFile] = File(None),
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
@@ -259,6 +341,7 @@ async def api_encode_multipart(
     """
     Encode using multipart form data (file uploads).
     
+    Provide either 'message' (text) or 'payload_file' (binary file).
     Returns the stego image directly as PNG with metadata headers.
     """
     try:
@@ -266,8 +349,21 @@ async def api_encode_multipart(
         carrier_data = await carrier.read()
         rsa_key_data = await rsa_key.read() if rsa_key else None
         
+        # Determine payload
+        if payload_file and payload_file.filename:
+            file_data = await payload_file.read()
+            payload = FilePayload(
+                data=file_data,
+                filename=payload_file.filename,
+                mime_type=payload_file.content_type
+            )
+        elif message:
+            payload = message
+        else:
+            raise HTTPException(400, "Must provide either 'message' or 'payload_file'")
+        
         result = encode(
-            message=message,
+            message=payload,
             reference_photo=ref_data,
             carrier_image=carrier_data,
             day_phrase=day_phrase,
@@ -277,7 +373,6 @@ async def api_encode_multipart(
             date_str=date_str if date_str else None
         )
         
-        # Get day of week from the date used
         day_of_week = get_day_from_date(result.date_used)
         
         return Response(
@@ -310,13 +405,15 @@ async def api_decode_multipart(
 ):
     """
     Decode using multipart form data (file uploads).
+    
+    Returns JSON with payload_type indicating text or file.
     """
     try:
         ref_data = await reference_photo.read()
         stego_data = await stego_image.read()
         rsa_key_data = await rsa_key.read() if rsa_key else None
         
-        message = decode(
+        result = decode(
             stego_image=stego_data,
             reference_photo=ref_data,
             day_phrase=day_phrase,
@@ -325,7 +422,18 @@ async def api_decode_multipart(
             rsa_password=rsa_password if rsa_password else None
         )
         
-        return DecodeResponse(message=message)
+        if result.is_file:
+            return DecodeResponse(
+                payload_type='file',
+                file_data_base64=base64.b64encode(result.file_data).decode('utf-8'),
+                filename=result.filename,
+                mime_type=result.mime_type
+            )
+        else:
+            return DecodeResponse(
+                payload_type='text',
+                message=result.message
+            )
         
     except DecryptionError:
         raise HTTPException(401, "Decryption failed. Check credentials.")

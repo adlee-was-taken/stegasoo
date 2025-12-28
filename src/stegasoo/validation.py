@@ -5,17 +5,17 @@ Validators for all user inputs with clear error messages.
 """
 
 import io
-from typing import Optional
+from typing import Optional, Union
 
 from PIL import Image
 
 from .constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
-    MAX_MESSAGE_SIZE, MAX_IMAGE_PIXELS, MAX_FILE_SIZE,
+    MAX_MESSAGE_SIZE, MAX_FILE_PAYLOAD_SIZE, MAX_IMAGE_PIXELS, MAX_FILE_SIZE,
     MIN_RSA_BITS, MIN_KEY_PASSWORD_LENGTH,
     ALLOWED_IMAGE_EXTENSIONS, ALLOWED_KEY_EXTENSIONS,
 )
-from .models import ValidationResult
+from .models import ValidationResult, FilePayload
 from .exceptions import (
     ValidationError, PinValidationError, MessageValidationError,
     ImageValidationError, KeyValidationError, SecurityFactorError,
@@ -61,7 +61,7 @@ def validate_pin(pin: str, required: bool = False) -> ValidationResult:
 
 def validate_message(message: str) -> ValidationResult:
     """
-    Validate message content and size.
+    Validate text message content and size.
     
     Args:
         message: Message text
@@ -78,6 +78,81 @@ def validate_message(message: str) -> ValidationResult:
         )
     
     return ValidationResult.ok(length=len(message))
+
+
+def validate_payload(payload: Union[str, bytes, FilePayload]) -> ValidationResult:
+    """
+    Validate a payload (text message, bytes, or file).
+    
+    Args:
+        payload: Text string, raw bytes, or FilePayload
+        
+    Returns:
+        ValidationResult
+    """
+    if isinstance(payload, str):
+        return validate_message(payload)
+    
+    elif isinstance(payload, FilePayload):
+        if not payload.data:
+            return ValidationResult.error("File is empty")
+        
+        if len(payload.data) > MAX_FILE_PAYLOAD_SIZE:
+            return ValidationResult.error(
+                f"File too large ({len(payload.data):,} bytes). "
+                f"Maximum: {MAX_FILE_PAYLOAD_SIZE:,} bytes ({MAX_FILE_PAYLOAD_SIZE // 1024} KB)"
+            )
+        
+        return ValidationResult.ok(
+            size=len(payload.data),
+            filename=payload.filename,
+            mime_type=payload.mime_type
+        )
+    
+    elif isinstance(payload, bytes):
+        if not payload:
+            return ValidationResult.error("Payload is empty")
+        
+        if len(payload) > MAX_FILE_PAYLOAD_SIZE:
+            return ValidationResult.error(
+                f"Payload too large ({len(payload):,} bytes). "
+                f"Maximum: {MAX_FILE_PAYLOAD_SIZE:,} bytes ({MAX_FILE_PAYLOAD_SIZE // 1024} KB)"
+            )
+        
+        return ValidationResult.ok(size=len(payload))
+    
+    else:
+        return ValidationResult.error(f"Invalid payload type: {type(payload)}")
+
+
+def validate_file_payload(
+    file_data: bytes,
+    filename: str = "",
+    max_size: int = MAX_FILE_PAYLOAD_SIZE
+) -> ValidationResult:
+    """
+    Validate a file for embedding.
+    
+    Args:
+        file_data: Raw file bytes
+        filename: Original filename (for display in errors)
+        max_size: Maximum allowed size in bytes
+        
+    Returns:
+        ValidationResult
+    """
+    if not file_data:
+        return ValidationResult.error("File is empty")
+    
+    if len(file_data) > max_size:
+        size_kb = len(file_data) / 1024
+        max_kb = max_size / 1024
+        return ValidationResult.error(
+            f"File '{filename or 'unnamed'}' too large ({size_kb:.1f} KB). "
+            f"Maximum: {max_kb:.0f} KB"
+        )
+    
+    return ValidationResult.ok(size=len(file_data), filename=filename)
 
 
 def validate_image(
@@ -315,6 +390,13 @@ def require_valid_pin(pin: str, required: bool = False) -> None:
 def require_valid_message(message: str) -> None:
     """Validate message, raising exception on failure."""
     result = validate_message(message)
+    if not result.is_valid:
+        raise MessageValidationError(result.error_message)
+
+
+def require_valid_payload(payload: Union[str, bytes, FilePayload]) -> None:
+    """Validate payload (text, bytes, or file), raising exception on failure."""
+    result = validate_payload(payload)
     if not result.is_valid:
         raise MessageValidationError(result.error_message)
 

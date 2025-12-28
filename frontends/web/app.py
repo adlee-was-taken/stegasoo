@@ -3,13 +3,14 @@
 Stegasoo Web Frontend
 
 Flask-based web UI for steganography operations.
-This is a thin wrapper around the stegasoo library.
+Supports both text messages and file embedding.
 """
 
 import io
 import sys
 import time
 import secrets
+import mimetypes
 from pathlib import Path
 from datetime import datetime
 
@@ -27,14 +28,17 @@ from stegasoo import (
     export_rsa_key_pem, load_rsa_key,
     validate_pin, validate_message, validate_image,
     validate_rsa_key, validate_security_factors,
+    validate_file_payload,
     get_today_day, generate_filename,
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
+    FilePayload,
+    MAX_FILE_PAYLOAD_SIZE,
 )
 from stegasoo.constants import (
     MAX_MESSAGE_SIZE, MIN_PIN_LENGTH, MAX_PIN_LENGTH,
-    VALID_RSA_SIZES,
+    VALID_RSA_SIZES, MAX_FILE_SIZE,
 )
 
 
@@ -44,7 +48,7 @@ from stegasoo.constants import (
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max upload
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 10MB max upload
 
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
@@ -65,6 +69,16 @@ def allowed_image(filename: str) -> bool:
         return False
     ext = filename.rsplit('.', 1)[1].lower()
     return ext in {'png', 'jpg', 'jpeg', 'bmp', 'gif'}
+
+
+def format_size(size_bytes: int) -> str:
+    """Format file size for display."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 # ============================================================================
@@ -164,6 +178,7 @@ def download_key():
 @app.route('/encode', methods=['GET', 'POST'])
 def encode_page():
     day_of_week = get_today_day()
+    max_payload_kb = MAX_FILE_PAYLOAD_SIZE // 1024
     
     if request.method == 'POST':
         try:
@@ -171,30 +186,50 @@ def encode_page():
             ref_photo = request.files.get('reference_photo')
             carrier = request.files.get('carrier')
             rsa_key_file = request.files.get('rsa_key')
+            payload_file = request.files.get('payload_file')
             
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             if not allowed_image(ref_photo.filename) or not allowed_image(carrier.filename):
                 flash('Invalid file type. Use PNG, JPG, or BMP', 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Get form data
             message = request.form.get('message', '')
             day_phrase = request.form.get('day_phrase', '')
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
+            payload_type = request.form.get('payload_type', 'text')
             
-            # Validate message
-            result = validate_message(message)
-            if not result.is_valid:
-                flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+            # Determine payload
+            if payload_type == 'file' and payload_file and payload_file.filename:
+                # File payload
+                file_data = payload_file.read()
+                
+                result = validate_file_payload(file_data, payload_file.filename)
+                if not result.is_valid:
+                    flash(result.error_message, 'error')
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
+                
+                mime_type, _ = mimetypes.guess_type(payload_file.filename)
+                payload = FilePayload(
+                    data=file_data,
+                    filename=payload_file.filename,
+                    mime_type=mime_type
+                )
+            else:
+                # Text message
+                result = validate_message(message)
+                if not result.is_valid:
+                    flash(result.error_message, 'error')
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
+                payload = message
             
             if not day_phrase:
                 flash('Day phrase is required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Read files
             ref_data = ref_photo.read()
@@ -205,27 +240,27 @@ def encode_page():
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Validate RSA key if provided
             if rsa_key_data:
                 result = validate_rsa_key(rsa_key_data, rsa_password if rsa_password else None)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Validate carrier image
             result = validate_image(carrier_data, "Carrier image")
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
             
             # Get date
             client_date = request.form.get('client_date', '').strip()
@@ -236,7 +271,7 @@ def encode_page():
             
             # Encode
             encode_result = encode(
-                message=message,
+                message=payload,
                 reference_photo=ref_data,
                 carrier_image=carrier_data,
                 day_phrase=day_phrase,
@@ -259,15 +294,15 @@ def encode_page():
             
         except CapacityError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
         except StegasooError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
         except Exception as e:
             flash(f'Error: {e}', 'error')
-            return render_template('encode.html', day_of_week=day_of_week)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
     
-    return render_template('encode.html', day_of_week=day_of_week)
+    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb)
 
 
 @app.route('/encode/result/<file_id>')
@@ -299,7 +334,7 @@ def encode_download(file_id):
 
 
 @app.route('/encode/file/<file_id>')
-def encode_file(file_id):
+def encode_file_route(file_id):
     """Serve file for Web Share API."""
     if file_id not in TEMP_FILES:
         return "Not found", 404
@@ -368,7 +403,7 @@ def decode_page():
                     return render_template('decode.html')
             
             # Decode
-            message = decode(
+            decode_result = decode(
                 stego_image=stego_data,
                 reference_photo=ref_data,
                 day_phrase=day_phrase,
@@ -377,7 +412,29 @@ def decode_page():
                 rsa_password=rsa_password if rsa_password else None
             )
             
-            return render_template('decode.html', decoded_message=message)
+            if decode_result.is_file:
+                # File content - store temporarily for download
+                file_id = secrets.token_urlsafe(16)
+                cleanup_temp_files()
+                
+                filename = decode_result.filename or 'decoded_file'
+                TEMP_FILES[file_id] = {
+                    'data': decode_result.file_data,
+                    'filename': filename,
+                    'mime_type': decode_result.mime_type,
+                    'timestamp': time.time()
+                }
+                
+                return render_template('decode.html',
+                    decoded_file=True,
+                    file_id=file_id,
+                    filename=filename,
+                    file_size=format_size(len(decode_result.file_data)),
+                    mime_type=decode_result.mime_type
+                )
+            else:
+                # Text content
+                return render_template('decode.html', decoded_message=decode_result.message)
             
         except DecryptionError:
             flash('Decryption failed. Check your phrase, PIN, RSA key, and reference photo.', 'error')
@@ -392,9 +449,30 @@ def decode_page():
     return render_template('decode.html')
 
 
+@app.route('/decode/download/<file_id>')
+def decode_download(file_id):
+    """Download decoded file."""
+    if file_id not in TEMP_FILES:
+        flash('File expired or not found.', 'error')
+        return redirect(url_for('decode_page'))
+    
+    file_info = TEMP_FILES[file_id]
+    mime_type = file_info.get('mime_type', 'application/octet-stream')
+    
+    return send_file(
+        io.BytesIO(file_info['data']),
+        mimetype=mime_type,
+        as_attachment=True,
+        download_name=file_info['filename']
+    )
+
+
 @app.route('/about')
 def about():
-    return render_template('about.html', has_argon2=has_argon2())
+    return render_template('about.html', 
+        has_argon2=has_argon2(),
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
+    )
 
 
 # ============================================================================

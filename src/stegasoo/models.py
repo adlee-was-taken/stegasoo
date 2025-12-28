@@ -6,7 +6,7 @@ Dataclasses for structured data exchange between modules and frontends.
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
+from typing import Optional, Union
 
 
 @dataclass
@@ -44,9 +44,34 @@ class Credentials:
 
 
 @dataclass
+class FilePayload:
+    """Represents a file to be embedded."""
+    data: bytes
+    filename: str
+    mime_type: Optional[str] = None
+    
+    @property
+    def size(self) -> int:
+        return len(self.data)
+    
+    @classmethod
+    def from_file(cls, filepath: str, filename: Optional[str] = None) -> 'FilePayload':
+        """Create FilePayload from a file path."""
+        from pathlib import Path
+        import mimetypes
+        
+        path = Path(filepath)
+        data = path.read_bytes()
+        name = filename or path.name
+        mime, _ = mimetypes.guess_type(name)
+        
+        return cls(data=data, filename=name, mime_type=mime)
+
+
+@dataclass
 class EncodeInput:
     """Input parameters for encoding a message."""
-    message: str
+    message: Union[str, bytes, FilePayload]  # Text, raw bytes, or file
     reference_photo: bytes
     carrier_image: bytes
     day_phrase: str
@@ -90,8 +115,26 @@ class DecodeInput:
 @dataclass
 class DecodeResult:
     """Result of decoding operation."""
-    message: str
-    date_encoded: str
+    payload_type: str  # 'text' or 'file'
+    message: Optional[str] = None  # For text payloads
+    file_data: Optional[bytes] = None  # For file payloads
+    filename: Optional[str] = None  # Original filename for file payloads
+    mime_type: Optional[str] = None  # MIME type hint
+    date_encoded: Optional[str] = None
+    
+    @property
+    def is_file(self) -> bool:
+        return self.payload_type == 'file'
+    
+    @property
+    def is_text(self) -> bool:
+        return self.payload_type == 'text'
+    
+    def get_content(self) -> Union[str, bytes]:
+        """Get the decoded content (text or bytes)."""
+        if self.is_text:
+            return self.message or ""
+        return self.file_data or b""
 
 
 @dataclass 

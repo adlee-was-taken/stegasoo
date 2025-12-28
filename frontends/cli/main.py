@@ -20,12 +20,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 import stegasoo
 from stegasoo import (
-    encode, decode, generate_credentials,
+    encode, encode_file, decode,
+    generate_credentials,
     export_rsa_key_pem, load_rsa_key,
     validate_image, calculate_capacity,
     get_day_from_date, parse_date_from_filename,
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, ExtractionError,
+    FilePayload,
 )
 
 
@@ -42,7 +44,7 @@ def cli():
     """
     Stegasoo - Secure steganography with hybrid authentication.
     
-    Hide encrypted messages in images using a combination of:
+    Hide encrypted messages or files in images using a combination of:
     
     \b
     • Reference photo (something you have)
@@ -170,8 +172,9 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
 @cli.command()
 @click.option('--ref', '-r', required=True, type=click.Path(exists=True), help='Reference photo')
 @click.option('--carrier', '-c', required=True, type=click.Path(exists=True), help='Carrier image')
-@click.option('--message', '-m', help='Message to encode (or use stdin)')
-@click.option('--message-file', '-f', type=click.Path(exists=True), help='Read message from file')
+@click.option('--message', '-m', help='Text message to encode')
+@click.option('--message-file', '-f', type=click.Path(exists=True), help='Read text message from file')
+@click.option('--embed-file', '-e', type=click.Path(exists=True), help='Embed a file (binary)')
 @click.option('--phrase', '-p', required=True, help='Day phrase')
 @click.option('--pin', help='Static PIN')
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file')
@@ -179,28 +182,46 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
 @click.option('--output', '-o', type=click.Path(), help='Output file (default: auto-generated)')
 @click.option('--date', 'date_str', help='Date override (YYYY-MM-DD)')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress output except errors')
-def encode_cmd(ref, carrier, message, message_file, phrase, pin, key, key_password, output, date_str, quiet):
+def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key, key_password, output, date_str, quiet):
     """
-    Encode a secret message into an image.
+    Encode a secret message or file into an image.
     
     Requires a reference photo, carrier image, and day phrase.
     Must provide either --pin or --key (or both).
     
+    For text messages, use -m or -f or pipe via stdin.
+    For binary files, use -e/--embed-file.
+    
     \b
     Examples:
+        # Text message
         stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -m "secret"
-        echo "secret" | stegasoo encode -r photo.jpg -c meme.png -p "word1 word2 word3" --pin 123456
-        stegasoo encode -r photo.jpg -c meme.png -p "words" -k mykey.pem --key-password "pass"
+        
+        # Text from file
+        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -f message.txt
+        
+        # Embed a binary file (PDF, ZIP, etc.)
+        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -e secret.pdf
+        
+        # Pipe text
+        echo "secret" | stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456
     """
-    # Get message
-    if message:
-        msg = message
+    # Determine what to encode
+    payload = None
+    
+    if embed_file:
+        # Binary file embedding
+        payload = FilePayload.from_file(embed_file)
+        if not quiet:
+            click.echo(f"Embedding file: {payload.filename} ({len(payload.data):,} bytes)")
+    elif message:
+        payload = message
     elif message_file:
-        msg = Path(message_file).read_text()
+        payload = Path(message_file).read_text()
     elif not sys.stdin.isatty():
-        msg = sys.stdin.read()
+        payload = sys.stdin.read()
     else:
-        raise click.UsageError("Must provide message via -m, -f, or stdin")
+        raise click.UsageError("Must provide message via -m, -f, -e, or stdin")
     
     # Load key if provided
     rsa_key_data = None
@@ -216,7 +237,7 @@ def encode_cmd(ref, carrier, message, message_file, phrase, pin, key, key_passwo
         carrier_image = Path(carrier).read_bytes()
         
         result = encode(
-            message=msg,
+            message=payload,
             reference_photo=ref_photo,
             carrier_image=carrier_image,
             day_phrase=phrase,
@@ -259,19 +280,26 @@ def encode_cmd(ref, carrier, message, message_file, phrase, pin, key, key_passwo
 @click.option('--pin', help='Static PIN')
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file')
 @click.option('--key-password', help='RSA key password')
-@click.option('--output', '-o', type=click.Path(), help='Save message to file')
-@click.option('--quiet', '-q', is_flag=True, help='Output only the message')
-def decode_cmd(ref, stego, phrase, pin, key, key_password, output, quiet):
+@click.option('--output', '-o', type=click.Path(), help='Save decoded content to file')
+@click.option('--quiet', '-q', is_flag=True, help='Output only the content (for text) or suppress messages (for files)')
+@click.option('--force', is_flag=True, help='Overwrite existing output file')
+def decode_cmd(ref, stego, phrase, pin, key, key_password, output, quiet, force):
     """
-    Decode a secret message from a stego image.
+    Decode a secret message or file from a stego image.
     
     Must use the same credentials that were used for encoding.
+    Automatically detects whether content is text or a file.
     
     \b
     Examples:
+        # Decode and print text
         stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456
-        stegasoo decode -r photo.jpg -s stego.png -p "words" -k mykey.pem --key-password "pass"
-        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 -o message.txt
+        
+        # Decode and save (auto-detect type)
+        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 -o output.txt
+        
+        # Quiet mode for piping text
+        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 -q | less
     """
     # Load key if provided
     rsa_key_data = None
@@ -286,7 +314,7 @@ def decode_cmd(ref, stego, phrase, pin, key, key_password, output, quiet):
         ref_photo = Path(ref).read_bytes()
         stego_image = Path(stego).read_bytes()
         
-        message = decode(
+        result = decode(
             stego_image=stego_image,
             reference_photo=ref_photo,
             day_phrase=phrase,
@@ -295,18 +323,42 @@ def decode_cmd(ref, stego, phrase, pin, key, key_password, output, quiet):
             rsa_password=key_password,
         )
         
-        if output:
-            Path(output).write_text(message)
-            if not quiet:
-                click.secho(f"✓ Decoded successfully!", fg='green')
-                click.echo(f"  Saved to: {output}")
-        else:
-            if quiet:
-                click.echo(message)
+        if result.is_file:
+            # File content
+            if output:
+                out_path = Path(output)
+            elif result.filename:
+                out_path = Path(result.filename)
             else:
-                click.secho("✓ Decoded successfully!", fg='green')
-                click.echo()
-                click.echo(message)
+                out_path = Path("decoded_file")
+            
+            if out_path.exists() and not force:
+                raise click.ClickException(
+                    f"Output file '{out_path}' exists. Use --force to overwrite."
+                )
+            
+            out_path.write_bytes(result.file_data)
+            
+            if not quiet:
+                click.secho("✓ Decoded file successfully!", fg='green')
+                click.echo(f"  Saved to: {out_path}")
+                click.echo(f"  Size: {len(result.file_data):,} bytes")
+                if result.mime_type:
+                    click.echo(f"  Type: {result.mime_type}")
+        else:
+            # Text content
+            if output:
+                Path(output).write_text(result.message)
+                if not quiet:
+                    click.secho("✓ Decoded successfully!", fg='green')
+                    click.echo(f"  Saved to: {output}")
+            else:
+                if quiet:
+                    click.echo(result.message)
+                else:
+                    click.secho("✓ Decoded successfully!", fg='green')
+                    click.echo()
+                    click.echo(result.message)
         
     except (DecryptionError, ExtractionError) as e:
         raise click.ClickException(f"Decryption failed: {e}")

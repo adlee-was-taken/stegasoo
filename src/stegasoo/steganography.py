@@ -16,6 +16,43 @@ from .models import EmbedStats
 from .exceptions import CapacityError, ExtractionError, EmbeddingError
 
 
+# Lossless formats that preserve LSB data
+LOSSLESS_FORMATS = {'PNG', 'BMP', 'TIFF'}
+
+# Format to extension mapping
+FORMAT_TO_EXT = {
+    'PNG': 'png',
+    'BMP': 'bmp',
+    'TIFF': 'tiff',
+}
+
+# Extension to PIL format mapping
+EXT_TO_FORMAT = {
+    'png': 'PNG',
+    'bmp': 'BMP',
+    'tiff': 'TIFF',
+    'tif': 'TIFF',
+}
+
+
+def get_output_format(input_format: Optional[str]) -> tuple[str, str]:
+    """
+    Determine the output format based on input format.
+    
+    Args:
+        input_format: PIL format string of input image (e.g., 'JPEG', 'PNG')
+        
+    Returns:
+        Tuple of (PIL format string, file extension) for output
+        Falls back to PNG for lossy or unknown formats.
+    """
+    if input_format and input_format.upper() in LOSSLESS_FORMATS:
+        fmt = input_format.upper()
+        return fmt, FORMAT_TO_EXT.get(fmt, 'png')
+    # Default to PNG for lossy formats (JPEG, GIF) or unknown
+    return 'PNG', 'png'
+
+
 def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list[int]:
     """
     Generate pseudo-random pixel indices for embedding.
@@ -83,8 +120,9 @@ def embed_in_image(
     carrier_data: bytes,
     encrypted_data: bytes,
     pixel_key: bytes,
-    bits_per_channel: int = 1
-) -> tuple[bytes, EmbedStats]:
+    bits_per_channel: int = 1,
+    output_format: Optional[str] = None
+) -> tuple[bytes, EmbedStats, str]:
     """
     Embed encrypted data in carrier image using LSB steganography.
     
@@ -96,9 +134,11 @@ def embed_in_image(
         encrypted_data: Data to embed
         pixel_key: Key for pixel selection
         bits_per_channel: Bits to use per color channel (1-2)
+        output_format: Force specific output format (PNG, BMP). 
+                       If None, auto-detect from carrier (lossless) or default to PNG.
         
     Returns:
-        Tuple of (PNG image bytes, EmbedStats)
+        Tuple of (image bytes, EmbedStats, file extension)
         
     Raises:
         CapacityError: If carrier is too small
@@ -106,6 +146,8 @@ def embed_in_image(
     """
     try:
         img = Image.open(io.BytesIO(carrier_data))
+        input_format = img.format
+        
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
@@ -160,8 +202,15 @@ def embed_in_image(
         stego_img = Image.new('RGB', img.size)
         stego_img.putdata(new_pixels)
         
+        # Determine output format
+        if output_format:
+            out_fmt = output_format.upper()
+            out_ext = FORMAT_TO_EXT.get(out_fmt, 'png')
+        else:
+            out_fmt, out_ext = get_output_format(input_format)
+        
         output = io.BytesIO()
-        stego_img.save(output, 'PNG')
+        stego_img.save(output, out_fmt)
         output.seek(0)
         
         stats = EmbedStats(
@@ -171,7 +220,7 @@ def embed_in_image(
             bytes_embedded=len(data_with_len)
         )
         
-        return output.getvalue(), stats
+        return output.getvalue(), stats, out_ext
         
     except CapacityError:
         raise
@@ -284,3 +333,18 @@ def get_image_dimensions(image_data: bytes) -> tuple[int, int]:
     """Get image dimensions without loading full image."""
     img = Image.open(io.BytesIO(image_data))
     return img.size
+
+
+def get_image_format(image_data: bytes) -> Optional[str]:
+    """Get image format (PIL format string like 'PNG', 'JPEG')."""
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        return img.format
+    except Exception:
+        return None
+
+
+def is_lossless_format(image_data: bytes) -> bool:
+    """Check if image is in a lossless format suitable for steganography."""
+    fmt = get_image_format(image_data)
+    return fmt is not None and fmt.upper() in LOSSLESS_FORMATS

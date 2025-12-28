@@ -15,15 +15,20 @@ from typing import Optional
 from .constants import DAY_NAMES
 
 
-def generate_filename(date_str: Optional[str] = None, prefix: str = "") -> str:
+def generate_filename(
+    date_str: Optional[str] = None,
+    prefix: str = "",
+    extension: str = "png"
+) -> str:
     """
     Generate a filename for stego images.
     
-    Format: {prefix}{random}_{YYYYMMDD}.png
+    Format: {prefix}{random}_{YYYYMMDD}.{extension}
     
     Args:
         date_str: Date string (YYYY-MM-DD), defaults to today
         prefix: Optional prefix
+        extension: File extension without dot (default: 'png')
         
     Returns:
         Filename string
@@ -34,7 +39,10 @@ def generate_filename(date_str: Optional[str] = None, prefix: str = "") -> str:
     date_compact = date_str.replace('-', '')
     random_hex = secrets.token_hex(4)
     
-    return f"{prefix}{random_hex}_{date_compact}.png"
+    # Ensure extension doesn't have a leading dot
+    extension = extension.lstrip('.')
+    
+    return f"{prefix}{random_hex}_{date_compact}.{extension}"
 
 
 def parse_date_from_filename(filename: str) -> Optional[str]:

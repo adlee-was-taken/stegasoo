@@ -7,10 +7,11 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-unlock-fill me-2"></i>Decode Secret Message</h5>
+                <h5 class="mb-0"><i class="bi bi-unlock-fill me-2"></i>Decode Secret Message or File</h5>
             </div>
             <div class="card-body">
                 {% if decoded_message %}
+                <!-- Text Message Result -->
                 <div class="alert alert-success">
                     <h6><i class="bi bi-check-circle me-2"></i>Message Decrypted Successfully!</h6>
                 </div>
@@ -23,17 +24,40 @@
                   </button>
                 </div>
 
-                i<!--then<div class="mb-4">
-                    <label class="form-label text-muted">Decoded Message:</label>
-                    <div class="alert-message">{{ decoded_message }}</div>
-                </div>-->
+                <a href="/decode" class="btn btn-outline-light w-100 mt-3">
+                    <i class="bi bi-arrow-repeat me-2"></i>Decode Another
+                </a>
+                
+                {% elif decoded_file %}
+                <!-- File Result -->
+                <div class="alert alert-success">
+                    <h6><i class="bi bi-check-circle me-2"></i>File Decrypted Successfully!</h6>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <i class="bi bi-file-earmark-check text-success" style="font-size: 4rem;"></i>
+                    <h5 class="mt-3">{{ filename }}</h5>
+                    <p class="text-muted mb-1">{{ file_size }}</p>
+                    {% if mime_type %}
+                    <small class="text-muted">Type: {{ mime_type }}</small>
+                    {% endif %}
+                </div>
+                
+                <a href="{{ url_for('decode_download', file_id=file_id) }}" class="btn btn-primary btn-lg w-100 mb-3">
+                    <i class="bi bi-download me-2"></i>Download File
+                </a>
+                
+                <div class="alert alert-warning small">
+                    <i class="bi bi-clock me-1"></i>
+                    <strong>File expires in 5 minutes.</strong> Download now.
+                </div>
                 
                 <a href="/decode" class="btn btn-outline-light w-100">
-                    <i class="bi bi-arrow-repeat me-2"></i>Decode Another Message
+                    <i class="bi bi-arrow-repeat me-2"></i>Decode Another
                 </a>
                 
                 {% else %}
-                
+                <!-- Decode Form -->
                 <form method="POST" enctype="multipart/form-data" id="decodeForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -66,7 +90,7 @@
                                 <img class="drop-zone-preview d-none">
                             </div>
                             <div class="form-text">
-                                The image containing the hidden message
+                                The image containing the hidden message/file
                             </div>
                         </div>
                     </div>
@@ -130,7 +154,7 @@
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-lg w-100" id="decodeBtn">
-                        <i class="bi bi-unlock me-2"></i>Decode Message
+                        <i class="bi bi-unlock me-2"></i>Decode
                     </button>
                 </form>
                 
@@ -138,6 +162,7 @@
             </div>
         </div>
         
+        {% if not decoded_message and not decoded_file %}
         <div class="card mt-4">
             <div class="card-body">
                 <h6 class="text-muted mb-3"><i class="bi bi-question-circle me-2"></i>Troubleshooting</h6>
@@ -165,6 +190,7 @@
                 </ul>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -209,7 +235,7 @@ function updateDayLabel(dayName) {
     }
 }
 
-// 1. PIN Toggle
+// PIN Toggle
 document.getElementById('togglePin')?.addEventListener('click', function() {
     const input = document.getElementById('pinInput');
     const icon = this.querySelector('i');
@@ -222,9 +248,8 @@ document.getElementById('togglePin')?.addEventListener('click', function() {
     }
 });
 
-// 2. Paste from Clipboard
+// Paste from Clipboard
 document.addEventListener('paste', function(e) {
-    // Only run if the form exists (we are not on the success page)
     if (!document.getElementById('decodeForm')) return;
 
     const items = e.clipboardData.items;
@@ -232,7 +257,6 @@ document.addEventListener('paste', function(e) {
         if (items[i].type.indexOf("image") !== -1) {
             const blob = items[i].getAsFile();
             
-            // Priority for Decode: Fill Stego Image first (most common), then Reference
             const stegoInput = document.querySelector('input[name="stego_image"]');
             const refInput = document.querySelector('input[name="reference_photo"]');
             
