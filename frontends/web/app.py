@@ -254,10 +254,41 @@ def generate_qr_download(token):
         return f"Error generating QR code: {e}", 500
 
 
+#@app.route('/generate/download-key', methods=['POST'])
+#def download_key():
+#    """Download RSA key as password-protected PEM file."""
+#    key_pem = request.form.get('key_pem', '')
+
 @app.route('/generate/download-key', methods=['POST'])
 def download_key():
     """Download RSA key as password-protected PEM file."""
     key_pem = request.form.get('key_pem', '')
+    password = request.form.get('key_password', '')
+
+    if not key_pem:
+        flash('No key to download', 'error')
+        return redirect(url_for('generate'))
+
+    if not password or len(password) < 8:
+        flash('Password must be at least 8 characters', 'error')
+        return redirect(url_for('generate'))
+
+    try:
+        private_key = load_rsa_key(key_pem.encode('utf-8'))
+        encrypted_pem = export_rsa_key_pem(private_key, password=password)
+
+        key_id = secrets.token_hex(4)
+        filename = f'stegasoo_key_{private_key.key_size}_{key_id}.pem'
+
+        return send_file(
+            io.BytesIO(encrypted_pem),
+            mimetype='application/x-pem-file',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        flash(f'Error creating key file: {e}', 'error')
+        return redirect(url_for('generate'))
 
 
 @app.route('/extract-key-from-qr', methods=['POST'])

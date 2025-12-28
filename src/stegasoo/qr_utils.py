@@ -3,6 +3,11 @@ Stegasoo QR Code Utilities
 
 Functions for generating and reading QR codes containing RSA keys.
 Supports automatic compression for large keys.
+
+IMPROVEMENTS IN THIS VERSION:
+- Much more robust PEM normalization
+- Better handling of QR code extraction edge cases
+- Improved error messages
 """
 
 import io
@@ -72,47 +77,88 @@ def decompress_data(data: str) -> str:
 
 def normalize_pem(pem_data: str) -> str:
     """
-    Normalize PEM data to ensure proper formatting.
+    Normalize PEM data to ensure proper formatting for cryptography library.
     
-    Fixes common issues:
-    - Inconsistent line endings
+    The cryptography library is very particular about PEM formatting.
+    This function handles all common issues from QR code extraction:
+    - Inconsistent line endings (CRLF, LF, CR)
     - Missing newlines after header/before footer
-    - Extra whitespace
+    - Extra whitespace, tabs, multiple spaces
+    - Non-ASCII characters
+    - Incorrect base64 padding
+    - Malformed headers/footers
     
     Args:
-        pem_data: Raw PEM string
+        pem_data: Raw PEM string from QR code
         
     Returns:
-        Properly formatted PEM string
+        Properly formatted PEM string that cryptography library will accept
     """
     import re
     
-    # Normalize line endings
+    # Step 1: Normalize ALL line endings to \n
     pem_data = pem_data.replace('\r\n', '\n').replace('\r', '\n')
     
-    # Remove any leading/trailing whitespace
+    # Step 2: Remove leading/trailing whitespace
     pem_data = pem_data.strip()
     
-    # Extract header, content, and footer using regex
-    # Match patterns like -----BEGIN RSA PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----
-    pattern = r'(-----BEGIN [^-]+-----)(.*?)(-----END [^-]+-----)'
-    match = re.search(pattern, pem_data, re.DOTALL)
+    # Step 3: Remove any non-ASCII characters (QR artifacts)
+    pem_data = ''.join(char for char in pem_data if ord(char) < 128)
+    
+    # Step 4: Extract header, content, and footer with flexible regex
+    # This handles variations like:
+    # - "PRIVATE KEY" vs "RSA PRIVATE KEY"
+    # - Extra spaces in headers
+    # - Missing spaces
+    pattern = r'(-----BEGIN[^-]*-----)(.*?)(-----END[^-]*-----)'
+    match = re.search(pattern, pem_data, re.DOTALL | re.IGNORECASE)
     
     if not match:
-        return pem_data  # Return as-is if not recognized
+        # Fallback: try even more permissive pattern
+        pattern = r'(-+BEGIN[^-]+-+)(.*?)(-+END[^-]+-+)'
+        match = re.search(pattern, pem_data, re.DOTALL | re.IGNORECASE)
+        
+        if not match:
+            # Last resort: return original if can't parse
+            return pem_data
     
-    header = match.group(1)
-    content = match.group(2)
-    footer = match.group(3)
+    header_raw = match.group(1).strip()
+    content_raw = match.group(2)
+    footer_raw = match.group(3).strip()
     
-    # Clean up the base64 content
-    # Remove all whitespace and rejoin with proper 64-char lines
-    content_clean = ''.join(content.split())
+    # Step 5: Normalize header and footer
+    # Standardize spacing and ensure proper format
+    header = re.sub(r'\s+', ' ', header_raw)
+    footer = re.sub(r'\s+', ' ', footer_raw)
     
-    # Split into 64-character lines (PEM standard)
+    # Ensure exactly 5 dashes on each side
+    header = re.sub(r'^-+', '-----', header)
+    header = re.sub(r'-+$', '-----', header)
+    footer = re.sub(r'^-+', '-----', footer)
+    footer = re.sub(r'-+$', '-----', footer)
+    
+    # Step 6: Clean the base64 content THOROUGHLY
+    # Remove ALL whitespace: spaces, tabs, newlines
+    # Keep only valid base64 characters: A-Z, a-z, 0-9, +, /, =
+    content_clean = ''.join(
+        char for char in content_raw 
+        if char.isalnum() or char in '+/='
+    )
+    
+    # Double-check: remove any remaining invalid characters
+    content_clean = re.sub(r'[^A-Za-z0-9+/=]', '', content_clean)
+    
+    # Step 7: Fix base64 padding
+    # Base64 strings must be divisible by 4
+    remainder = len(content_clean) % 4
+    if remainder:
+        content_clean += '=' * (4 - remainder)
+    
+    # Step 8: Split into 64-character lines (PEM standard)
     lines = [content_clean[i:i+64] for i in range(0, len(content_clean), 64)]
     
-    # Reconstruct PEM
+    # Step 9: Reconstruct with EXACT PEM formatting
+    # Format: header\ncontent_line1\ncontent_line2\n...\nfooter\n
     return header + '\n' + '\n'.join(lines) + '\n' + footer + '\n'
 
 
@@ -278,30 +324,45 @@ def extract_key_from_qr(image_data: bytes) -> Optional[str]:
     """
     Extract RSA key from QR code image, auto-decompressing if needed.
     
+    This function is more robust than the original, with better error handling
+    and PEM normalization.
+    
     Args:
         image_data: Image bytes containing QR code
         
     Returns:
         PEM-encoded RSA key string, or None if not found/invalid
     """
+    # Step 1: Read QR code
     qr_data = read_qr_code(image_data)
     
     if not qr_data:
         return None
     
-    # Auto-decompress if needed
+    # Step 2: Auto-decompress if needed
     try:
         if is_compressed(qr_data):
             key_pem = decompress_data(qr_data)
         else:
             key_pem = qr_data
-    except Exception:
+    except Exception as e:
+        # If decompression fails, try using data as-is
         key_pem = qr_data
     
-    # Validate it looks like a PEM key
-    if '-----BEGIN' in key_pem and '-----END' in key_pem:
-        # Normalize PEM format to fix potential line ending issues
+    # Step 3: Validate it looks like a PEM key
+    if '-----BEGIN' not in key_pem or '-----END' not in key_pem:
+        return None
+    
+    # Step 4: Aggressively normalize PEM format
+    # This is crucial - QR codes can introduce subtle formatting issues
+    try:
         key_pem = normalize_pem(key_pem)
+    except Exception as e:
+        # If normalization fails, return None rather than broken PEM
+        return None
+    
+    # Step 5: Final validation - ensure it still looks like PEM
+    if '-----BEGIN' in key_pem and '-----END' in key_pem:
         return key_pem
     
     return None
