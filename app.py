@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
 """
-Stegasoo: Stegonography portal, for security-mided messagin demo.
+Stegasoo: Steganography portal for security-minded messaging.
 
     Aaron D. Lee (w/ vibes)
     2025-12-27
-
-    Right Now: It's a stupid bootstrap looking portal that works.
-
-    Future: Socials, Slack, and Matrix server channel watcher function to encode/send/decode
-            messages in real-time from a configurable memes or photos channel.
 
 Built as a learning experience with a few LLMs to see if I can make something decent.
 """
 
 import os
 import io
+import re
 import secrets
 import hashlib
 import struct
 import time
-import threading
 from datetime import datetime
 from flask import Flask, render_template, request, send_file, jsonify, flash, redirect, url_for
 from werkzeug.utils import secure_filename
 from PIL import Image
 from secureDeleter import SecureDeleter
-#from story_generator import generate_all_stories, HAS_ML
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 try:
     from argon2.low_level import hash_secret_raw, Type
@@ -37,6 +34,8 @@ except ImportError:
     HAS_ARGON2 = False
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     from cryptography.hazmat.primitives import hashes
+
+HAS_ML = False  # Story generator disabled
 
 # ============================================================================
 # FLASK APP CONFIGURATION
@@ -50,6 +49,10 @@ app.config['UPLOAD_FOLDER'] = '/tmp/stego_uploads'
 # Limits
 MAX_IMAGE_PIXELS = 4000000  # 4 megapixels max (e.g., 2000x2000)
 MAX_MESSAGE_SIZE = 50000    # 50KB message max
+MIN_PIN_LENGTH = 6
+MAX_PIN_LENGTH = 9
+MIN_RSA_BITS = 2048
+VALID_RSA_SIZES = [2048, 3072, 4096]
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -94,7 +97,6 @@ def secure_cleanup_uploads():
                     deleter = SecureDeleter(filepath)
                     deleter.execute()
                 except Exception as e:
-                    # Fallback to regular delete
                     os.remove(filepath)
 
 
@@ -106,17 +108,138 @@ def cleanup_temp_files():
         TEMP_FILES.pop(fid, None)
 
 # ============================================================================
-# HELPER FUNCTIONS
+# VALIDATION FUNCTIONS
 # ============================================================================
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+def validate_pin(pin):
+    """Validate PIN format: 6-9 digits, no leading zeros."""
+    if not pin:
+        return True, ""  # Empty PIN is valid (if RSA key provided)
+    if not pin.isdigit():
+        return False, "PIN must contain only digits"
+    if len(pin) < MIN_PIN_LENGTH or len(pin) > MAX_PIN_LENGTH:
+        return False, f"PIN must be {MIN_PIN_LENGTH}-{MAX_PIN_LENGTH} digits"
+    if pin[0] == '0':
+        return False, "PIN cannot start with zero"
+    return True, ""
+
+
+def validate_message(message):
+    """Validate message size."""
+    if not message:
+        return False, "Message is required"
+    if len(message) > MAX_MESSAGE_SIZE:
+        return False, f"Message too long. Max {MAX_MESSAGE_SIZE // 1000}KB allowed"
+    return True, ""
+
+
+def validate_image(image_data, name="Image"):
+    """Validate image data and dimensions."""
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        width, height = img.size
+        num_pixels = width * height
+        
+        if num_pixels > MAX_IMAGE_PIXELS:
+            max_dim = int(MAX_IMAGE_PIXELS ** 0.5)
+            return False, f"{name} too large ({width}x{height} = {num_pixels:,} pixels). Max ~{MAX_IMAGE_PIXELS:,} pixels ({max_dim}x{max_dim})"
+        return True, ""
+    except Exception as e:
+        return False, f"Could not read {name}: {str(e)}"
+
+
+def validate_rsa_key(key_data, password=None):
+    """
+    Validate RSA private key.
+    Returns (is_valid, error_message, key_size_bits)
+    """
+    if not key_data:
+        return True, "", 0  # Empty key is valid (if PIN provided)
+    
+    try:
+        # Try to load the key
+        if password:
+            private_key = load_pem_private_key(key_data, password=password.encode(), backend=default_backend())
+        else:
+            # Try without password first
+            try:
+                private_key = load_pem_private_key(key_data, password=None, backend=default_backend())
+            except TypeError:
+                # Key is encrypted but no password provided
+                return False, "RSA key is password-protected. Please enter the password.", 0
+        
+        # Check key size
+        key_size = private_key.key_size
+        if key_size < MIN_RSA_BITS:
+            return False, f"RSA key must be at least {MIN_RSA_BITS} bits (got {key_size})", 0
+        
+        return True, "", key_size
+        
+    except ValueError as e:
+        if "password" in str(e).lower() or "encrypted" in str(e).lower():
+            return False, "Incorrect password for RSA key", 0
+        return False, f"Invalid RSA key format: {str(e)}", 0
+    except Exception as e:
+        return False, f"Could not load RSA key: {str(e)}", 0
+
+
+def validate_security_factors(pin, rsa_key_data):
+    """Ensure at least one security factor is provided."""
+    has_pin = bool(pin and pin.strip())
+    has_key = bool(rsa_key_data and len(rsa_key_data) > 0)
+    
+    if not has_pin and not has_key:
+        return False, "You must provide at least a PIN or RSA Key"
+    return True, ""
+
+
+# ============================================================================
+# RSA KEY GENERATION
+# ============================================================================
+
+def generate_rsa_key(bits=2048):
+    """Generate RSA private key."""
+    if bits not in VALID_RSA_SIZES:
+        bits = 2048
+    
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=bits,
+        backend=default_backend()
+    )
+    return private_key
+
+
+def export_rsa_key_pem(private_key, password=None):
+    """Export RSA key to PEM format, optionally encrypted."""
+    if password:
+        encryption = serialization.BestAvailableEncryption(password.encode())
+    else:
+        encryption = serialization.NoEncryption()
+    
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=encryption
+    )
+    return pem
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
 def generate_pin(length=6):
-    """Generate a random PIN of specified length (6-8 digits)."""
+    """Generate a random PIN of specified length (6-9 digits)."""
+    length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, length))
     first_digit = str(secrets.randbelow(9) + 1)  # 1-9
-    rest = ''.join(str(secrets.randbelow(10)) for _ in range(length - 1))  # 0-9
+    rest = ''.join(str(secrets.randbelow(10)) for _ in range(length - 1))
     return first_digit + rest
+
 
 def generate_day_phrases(words_per_phrase=3):
     phrases = {}
@@ -136,8 +259,8 @@ def hash_photo(image_data):
     return h
 
 
-def derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin=""):
-    """Derive encryption key from photo + phrase + PIN + date + salt."""
+def derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin="", rsa_key_data=None):
+    """Derive encryption key from photo + phrase + PIN + RSA key + date + salt."""
     photo_hash = hash_photo(photo_data)
 
     key_material = (
@@ -147,6 +270,10 @@ def derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin=""):
         date_str.encode() +
         salt
     )
+    
+    # Add RSA key hash if provided
+    if rsa_key_data:
+        key_material += hashlib.sha256(rsa_key_data).digest()
 
     if HAS_ARGON2:
         key = hash_secret_raw(
@@ -171,20 +298,23 @@ def derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin=""):
     return key
 
 
-def derive_pixel_key(photo_data, day_phrase, date_str, pin=""):
+def derive_pixel_key(photo_data, day_phrase, date_str, pin="", rsa_key_data=None):
     """Derive key for pixel selection."""
     photo_hash = hash_photo(photo_data)
     material = photo_hash + day_phrase.lower().encode() + pin.encode() + date_str.encode()
+    
+    if rsa_key_data:
+        material += hashlib.sha256(rsa_key_data).digest()
+    
     return hashlib.sha256(material + b"pixel_selection").digest()
 
 
-def encrypt_message(message, photo_data, day_phrase, date_str, pin=""):
+def encrypt_message(message, photo_data, day_phrase, date_str, pin="", rsa_key_data=None):
     """Encrypt message using hybrid key derivation."""
     salt = secrets.token_bytes(SALT_SIZE)
-    key = derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin)
+    key = derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin, rsa_key_data)
     iv = secrets.token_bytes(IV_SIZE)
 
-    # Random padding
     if isinstance(message, str):
         message = message.encode()
 
@@ -214,14 +344,8 @@ def encrypt_message(message, photo_data, day_phrase, date_str, pin=""):
 
 
 def generate_pixel_indices(key, num_pixels, num_needed):
-    """
-    Generate pseudo-random pixel indices.
-
-    Optimized: Instead of shuffling ALL pixels (slow for large images),
-    we generate indices directly using PRNG and handle collisions.
-    """
+    """Generate pseudo-random pixel indices."""
     if num_needed >= num_pixels // 2:
-        # If we need many pixels, fall back to shuffle (rare case)
         nonce = b'\x00' * 16
         cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
         encryptor = cipher.encryptor()
@@ -236,18 +360,14 @@ def generate_pixel_indices(key, num_pixels, num_needed):
 
         return indices[:num_needed]
 
-    # Optimized path: generate indices directly
-    # Use key to seed selection, ensuring deterministic results
     selected = []
     used = set()
 
-    # Generate random bytes for index selection
     nonce = b'\x00' * 16
     cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
     encryptor = cipher.encryptor()
 
-    # Generate more than needed to handle collisions
-    bytes_needed = (num_needed * 2) * 4  # 4 bytes per index, 2x for collisions
+    bytes_needed = (num_needed * 2) * 4
     random_bytes = encryptor.update(b'\x00' * bytes_needed)
 
     byte_offset = 0
@@ -259,7 +379,6 @@ def generate_pixel_indices(key, num_pixels, num_needed):
             used.add(idx)
             selected.append(idx)
 
-    # If we still need more (very unlikely), generate additional
     while len(selected) < num_needed:
         extra_bytes = encryptor.update(b'\x00' * 4)
         idx = int.from_bytes(extra_bytes, 'big') % num_pixels
@@ -343,7 +462,6 @@ def extract_from_image(image_data, pixel_key, bits_per_channel=1):
     num_pixels = len(pixels)
     bits_per_pixel = 3 * bits_per_channel
 
-    # First extract enough to get length
     initial_pixels = (32 + bits_per_pixel - 1) // bits_per_pixel + 10
     initial_indices = generate_pixel_indices(pixel_key, num_pixels, initial_pixels)
 
@@ -407,13 +525,13 @@ def parse_header(encrypted_data):
     return {'date': date_str, 'salt': salt, 'iv': iv, 'tag': tag, 'ciphertext': ciphertext}
 
 
-def decrypt_message(encrypted_data, photo_data, day_phrase, pin=""):
+def decrypt_message(encrypted_data, photo_data, day_phrase, pin="", rsa_key_data=None):
     """Decrypt message."""
     header = parse_header(encrypted_data)
     if not header:
         return None
 
-    key = derive_hybrid_key(photo_data, day_phrase, header['date'], header['salt'], pin)
+    key = derive_hybrid_key(photo_data, day_phrase, header['date'], header['salt'], pin, rsa_key_data)
 
     cipher = Cipher(
         algorithms.AES(key),
@@ -444,28 +562,42 @@ def index():
 def generate():
     if request.method == 'POST':
         words_per_phrase = int(request.form.get('words_per_phrase', 3))
+        
+        # Security factor options
+        use_pin = request.form.get('use_pin') == 'on'
+        use_rsa = request.form.get('use_rsa') == 'on'
+        
+        # Validate at least one factor selected
+        if not use_pin and not use_rsa:
+            flash('You must select at least one security factor (PIN or RSA Key)', 'error')
+            return render_template('generate.html', generated=False, has_ml=HAS_ML)
+        
         pin_length = int(request.form.get('pin_length', 6))
-
-        # Disable generate_stories for now (until much better)
-        #generate_stories = request.form.get('generate_stories') == 'on'
-        generate_stories = request.form.get('generate_stories') == 'off'
-
+        rsa_bits = int(request.form.get('rsa_bits', 2048))
+        
         # Clamp values to valid ranges
         words_per_phrase = max(3, min(12, words_per_phrase))
-        pin_length = max(6, min(8, pin_length))
+        pin_length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, pin_length))
+        if rsa_bits not in VALID_RSA_SIZES:
+            rsa_bits = 2048
 
         phrases = generate_day_phrases(words_per_phrase)
-        pin = generate_pin(pin_length)
+        
+        # Generate PIN if selected
+        pin = generate_pin(pin_length) if use_pin else None
+        
+        # Generate RSA key if selected
+        rsa_key_pem = None
+        if use_rsa:
+            private_key = generate_rsa_key(rsa_bits)
+            rsa_key_pem = export_rsa_key_pem(private_key, password=None).decode('utf-8')
 
         # Calculate entropy
-        phrase_entropy = words_per_phrase * 11  # ~11 bits per BIP-39 word
-        pin_entropy = int(pin_length * 3.32)    # log2(10) ≈ 3.32 bits per digit
-        total_entropy = phrase_entropy + pin_entropy
-
-        # Generate memory aid stories if requested
-        stories = None
-        if generate_stories:
-            stories = generate_all_stories(phrases, use_ml=HAS_ML)
+        phrase_entropy = words_per_phrase * 11
+        pin_entropy = int(pin_length * 3.32) if use_pin else 0
+        # RSA key adds significant entropy (conservatively estimate effective security)
+        rsa_entropy = min(rsa_bits // 16, 128) if use_rsa else 0  # ~128 bits effective for 2048-bit
+        total_entropy = phrase_entropy + pin_entropy + rsa_entropy
 
         return render_template('generate.html',
                              phrases=phrases,
@@ -473,13 +605,54 @@ def generate():
                              days=DAY_NAMES,
                              generated=True,
                              words_per_phrase=words_per_phrase,
-                             pin_length=pin_length,
+                             pin_length=pin_length if use_pin else None,
+                             use_pin=use_pin,
+                             use_rsa=use_rsa,
+                             rsa_bits=rsa_bits,
+                             rsa_key_pem=rsa_key_pem,
                              phrase_entropy=phrase_entropy,
                              pin_entropy=pin_entropy,
+                             rsa_entropy=rsa_entropy,
                              total_entropy=total_entropy,
-                             stories=stories,
                              has_ml=HAS_ML)
+    
     return render_template('generate.html', generated=False, has_ml=HAS_ML)
+
+
+@app.route('/generate/download-key', methods=['POST'])
+def download_key():
+    """Download RSA key as password-protected PEM file."""
+    key_pem = request.form.get('key_pem', '')
+    password = request.form.get('key_password', '')
+    
+    if not key_pem:
+        flash('No key to download', 'error')
+        return redirect(url_for('generate'))
+    
+    if not password or len(password) < 8:
+        flash('Password must be at least 8 characters', 'error')
+        return redirect(url_for('generate'))
+    
+    try:
+        # Load the unencrypted key
+        private_key = load_pem_private_key(key_pem.encode(), password=None, backend=default_backend())
+        
+        # Re-export with password protection
+        encrypted_pem = export_rsa_key_pem(private_key, password=password)
+        
+        # Generate filename
+        key_id = secrets.token_hex(4)
+        filename = f'stegasoo_key_{private_key.key_size}_{key_id}.pem'
+        
+        return send_file(
+            io.BytesIO(encrypted_pem),
+            mimetype='application/x-pem-file',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        flash(f'Error creating key file: {str(e)}', 'error')
+        return redirect(url_for('generate'))
 
 
 @app.route('/encode', methods=['GET', 'POST'])
@@ -491,6 +664,7 @@ def encode():
             # Get files
             ref_photo = request.files.get('reference_photo')
             carrier = request.files.get('carrier')
+            rsa_key_file = request.files.get('rsa_key')
 
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
@@ -503,55 +677,72 @@ def encode():
             # Get form data
             message = request.form.get('message', '')
             day_phrase = request.form.get('day_phrase', '')
-            pin = request.form.get('pin', '')
+            pin = request.form.get('pin', '').strip()
+            rsa_password = request.form.get('rsa_password', '')
 
-            if not message or not day_phrase:
-                flash('Message and day phrase are required', 'error')
+            # Validate message
+            valid, error = validate_message(message)
+            if not valid:
+                flash(error, 'error')
                 return render_template('encode.html', day_of_week=day_of_week)
 
-            # Check message size
-            if len(message) > MAX_MESSAGE_SIZE:
-                flash(f'Message too long. Max {MAX_MESSAGE_SIZE // 1000}KB allowed.', 'error')
+            if not day_phrase:
+                flash('Day phrase is required', 'error')
                 return render_template('encode.html', day_of_week=day_of_week)
 
             # Read files
             ref_data = ref_photo.read()
             carrier_data = carrier.read()
+            rsa_key_data = rsa_key_file.read() if rsa_key_file and rsa_key_file.filename else None
 
-            # Validate carrier image dimensions
-            try:
-                carrier_img = Image.open(io.BytesIO(carrier_data))
-                width, height = carrier_img.size
-                num_pixels = width * height
-
-                if num_pixels > MAX_IMAGE_PIXELS:
-                    max_dim = int(MAX_IMAGE_PIXELS ** 0.5)
-                    flash(f'Carrier image too large ({width}x{height} = {num_pixels:,} pixels). '
-                          f'Max ~{MAX_IMAGE_PIXELS:,} pixels ({max_dim}x{max_dim}). '
-                          f'Please resize your image.', 'error')
-                    return render_template('encode.html', day_of_week=day_of_week)
-            except Exception as e:
-                flash(f'Could not read carrier image: {str(e)}', 'error')
+            # Validate security factors
+            valid, error = validate_security_factors(pin, rsa_key_data)
+            if not valid:
+                flash(error, 'error')
                 return render_template('encode.html', day_of_week=day_of_week)
 
-            # Get date
-            date_str = datetime.now().strftime('%Y-%m-%d')
+            # Validate PIN if provided
+            if pin:
+                valid, error = validate_pin(pin)
+                if not valid:
+                    flash(error, 'error')
+                    return render_template('encode.html', day_of_week=day_of_week)
+
+            # Validate RSA key if provided
+            if rsa_key_data:
+                valid, error, key_size = validate_rsa_key(rsa_key_data, rsa_password if rsa_password else None)
+                if not valid:
+                    flash(error, 'error')
+                    return render_template('encode.html', day_of_week=day_of_week)
+
+            # Validate carrier image
+            valid, error = validate_image(carrier_data, "Carrier image")
+            if not valid:
+                flash(error, 'error')
+                return render_template('encode.html', day_of_week=day_of_week)
+
+            # Get date - use client's local date if provided
+            client_date = request.form.get('client_date', '').strip()
+            if client_date and len(client_date) == 10 and client_date[4] == '-' and client_date[7] == '-':
+                date_str = client_date
+            else:
+                date_str = datetime.now().strftime('%Y-%m-%d')
 
             # Encrypt
-            encrypted = encrypt_message(message, ref_data, day_phrase, date_str, pin)
+            encrypted = encrypt_message(message, ref_data, day_phrase, date_str, pin, rsa_key_data)
 
             # Get pixel key
-            pixel_key = derive_pixel_key(ref_data, day_phrase, date_str, pin)
+            pixel_key = derive_pixel_key(ref_data, day_phrase, date_str, pin, rsa_key_data)
 
             # Embed
             stego_data, stats = embed_in_image(carrier_data, encrypted, pixel_key)
 
             # Generate filename and file ID
-            filename = f'{secrets.token_hex(4)}_{datetime.now().strftime("%Y%m%d")}.png'
+            filename = f'{secrets.token_hex(4)}_{date_str.replace("-", "")}.png'
             file_id = secrets.token_urlsafe(16)
 
             # Store temporarily for download/share
-            cleanup_temp_files()  # Clean old files first
+            cleanup_temp_files()
             TEMP_FILES[file_id] = {
                 'data': stego_data,
                 'filename': filename,
@@ -625,6 +816,7 @@ def decode():
             # Get files
             ref_photo = request.files.get('reference_photo')
             stego_image = request.files.get('stego_image')
+            rsa_key_file = request.files.get('rsa_key')
 
             if not ref_photo or not stego_image:
                 flash('Both reference photo and stego image are required', 'error')
@@ -632,7 +824,8 @@ def decode():
 
             # Get form data
             day_phrase = request.form.get('day_phrase', '')
-            pin = request.form.get('pin', '')
+            pin = request.form.get('pin', '').strip()
+            rsa_password = request.form.get('rsa_password', '')
 
             if not day_phrase:
                 flash('Day phrase is required', 'error')
@@ -641,32 +834,50 @@ def decode():
             # Read files
             ref_data = ref_photo.read()
             stego_data = stego_image.read()
+            rsa_key_data = rsa_key_file.read() if rsa_key_file and rsa_key_file.filename else None
+
+            # Validate security factors
+            valid, error = validate_security_factors(pin, rsa_key_data)
+            if not valid:
+                flash(error, 'error')
+                return render_template('decode.html')
+
+            # Validate PIN if provided
+            if pin:
+                valid, error = validate_pin(pin)
+                if not valid:
+                    flash(error, 'error')
+                    return render_template('decode.html')
+
+            # Validate RSA key if provided
+            if rsa_key_data:
+                valid, error, key_size = validate_rsa_key(rsa_key_data, rsa_password if rsa_password else None)
+                if not valid:
+                    flash(error, 'error')
+                    return render_template('decode.html')
 
             # Try to extract and decrypt
-            # We need to try with today's date first for pixel key
             date_str = datetime.now().strftime('%Y-%m-%d')
-            pixel_key = derive_pixel_key(ref_data, day_phrase, date_str, pin)
+            pixel_key = derive_pixel_key(ref_data, day_phrase, date_str, pin, rsa_key_data)
 
             encrypted = extract_from_image(stego_data, pixel_key)
 
             if encrypted:
-                # Parse to get actual date
                 header = parse_header(encrypted)
                 if header and header['date'] != date_str:
-                    # Re-extract with correct date
-                    pixel_key = derive_pixel_key(ref_data, day_phrase, header['date'], pin)
+                    pixel_key = derive_pixel_key(ref_data, day_phrase, header['date'], pin, rsa_key_data)
                     encrypted = extract_from_image(stego_data, pixel_key)
 
             if not encrypted:
                 flash('Could not extract data. Check your inputs.', 'error')
                 return render_template('decode.html')
 
-            message = decrypt_message(encrypted, ref_data, day_phrase, pin)
+            message = decrypt_message(encrypted, ref_data, day_phrase, pin, rsa_key_data)
 
             if message:
                 return render_template('decode.html', decoded_message=message)
             else:
-                flash('Decryption failed. Wrong phrase, PIN, or reference photo.', 'error')
+                flash('Decryption failed. Wrong phrase, PIN, RSA key, or reference photo.', 'error')
                 return render_template('decode.html')
 
         except Exception as e:

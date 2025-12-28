@@ -11,6 +11,8 @@
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
+                    <input type="hidden" name="client_date" id="clientDate" value="">
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
@@ -64,27 +66,57 @@
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="col-md-8 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-chat-quote me-1"></i> {{ day_of_week }}'s Phrase
-                            </label>
-                            <input type="text" name="day_phrase" class="form-control" 
-                                   placeholder="e.g., correct horse battery" required>
-                            <div class="form-text">
-                                Your phrase for <strong>today</strong> (based on your local timezone)
-                            </div>
+                    <div class="mb-3">
+                        <label class="form-label" id="dayPhraseLabel">
+                            <i class="bi bi-chat-quote me-1"></i> {{ day_of_week }}'s Phrase
+                        </label>
+                        <input type="text" name="day_phrase" class="form-control" 
+                               placeholder="e.g., correct horse battery" required>
+                        <div class="form-text">
+                            Your phrase for <strong>today</strong> (based on your local timezone)
                         </div>
-                        
-                        <div class="col-md-4 mb-3">
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <h6 class="text-muted mb-3">
+                        SECURITY FACTORS 
+                        <span class="text-warning small">(provide at least one: PIN or RSA Key)</span>
+                    </h6>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-123 me-1"></i> PIN
                             </label>
-                            <input type="password" name="pin" class="form-control" 
-                                   placeholder="123456" maxlength="10">
+                            <input type="password" name="pin" class="form-control" id="pinInput"
+                                   placeholder="6-9 digits" maxlength="9">
                             <div class="form-text">
-                                Your static 6-digit PIN
+                                Your static 6-9 digit PIN (if configured)
                             </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
+                            </label>
+                            <input type="file" name="rsa_key" class="form-control" id="rsaKeyInput"
+                                   accept=".pem,.key">
+                            <div class="form-text">
+                                Your shared .pem key file (if configured)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- RSA Key Password (shown when key selected) -->
+                    <div class="mb-3 d-none" id="rsaPasswordGroup">
+                        <label class="form-label">
+                            <i class="bi bi-key me-1"></i> RSA Key Password
+                        </label>
+                        <input type="password" name="rsa_password" class="form-control"
+                               placeholder="Password for the .pem file (if encrypted)">
+                        <div class="form-text">
+                            Leave blank if your key file is not password-protected
                         </div>
                     </div>
                     
@@ -125,6 +157,34 @@
 
 {% block scripts %}
 <script>
+// Detect client's local date and day
+const now = new Date();
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const localDay = dayNames[now.getDay()];
+const localDate = now.getFullYear() + '-' + 
+    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+    String(now.getDate()).padStart(2, '0');
+
+// Update day label to client's local day
+const dayLabel = document.getElementById('dayPhraseLabel');
+if (dayLabel) {
+    dayLabel.innerHTML = `<i class="bi bi-chat-quote me-1"></i> ${localDay}'s Phrase`;
+}
+
+// Set hidden field with client's local date for server
+const dateInput = document.getElementById('clientDate');
+if (dateInput) {
+    dateInput.value = localDate;
+}
+
+// Show RSA password field when key is selected
+const rsaKeyInput = document.getElementById('rsaKeyInput');
+const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
+
+rsaKeyInput.addEventListener('change', function() {
+    rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
+});
+
 // Form submit loading state
 document.getElementById('encodeForm').addEventListener('submit', function(e) {
     const btn = document.getElementById('encodeBtn');
@@ -146,10 +206,7 @@ messageInput.addEventListener('input', function() {
     const pct = Math.round((len / maxChars) * 100);
     charPercent.textContent = pct + '%';
     
-    // Warning at 80%
     charWarning.classList.toggle('d-none', len < maxChars * 0.8);
-    
-    // Red text when near/over limit
     charCount.classList.toggle('text-danger', len > maxChars * 0.95);
 });
 
@@ -159,7 +216,6 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
     const label = zone.querySelector('.drop-zone-label');
     const preview = zone.querySelector('.drop-zone-preview');
     
-    // Drag events
     ['dragenter', 'dragover'].forEach(evt => {
         zone.addEventListener(evt, e => {
             e.preventDefault();
@@ -174,7 +230,6 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
         });
     });
     
-    // Handle drop
     zone.addEventListener('drop', e => {
         if (e.dataTransfer.files.length) {
             input.files = e.dataTransfer.files;
@@ -182,7 +237,6 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
         }
     });
     
-    // Handle click selection
     input.addEventListener('change', function() {
         if (this.files && this.files[0]) {
             showPreview(this.files[0]);
