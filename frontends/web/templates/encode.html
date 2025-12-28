@@ -86,14 +86,14 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-123 me-1"></i> PIN
-                            </label>
-                            <input type="password" name="pin" class="form-control" id="pinInput"
-                                   placeholder="6-9 digits" maxlength="9">
-                            <div class="form-text">
-                                Your static 6-9 digit PIN (if configured)
-                            </div>
+                          <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
+                          <div class="input-group">
+                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9">
+                            <button class="btn btn-outline-secondary" type="button" id="togglePin">
+                              <i class="bi bi-eye"></i>
+                            </button>
+                          </div>
+                        <div class="form-text">Your static 6-9 digit PIN (if configured)</div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -253,6 +253,62 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
             label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
         };
         reader.readAsDataURL(file);
+    }
+});
+// 1. PIN Toggle Logic
+document.getElementById('togglePin').addEventListener('click', function() {
+    const input = document.getElementById('pinInput');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+
+// 2. Prevent Same File Selection
+function checkDuplicateFiles() {
+    const refInput = document.querySelector('input[name="reference_photo"]');
+    const carInput = document.querySelector('input[name="carrier"]');
+    
+    if (refInput.files[0] && carInput.files[0]) {
+        // Compare name and size as a proxy for identical files
+        if (refInput.files[0].name === carInput.files[0].name && 
+            refInput.files[0].size === carInput.files[0].size) {
+            alert("Security Warning: You cannot use the same image for both Reference and Carrier!");
+            carInput.value = ''; // Clear carrier
+            document.getElementById('carrierPreview').classList.add('d-none');
+            document.querySelector('#carrierDropZone .drop-zone-label').innerHTML = 
+                '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>' +
+                '<span class="text-muted">Drop image or click to browse</span>';
+        }
+    }
+}
+document.querySelector('input[name="reference_photo"]').addEventListener('change', checkDuplicateFiles);
+document.querySelector('input[name="carrier"]').addEventListener('change', checkDuplicateFiles);
+
+// 3. Paste from Clipboard
+document.addEventListener('paste', function(e) {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+            const blob = items[i].getAsFile();
+            
+            // Priority: Fill Carrier first, if empty. Else fill Reference.
+            const carrierInput = document.querySelector('input[name="carrier"]');
+            const refInput = document.querySelector('input[name="reference_photo"]');
+            
+            const targetInput = (!carrierInput.files.length) ? carrierInput : refInput;
+            
+            const container = new DataTransfer();
+            container.items.add(blob);
+            targetInput.files = container.files;
+            
+            targetInput.dispatchEvent(new Event('change'));
+            break; // Only paste one image at a time
+        }
     }
 });
 </script>

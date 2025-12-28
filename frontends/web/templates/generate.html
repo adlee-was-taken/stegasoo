@@ -3,6 +3,18 @@
 {% block title %}Generate Credentials - Stegasoo{% endblock %}
 
 {% block content %}
+<style>
+    @media print {
+        body * { visibility: hidden; }
+        .card-body, .card-body * { visibility: visible; color: black !important; }
+        .card-body { position: absolute; left: 0; top: 0; width: 100%; margin: 0; border: none; }
+        .btn, .alert, form, .card-header { display: none !important; }
+        .table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #000 !important; padding: 8px; }
+        /* Hide the inputs, show the results */
+        #generateForm { display: none; }
+    }
+</style>
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card">
@@ -120,16 +132,16 @@
                 </div>
                 
                 {% if pin %}
-                <hr class="my-4">
+ 
                 <div class="text-center mb-4">
-                    <h6 class="text-muted mb-2">YOUR STATIC PIN</h6>
-                    <div class="pin-container">
-                        <div class="pin-display">{{ pin }}</div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">Use this {{ pin_length }}-digit PIN every day</small>
-                    </div>
+                  <h6 class="text-muted mb-2">YOUR STATIC PIN</h6>
+                  <div class="pin-container p-3 bg-dark border rounded fs-1 font-monospace text-white">
+                    {{ pin }}
+                  </div>
+                  <div class="mt-2 d-print-none"> <small class="text-muted">Use this {{ pin_length }}-digit PIN every day</small>
+                  </div>
                 </div>
+
                 {% endif %}
                 
                 {% if rsa_key_pem %}
