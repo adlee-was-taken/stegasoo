@@ -37,6 +37,9 @@ pip install stegasoo[api]
 
 # Everything
 pip install stegasoo[all]
+```
+
+## CLI Usage
 
 ```bash
 # Generate credentials
