@@ -23,7 +23,7 @@ A secure steganography system for hiding encrypted messages in images using hybr
 
 Front Page                 |  Encode                   |  Decode                  | Generate |
 :-------------------------:|:-------------------------:|:------------------------:|:--------:|
-![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI.webp)  |  ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Encode.webp)   | ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Decode.webp) ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Generate.webp)
+![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI.webp)  |  ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Encode.webp)   | ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Decode.webp) | ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Generate.webp)
 
 
 ## Installation
