@@ -19,9 +19,9 @@ A secure steganography system for hiding encrypted messages in images using hybr
 - 📱 **QR code support** - Encode/decode RSA keys via QR codes
 
 
-## Advanced WebUI
+## WebUI Preview
 
-
+![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI.webp)
 
 
 ## Installation
