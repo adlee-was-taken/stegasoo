@@ -113,9 +113,9 @@
                         <span class="text-warning small">(provide same factors used during encoding)</span>
                     </h6>
                     
-                    <!-- CHANGED SECTION: Updated column widths -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
+
                             <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                             <div class="input-group">
                                 <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9">
@@ -126,9 +126,10 @@
                             <div class="form-text">
                                 If PIN was used during encoding
                             </div>
+ 
                         </div>
                         
-                        <div class="col-md-8 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
@@ -149,7 +150,7 @@
                                     <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
                                 </div>
                                 <div class="tab-pane fade" id="rsaQrTabDec" role="tabpanel">
-                                    <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
+                                  <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
                                     <div class="form-text small">PNG, JPG, or other image of QR code</div>
                                 </div>
                             </div>

@@ -39,7 +39,7 @@ from stegasoo import (
 )
 from stegasoo.constants import (
     MAX_MESSAGE_SIZE, MIN_PIN_LENGTH, MAX_PIN_LENGTH,
-    VALID_RSA_SIZES, MAX_FILE_SIZE,
+    VALID_RSA_SIZES, MAX_FILE_SIZE, STEGASOO_VERSION
 )
 
 # QR Code support
@@ -754,7 +754,8 @@ def about():
     return render_template('about.html', 
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QRCODE_READ,
-        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
+        stegasoo_version=STEGASOO_VERSION
     )
 
 
