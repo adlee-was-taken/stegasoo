@@ -44,11 +44,13 @@ PBKDF2_ITERATIONS = 600000
 # INPUT LIMITS
 # ============================================================================
 
-MAX_IMAGE_PIXELS = 16_000_000     # ~16 megapixels (4000x4000)
+MAX_IMAGE_PIXELS = 24_000_000     # ~24 megapixels
 MAX_MESSAGE_SIZE = 250_000        # 250 KB (text messages)
-MAX_FILE_PAYLOAD_SIZE = 250_000   # 250 KB (file payloads)
 MAX_FILENAME_LENGTH = 255         # Max filename length to store
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB (upload limit)
+
+# Example in constants.py
+MAX_FILE_SIZE = 30 * 1024 * 1024  # 30MB total file size
+MAX_FILE_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB payload
 
 MIN_PIN_LENGTH = 6
 MAX_PIN_LENGTH = 9

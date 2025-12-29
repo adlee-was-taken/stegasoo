@@ -84,6 +84,36 @@ THUMBNAIL_FILES: dict[str, bytes] = {}
 TEMP_FILE_EXPIRY = 300  # 5 minutes
 THUMBNAIL_SIZE = (250, 250)  # Maximum dimensions for thumbnail
 
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+# Override stegasoo limits for larger files
+# Note: You might need to modify the stegasoo library itself
+# to actually increase these limits in its internal calculations
+
+# Flask upload limit (30MB)
+MAX_UPLOAD_SIZE = 30 * 1024 * 1024
+
+# Try to import and override stegasoo constants if possible
+try:
+    # Check current limits
+    print(f"Current MAX_FILE_SIZE from constants: {MAX_FILE_SIZE}")
+    print(f"Current MAX_FILE_PAYLOAD_SIZE: {MAX_FILE_PAYLOAD_SIZE}")
+    
+    # Try to increase payload size limit (in bytes)
+    # 15MB should be enough for 7.6MB files with overhead
+    DESIRED_PAYLOAD_SIZE = 15 * 1024 * 1024  # 15MB
+    
+    # Note: You might need to patch the stegasoo module
+    # if MAX_FILE_PAYLOAD_SIZE is used internally
+    import stegasoo
+    if hasattr(stegasoo, 'MAX_FILE_PAYLOAD_SIZE'):
+        print(f"Overriding MAX_FILE_PAYLOAD_SIZE to {DESIRED_PAYLOAD_SIZE}")
+        stegasoo.MAX_FILE_PAYLOAD_SIZE = DESIRED_PAYLOAD_SIZE
+    
+except Exception as e:
+    print(f"Could not override stegasoo limits: {e}")
 
 def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes:
     """Generate thumbnail from image data."""
