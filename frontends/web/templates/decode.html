@@ -269,7 +269,7 @@ function detectDayFromFilename(filename) {
 function updateDayLabel(dayName) {
     const label = document.getElementById('dayPhraseLabel');
     if (label && dayName) {
-        label.innerHTML = `<i class="bi bi-chat-quote me-1"></i> ${dayName}'s Phrase`;
+        label.innerHTML = `<i class="bi bi-chat-quote me-1"></i>Provide <span class="day-of-week-highlight">${dayName}</span>'s Phrase`;
     }
 }
 

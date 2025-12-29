@@ -298,7 +298,6 @@ stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456
 stegasoo info image.png</code></pre>
                 
                 <p class="small text-muted mt-3 mb-0">
-                    API version: {{ version }} &bull; 
                     <span class="badge bg-{% if has_argon2 %}success{% else %}warning{% endif %} me-1">
                         {% if has_argon2 %}Argon2 Available{% else %}PBKDF2 Fallback{% endif %}
                     </span>
