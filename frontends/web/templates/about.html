@@ -213,31 +213,39 @@
                     </div>
                 </div>
                 
+                <div class="alert alert-info small mt-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Note:</strong> The <code>/encode/multipart</code> endpoint returns the PNG image directly 
+                    (with headers indicating metadata), while <code>/decode/multipart</code> returns JSON. 
+                    Use <code>--output</code> flag to save responses to files.
+                </div>
+                
                 <h6 class="mt-4"><i class="bi bi-file-earmark-code me-2"></i>JSON API Examples</h6>
                 <pre class="bg-dark p-3 rounded"><code>// Generate credentials
 curl -X POST "http://localhost:8000/generate" \
   -H "Content-Type: application/json" \
   -d '{"use_pin": true, "use_rsa": false, "pin_length": 6, "words_per_phrase": 3}'
 
-// Encode text message
+// Encode text message (images must be base64 encoded first)
+// First encode images: base64 -w0 photo.jpg > photo.b64
 curl -X POST "http://localhost:8000/encode" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "secret message",
-    "reference_photo_base64": "BASE64_ENCODED_PHOTO",
-    "carrier_image_base64": "BASE64_ENCODED_IMAGE",
+    "reference_photo_base64": "'"$(cat photo.b64)"'",
+    "carrier_image_base64": "'"$(cat carrier.b64)"'",
     "day_phrase": "apple forest thunder",
     "pin": "123456"
   }'
 
-// Encode file (base64)
+// Encode file (base64) - encode file first: base64 -w0 document.pdf > doc.b64
 curl -X POST "http://localhost:8000/encode/file" \
   -H "Content-Type: application/json" \
   -d '{
-    "file_data_base64": "BASE64_ENCODED_FILE",
+    "file_data_base64": "'"$(cat doc.b64)"'",
     "filename": "document.pdf",
-    "reference_photo_base64": "BASE64_ENCODED_PHOTO",
-    "carrier_image_base64": "BASE64_ENCODED_IMAGE",
+    "reference_photo_base64": "'"$(cat photo.b64)"'",
+    "carrier_image_base64": "'"$(cat carrier.b64)"'",
     "day_phrase": "apple forest thunder",
     "pin": "123456"
   }'</code></pre>
@@ -252,17 +260,26 @@ curl -X POST "http://localhost:8000/encode/multipart" \
   -F "message=secret" \
   --output stego.png
 
-# Encode file with QR code key
+# Encode file (no message field when using payload_file)
 curl -X POST "http://localhost:8000/encode/multipart" \
   -F "day_phrase=apple forest thunder" \
   -F "pin=123456" \
   -F "reference_photo=@photo.jpg" \
   -F "carrier=@carrier.png" \
   -F "payload_file=@document.pdf" \
+  --output stego.png
+
+# Encode with RSA key from QR code (optional)
+curl -X POST "http://localhost:8000/encode/multipart" \
+  -F "day_phrase=apple forest thunder" \
+  -F "pin=123456" \
+  -F "reference_photo=@photo.jpg" \
+  -F "carrier=@carrier.png" \
+  -F "message=secret" \
   -F "rsa_key_qr=@keyqr.png" \
   --output stego.png
 
-# Decode with file uploads
+# Decode with file uploads (returns JSON)
 curl -X POST "http://localhost:8000/decode/multipart" \
   -F "day_phrase=apple forest thunder" \
   -F "pin=123456" \
@@ -275,7 +292,7 @@ curl -X POST "http://localhost:8000/decode/multipart" \
                     The API can extract RSA keys from QR code images. QR code reading requires 
                     <code>pyzbar</code> and <code>libzbar</code> system library.
                 </p>
-                <pre class="bg-dark p-3 rounded"><code># Extract key from QR code
+                <pre class="bg-dark p-3 rounded"><code># Extract key from QR code (returns JSON)
 curl -X POST "http://localhost:8000/extract-key-from-qr" \
   -F "qr_image=@keyqr.png"</code></pre>
                 
