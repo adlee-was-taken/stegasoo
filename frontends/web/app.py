@@ -76,7 +76,7 @@ from stegasoo.qr_utils import (
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
-app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 10MB max upload
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 20MB max upload
 
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
@@ -101,9 +101,7 @@ try:
     print(f"Current MAX_FILE_SIZE from constants: {MAX_FILE_SIZE}")
     print(f"Current MAX_FILE_PAYLOAD_SIZE: {MAX_FILE_PAYLOAD_SIZE}")
     
-    # Try to increase payload size limit (in bytes)
-    # 15MB should be enough for 7.6MB files with overhead
-    DESIRED_PAYLOAD_SIZE = 15 * 1024 * 1024  # 15MB
+    DESIRED_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB
     
     # Note: You might need to patch the stegasoo module
     # if MAX_FILE_PAYLOAD_SIZE is used internally
