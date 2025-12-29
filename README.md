@@ -22,24 +22,52 @@ A secure steganography system for hiding encrypted messages in images using hybr
 
 ### From PyPI (coming soon)
 
+# Stegasoo
+
+A secure steganography system for hiding encrypted messages in images using hybrid authentication.
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Security](https://img.shields.io/badge/Security-AES--256--GCM-red)
+
+## Features
+
+- 🔐 **AES-256-GCM** authenticated encryption
+- 🧠 **Argon2id** memory-hard key derivation (256MB RAM requirement)
+- 🎲 **Pseudo-random pixel selection** defeats steganalysis
+- 📅 **Daily key rotation** with BIP-39 passphrases
+- 🔑 **Multi-factor authentication**: PIN, RSA key, or both
+- 🖼️ **Reference photo** as "something you have"
+- 🌐 **Multiple interfaces**: CLI, Web UI, REST API
+- 📁 **File embedding** - Hide any file type (PDF, ZIP, documents)
+- 📱 **QR code support** - Encode/decode RSA keys via QR codes
+
+## Installation
+
+### From Source
+
 ```bash
-# Core library only
-pip install stegasoo
+# Clone the repository
+git clone https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo
 
-# With CLI
-pip install stegasoo[cli]
+# Install core library
+pip install -e .
 
-# With Web UI
-pip install stegasoo[web]
+# Install with CLI
+pip install -e ".[cli]"
 
-# With REST API
-pip install stegasoo[api]
+# Install with Web UI
+pip install -e ".[web]"
 
-# Everything
-pip install stegasoo[all]
+# Install with REST API
+pip install -e ".[api]"
+
+# Install everything
+pip install -e ".[all]"
 ```
 
-## CLI Usage
+### CLI Usage
 
 ```bash
 # Generate credentials
