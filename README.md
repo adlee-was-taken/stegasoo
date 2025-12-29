@@ -128,10 +128,10 @@ curl -X POST http://localhost:8000/decode/multipart \
 | Component | Entropy | Purpose |
 |-----------|---------|---------|
 | Reference Photo | ~80-256 bits | Something you have |
-| Day Phrase (3 words) | ~33 bits | Something you know (rotates daily) |
-| PIN (6 digits) | ~20 bits | Something you know (static) |
+| Day Phrase (3-12 words) | ~33-100+ bits | Something you know (rotates daily) |
+| PIN (6-9 digits) | ~20+ bits | Something you know (static) |
 | RSA Key (2048-bit) | ~128 bits | Something you have |
-| **Combined** | **133-400+ bits** | **Beyond brute force** |
+| **Combined** | **~133-400+ bits** | **Beyond brute force** |
 
 ### Attack Resistance
 
