@@ -216,9 +216,7 @@ def generate():
             
             if creds.rsa_key_pem and HAS_QRCODE:
                 # Check if key fits in QR code
-                if can_fit_in_qr(creds.rsa_key_pem, compress=False):
-                    qr_needs_compression = False
-                elif can_fit_in_qr(creds.rsa_key_pem, compress=True):
+                if can_fit_in_qr(creds.rsa_key_pem, compress=True):
                     qr_needs_compression = True
                 else:
                     qr_too_large = True
