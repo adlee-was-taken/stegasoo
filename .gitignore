@@ -26,6 +26,9 @@ venv/
 ENV/
 env/
 
+# Old versions of code files.
+old_files/
+
 # IDE
 .idea/
 .vscode/
