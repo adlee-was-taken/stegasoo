@@ -18,6 +18,12 @@ A secure steganography system for hiding encrypted messages in images using hybr
 - 📁 **File embedding** - Hide any file type (PDF, ZIP, documents)
 - 📱 **QR code support** - Encode/decode RSA keys via QR codes
 
+
+## Advanced WebUI
+
+
+
+
 ## Installation
 
 ### From Source
