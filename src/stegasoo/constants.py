@@ -11,7 +11,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "2.0.1"
+__version__ = "2.1.3"
 
 # ============================================================================
 # FILE FORMAT
@@ -19,6 +19,10 @@ __version__ = "2.0.1"
 
 MAGIC_HEADER = b'\x89ST3'
 FORMAT_VERSION = 3
+
+# Payload type markers
+PAYLOAD_TEXT = 0x01
+PAYLOAD_FILE = 0x02
 
 # ============================================================================
 # CRYPTO PARAMETERS
@@ -40,9 +44,13 @@ PBKDF2_ITERATIONS = 600000
 # INPUT LIMITS
 # ============================================================================
 
-MAX_IMAGE_PIXELS = 4_000_000      # ~4 megapixels (2000x2000)
-MAX_MESSAGE_SIZE = 50_000         # 50 KB
-MAX_FILE_SIZE = 5 * 1024 * 1024   # 5 MB
+MAX_IMAGE_PIXELS = 24_000_000     # ~24 megapixels
+MAX_MESSAGE_SIZE = 250_000        # 250 KB (text messages)
+MAX_FILENAME_LENGTH = 255         # Max filename length to store
+
+# Example in constants.py
+MAX_FILE_SIZE = 30 * 1024 * 1024  # 30MB total file size
+MAX_FILE_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB payload
 
 MIN_PIN_LENGTH = 6
 MAX_PIN_LENGTH = 9
@@ -78,11 +86,17 @@ DAY_NAMES = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 def get_data_dir() -> Path:
     """Get the data directory path."""
     # Check multiple locations
+    # From src/stegasoo/constants.py:
+    #   .parent = src/stegasoo/
+    #   .parent.parent = src/
+    #   .parent.parent.parent = project root (where data/ lives)
     candidates = [
-        Path(__file__).parent.parent.parent.parent / 'data',  # Development
+        Path(__file__).parent.parent.parent / 'data',          # Development: src/stegasoo -> project root
         Path(__file__).parent / 'data',                        # Installed package
         Path('/app/data'),                                     # Docker
         Path.cwd() / 'data',                                   # Current directory
+        Path.cwd().parent / 'data',                            # One level up from cwd
+        Path.cwd().parent.parent / 'data',                     # Two levels up from cwd
     ]
     
     for path in candidates:

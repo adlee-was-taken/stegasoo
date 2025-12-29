@@ -45,15 +45,19 @@ dependencies = [
 [project.optional-dependencies]
 cli = [
     "click>=8.0.0",
+    "qrcode>=7.30"
 ]
 web = [
     "flask>=3.0.0",
     "gunicorn>=21.0.0",
+    "qrcode>=7.3.0",
+    "pyzbar",
 ]
 api = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
     "python-multipart>=0.0.6",
+    "qrcode>=7.30",
 ]
 all = [
     "stegasoo[cli,web,api]",

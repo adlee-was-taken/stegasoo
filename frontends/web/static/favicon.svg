@@ -1,112 +1,86 @@
 <svg width="32" height="32" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- Sunset gradient in the photo -->
     <linearGradient id="sunsetGradientFavicon" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFD873"/>
-      <stop offset="40%" stop-color="#FF7E88"/>
-      <stop offset="75%" stop-color="#D45BFF"/>
-      <stop offset="100%" stop-color="#3B2A88"/>
+      <stop offset="0%" stop-color="#FFD873"></stop>
+      <stop offset="40%" stop-color="#FF7E88"></stop>
+      <stop offset="75%" stop-color="#D45BFF"></stop>
+      <stop offset="100%" stop-color="#3B2A88"></stop>
     </linearGradient>
 
+    <!-- Caption / cipher gradient -->
     <linearGradient id="cipherGradientFavicon" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#D2C8FF" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#A796FF" stop-opacity="1"/>
+      <stop offset="0%" stop-color="#D2C8FF" stop-opacity="1"></stop>
+      <stop offset="100%" stop-color="#A796FF" stop-opacity="1"></stop>
     </linearGradient>
 
+    <!-- GOLD lock body gradient -->
     <linearGradient id="lockBodyGradientFavicon" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFF4C7"/>
-      <stop offset="40%" stop-color="#F7D978"/>
-      <stop offset="100%" stop-color="#D49A27"/>
+      <stop offset="0%" stop-color="#FFF4C7"></stop>
+      <stop offset="40%" stop-color="#F7D978"></stop>
+      <stop offset="100%" stop-color="#D49A27"></stop>
     </linearGradient>
 
-    <filter id="lockShadowFavicon" x="-15%" y="-15%" width="130%" height="130%">
-      <feDropShadow dx="0" dy="1" stdDeviation="0.8"
-                    flood-color="#000000" flood-opacity="0.45"/>
+    <!-- STRONG, CRISP LOCK SHADOW -->
+    <filter id="lockShadowFavicon" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.4" flood-color="#000000" flood-opacity="0.9"></feDropShadow>
     </filter>
   </defs>
 
-  <!-- Inset and scaled: margin + size tweak -->
+  <!-- Inset and scaled slightly so nothing clips -->
   <g transform="translate(5 5) scale(0.9)">
     <g transform="rotate(-6 38 44)">
       <!-- Frame -->
-      <rect x="0" y="0" width="76" height="88"
-            rx="1" ry="1"
-            fill="#FCFCFF"
-            stroke="#E0E0F4"
-            stroke-width="1"/>
+      <rect x="0" y="0" width="76" height="88" rx="1" ry="1" fill="#FCFCFF" stroke="#E0E0F4" stroke-width="1"></rect>
 
-      <!-- Photo area (left edge at x=6) -->
-      <rect x="6" y="6" width="64" height="48"
-            rx="0.5" ry="0.5"
-            fill="url(#sunsetGradientFavicon)"
-            stroke="#3C3C46"
-            stroke-width="1"
-            stroke-opacity="0.7"/>
+      <!-- Photo area -->
+      <rect x="6" y="6" width="64" height="48" rx="0.5" ry="0.5" fill="url(#sunsetGradientFavicon)" stroke="#3C3C46" stroke-width="1" stroke-opacity="0.7"></rect>
 
-      <!-- FAR BACKGROUND BUILDINGS -->
+      <!-- Far background buildings -->
       <g fill="#59407E" opacity="0.55">
-        <rect x="20" y="35" width="4" height="7"/>
-        <rect x="32" y="32" width="5" height="10"/>
-        <rect x="34" y="30.5" width="0.7" height="2.3"/>
-        <rect x="46" y="34" width="4" height="8"/>
-        <rect x="51" y="36" width="3" height="6"/>
+        <rect x="20" y="35" width="4" height="7"></rect>
+        <rect x="32" y="32" width="5" height="10"></rect>
+        <rect x="34" y="30.5" width="0.7" height="2.3"></rect>
+        <rect x="46" y="34" width="4" height="8"></rect>
+        <rect x="51" y="36" width="3" height="6"></rect>
       </g>
 
       <!-- Hills / skyline -->
-      <path d="M6 44 Q22 36 36 39 T70 42 L70 54 L6 54 Z"
-            fill="#351C6A" opacity="1"/>
+      <path d="M6 44 Q22 36 36 39 T70 42 L70 54 L6 54 Z" fill="#351C6A" opacity="1"></path>
 
       <!-- Sun -->
-      <circle cx="54" cy="18" r="7" fill="#FFEBA9" opacity="0.96"/>
+      <circle cx="54" cy="18" r="7" fill="#FFEBA9" opacity="0.96"></circle>
 
       <!-- Bottom caption area -->
-      <rect x="1" y="54" width="74" height="32"
-            fill="#F5F3FF" opacity="0.9"/>
+      <rect x="1" y="54" width="74" height="32" fill="#F5F3FF" opacity="0.9"></rect>
 
-      <!-- DARKER "WRITING": two lines aligned to photo left (x = 6) -->
+      <!-- "Writing": 2 lines aligned to photo left (x = 6) -->
       <g transform="translate(6 62)">
-        <rect x="0"  y="0"  width="30" height="3.4" rx="1.7"
-              fill="url(#cipherGradientFavicon)"/>
-        <rect x="0"  y="6"  width="20" height="3.2" rx="1.6"
-              fill="url(#cipherGradientFavicon)" opacity="0.85"/>
+        <rect x="0" y="0" width="30" height="3.4" rx="1.7" fill="url(#cipherGradientFavicon)"></rect>
+        <rect x="0" y="6" width="20" height="3.2" rx="1.6" fill="url(#cipherGradientFavicon)" opacity="0.85"></rect>
       </g>
 
-      <!-- Large gold lock hanging over corner -->
+      <!-- Gold lock overlapping corner -->
       <g transform="translate(41.32 51.15) scale(1.86)" filter="url(#lockShadowFavicon)">
-        <rect x="0" y="6" width="24" height="18"
-              rx="3" ry="3"
-              fill="url(#lockBodyGradientFavicon)"
-              stroke="#8A6115"
-              stroke-width="0.9"/>
+        <rect x="0" y="6" width="24" height="18" rx="3" ry="3" fill="url(#lockBodyGradientFavicon)" stroke="#8A6115" stroke-width="0.9"></rect>
 
-        <rect x="2.2" y="8.2" width="19.6" height="8"
-              rx="2" ry="2"
-              fill="#FFFFFF"
-              opacity="0.16"/>
+        <rect x="2.2" y="8.2" width="19.6" height="8" rx="2" ry="2" fill="#FFFFFF" opacity="0.16"></rect>
 
-        <circle cx="3.4" cy="9.4" r="0.7" fill="#C28A24" opacity="0.9"/>
-        <circle cx="20.6" cy="9.4" r="0.7" fill="#C28A24" opacity="0.9"/>
+        <circle cx="3.4" cy="9.4" r="0.7" fill="#C28A24" opacity="0.9"></circle>
+        <circle cx="20.6" cy="9.4" r="0.7" fill="#C28A24" opacity="0.9"></circle>
 
-        <rect x="7.2" y="8.4" width="3.6" height="13"
-              fill="#FFFFFF" opacity="0.10"/>
+        <rect x="7.2" y="8.4" width="3.6" height="13" fill="#FFFFFF" opacity="0.10"></rect>
 
-        <rect x="2.2" y="17.2" width="19.6" height="1.5"
-              rx="0.75" fill="#A46D16" opacity="0.45"/>
+        <rect x="2.2" y="17.2" width="19.6" height="1.5" rx="0.75" fill="#A46D16" opacity="0.45"></rect>
 
         <path d="M6 7.5
                  v-3.7
                  a5 5 0 0 1 12 0
-                 v3.7"
-              fill="none"
-              stroke="#C28A24"
-              stroke-width="2.4"
-              stroke-linecap="round"/>
+                 v3.7" fill="none" stroke="#C28A24" stroke-width="2.4" stroke-linecap="round"></path>
 
-        <circle cx="12" cy="15" r="2.3" fill="#4A3210"/>
-        <rect x="11.2" y="15.7" width="1.6" height="3.4"
-              rx="0.8" fill="#2F1F08"/>
+        <circle cx="12" cy="15" r="2.3" fill="#4A3210"></circle>
+        <rect x="11.2" y="15.7" width="1.6" height="3.4" rx="0.8" fill="#2F1F08"></rect>
       </g>
     </g>
   </g>
 </svg>
-
-

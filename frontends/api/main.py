@@ -3,7 +3,7 @@
 Stegasoo REST API
 
 FastAPI-based REST API for steganography operations.
-Designed for integration with other services and automation.
+Supports both text messages and file embedding.
 """
 
 import io
@@ -28,12 +28,25 @@ from stegasoo import (
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
+    FilePayload,
+    MAX_FILE_PAYLOAD_SIZE,
 )
 from stegasoo.constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
     MIN_PHRASE_WORDS, MAX_PHRASE_WORDS,
     VALID_RSA_SIZES,
 )
+
+# QR Code utilities
+try:
+    from stegasoo.qr_utils import (
+        extract_key_from_qr,
+        has_qr_read,
+    )
+    HAS_QR_READ = has_qr_read()
+except ImportError:
+    HAS_QR_READ = False
+    extract_key_from_qr = None
 
 
 # ============================================================================
@@ -42,7 +55,7 @@ from stegasoo.constants import (
 
 app = FastAPI(
     title="Stegasoo API",
-    description="Secure steganography with hybrid authentication",
+    description="Secure steganography with hybrid authentication. Supports text messages and file embedding.",
     version=__version__,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -79,6 +92,20 @@ class EncodeRequest(BaseModel):
     date_str: Optional[str] = None
 
 
+class EncodeFileRequest(BaseModel):
+    """Request for embedding a file (base64-encoded)."""
+    file_data_base64: str
+    filename: str
+    mime_type: Optional[str] = None
+    reference_photo_base64: str
+    carrier_image_base64: str
+    day_phrase: str
+    pin: str = ""
+    rsa_key_base64: Optional[str] = None
+    rsa_password: Optional[str] = None
+    date_str: Optional[str] = None
+
+
 class EncodeResponse(BaseModel):
     stego_image_base64: str
     filename: str
@@ -97,7 +124,12 @@ class DecodeRequest(BaseModel):
 
 
 class DecodeResponse(BaseModel):
-    message: str
+    """Response for decode - can be text or file."""
+    payload_type: str  # 'text' or 'file'
+    message: Optional[str] = None  # For text
+    file_data_base64: Optional[str] = None  # For file (base64-encoded)
+    filename: Optional[str] = None  # For file
+    mime_type: Optional[str] = None  # For file
 
 
 class ImageInfoResponse(BaseModel):
@@ -111,7 +143,15 @@ class ImageInfoResponse(BaseModel):
 class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
+    has_qrcode_read: bool
     day_names: list[str]
+    max_payload_kb: int
+
+
+class QrExtractResponse(BaseModel):
+    success: bool
+    key_pem: Optional[str] = None
+    error: Optional[str] = None
 
 
 class ErrorResponse(BaseModel):
@@ -129,8 +169,41 @@ async def root():
     return StatusResponse(
         version=__version__,
         has_argon2=has_argon2(),
-        day_names=list(DAY_NAMES)
+        has_qrcode_read=HAS_QR_READ,
+        day_names=list(DAY_NAMES),
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
     )
+
+
+@app.post("/extract-key-from-qr", response_model=QrExtractResponse)
+async def api_extract_key_from_qr(
+    qr_image: UploadFile = File(..., description="QR code image containing RSA key")
+):
+    """
+    Extract RSA key from a QR code image.
+    
+    Supports both compressed (STEGASOO-Z: prefix) and uncompressed keys.
+    Returns the PEM-encoded key if found.
+    """
+    if not HAS_QR_READ:
+        raise HTTPException(
+            501,
+            "QR code reading not available. Install pyzbar and libzbar."
+        )
+    
+    try:
+        image_data = await qr_image.read()
+        key_pem = extract_key_from_qr(image_data)
+        
+        if key_pem:
+            return QrExtractResponse(success=True, key_pem=key_pem)
+        else:
+            return QrExtractResponse(
+                success=False,
+                error="No valid RSA key found in QR code"
+            )
+    except Exception as e:
+        return QrExtractResponse(success=False, error=str(e))
 
 
 @app.post("/generate", response_model=GenerateResponse)
@@ -173,7 +246,7 @@ async def api_generate(request: GenerateRequest):
 @app.post("/encode", response_model=EncodeResponse)
 async def api_encode(request: EncodeRequest):
     """
-    Encode a secret message into an image.
+    Encode a text message into an image.
     
     Images must be base64-encoded. Returns base64-encoded stego image.
     """
@@ -194,8 +267,55 @@ async def api_encode(request: EncodeRequest):
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
+        day_of_week = get_day_from_date(result.date_used)
         
-        # Get day of week from the date used
+        return EncodeResponse(
+            stego_image_base64=stego_b64,
+            filename=result.filename,
+            capacity_used_percent=result.capacity_percent,
+            date_used=result.date_used,
+            day_of_week=day_of_week
+        )
+        
+    except CapacityError as e:
+        raise HTTPException(400, str(e))
+    except StegasooError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/encode/file", response_model=EncodeResponse)
+async def api_encode_file(request: EncodeFileRequest):
+    """
+    Encode a file into an image (JSON with base64).
+    
+    File data must be base64-encoded.
+    """
+    try:
+        file_data = base64.b64decode(request.file_data_base64)
+        ref_photo = base64.b64decode(request.reference_photo_base64)
+        carrier = base64.b64decode(request.carrier_image_base64)
+        rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
+        
+        payload = FilePayload(
+            data=file_data,
+            filename=request.filename,
+            mime_type=request.mime_type
+        )
+        
+        result = encode(
+            message=payload,
+            reference_photo=ref_photo,
+            carrier_image=carrier,
+            day_phrase=request.day_phrase,
+            pin=request.pin,
+            rsa_key_data=rsa_key,
+            rsa_password=request.rsa_password,
+            date_str=request.date_str
+        )
+        
+        stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
         day_of_week = get_day_from_date(result.date_used)
         
         return EncodeResponse(
@@ -217,16 +337,16 @@ async def api_encode(request: EncodeRequest):
 @app.post("/decode", response_model=DecodeResponse)
 async def api_decode(request: DecodeRequest):
     """
-    Decode a secret message from a stego image.
+    Decode a message or file from a stego image.
     
-    Images must be base64-encoded.
+    Returns payload_type to indicate if result is text or file.
     """
     try:
         stego = base64.b64decode(request.stego_image_base64)
         ref_photo = base64.b64decode(request.reference_photo_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
         
-        message = decode(
+        result = decode(
             stego_image=stego,
             reference_photo=ref_photo,
             day_phrase=request.day_phrase,
@@ -235,7 +355,18 @@ async def api_decode(request: DecodeRequest):
             rsa_password=request.rsa_password
         )
         
-        return DecodeResponse(message=message)
+        if result.is_file:
+            return DecodeResponse(
+                payload_type='file',
+                file_data_base64=base64.b64encode(result.file_data).decode('utf-8'),
+                filename=result.filename,
+                mime_type=result.mime_type
+            )
+        else:
+            return DecodeResponse(
+                payload_type='text',
+                message=result.message
+            )
         
     except DecryptionError as e:
         raise HTTPException(401, "Decryption failed. Check credentials.")
@@ -247,37 +378,74 @@ async def api_decode(request: DecodeRequest):
 
 @app.post("/encode/multipart")
 async def api_encode_multipart(
-    message: str = Form(...),
     day_phrase: str = Form(...),
     reference_photo: UploadFile = File(...),
     carrier: UploadFile = File(...),
+    message: str = Form(""),
+    payload_file: Optional[UploadFile] = File(None),
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
+    rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
     date_str: str = Form("")
 ):
     """
     Encode using multipart form data (file uploads).
     
+    Provide either 'message' (text) or 'payload_file' (binary file).
+    RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns the stego image directly as PNG with metadata headers.
     """
     try:
         ref_data = await reference_photo.read()
         carrier_data = await carrier.read()
-        rsa_key_data = await rsa_key.read() if rsa_key else None
+        
+        # Handle RSA key from .pem file or QR code image
+        rsa_key_data = None
+        rsa_key_from_qr = False
+        
+        if rsa_key and rsa_key.filename:
+            rsa_key_data = await rsa_key.read()
+        elif rsa_key_qr and rsa_key_qr.filename:
+            if not HAS_QR_READ:
+                raise HTTPException(
+                    501,
+                    "QR code reading not available. Install pyzbar and libzbar."
+                )
+            qr_image_data = await rsa_key_qr.read()
+            key_pem = extract_key_from_qr(qr_image_data)
+            if not key_pem:
+                raise HTTPException(400, "Could not extract RSA key from QR code image")
+            rsa_key_data = key_pem.encode('utf-8')
+            rsa_key_from_qr = True
+        
+        # QR code keys are never password-protected
+        effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
+        
+        # Determine payload
+        if payload_file and payload_file.filename:
+            file_data = await payload_file.read()
+            payload = FilePayload(
+                data=file_data,
+                filename=payload_file.filename,
+                mime_type=payload_file.content_type
+            )
+        elif message:
+            payload = message
+        else:
+            raise HTTPException(400, "Must provide either 'message' or 'payload_file'")
         
         result = encode(
-            message=message,
+            message=payload,
             reference_photo=ref_data,
             carrier_image=carrier_data,
             day_phrase=day_phrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
-            rsa_password=rsa_password if rsa_password else None,
+            rsa_password=effective_password,
             date_str=date_str if date_str else None
         )
         
-        # Get day of week from the date used
         day_of_week = get_day_from_date(result.date_used)
         
         return Response(
@@ -306,26 +474,62 @@ async def api_decode_multipart(
     stego_image: UploadFile = File(...),
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
+    rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form("")
 ):
     """
     Decode using multipart form data (file uploads).
+    
+    RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
+    Returns JSON with payload_type indicating text or file.
     """
     try:
         ref_data = await reference_photo.read()
         stego_data = await stego_image.read()
-        rsa_key_data = await rsa_key.read() if rsa_key else None
         
-        message = decode(
+        # Handle RSA key from .pem file or QR code image
+        rsa_key_data = None
+        rsa_key_from_qr = False
+        
+        if rsa_key and rsa_key.filename:
+            rsa_key_data = await rsa_key.read()
+        elif rsa_key_qr and rsa_key_qr.filename:
+            if not HAS_QR_READ:
+                raise HTTPException(
+                    501,
+                    "QR code reading not available. Install pyzbar and libzbar."
+                )
+            qr_image_data = await rsa_key_qr.read()
+            key_pem = extract_key_from_qr(qr_image_data)
+            if not key_pem:
+                raise HTTPException(400, "Could not extract RSA key from QR code image")
+            rsa_key_data = key_pem.encode('utf-8')
+            rsa_key_from_qr = True
+        
+        # QR code keys are never password-protected
+        effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
+        
+        result = decode(
             stego_image=stego_data,
             reference_photo=ref_data,
             day_phrase=day_phrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
-            rsa_password=rsa_password if rsa_password else None
+            rsa_password=effective_password
         )
         
-        return DecodeResponse(message=message)
+        if result.is_file:
+            return DecodeResponse(
+                payload_type='file',
+                file_data_base64=base64.b64encode(result.file_data).decode('utf-8'),
+                filename=result.filename,
+                mime_type=result.mime_type
+            )
+        else:
+            return DecodeResponse(
+                payload_type='text',
+                message=result.message
+            )
         
     except DecryptionError:
         raise HTTPException(401, "Decryption failed. Check credentials.")

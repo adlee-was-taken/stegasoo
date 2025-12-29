@@ -22,6 +22,7 @@ from stegasoo import (
     decode,
     DAY_NAMES,
 )
+from stegasoo.steganography import get_output_format, get_image_format
 
 
 class TestKeygen:
@@ -127,19 +128,71 @@ class TestValidation:
         assert not result.is_valid
 
 
+class TestOutputFormat:
+    """Test output format detection and preservation."""
+    
+    def test_png_stays_png(self):
+        fmt, ext = get_output_format('PNG')
+        assert fmt == 'PNG'
+        assert ext == 'png'
+    
+    def test_bmp_stays_bmp(self):
+        fmt, ext = get_output_format('BMP')
+        assert fmt == 'BMP'
+        assert ext == 'bmp'
+    
+    def test_jpeg_becomes_png(self):
+        fmt, ext = get_output_format('JPEG')
+        assert fmt == 'PNG'
+        assert ext == 'png'
+    
+    def test_gif_becomes_png(self):
+        fmt, ext = get_output_format('GIF')
+        assert fmt == 'PNG'
+        assert ext == 'png'
+    
+    def test_none_becomes_png(self):
+        fmt, ext = get_output_format(None)
+        assert fmt == 'PNG'
+        assert ext == 'png'
+    
+    def test_unknown_becomes_png(self):
+        fmt, ext = get_output_format('WEBP')
+        assert fmt == 'PNG'
+        assert ext == 'png'
+
+
 class TestEncodeDecode:
     """Test encoding and decoding (requires test images)."""
     
     @pytest.fixture
-    def test_image(self):
-        """Create a simple test image."""
+    def png_image(self):
+        """Create a simple PNG test image."""
         from PIL import Image
         img = Image.new('RGB', (100, 100), color='red')
         buf = io.BytesIO()
         img.save(buf, format='PNG')
         return buf.getvalue()
     
-    def test_encode_decode_roundtrip(self, test_image):
+    @pytest.fixture
+    def bmp_image(self):
+        """Create a simple BMP test image."""
+        from PIL import Image
+        img = Image.new('RGB', (100, 100), color='blue')
+        buf = io.BytesIO()
+        img.save(buf, format='BMP')
+        return buf.getvalue()
+    
+    @pytest.fixture
+    def jpeg_image(self):
+        """Create a simple JPEG test image."""
+        from PIL import Image
+        img = Image.new('RGB', (100, 100), color='green')
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=95)
+        return buf.getvalue()
+    
+    def test_encode_decode_roundtrip(self, png_image):
         """Test full encode/decode cycle."""
         message = "Secret message!"
         phrase = "apple forest thunder"
@@ -147,8 +200,8 @@ class TestEncodeDecode:
         
         result = encode(
             message=message,
-            reference_photo=test_image,
-            carrier_image=test_image,
+            reference_photo=png_image,
+            carrier_image=png_image,
             day_phrase=phrase,
             pin=pin
         )
@@ -159,19 +212,89 @@ class TestEncodeDecode:
         
         decoded = decode(
             stego_image=result.stego_image,
-            reference_photo=test_image,
+            reference_photo=png_image,
             day_phrase=phrase,
             pin=pin
         )
         
         assert decoded == message
     
-    def test_wrong_pin_fails(self, test_image):
+    def test_png_carrier_produces_png(self, png_image):
+        """Test that PNG carrier produces PNG output."""
+        result = encode(
+            message="Test",
+            reference_photo=png_image,
+            carrier_image=png_image,
+            day_phrase="test phrase here",
+            pin="123456"
+        )
+        
+        assert result.filename.endswith('.png')
+        # Verify actual format
+        output_format = get_image_format(result.stego_image)
+        assert output_format == 'PNG'
+    
+    def test_bmp_carrier_produces_bmp(self, bmp_image, png_image):
+        """Test that BMP carrier produces BMP output."""
+        result = encode(
+            message="Test",
+            reference_photo=png_image,
+            carrier_image=bmp_image,
+            day_phrase="test phrase here",
+            pin="123456"
+        )
+        
+        assert result.filename.endswith('.bmp')
+        # Verify actual format
+        output_format = get_image_format(result.stego_image)
+        assert output_format == 'BMP'
+    
+    def test_jpeg_carrier_produces_png(self, jpeg_image, png_image):
+        """Test that JPEG carrier produces PNG output (lossy -> lossless)."""
+        result = encode(
+            message="Test",
+            reference_photo=png_image,
+            carrier_image=jpeg_image,
+            day_phrase="test phrase here",
+            pin="123456"
+        )
+        
+        assert result.filename.endswith('.png')
+        # Verify actual format
+        output_format = get_image_format(result.stego_image)
+        assert output_format == 'PNG'
+    
+    def test_bmp_roundtrip(self, bmp_image, png_image):
+        """Test full encode/decode cycle with BMP."""
+        message = "BMP test message!"
+        phrase = "test phrase words"
+        pin = "123456"
+        
+        result = encode(
+            message=message,
+            reference_photo=png_image,
+            carrier_image=bmp_image,
+            day_phrase=phrase,
+            pin=pin
+        )
+        
+        assert result.filename.endswith('.bmp')
+        
+        decoded = decode(
+            stego_image=result.stego_image,
+            reference_photo=png_image,
+            day_phrase=phrase,
+            pin=pin
+        )
+        
+        assert decoded == message
+    
+    def test_wrong_pin_fails(self, png_image):
         """Test that wrong PIN fails to decode."""
         result = encode(
             message="Secret",
-            reference_photo=test_image,
-            carrier_image=test_image,
+            reference_photo=png_image,
+            carrier_image=png_image,
             day_phrase="test phrase here",
             pin="123456"
         )
@@ -179,17 +302,17 @@ class TestEncodeDecode:
         with pytest.raises(stegasoo.DecryptionError):
             decode(
                 stego_image=result.stego_image,
-                reference_photo=test_image,
+                reference_photo=png_image,
                 day_phrase="test phrase here",
                 pin="654321"  # Wrong PIN
             )
     
-    def test_wrong_phrase_fails(self, test_image):
+    def test_wrong_phrase_fails(self, png_image):
         """Test that wrong phrase fails to decode."""
         result = encode(
             message="Secret",
-            reference_photo=test_image,
-            carrier_image=test_image,
+            reference_photo=png_image,
+            carrier_image=png_image,
             day_phrase="correct phrase here",
             pin="123456"
         )
@@ -197,7 +320,7 @@ class TestEncodeDecode:
         with pytest.raises(stegasoo.DecryptionError):
             decode(
                 stego_image=result.stego_image,
-                reference_photo=test_image,
+                reference_photo=png_image,
                 day_phrase="wrong phrase here",
                 pin="123456"
             )

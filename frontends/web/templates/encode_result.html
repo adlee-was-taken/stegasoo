@@ -1,61 +1,64 @@
 {% extends "base.html" %}
 
-{% block title %}Message Encoded - Stegasoo{% endblock %}
+{% block title %}Encode Success - Stegasoo{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-6">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-check-circle-fill me-2"></i>Message Encoded Successfully!</h5>
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Encoding Successful!</h5>
             </div>
             <div class="card-body text-center">
-                <div class="mb-4">
-                    <i class="bi bi-file-earmark-image text-success result-icon"></i>
-                    <h5 class="mt-3">{{ filename }}</h5>
-                    <p class="text-muted">Your secret message is hidden in this image</p>
+                <div class="my-4">
+                    {% if thumbnail_url %}
+                    <!-- Thumbnail of the actual encoded image -->
+                    <div class="encoded-image-thumbnail">
+                        <img src="{{ thumbnail_url }}" 
+                             alt="Encoded image thumbnail" 
+                             class="img-thumbnail rounded"
+                             style="max-width: 250px; max-height: 250px; object-fit: contain;">
+                        <div class="mt-2 small text-muted">
+                            <i class="bi bi-image me-1"></i>Encoded Image Preview
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Fallback to icon if thumbnail not available -->
+                    <i class="bi bi-file-earmark-image text-success" style="font-size: 4rem;"></i>
+                    {% endif %}
                 </div>
                 
-                <div class="d-grid gap-3 mb-4">
+                <p class="lead mb-4">Your secret has been hidden in the image.</p>
+                
+                <div class="mb-3">
+                    <code class="fs-5">{{ filename }}</code>
+                </div>
+                
+                <div class="d-grid gap-2">
                     <a href="{{ url_for('encode_download', file_id=file_id) }}" 
                        class="btn btn-primary btn-lg" id="downloadBtn">
                         <i class="bi bi-download me-2"></i>Download Image
                     </a>
                     
-                    <button type="button" class="btn btn-outline-light btn-lg" id="shareBtn">
-                        <i class="bi bi-share me-2"></i>Share Image
+                    <button type="button" class="btn btn-outline-primary" id="shareBtn" style="display: none;">
+                        <i class="bi bi-share me-2"></i>Share
                     </button>
-                </div>
-                
-                <!-- Fallback share options (shown if Web Share API unavailable) -->
-                <div id="shareFallback" class="d-none">
-                    <p class="text-muted mb-3">Share via:</p>
-                    <div class="d-flex justify-content-center gap-2 flex-wrap">
-                        <a href="#" id="shareEmail" class="btn btn-outline-secondary">
-                            <i class="bi bi-envelope me-1"></i>Email
-                        </a>
-                        <a href="#" id="shareTelegram" class="btn btn-outline-secondary">
-                            <i class="bi bi-telegram me-1"></i>Telegram
-                        </a>
-                        <a href="#" id="shareWhatsapp" class="btn btn-outline-secondary">
-                            <i class="bi bi-whatsapp me-1"></i>WhatsApp
-                        </a>
-                        <button type="button" id="copyLink" class="btn btn-outline-secondary">
-                            <i class="bi bi-link-45deg me-1"></i>Copy Link
-                        </button>
-                    </div>
                 </div>
                 
                 <hr class="my-4">
                 
                 <div class="alert alert-warning small text-start">
-                    <i class="bi bi-clock me-1"></i>
-                    <strong>File expires in 5 minutes.</strong> 
-                    Download or share now. The file will be securely deleted after expiry.
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Important:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>This file expires in <strong>5 minutes</strong></li>
+                        <li>Do <strong>not</strong> resize or recompress the image</li>
+                        <li>PNG format preserves your hidden data</li>
+                    </ul>
                 </div>
                 
-                <a href="{{ url_for('encode_page') }}" class="btn btn-outline-light">
-                    <i class="bi bi-plus-circle me-2"></i>Encode Another Message
+                <a href="{{ url_for('encode_page') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-repeat me-2"></i>Encode Another Message
                 </a>
             </div>
         </div>
@@ -65,78 +68,42 @@
 
 {% block scripts %}
 <script>
-const fileId = "{{ file_id }}";
-const filename = "{{ filename }}";
-const fileUrl = "{{ url_for('encode_file', file_id=file_id, _external=True) }}";
-const downloadUrl = "{{ url_for('encode_download', file_id=file_id, _external=True) }}";
-
+// Web Share API support
 const shareBtn = document.getElementById('shareBtn');
-const shareFallback = document.getElementById('shareFallback');
+const fileUrl = "{{ url_for('encode_file_route', file_id=file_id, _external=True) }}";
+const fileName = "{{ filename }}";
 
-// Check if Web Share API with files is supported
-async function canShareFiles() {
-    if (!navigator.canShare) return false;
-    
-    // Create a test file to check
-    const testFile = new File(['test'], 'test.png', { type: 'image/png' });
-    return navigator.canShare({ files: [testFile] });
+if (navigator.share && navigator.canShare) {
+    // Check if we can share files
+    fetch(fileUrl)
+        .then(response => response.blob())
+        .then(blob => {
+            const file = new File([blob], fileName, { type: 'image/png' });
+            if (navigator.canShare({ files: [file] })) {
+                shareBtn.style.display = 'block';
+                shareBtn.addEventListener('click', async () => {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Stegasoo Image',
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('Share failed:', err);
+                        }
+                    }
+                });
+            }
+        })
+        .catch(err => console.log('Could not load file for sharing'));
 }
 
-shareBtn.addEventListener('click', async function() {
-    const canShare = await canShareFiles();
-    
-    if (canShare) {
-        try {
-            // Fetch the image as a blob
-            const response = await fetch(fileUrl);
-            const blob = await response.blob();
-            const file = new File([blob], filename, { type: 'image/png' });
-            
-            await navigator.share({
-                files: [file],
-                title: 'Shared Image',
-            });
-            
-            // Cleanup after successful share
-            fetch("{{ url_for('encode_cleanup', file_id=file_id) }}", { method: 'POST' });
-            
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error('Share failed:', err);
-                shareFallback.classList.remove('d-none');
-            }
-        }
-    } else {
-        // Show fallback options
-        shareFallback.classList.remove('d-none');
-    }
-});
-
-// Fallback share links
-document.getElementById('shareEmail').href = 
-    `mailto:?subject=Shared Image&body=Check out this image: ${downloadUrl}`;
-
-document.getElementById('shareTelegram').href = 
-    `https://t.me/share/url?url=${encodeURIComponent(downloadUrl)}`;
-
-document.getElementById('shareWhatsapp').href = 
-    `https://wa.me/?text=${encodeURIComponent('Check this out: ' + downloadUrl)}`;
-
-document.getElementById('copyLink').addEventListener('click', function() {
-    navigator.clipboard.writeText(downloadUrl).then(() => {
-        this.innerHTML = '<i class="bi bi-check me-1"></i>Copied!';
-        setTimeout(() => {
-            this.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Copy Link';
-        }, 2000);
-    });
-});
-
-// Cleanup after download
+// Auto-cleanup after download
 document.getElementById('downloadBtn').addEventListener('click', function() {
     // Give time for download to start, then cleanup
     setTimeout(() => {
         fetch("{{ url_for('encode_cleanup', file_id=file_id) }}", { method: 'POST' });
-    }, 3000);
+    }, 2000);
 });
 </script>
 {% endblock %}

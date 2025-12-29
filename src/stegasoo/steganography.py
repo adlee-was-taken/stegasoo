@@ -6,7 +6,7 @@ LSB embedding and extraction with pseudo-random pixel selection.
 
 import io
 import struct
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from PIL import Image
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
@@ -14,9 +14,61 @@ from cryptography.hazmat.backends import default_backend
 
 from .models import EmbedStats
 from .exceptions import CapacityError, ExtractionError, EmbeddingError
+from .debug import debug
 
 
-def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list[int]:
+# Lossless formats that preserve LSB data
+LOSSLESS_FORMATS = {'PNG', 'BMP', 'TIFF'}
+
+# Format to extension mapping
+FORMAT_TO_EXT = {
+    'PNG': 'png',
+    'BMP': 'bmp',
+    'TIFF': 'tiff',
+}
+
+# Extension to PIL format mapping
+EXT_TO_FORMAT = {
+    'png': 'PNG',
+    'bmp': 'BMP',
+    'tiff': 'TIFF',
+    'tif': 'TIFF',
+}
+
+
+def get_output_format(input_format: Optional[str]) -> Tuple[str, str]:
+    """
+    Determine the output format based on input format.
+    
+    Args:
+        input_format: PIL format string of input image (e.g., 'JPEG', 'PNG')
+        
+    Returns:
+        Tuple of (PIL format string, file extension) for output
+        Falls back to PNG for lossy or unknown formats.
+        
+    Example:
+        >>> get_output_format('JPEG')
+        ('PNG', 'png')
+        >>> get_output_format('PNG')
+        ('PNG', 'png')
+    """
+    debug.validate(input_format is None or isinstance(input_format, str),
+                "Input format must be string or None")
+    
+    if input_format and input_format.upper() in LOSSLESS_FORMATS:
+        fmt = input_format.upper()
+        ext = FORMAT_TO_EXT.get(fmt, 'png')
+        debug.print(f"Using lossless format: {fmt} -> .{ext}")
+        return fmt, ext
+    
+    # Default to PNG for lossy formats (JPEG, GIF) or unknown
+    debug.print(f"Input format {input_format} is lossy or unknown, defaulting to PNG")
+    return 'PNG', 'png'
+
+
+@debug.time
+def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List[int]:
     """
     Generate pseudo-random pixel indices for embedding.
     
@@ -30,9 +82,21 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
         
     Returns:
         List of pixel indices
+        
+    Note:
+        Optimizes for both small and large num_needed values.
     """
+    debug.validate(len(key) == 32, f"Pixel key must be 32 bytes, got {len(key)}")
+    debug.validate(num_pixels > 0, f"Number of pixels must be positive, got {num_pixels}")
+    debug.validate(num_needed > 0, f"Number needed must be positive, got {num_needed}")
+    debug.validate(num_needed <= num_pixels, 
+                f"Cannot select {num_needed} pixels from {num_pixels} available")
+    
+    debug.print(f"Generating {num_needed} pixel indices from {num_pixels} total pixels")
+    
     if num_needed >= num_pixels // 2:
         # If we need many pixels, shuffle all indices
+        debug.print(f"Using full shuffle (needed {num_needed}/{num_pixels} pixels)")
         nonce = b'\x00' * 16
         cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
         encryptor = cipher.encryptor()
@@ -40,14 +104,18 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
         indices = list(range(num_pixels))
         random_bytes = encryptor.update(b'\x00' * (num_pixels * 4))
         
+        # Fisher-Yates shuffle using CSPRNG
         for i in range(num_pixels - 1, 0, -1):
             j_bytes = random_bytes[(num_pixels - 1 - i) * 4:(num_pixels - i) * 4]
             j = int.from_bytes(j_bytes, 'big') % (i + 1)
             indices[i], indices[j] = indices[j], indices[i]
         
-        return indices[:num_needed]
+        selected = indices[:num_needed]
+        debug.print(f"Generated {len(selected)} indices via shuffle")
+        return selected
     
-    # Optimized path: generate indices directly
+    # Optimized path: generate indices directly (for smaller selections)
+    debug.print(f"Using optimized selection (needed {num_needed}/{num_pixels} pixels)")
     selected = []
     used = set()
     
@@ -60,6 +128,7 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
     random_bytes = encryptor.update(b'\x00' * bytes_needed)
     
     byte_offset = 0
+    collisions = 0
     while len(selected) < num_needed and byte_offset < len(random_bytes) - 4:
         idx = int.from_bytes(random_bytes[byte_offset:byte_offset + 4], 'big') % num_pixels
         byte_offset += 4
@@ -67,24 +136,36 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
         if idx not in used:
             used.add(idx)
             selected.append(idx)
+        else:
+            collisions += 1
     
     # Generate additional if needed (rare)
-    while len(selected) < num_needed:
-        extra_bytes = encryptor.update(b'\x00' * 4)
-        idx = int.from_bytes(extra_bytes, 'big') % num_pixels
-        if idx not in used:
-            used.add(idx)
-            selected.append(idx)
+    if len(selected) < num_needed:
+        debug.print(f"Need {num_needed - len(selected)} more indices, generating...")
+        extra_needed = num_needed - len(selected)
+        for _ in range(extra_needed * 2):  # Try twice as many to account for collisions
+            extra_bytes = encryptor.update(b'\x00' * 4)
+            idx = int.from_bytes(extra_bytes, 'big') % num_pixels
+            if idx not in used:
+                used.add(idx)
+                selected.append(idx)
+                if len(selected) == num_needed:
+                    break
     
+    debug.print(f"Generated {len(selected)} indices with {collisions} collisions")
+    debug.validate(len(selected) == num_needed,
+                f"Failed to generate enough indices: {len(selected)}/{num_needed}")
     return selected
 
 
+@debug.time
 def embed_in_image(
     carrier_data: bytes,
     encrypted_data: bytes,
     pixel_key: bytes,
-    bits_per_channel: int = 1
-) -> tuple[bytes, EmbedStats]:
+    bits_per_channel: int = 1,
+    output_format: Optional[str] = None
+) -> Tuple[bytes, EmbedStats, str]:
     """
     Embed encrypted data in carrier image using LSB steganography.
     
@@ -96,17 +177,36 @@ def embed_in_image(
         encrypted_data: Data to embed
         pixel_key: Key for pixel selection
         bits_per_channel: Bits to use per color channel (1-2)
+        output_format: Force specific output format (PNG, BMP). 
+                       If None, auto-detect from carrier (lossless) or default to PNG.
         
     Returns:
-        Tuple of (PNG image bytes, EmbedStats)
+        Tuple of (image bytes, EmbedStats, file extension)
         
     Raises:
         CapacityError: If carrier is too small
         EmbeddingError: If embedding fails
+        
+    Example:
+        >>> stego_bytes, stats, ext = embed_in_image(carrier, encrypted, key)
+        >>> stats.pixels_modified
+        1500
     """
+    debug.print(f"Embedding {len(encrypted_data)} bytes into image")
+    debug.data(pixel_key, "Pixel key for embedding")
+    debug.validate(bits_per_channel in (1, 2), 
+                f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
+    debug.validate(len(pixel_key) == 32,
+                f"Pixel key must be 32 bytes, got {len(pixel_key)}")
+    
     try:
         img = Image.open(io.BytesIO(carrier_data))
+        input_format = img.format
+        
+        debug.print(f"Carrier image: {img.size[0]}x{img.size[1]}, format: {input_format}")
+        
         if img.mode != 'RGB':
+            debug.print(f"Converting image from {img.mode} to RGB")
             img = img.convert('RGB')
         
         pixels = list(img.getdata())
@@ -115,15 +215,23 @@ def embed_in_image(
         bits_per_pixel = 3 * bits_per_channel
         max_bytes = (num_pixels * bits_per_pixel) // 8
         
+        debug.print(f"Image capacity: {max_bytes} bytes at {bits_per_channel} bit(s)/channel")
+        
         # Prepend length
         data_with_len = struct.pack('>I', len(encrypted_data)) + encrypted_data
         
         if len(data_with_len) > max_bytes:
+            debug.print(f"Capacity error: need {len(data_with_len)}, have {max_bytes}")
             raise CapacityError(len(data_with_len), max_bytes)
+        
+        debug.print(f"Total data to embed: {len(data_with_len)} bytes "
+                   f"({len(data_with_len)/max_bytes*100:.1f}% of capacity)")
         
         # Convert to binary string
         binary_data = ''.join(format(b, '08b') for b in data_with_len)
         pixels_needed = (len(binary_data) + bits_per_pixel - 1) // bits_per_pixel
+        
+        debug.print(f"Need {pixels_needed} pixels to embed {len(binary_data)} bits")
         
         # Get pixel indices
         selected_indices = generate_pixel_indices(pixel_key, num_pixels, pixels_needed)
@@ -133,11 +241,14 @@ def embed_in_image(
         clear_mask = 0xFF ^ ((1 << bits_per_channel) - 1)
         
         bit_idx = 0
+        modified_pixels = 0
+        
         for pixel_idx in selected_indices:
             if bit_idx >= len(binary_data):
                 break
             
             r, g, b = new_pixels[pixel_idx]
+            modified = False
             
             for channel_idx, channel_val in enumerate([r, g, b]):
                 if bit_idx >= len(binary_data):
@@ -145,40 +256,58 @@ def embed_in_image(
                 bits = binary_data[bit_idx:bit_idx + bits_per_channel].ljust(bits_per_channel, '0')
                 new_val = (channel_val & clear_mask) | int(bits, 2)
                 
-                if channel_idx == 0:
-                    r = new_val
-                elif channel_idx == 1:
-                    g = new_val
-                else:
-                    b = new_val
+                if channel_val != new_val:
+                    modified = True
+                    if channel_idx == 0:
+                        r = new_val
+                    elif channel_idx == 1:
+                        g = new_val
+                    else:
+                        b = new_val
                 
                 bit_idx += bits_per_channel
             
-            new_pixels[pixel_idx] = (r, g, b)
+            if modified:
+                new_pixels[pixel_idx] = (r, g, b)
+                modified_pixels += 1
+        
+        debug.print(f"Modified {modified_pixels} pixels (out of {len(selected_indices)} selected)")
         
         # Create output image
         stego_img = Image.new('RGB', img.size)
         stego_img.putdata(new_pixels)
         
+        # Determine output format
+        if output_format:
+            out_fmt = output_format.upper()
+            out_ext = FORMAT_TO_EXT.get(out_fmt, 'png')
+            debug.print(f"Using forced output format: {out_fmt}")
+        else:
+            out_fmt, out_ext = get_output_format(input_format)
+            debug.print(f"Auto-selected output format: {out_fmt}")
+        
         output = io.BytesIO()
-        stego_img.save(output, 'PNG')
+        stego_img.save(output, out_fmt)
         output.seek(0)
         
         stats = EmbedStats(
-            pixels_modified=len(selected_indices),
+            pixels_modified=modified_pixels,
             total_pixels=num_pixels,
             capacity_used=len(data_with_len) / max_bytes,
             bytes_embedded=len(data_with_len)
         )
         
-        return output.getvalue(), stats
+        debug.print(f"Embedding complete: {out_fmt} image, {len(output.getvalue())} bytes")
+        return output.getvalue(), stats, out_ext
         
     except CapacityError:
         raise
     except Exception as e:
+        debug.exception(e, "embed_in_image")
         raise EmbeddingError(f"Failed to embed data: {e}") from e
 
 
+@debug.time
 def extract_from_image(
     image_data: bytes,
     pixel_key: bytes,
@@ -197,18 +326,35 @@ def extract_from_image(
         
     Raises:
         ExtractionError: If extraction fails critically
+        
+    Example:
+        >>> extracted = extract_from_image(stego_bytes, key)
+        >>> len(extracted)
+        1024
     """
+    debug.print(f"Extracting from {len(image_data)} byte image")
+    debug.data(pixel_key, "Pixel key for extraction")
+    debug.validate(bits_per_channel in (1, 2),
+                f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
+    
     try:
         img = Image.open(io.BytesIO(image_data))
+        debug.print(f"Image: {img.size[0]}x{img.size[1]}, format: {img.format}")
+        
         if img.mode != 'RGB':
+            debug.print(f"Converting image from {img.mode} to RGB")
             img = img.convert('RGB')
         
         pixels = list(img.getdata())
         num_pixels = len(pixels)
         bits_per_pixel = 3 * bits_per_channel
         
+        debug.print(f"Image has {num_pixels} pixels, {bits_per_pixel} bits/pixel")
+        
         # First, extract enough to get the length (4 bytes = 32 bits)
         initial_pixels = (32 + bits_per_pixel - 1) // bits_per_pixel + 10
+        debug.print(f"Extracting initial {initial_pixels} pixels to find length")
+        
         initial_indices = generate_pixel_indices(pixel_key, num_pixels, initial_pixels)
         
         binary_data = ''
@@ -221,18 +367,27 @@ def extract_from_image(
         # Parse length
         try:
             length_bits = binary_data[:32]
+            if len(length_bits) < 32:
+                debug.print(f"Not enough bits for length: {len(length_bits)}/32")
+                return None
+            
             data_length = struct.unpack('>I', int(length_bits, 2).to_bytes(4, 'big'))[0]
-        except Exception:
+            debug.print(f"Extracted length: {data_length} bytes")
+        except Exception as e:
+            debug.print(f"Failed to parse length: {e}")
             return None
         
         # Sanity check
         max_possible = (num_pixels * bits_per_pixel) // 8 - 4
         if data_length > max_possible or data_length < 10:
+            debug.print(f"Invalid data length: {data_length} (max possible: {max_possible})")
             return None
         
         # Extract full data
         total_bits = (4 + data_length) * 8
         pixels_needed = (total_bits + bits_per_pixel - 1) // bits_per_pixel
+        
+        debug.print(f"Need {pixels_needed} pixels to extract {data_length} bytes")
         
         selected_indices = generate_pixel_indices(pixel_key, num_pixels, pixels_needed)
         
@@ -245,15 +400,21 @@ def extract_from_image(
         
         data_bits = binary_data[32:32 + (data_length * 8)]
         
+        if len(data_bits) < data_length * 8:
+            debug.print(f"Insufficient bits: {len(data_bits)} < {data_length * 8}")
+            return None
+        
         data_bytes = bytearray()
         for i in range(0, len(data_bits), 8):
             byte_bits = data_bits[i:i + 8]
             if len(byte_bits) == 8:
                 data_bytes.append(int(byte_bits, 2))
         
+        debug.print(f"Successfully extracted {len(data_bytes)} bytes")
         return bytes(data_bytes)
         
     except Exception as e:
+        debug.exception(e, "extract_from_image")
         raise ExtractionError(f"Failed to extract data: {e}") from e
 
 
@@ -267,7 +428,15 @@ def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
         
     Returns:
         Maximum bytes that can be embedded (minus overhead)
+        
+    Example:
+        >>> capacity = calculate_capacity(image_bytes)
+        >>> capacity
+        12000
     """
+    debug.validate(bits_per_channel in (1, 2),
+                f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
+    
     img = Image.open(io.BytesIO(image_data))
     if img.mode != 'RGB':
         img = img.convert('RGB')
@@ -277,10 +446,74 @@ def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
     max_bytes = (num_pixels * bits_per_pixel) // 8
     
     # Subtract overhead: 4 bytes length + ~100 bytes header
-    return max(0, max_bytes - 104)
+    capacity = max(0, max_bytes - 104)
+    debug.print(f"Image capacity: {capacity} bytes at {bits_per_channel} bit(s)/channel")
+    return capacity
 
 
-def get_image_dimensions(image_data: bytes) -> tuple[int, int]:
-    """Get image dimensions without loading full image."""
+def get_image_dimensions(image_data: bytes) -> Tuple[int, int]:
+    """
+    Get image dimensions without loading full image.
+    
+    Args:
+        image_data: Image bytes
+        
+    Returns:
+        Tuple of (width, height)
+        
+    Example:
+        >>> width, height = get_image_dimensions(image_bytes)
+        >>> width, height
+        (800, 600)
+    """
+    debug.validate(len(image_data) > 0, "Image data cannot be empty")
+    
     img = Image.open(io.BytesIO(image_data))
-    return img.size
+    dimensions = img.size
+    debug.print(f"Image dimensions: {dimensions[0]}x{dimensions[1]}")
+    return dimensions
+
+
+def get_image_format(image_data: bytes) -> Optional[str]:
+    """
+    Get image format (PIL format string like 'PNG', 'JPEG').
+    
+    Args:
+        image_data: Image bytes
+        
+    Returns:
+        Format string or None if invalid
+        
+    Example:
+        >>> format = get_image_format(image_bytes)
+        >>> format
+        'PNG'
+    """
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        format_str = img.format
+        debug.print(f"Image format: {format_str}")
+        return format_str
+    except Exception as e:
+        debug.print(f"Failed to get image format: {e}")
+        return None
+
+
+def is_lossless_format(image_data: bytes) -> bool:
+    """
+    Check if image is in a lossless format suitable for steganography.
+    
+    Args:
+        image_data: Image bytes
+        
+    Returns:
+        True if format is lossless (PNG, BMP, TIFF)
+        
+    Example:
+        >>> is_lossless_format(image_bytes)
+        True
+    """
+    fmt = get_image_format(image_data)
+    is_lossless = fmt is not None and fmt.upper() in LOSSLESS_FORMATS
+    debug.print(f"Image is lossless: {is_lossless} (format: {fmt})")
+    return is_lossless

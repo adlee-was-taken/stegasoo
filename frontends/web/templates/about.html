@@ -10,37 +10,239 @@
                 <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>About Stegasoo</h5>
             </div>
             <div class="card-body">
-                <p>
-                    Stegasoo is a hybrid steganography system that hides encrypted messages inside 
-                    ordinary images. It combines multiple security layers to create a system that is 
-                    both highly secure and practical to use.
+                <p class="lead">
+                    Stegasoo is a secure steganography tool that hides encrypted messages and files 
+                    inside ordinary images using multi-factor authentication.
                 </p>
                 
-                <h6 class="mt-4 mb-3">System Status</h6>
-                <div class="row g-3">
+                <h6 class="text-primary mt-4 mb-3"><i class="bi bi-stars me-2"></i>Key Features</h6>
+                <div class="row">
                     <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3 rounded status-box">
-                            {% if has_argon2 %}
-                            <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
-                            <div>
-                                <strong>Argon2id Available</strong>
-                                <div class="small text-muted">Memory-hard key derivation (256MB)</div>
-                            </div>
-                            {% else %}
-                            <i class="bi bi-exclamation-triangle-fill text-warning fs-4 me-3"></i>
-                            <div>
-                                <strong>Using PBKDF2 Fallback</strong>
-                                <div class="small text-muted">Install argon2-cffi for better security</div>
-                            </div>
-                            {% endif %}
-                        </div>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Text &amp; File Embedding</strong> — Hide messages or any file type (PDF, ZIP, documents)
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Multi-Factor Security</strong> — Combines photo + phrase + PIN/RSA key
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>AES-256-GCM Encryption</strong> — Military-grade authenticated encryption
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Daily Rotating Phrases</strong> — Different passphrase each day of the week
+                            </li>
+                        </ul>
                     </div>
                     <div class="col-md-6">
-                        <div class="d-flex align-items-center p-3 rounded status-box">
-                            <i class="bi bi-shield-fill-check text-success fs-4 me-3"></i>
-                            <div>
-                                <strong>AES-256-GCM</strong>
-                                <div class="small text-muted">Authenticated encryption enabled</div>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Random Pixel Embedding</strong> — Defeats statistical steganalysis
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Format Preservation</strong> — Maintains PNG/BMP lossless formats
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Large Capacity</strong> — Up to {{ max_payload_kb }} KB payload, 16MP images
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Zero Server Storage</strong> — Nothing saved, files auto-expire
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>How Security Works</h5>
+            </div>
+            <div class="card-body">
+                <p>Stegasoo uses <strong>hybrid multi-factor authentication</strong> to derive encryption keys:</p>
+                
+                <div class="row text-center my-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded">
+                            <i class="bi bi-image text-info fs-2 d-block mb-2"></i>
+                            <strong>Reference Photo</strong>
+                            <div class="small text-muted mt-1">Something you have</div>
+                            <div class="small text-success">~80-256 bits</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded">
+                            <i class="bi bi-chat-quote text-warning fs-2 d-block mb-2"></i>
+                            <strong>Daily Phrase</strong>
+                            <div class="small text-muted mt-1">Something you know (rotates)</div>
+                            <div class="small text-success">~33 bits (3 words)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded">
+                            <i class="bi bi-123 text-danger fs-2 d-block mb-2"></i>
+                            <strong>Static PIN</strong>
+                            <div class="small text-muted mt-1">Something you know (fixed)</div>
+                            <div class="small text-success">~20 bits (6 digits)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded">
+                            <i class="bi bi-key text-primary fs-2 d-block mb-2"></i>
+                            <strong>RSA Key</strong>
+                            <div class="small text-muted mt-1">Something you have (optional)</div>
+                            <div class="small text-success">~128 bits (2048-bit)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-secondary">
+                    <i class="bi bi-calculator me-2"></i>
+                    <strong>Combined entropy:</strong> 130-400+ bits depending on configuration.
+                    For reference, 128 bits is considered computationally infeasible to brute force.
+                </div>
+                
+                <h6 class="mt-4">Key Derivation</h6>
+                <p>
+                    {% if has_argon2 %}
+                    <span class="badge bg-success me-1"><i class="bi bi-check"></i> Argon2id Available</span>
+                    Using <strong>Argon2id</strong> with 256MB memory cost — the winner of the Password Hashing Competition 
+                    and current best practice for key derivation.
+                    {% else %}
+                    <span class="badge bg-warning text-dark me-1"><i class="bi bi-exclamation-triangle"></i> Argon2 Not Available</span>
+                    Falling back to <strong>PBKDF2-SHA512</strong> with 600,000 iterations.
+                    Install <code>argon2-cffi</code> for stronger security.
+                    {% endif %}
+                </p>
+                
+                <h6 class="mt-4">Steganography Technique</h6>
+                <p>
+                    Uses <strong>LSB (Least Significant Bit)</strong> embedding with pseudo-random pixel selection.
+                    The pixel locations are determined by a key derived from your credentials, making the 
+                    hidden data's location unpredictable without the correct inputs.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-binary me-2"></i>File Embedding</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <span class="badge bg-info me-1">New in v2.1</span>
+                    Stegasoo now supports embedding <strong>any file type</strong>, not just text messages.
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-check2-square text-success me-2"></i>Supported</h6>
+                        <ul class="small">
+                            <li>PDF documents</li>
+                            <li>ZIP/RAR archives</li>
+                            <li>Office documents (DOCX, XLSX, PPTX)</li>
+                            <li>Source code files</li>
+                            <li>Any binary file up to {{ max_payload_kb }} KB</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-info-circle text-info me-2"></i>How It Works</h6>
+                        <ul class="small">
+                            <li>Original filename is preserved</li>
+                            <li>MIME type is stored for proper handling</li>
+                            <li>File is encrypted identically to text</li>
+                            <li>Decoding auto-detects text vs. file</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info small mt-3">
+                    <i class="bi bi-lightbulb me-2"></i>
+                    <strong>Tip:</strong> For larger files, compress them first (ZIP) to maximize capacity.
+                    A 16MP carrier image can hold approximately 6MB of raw data, but we limit payloads 
+                    to {{ max_payload_kb }} KB for reasonable processing times.
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>Usage Guide</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="usageAccordion">
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button bg-dark text-light" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#setup">
+                                <i class="bi bi-1-circle me-2"></i>Initial Setup
+                            </button>
+                        </h2>
+                        <div id="setup" class="accordion-collapse collapse show" data-bs-parent="#usageAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Both parties agree on a <strong>reference photo</strong> (shared secretly, never transmitted)</li>
+                                    <li>Go to <a href="/generate">Generate</a> and create credentials</li>
+                                    <li><strong>Memorize</strong> the 7 daily phrases and PIN</li>
+                                    <li>If using RSA, download and securely store the key file</li>
+                                    <li>Share credentials with your contact through a secure channel</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-dark text-light" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#encoding">
+                                <i class="bi bi-2-circle me-2"></i>Encoding a Message or File
+                            </button>
+                        </h2>
+                        <div id="encoding" class="accordion-collapse collapse" data-bs-parent="#usageAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Go to <a href="/encode">Encode</a></li>
+                                    <li>Upload your <strong>reference photo</strong></li>
+                                    <li>Upload a <strong>carrier image</strong> (the image to hide data in)</li>
+                                    <li>Choose <strong>Text</strong> or <strong>File</strong> mode</li>
+                                    <li>Enter your message or select a file to embed</li>
+                                    <li>Enter <strong>today's phrase</strong> and your PIN/key</li>
+                                    <li>Download the resulting stego image</li>
+                                    <li>Send the stego image through any channel (email, social media, etc.)</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-dark text-light" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#decoding">
+                                <i class="bi bi-3-circle me-2"></i>Decoding a Message or File
+                            </button>
+                        </h2>
+                        <div id="decoding" class="accordion-collapse collapse" data-bs-parent="#usageAccordion">
+                            <div class="accordion-body">
+                                <ol>
+                                    <li>Go to <a href="/decode">Decode</a></li>
+                                    <li>Upload your <strong>reference photo</strong> (same one used for encoding)</li>
+                                    <li>Upload the <strong>stego image</strong> you received</li>
+                                    <li>Enter the phrase for <strong>the day it was encoded</strong> (check the filename for date)</li>
+                                    <li>Enter your PIN and/or RSA key</li>
+                                    <li>View the decoded message or download the extracted file</li>
+                                </ol>
+                                <div class="alert alert-warning small mt-3 mb-0">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    The stego image filename contains the encoding date (e.g., <code>abc123_20251228.png</code>).
+                                    Use this to determine which day's phrase to use!
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -50,128 +252,99 @@
         
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Security Model</h5>
+                <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Limits &amp; Specifications</h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-dark">
-                        <thead>
-                            <tr>
-                                <th>Component</th>
-                                <th>Entropy</th>
-                                <th>Purpose</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><i class="bi bi-image text-info me-2"></i>Reference Photo</td>
-                                <td>~80-256 bits</td>
-                                <td>Something you have (plausible deniability)</td>
-                            </tr>
-                            <tr>
-                                <td><i class="bi bi-chat-quote text-info me-2"></i>3-Word Phrase</td>
-                                <td>~33 bits</td>
-                                <td>Something you know (changes daily)</td>
-                            </tr>
-                            <tr>
-                                <td><i class="bi bi-123 text-info me-2"></i>6-Digit PIN</td>
-                                <td>~20 bits</td>
-                                <td>Something you know (static)</td>
-                            </tr>
-                            <tr>
-                                <td><i class="bi bi-calendar text-info me-2"></i>Date</td>
-                                <td>N/A</td>
-                                <td>Automatic key rotation</td>
-                            </tr>
-                            <tr class="table-active">
-                                <td><strong>Combined</strong></td>
-                                <td><strong>133+ bits</strong></td>
-                                <td><strong>Beyond brute force</strong></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Attack Resistance</h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-md-6">
-                        <h6 class="text-danger"><i class="bi bi-x-circle me-2"></i>What Attackers Can't Do</h6>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="bi bi-shield-x text-muted me-2"></i>
-                                Brute force the passphrase (2<sup>133</sup> combinations)
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-shield-x text-muted me-2"></i>
-                                Use rainbow tables (random salt per message)
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-shield-x text-muted me-2"></i>
-                                Detect hidden data (random pixel selection)
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-shield-x text-muted me-2"></i>
-                                Use GPU farms (Argon2 requires 256MB RAM per attempt)
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Real Threats</h6>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="bi bi-person-x text-muted me-2"></i>
-                                Social engineering (someone tricks you)
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-door-open text-muted me-2"></i>
-                                Physical access to your devices
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-bug text-muted me-2"></i>
-                                Malware/keyloggers on your system
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-camera-video text-muted me-2"></i>
-                                Shoulder surfing while you type
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+                <table class="table table-dark table-striped">
+                    <tbody>
+                        <tr>
+                            <td><i class="bi bi-file-text me-2"></i>Max text message</td>
+                            <td><strong>250,000 characters</strong> (~250 KB)</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-file-earmark me-2"></i>Max file payload</td>
+                            <td><strong>{{ max_payload_kb }} KB</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-image me-2"></i>Max carrier image</td>
+                            <td><strong>16 megapixels</strong> (~4000×4000)</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-upload me-2"></i>Max upload size</td>
+                            <td><strong>10 MB</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-clock me-2"></i>Temp file expiry</td>
+                            <td><strong>5 minutes</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-key me-2"></i>PIN length</td>
+                            <td><strong>6-9 digits</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-shield me-2"></i>RSA key sizes</td>
+                            <td><strong>2048, 3072, 4096 bits</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-chat-quote me-2"></i>Phrase length</td>
+                            <td><strong>3-12 words</strong> (BIP-39 wordlist)</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-book me-2"></i>Best Practices</h5>
+                <h5 class="mb-0"><i class="bi bi-terminal me-2"></i>CLI &amp; API</h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 class="text-success"><i class="bi bi-check-lg me-2"></i>Do</h6>
-                        <ul>
-                            <li>Memorize your phrases and PIN, never write them down</li>
-                            <li>Use a reference photo that both parties already have</li>
-                            <li>Use different carrier images for each message</li>
-                            <li>Share stego images through normal channels (looks innocent)</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 class="text-danger"><i class="bi bi-x-lg me-2"></i>Don't</h6>
-                        <ul>
-                            <li>Don't transmit the reference photo</li>
-                            <li>Don't reuse the same carrier image</li>
-                            <li>Don't store phrases or PIN digitally</li>
-                            <li>Don't resize or recompress stego images</li>
-                        </ul>
-                    </div>
-                </div>
+                <p>Stegasoo is also available as a command-line tool and REST API:</p>
+                
+                <h6 class="mt-3">Command Line</h6>
+                <pre class="bg-dark p-3 rounded"><code># Generate credentials
+stegasoo generate --pin --rsa
+
+# Encode a text message
+stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -m "secret"
+
+# Encode a file
+stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -e document.pdf
+
+# Decode (auto-detects text vs file)
+stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456</code></pre>
+                
+                <h6 class="mt-4">REST API</h6>
+                <pre class="bg-dark p-3 rounded"><code># Encode with multipart upload
+curl -X POST http://localhost:8000/encode/multipart \
+  -F "reference_photo=@photo.jpg" \
+  -F "carrier=@meme.png" \
+  -F "message=secret" \
+  -F "day_phrase=apple forest thunder" \
+  -F "pin=123456" \
+  --output stego.png
+
+# Encode a file
+curl -X POST http://localhost:8000/encode/multipart \
+  -F "reference_photo=@photo.jpg" \
+  -F "carrier=@meme.png" \
+  -F "payload_file=@document.pdf" \
+  -F "day_phrase=apple forest thunder" \
+  -F "pin=123456" \
+  --output stego.png</code></pre>
+                
+                <p class="small text-muted mt-3 mb-0">
+                    API documentation available at <code>/docs</code> (Swagger) or <code>/redoc</code> when running the API server.
+                </p>
             </div>
+        </div>
+        
+        <div class="text-center mt-4 text-muted small">
+            <p>
+                Stegasoo v2.1.0 &bull; 
+                <i class="bi bi-github me-1"></i>Open Source &bull;
+                Built with Python, Flask, and cryptography
+            </p>
         </div>
     </div>
 </div>

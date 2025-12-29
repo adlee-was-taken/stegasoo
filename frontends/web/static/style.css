@@ -47,6 +47,15 @@ body {
     border-bottom: none;
 }
 
+.card-link .card-header.text-center {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    height: 4.5rem; /* Fixed height to match original */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .feature-card {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
@@ -254,4 +263,138 @@ footer {
 
 .footer-icon {
     vertical-align: text-bottom;
+}
+
+/* ----------------------------------------------------------------------------
+   Card Stuff Icons 
+   ---------------------------------------------------------------------------- */
+.action-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+.feature-card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Ensure buttons are easily tappable on mobile */
+@media (max-width: 768px) {
+    .btn-lg {
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* ----------------------------------------------------------------------------
+   Dramatic Gold Glow Hover Effect
+   ---------------------------------------------------------------------------- */
+.embossed-icon {
+    color: #f8f8f8 !important;
+    text-shadow: 
+        /* Subtle emboss only by default */
+        0 0.5px 0 rgba(255, 255, 255, 0.4),     /* Soft top highlight */
+        0 -0.5px 0 rgba(0, 0, 0, 0.15),         /* Very soft bottom shadow */
+        0 1px 2px rgba(0, 0, 0, 0.1);           /* Minimal drop shadow */
+    
+    position: relative;
+    display: inline-block;
+    transition: all 0.3s ease;
+    font-size: 3.5rem !important;
+    line-height: 1;
+    padding: 10px 0;
+}
+
+.card-link:hover .embossed-icon {
+    color: #ffffff !important;
+    text-shadow: 
+        /* GOLD GLOW LAYERS - Only on hover */
+        0 0 10px rgba(255, 215, 0, 0.5),        /* Soft inner glow */
+        0 0 20px rgba(255, 215, 0, 0.3),        /* Medium glow */
+        0 0 30px rgba(255, 215, 0, 0.2),        /* Outer glow */
+        0 0 40px rgba(255, 215, 0, 0.1),        /* Far outer glow */
+        
+        /* Enhanced emboss on hover */
+        0 1px 0 rgba(255, 255, 255, 0.8),       /* Bright top highlight */
+        0 -1px 0 rgba(0, 0, 0, 0.25),           /* Deeper bottom shadow */
+        0 2px 4px rgba(0, 0, 0, 0.15),          /* Soft drop shadow */
+        
+        /* Gold accent shadows */
+        0 1px 2px rgba(255, 215, 0, 0.3),       /* Gold highlight layer */
+        0 -1px 1px rgba(255, 215, 0, 0.15);     /* Gold shadow layer */
+    
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.25));
+    transform: scale(1.02); /* Slight grow on hover */
+}
+
+/* Card header adjustments for dramatic effect */
+.card-link .card-header.text-center {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+    min-height: 6.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+/* Enhance the gradient on hover for dramatic effect */
+.card-link:hover .card-header.text-center {
+    background: linear-gradient(135deg, 
+        var(--gradient-start) 0%, 
+        #5a67d8 20%, 
+        var(--gradient-end) 80%, 
+        #8a2be2 100%);
+    box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.1);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .embossed-icon {
+        font-size: 2.8rem !important;
+        padding: 8px 0;
+    }
+    
+    .card-link:hover .embossed-icon {
+        transform: scale(1.01);
+    }
+    
+    .card-link .card-header.text-center {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        min-height: 5.5rem;
+    }
+}
+
+/* ----------------------------------------------------------------------------
+   Card Links
+   ---------------------------------------------------------------------------- */
+.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    height: 100%;
+}
+
+.card-link:hover {
+    color: inherit;
+}
+
+/* Optional: Add a slight scale effect to the entire card on hover */
+.card-link .feature-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-link:hover .feature-card {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
 }

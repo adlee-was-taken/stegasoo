@@ -7,7 +7,7 @@
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-lock-fill me-2"></i>Encode Secret Message</h5>
+                <h5 class="mb-0"><i class="bi bi-lock-fill me-2"></i>Encode Secret Message or File</h5>
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
@@ -49,20 +49,62 @@
                         </div>
                     </div>
                     
+                    <!-- Payload Type Selector -->
                     <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-box me-1"></i> What to Encode
+                        </label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="payload_type" id="payloadText" value="text" checked>
+                            <label class="btn btn-outline-primary" for="payloadText">
+                                <i class="bi bi-chat-left-text me-1"></i> Text Message
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="payload_type" id="payloadFile" value="file">
+                            <label class="btn btn-outline-primary" for="payloadFile">
+                                <i class="bi bi-file-earmark me-1"></i> File
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Text Message Input -->
+                    <div class="mb-3" id="textPayloadSection">
                         <label class="form-label">
                             <i class="bi bi-chat-left-text me-1"></i> Secret Message
                         </label>
                         <textarea name="message" class="form-control" rows="4" id="messageInput"
-                                  placeholder="Enter your secret message here..." required></textarea>
+                                  placeholder="Enter your secret message here..."></textarea>
                         <div class="d-flex justify-content-between form-text">
                             <span>
-                                <span id="charCount">0</span> / 50,000 characters
+                                <span id="charCount">0</span> / 250,000 characters
                                 <span id="charWarning" class="text-warning d-none ms-2">
                                     <i class="bi bi-exclamation-triangle"></i> Getting long!
                                 </span>
                             </span>
                             <span id="charPercent" class="text-muted">0%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- File Upload Input -->
+                    <div class="mb-3 d-none" id="filePayloadSection">
+                        <label class="form-label">
+                            <i class="bi bi-file-earmark me-1"></i> File to Embed
+                        </label>
+                        <div class="drop-zone" id="payloadDropZone">
+                            <input type="file" name="payload_file" id="payloadFileInput">
+                            <div class="drop-zone-label" id="payloadDropLabel">
+                                <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                <span class="text-muted">Drop any file or click to browse</span>
+                                <div class="small text-muted mt-1">Max {{ max_payload_kb }} KB</div>
+                            </div>
+                        </div>
+                        <div class="form-text">
+                            Supports any file type: PDF, ZIP, documents, etc.
+                        </div>
+                        <div id="fileInfo" class="d-none mt-2 p-2 bg-dark rounded">
+                            <i class="bi bi-file-earmark-check text-success me-2"></i>
+                            <span id="fileInfoName"></span>
+                            <span class="text-muted">(<span id="fileInfoSize"></span>)</span>
                         </div>
                     </div>
                     
@@ -86,24 +128,41 @@
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-123 me-1"></i> PIN
-                            </label>
-                            <input type="password" name="pin" class="form-control" id="pinInput"
-                                   placeholder="6-9 digits" maxlength="9">
-                            <div class="form-text">
-                                Your static 6-9 digit PIN (if configured)
-                            </div>
+                          <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
+                          <div class="input-group">
+                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9">
+                            <button class="btn btn-outline-secondary" type="button" id="togglePin">
+                              <i class="bi bi-eye"></i>
+                            </button>
+                          </div>
+                        <div class="form-text">Your static 6-9 digit PIN (if configured)</div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
-                            <input type="file" name="rsa_key" class="form-control" id="rsaKeyInput"
-                                   accept=".pem,.key">
-                            <div class="form-text">
-                                Your shared .pem key file (if configured)
+                            <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaFileTab" type="button">
+                                        <i class="bi bi-file-earmark me-1"></i>.pem File
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaQrTab" type="button">
+                                        <i class="bi bi-qr-code me-1"></i>QR Code
+                                    </button>
+                                </li>
+                            </ul>
+                            <div class="tab-content">
+                                <div class="tab-pane fade show active" id="rsaFileTab" role="tabpanel">
+                                    <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
+                                    <div class="form-text small">Shared .pem format key file.</div>
+                                </div>
+                                <div class="tab-pane fade" id="rsaQrTab" role="tabpanel">
+                                    <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
+                                    <div class="form-text small">PNG, JPG, or other image of QR code</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -116,15 +175,15 @@
                         <input type="password" name="rsa_password" class="form-control"
                                placeholder="Password for the .pem file (if encrypted)">
                         <div class="form-text">
-                            Leave blank if your key file is not password-protected
+                            Leave blank if your key file is not password-protected (not needed for QR codes)
                         </div>
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-lg w-100" id="encodeBtn">
-                        <i class="bi bi-lock me-2"></i>Encode Message
+                        <i class="bi bi-lock me-2"></i>Encode
                     </button>
                 </form>
-                
+               
                 <hr class="my-4">
                 
                 <div class="row text-center text-muted small">
@@ -146,8 +205,8 @@
                     <i class="bi bi-info-circle me-1"></i>
                     <strong>Limits:</strong> 
                     Carrier image max ~4 megapixels (2000×2000). 
-                    Files max 5MB each. 
-                    Message max 50KB.
+                    Files max 10MB upload. 
+                    Payload max {{ max_payload_kb }} KB.
                 </div>
             </div>
         </div>
@@ -177,13 +236,83 @@ if (dateInput) {
     dateInput.value = localDate;
 }
 
-// Show RSA password field when key is selected
+// Payload type switching
+const payloadTextRadio = document.getElementById('payloadText');
+const payloadFileRadio = document.getElementById('payloadFile');
+const textSection = document.getElementById('textPayloadSection');
+const fileSection = document.getElementById('filePayloadSection');
+const messageInput = document.getElementById('messageInput');
+const payloadFileInput = document.getElementById('payloadFileInput');
+
+function updatePayloadSection() {
+    const isText = payloadTextRadio.checked;
+    textSection.classList.toggle('d-none', !isText);
+    fileSection.classList.toggle('d-none', isText);
+    
+    // Update required attribute
+    if (isText) {
+        messageInput.required = true;
+        payloadFileInput.required = false;
+    } else {
+        messageInput.required = false;
+        payloadFileInput.required = true;
+    }
+}
+
+payloadTextRadio.addEventListener('change', updatePayloadSection);
+payloadFileRadio.addEventListener('change', updatePayloadSection);
+
+// File payload info display
+const fileInfo = document.getElementById('fileInfo');
+const fileInfoName = document.getElementById('fileInfoName');
+const fileInfoSize = document.getElementById('fileInfoSize');
+const payloadDropLabel = document.getElementById('payloadDropLabel');
+
+payloadFileInput.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+        const file = this.files[0];
+        fileInfoName.textContent = file.name;
+        fileInfoSize.textContent = formatFileSize(file.size);
+        fileInfo.classList.remove('d-none');
+        payloadDropLabel.innerHTML = `<i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i><span>${file.name}</span>`;
+    } else {
+        fileInfo.classList.add('d-none');
+        payloadDropLabel.innerHTML = `<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i><span class="text-muted">Drop any file or click to browse</span><div class="small text-muted mt-1">Max {{ max_payload_kb }} KB</div>`;
+    }
+});
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Show RSA password field when key is selected (only for .pem files, not QR)
 const rsaKeyInput = document.getElementById('rsaKeyInput');
+const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
 const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
 
-rsaKeyInput.addEventListener('change', function() {
-    rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
-});
+if (rsaKeyInput) {
+    rsaKeyInput.addEventListener('change', function() {
+        // Show password field only for .pem files
+        rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
+        // Clear QR input if file is selected
+        if (rsaKeyQrInput && this.files.length) {
+            rsaKeyQrInput.value = '';
+        }
+    });
+}
+
+if (rsaKeyQrInput) {
+    rsaKeyQrInput.addEventListener('change', function() {
+        // Hide password field for QR codes (they're unencrypted)
+        rsaPasswordGroup.classList.add('d-none');
+        // Clear file input if QR is selected
+        if (rsaKeyInput && this.files.length) {
+            rsaKeyInput.value = '';
+        }
+    });
+}
 
 // Form submit loading state
 document.getElementById('encodeForm').addEventListener('submit', function(e) {
@@ -192,12 +321,11 @@ document.getElementById('encodeForm').addEventListener('submit', function(e) {
     btn.disabled = true;
 });
 
-// Character counter
-const messageInput = document.getElementById('messageInput');
+// Character counter for text
 const charCount = document.getElementById('charCount');
 const charWarning = document.getElementById('charWarning');
 const charPercent = document.getElementById('charPercent');
-const maxChars = 50000;
+const maxChars = 250000;
 
 messageInput.addEventListener('input', function() {
     const len = this.value.length;
@@ -210,11 +338,12 @@ messageInput.addEventListener('input', function() {
     charCount.classList.toggle('text-danger', len > maxChars * 0.95);
 });
 
-// Drag & drop with preview
+// Drag & drop with preview for images
 document.querySelectorAll('.drop-zone').forEach(zone => {
     const input = zone.querySelector('input[type="file"]');
     const label = zone.querySelector('.drop-zone-label');
     const preview = zone.querySelector('.drop-zone-preview');
+    const isPayloadZone = zone.id === 'payloadDropZone';
     
     ['dragenter', 'dragover'].forEach(evt => {
         zone.addEventListener(evt, e => {
@@ -233,26 +362,89 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
     zone.addEventListener('drop', e => {
         if (e.dataTransfer.files.length) {
             input.files = e.dataTransfer.files;
-            showPreview(e.dataTransfer.files[0]);
+            input.dispatchEvent(new Event('change'));
+            
+            if (!isPayloadZone) {
+                showPreview(e.dataTransfer.files[0]);
+            }
         }
     });
     
-    input.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            showPreview(this.files[0]);
-        }
-    });
+    if (!isPayloadZone) {
+        input.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                showPreview(this.files[0]);
+            }
+        });
+    }
     
     function showPreview(file) {
         if (!file.type.startsWith('image/')) return;
         
         const reader = new FileReader();
         reader.onload = e => {
-            preview.src = e.target.result;
-            preview.classList.remove('d-none');
+            if (preview) {
+                preview.src = e.target.result;
+                preview.classList.remove('d-none');
+            }
             label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
         };
         reader.readAsDataURL(file);
+    }
+});
+
+// PIN Toggle Logic
+document.getElementById('togglePin').addEventListener('click', function() {
+    const input = document.getElementById('pinInput');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+
+// Prevent Same File Selection
+function checkDuplicateFiles() {
+    const refInput = document.querySelector('input[name="reference_photo"]');
+    const carInput = document.querySelector('input[name="carrier"]');
+    
+    if (refInput.files[0] && carInput.files[0]) {
+        if (refInput.files[0].name === carInput.files[0].name && 
+            refInput.files[0].size === carInput.files[0].size) {
+            alert("Security Warning: You cannot use the same image for both Reference and Carrier!");
+            carInput.value = '';
+            document.getElementById('carrierPreview').classList.add('d-none');
+            document.querySelector('#carrierDropZone .drop-zone-label').innerHTML = 
+                '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>' +
+                '<span class="text-muted">Drop image or click to browse</span>';
+        }
+    }
+}
+document.querySelector('input[name="reference_photo"]').addEventListener('change', checkDuplicateFiles);
+document.querySelector('input[name="carrier"]').addEventListener('change', checkDuplicateFiles);
+
+// Paste from Clipboard
+document.addEventListener('paste', function(e) {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+            const blob = items[i].getAsFile();
+            
+            const carrierInput = document.querySelector('input[name="carrier"]');
+            const refInput = document.querySelector('input[name="reference_photo"]');
+            
+            const targetInput = (!carrierInput.files.length) ? carrierInput : refInput;
+            
+            const container = new DataTransfer();
+            container.items.add(blob);
+            targetInput.files = container.files;
+            
+            targetInput.dispatchEvent(new Event('change'));
+            break;
+        }
     }
 });
 </script>
