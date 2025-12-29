@@ -57,11 +57,6 @@ File Embedding:
             f.write(decoded.file_data)
     else:
         print(decoded.message)
-
-Debugging:
-    from stegasoo.debug import debug
-    debug.enable(True)  # Enable debug output
-    debug.enable_performance(True)  # Enable timing
 """
 
 from .constants import __version__, DAY_NAMES, MAX_MESSAGE_SIZE, MAX_FILE_PAYLOAD_SIZE
@@ -153,7 +148,6 @@ from .utils import (
     SecureDeleter,
     format_file_size,
 )
-from .debug import debug  # Import debug utilities
 
 # QR Code utilities (optional, depends on qrcode and pyzbar)
 try:
@@ -180,7 +174,7 @@ except ImportError:
 
 from datetime import date
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union
 
 
 def encode(
@@ -225,10 +219,6 @@ def encode(
         Output format is always lossless (PNG or BMP) to preserve hidden data.
         If carrier is JPEG/GIF, output will be PNG to maintain data integrity.
     """
-    # Debug logging
-    debug.print(f"encode called: message type={type(message).__name__}, "
-                f"day_phrase='{day_phrase[:20]}...', pin_length={len(pin)}")
-    
     # Validate inputs
     require_valid_payload(message)
     require_valid_image(carrier_image, "Carrier image")
@@ -243,22 +233,15 @@ def encode(
     if date_str is None:
         date_str = date.today().isoformat()
     
-    debug.print(f"Encoding for date: {date_str}")
-    
     # Encrypt message/file
     encrypted = encrypt_message(
         message, reference_photo, day_phrase, date_str, pin, rsa_key_data
     )
     
-    # Debug: show encrypted data size
-    debug.print(f"Encrypted payload: {len(encrypted)} bytes")
-    
     # Get pixel key
     pixel_key = derive_pixel_key(
         reference_photo, day_phrase, date_str, pin, rsa_key_data
     )
-    
-    debug.data(pixel_key, "Pixel key")
     
     # Embed in image (returns extension too)
     stego_data, stats, extension = embed_in_image(
@@ -267,10 +250,6 @@ def encode(
     
     # Generate filename with correct extension
     filename = generate_filename(date_str, extension=extension)
-    
-    debug.print(f"Encoding complete: {filename}, "
-                f"modified {stats.pixels_modified}/{stats.total_pixels} pixels "
-                f"({stats.modification_percent:.2f}%)")
     
     return EncodeResult(
         stego_image=stego_data,
@@ -314,7 +293,6 @@ def encode_file(
     Returns:
         EncodeResult with stego image and metadata
     """
-    debug.print(f"encode_file called: filepath={filepath}")
     payload = FilePayload.from_file(str(filepath), filename_override)
     
     return encode(
@@ -364,7 +342,6 @@ def encode_bytes(
     Returns:
         EncodeResult with stego image and metadata
     """
-    debug.print(f"encode_bytes called: filename={filename}, data_size={len(data)}")
     payload = FilePayload(data=data, filename=filename, mime_type=mime_type)
     
     return encode(
@@ -380,7 +357,6 @@ def encode_bytes(
     )
 
 
-@debug.time
 def decode(
     stego_image: bytes,
     reference_photo: bytes,
@@ -417,9 +393,6 @@ def decode(
         ExtractionError: If data cannot be extracted
         DecryptionError: If decryption fails
     """
-    debug.print(f"decode called: stego_image_size={len(stego_image)}, "
-                f"day_phrase='{day_phrase[:20]}...'")
-    
     # Validate inputs
     require_security_factors(pin, rsa_key_data)
     
@@ -434,15 +407,12 @@ def decode(
         reference_photo, day_phrase, date_str, pin, rsa_key_data
     )
     
-    debug.data(pixel_key, "Pixel key for extraction")
-    
     encrypted = extract_from_image(stego_image, pixel_key)
     
     # If we got data, check if it's from a different date
     if encrypted:
         header = parse_header(encrypted)
         if header and header['date'] != date_str:
-            debug.print(f"Found different date in header: {header['date']} (expected {date_str})")
             # Re-extract with correct date
             pixel_key = derive_pixel_key(
                 reference_photo, day_phrase, header['date'], pin, rsa_key_data
@@ -450,11 +420,7 @@ def decode(
             encrypted = extract_from_image(stego_image, pixel_key)
     
     if not encrypted:
-        debug.print("No data extracted from image")
         raise ExtractionError("Could not extract data. Check your inputs.")
-    
-    debug.print(f"Extracted {len(encrypted)} bytes from image")
-    debug.data(encrypted[:64], "First 64 bytes of extracted data")
     
     # Decrypt and return full result
     return decrypt_message(encrypted, reference_photo, day_phrase, pin, rsa_key_data)
@@ -488,7 +454,6 @@ def decode_text(
     Raises:
         DecryptionError: If content is a binary file, not text
     """
-    debug.print("decode_text called")
     result = decode(stego_image, reference_photo, day_phrase, pin, rsa_key_data, rsa_password)
     
     if result.is_file:
@@ -497,14 +462,12 @@ def decode_text(
             try:
                 return result.file_data.decode('utf-8')
             except UnicodeDecodeError:
-                debug.print(f"File is binary: {result.filename or 'unnamed'}")
                 raise DecryptionError(
                     f"Content is a binary file ({result.filename or 'unnamed'}), not text. "
                     "Use decode() instead and check result.is_file."
                 )
         return ""
     
-    debug.print(f"Decoded text: {result.message[:100] if result.message else 'empty'}...")
     return result.message or ""
 
 
@@ -611,7 +574,4 @@ __all__ = [
     'secure_delete',
     'SecureDeleter',
     'format_file_size',
-    
-    # Debugging
-    'debug',
 ]

@@ -13,7 +13,6 @@ import secrets
 import mimetypes
 from pathlib import Path
 from datetime import datetime
-from PIL import Image
 
 from flask import (
     Flask, render_template, request, send_file,
@@ -80,49 +79,15 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 10MB max upload
 
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
-THUMBNAIL_FILES: dict[str, bytes] = {}
 TEMP_FILE_EXPIRY = 300  # 5 minutes
-THUMBNAIL_SIZE = (250, 250)  # Maximum dimensions for thumbnail
-
-
-def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes:
-    """Generate thumbnail from image data."""
-    try:
-        with Image.open(io.BytesIO(image_data)) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'LA', 'P'):
-                # Create white background for transparent images
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode == 'P':
-                    img = img.convert('RGBA')
-                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                img = background
-            elif img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Create thumbnail
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-            
-            # Save to bytes
-            buffer = io.BytesIO()
-            img.save(buffer, format='JPEG', quality=85, optimize=True)
-            return buffer.getvalue()
-    except Exception as e:
-        # Log error but don't crash
-        print(f"Thumbnail generation error: {e}")
-        return None
 
 
 def cleanup_temp_files():
     """Remove expired temporary files."""
     now = time.time()
     expired = [fid for fid, info in TEMP_FILES.items() if now - info['timestamp'] > TEMP_FILE_EXPIRY]
-    
     for fid in expired:
         TEMP_FILES.pop(fid, None)
-        # Also clean up corresponding thumbnail
-        thumb_id = f"{fid}_thumb"
-        THUMBNAIL_FILES.pop(thumb_id, None)
 
 
 def allowed_image(filename: str) -> bool:
@@ -141,6 +106,7 @@ def format_size(size_bytes: int) -> str:
         return f"{size_bytes / 1024:.1f} KB"
     else:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
+
 
 
 # ============================================================================
@@ -288,6 +254,11 @@ def generate_qr_download(token):
         return f"Error generating QR code: {e}", 500
 
 
+#@app.route('/generate/download-key', methods=['POST'])
+#def download_key():
+#    """Download RSA key as password-protected PEM file."""
+#    key_pem = request.form.get('key_pem', '')
+
 @app.route('/generate/download-key', methods=['POST'])
 def download_key():
     """Download RSA key as password-protected PEM file."""
@@ -359,6 +330,32 @@ def extract_key_from_qr_route():
             'success': False,
             'error': str(e)
         }), 500
+    password = request.form.get('key_password', '')
+    
+    if not key_pem:
+        flash('No key to download', 'error')
+        return redirect(url_for('generate'))
+    
+    if not password or len(password) < 8:
+        flash('Password must be at least 8 characters', 'error')
+        return redirect(url_for('generate'))
+    
+    try:
+        private_key = load_rsa_key(key_pem.encode())
+        encrypted_pem = export_rsa_key_pem(private_key, password=password)
+        
+        key_id = secrets.token_hex(4)
+        filename = f'stegasoo_key_{private_key.key_size}_{key_id}.pem'
+        
+        return send_file(
+            io.BytesIO(encrypted_pem),
+            mimetype='application/x-pem-file',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        flash(f'Error creating key file: {e}', 'error')
+        return redirect(url_for('generate'))
 
 
 @app.route('/encode', methods=['GET', 'POST'])
@@ -519,32 +516,9 @@ def encode_result(file_id):
         return redirect(url_for('encode_page'))
     
     file_info = TEMP_FILES[file_id]
-    
-    # Generate thumbnail
-    thumbnail_data = generate_thumbnail(file_info['data'])
-    thumbnail_id = None
-    
-    if thumbnail_data:
-        thumbnail_id = f"{file_id}_thumb"
-        THUMBNAIL_FILES[thumbnail_id] = thumbnail_data
-    
     return render_template('encode_result.html',
         file_id=file_id,
-        filename=file_info['filename'],
-        thumbnail_url=url_for('encode_thumbnail', thumb_id=thumbnail_id) if thumbnail_id else None
-    )
-
-
-@app.route('/encode/thumbnail/<thumb_id>')
-def encode_thumbnail(thumb_id):
-    """Serve thumbnail image."""
-    if thumb_id not in THUMBNAIL_FILES:
-        return "Thumbnail not found", 404
-    
-    return send_file(
-        io.BytesIO(THUMBNAIL_FILES[thumb_id]),
-        mimetype='image/jpeg',
-        as_attachment=False
+        filename=file_info['filename']
     )
 
 
@@ -582,11 +556,6 @@ def encode_file_route(file_id):
 def encode_cleanup(file_id):
     """Manually cleanup a file after sharing."""
     TEMP_FILES.pop(file_id, None)
-    
-    # Also cleanup thumbnail if exists
-    thumb_id = f"{file_id}_thumb"
-    THUMBNAIL_FILES.pop(thumb_id, None)
-    
     return jsonify({'status': 'ok'})
 
 

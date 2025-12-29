@@ -10,9 +10,10 @@ import secrets
 import shutil
 from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from .constants import DAY_NAMES
+from .debug import debug
 
 
 def generate_filename(
@@ -32,7 +33,14 @@ def generate_filename(
         
     Returns:
         Filename string
+        
+    Example:
+        >>> generate_filename("2023-12-25", "secret_", "png")
+        "secret_a1b2c3d4_20231225.png"
     """
+    debug.validate(extension and '.' not in extension,
+                f"Extension must not contain dot, got '{extension}'")
+    
     if date_str is None:
         date_str = date.today().isoformat()
     
@@ -42,7 +50,9 @@ def generate_filename(
     # Ensure extension doesn't have a leading dot
     extension = extension.lstrip('.')
     
-    return f"{prefix}{random_hex}_{date_compact}.{extension}"
+    filename = f"{prefix}{random_hex}_{date_compact}.{extension}"
+    debug.print(f"Generated filename: {filename}")
+    return filename
 
 
 def parse_date_from_filename(filename: str) -> Optional[str]:
@@ -56,6 +66,10 @@ def parse_date_from_filename(filename: str) -> Optional[str]:
         
     Returns:
         Date string (YYYY-MM-DD) or None
+        
+    Example:
+        >>> parse_date_from_filename("secret_a1b2c3d4_20231225.png")
+        "2023-12-25"
     """
     import re
     
@@ -63,14 +77,19 @@ def parse_date_from_filename(filename: str) -> Optional[str]:
     match = re.search(r'_(\d{4})(\d{2})(\d{2})(?:\.|$)', filename)
     if match:
         year, month, day = match.groups()
-        return f"{year}-{month}-{day}"
+        date_str = f"{year}-{month}-{day}"
+        debug.print(f"Parsed date (compact): {date_str}")
+        return date_str
     
     # Try YYYY-MM-DD format
     match = re.search(r'_(\d{4})-(\d{2})-(\d{2})(?:\.|$)', filename)
     if match:
         year, month, day = match.groups()
-        return f"{year}-{month}-{day}"
+        date_str = f"{year}-{month}-{day}"
+        debug.print(f"Parsed date (dashed): {date_str}")
+        return date_str
     
+    debug.print(f"No date found in filename: {filename}")
     return None
 
 
@@ -83,23 +102,55 @@ def get_day_from_date(date_str: str) -> str:
         
     Returns:
         Day name (e.g., "Monday")
+        
+    Example:
+        >>> get_day_from_date("2023-12-25")
+        "Monday"
     """
+    debug.validate(len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-',
+                f"Invalid date format: {date_str}, expected YYYY-MM-DD")
+    
     try:
         year, month, day = map(int, date_str.split('-'))
         d = date(year, month, day)
-        return DAY_NAMES[d.weekday()]
-    except Exception:
+        day_name = DAY_NAMES[d.weekday()]
+        debug.print(f"Date {date_str} is {day_name}")
+        return day_name
+    except Exception as e:
+        debug.exception(e, f"get_day_from_date for {date_str}")
         return ""
 
 
 def get_today_date() -> str:
-    """Get today's date as YYYY-MM-DD."""
-    return date.today().isoformat()
+    """
+    Get today's date as YYYY-MM-DD.
+    
+    Returns:
+        Today's date string
+        
+    Example:
+        >>> get_today_date()
+        "2023-12-25"
+    """
+    today = date.today().isoformat()
+    debug.print(f"Today's date: {today}")
+    return today
 
 
 def get_today_day() -> str:
-    """Get today's day name."""
-    return DAY_NAMES[date.today().weekday()]
+    """
+    Get today's day name.
+    
+    Returns:
+        Today's day name
+        
+    Example:
+        >>> get_today_day()
+        "Monday"
+    """
+    today_day = DAY_NAMES[date.today().weekday()]
+    debug.print(f"Today is {today_day}")
+    return today_day
 
 
 class SecureDeleter:
@@ -107,9 +158,13 @@ class SecureDeleter:
     Securely delete files by overwriting with random data.
     
     Implements multi-pass overwriting before deletion.
+    
+    Example:
+        >>> deleter = SecureDeleter("secret.txt", passes=3)
+        >>> deleter.execute()
     """
     
-    def __init__(self, path: str | Path, passes: int = 7):
+    def __init__(self, path: Union[str, Path], passes: int = 7):
         """
         Initialize secure deleter.
         
@@ -117,66 +172,99 @@ class SecureDeleter:
             path: Path to file or directory
             passes: Number of overwrite passes
         """
+        debug.validate(passes > 0, f"Passes must be positive, got {passes}")
+        
         self.path = Path(path)
         self.passes = passes
+        debug.print(f"SecureDeleter initialized for {self.path} with {passes} passes")
     
     def _overwrite_file(self, file_path: Path) -> None:
         """Overwrite file with random data multiple times."""
         if not file_path.exists() or not file_path.is_file():
+            debug.print(f"File does not exist or is not a file: {file_path}")
             return
         
         length = file_path.stat().st_size
+        debug.print(f"Overwriting file {file_path} ({length} bytes)")
+        
         if length == 0:
+            debug.print("File is empty, nothing to overwrite")
             return
         
         patterns = [b'\x00', b'\xFF', bytes([random.randint(0, 255)])]
         
-        for _ in range(self.passes):
+        for pass_num in range(self.passes):
+            debug.print(f"Overwrite pass {pass_num + 1}/{self.passes}")
             with open(file_path, 'r+b') as f:
-                for pattern in patterns:
+                for pattern_idx, pattern in enumerate(patterns):
                     f.seek(0)
-                    for _ in range(length):
-                        f.write(pattern)
+                    # Write pattern in chunks for large files
+                    chunk_size = 1024 * 1024  # 1MB chunks
+                    for offset in range(0, length, chunk_size):
+                        chunk = min(chunk_size, length - offset)
+                        f.write(pattern * (chunk // len(pattern)))
+                        f.write(pattern[:chunk % len(pattern)])
                 
                 # Final pass with random data
                 f.seek(0)
                 f.write(os.urandom(length))
+        
+        debug.print(f"Completed {self.passes} overwrite passes")
     
     def delete_file(self) -> None:
         """Securely delete a single file."""
         if self.path.is_file():
+            debug.print(f"Securely deleting file: {self.path}")
             self._overwrite_file(self.path)
             self.path.unlink()
+            debug.print(f"File deleted: {self.path}")
+        else:
+            debug.print(f"Not a file: {self.path}")
     
     def delete_directory(self) -> None:
         """Securely delete a directory and all contents."""
         if not self.path.is_dir():
+            debug.print(f"Not a directory: {self.path}")
             return
         
+        debug.print(f"Securely deleting directory: {self.path}")
+        
         # First, securely overwrite all files
+        file_count = 0
         for file_path in self.path.rglob('*'):
             if file_path.is_file():
                 self._overwrite_file(file_path)
+                file_count += 1
+        
+        debug.print(f"Overwrote {file_count} files")
         
         # Then remove the directory tree
         shutil.rmtree(self.path)
+        debug.print(f"Directory deleted: {self.path}")
     
     def execute(self) -> None:
         """Securely delete the path (file or directory)."""
+        debug.print(f"Executing secure deletion: {self.path}")
         if self.path.is_file():
             self.delete_file()
         elif self.path.is_dir():
             self.delete_directory()
+        else:
+            debug.print(f"Path does not exist: {self.path}")
 
 
-def secure_delete(path: str | Path, passes: int = 7) -> None:
+def secure_delete(path: Union[str, Path], passes: int = 7) -> None:
     """
     Convenience function for secure deletion.
     
     Args:
         path: Path to file or directory
         passes: Number of overwrite passes
+        
+    Example:
+        >>> secure_delete("secret.txt", passes=3)
     """
+    debug.print(f"secure_delete called: {path}, passes={passes}")
     SecureDeleter(path, passes).execute()
 
 
@@ -189,7 +277,13 @@ def format_file_size(size_bytes: int) -> str:
         
     Returns:
         Human-readable string (e.g., "1.5 MB")
+        
+    Example:
+        >>> format_file_size(1500000)
+        "1.5 MB"
     """
+    debug.validate(size_bytes >= 0, f"File size cannot be negative: {size_bytes}")
+    
     for unit in ['B', 'KB', 'MB', 'GB']:
         if size_bytes < 1024:
             if unit == 'B':
@@ -200,10 +294,38 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def format_number(n: int) -> str:
-    """Format number with commas."""
+    """
+    Format number with commas.
+    
+    Args:
+        n: Integer to format
+        
+    Returns:
+        Formatted string
+        
+    Example:
+        >>> format_number(1234567)
+        "1,234,567"
+    """
+    debug.validate(isinstance(n, int), f"Input must be integer, got {type(n)}")
     return f"{n:,}"
 
 
 def clamp(value: int, min_val: int, max_val: int) -> int:
-    """Clamp value to range."""
+    """
+    Clamp value to range.
+    
+    Args:
+        value: Value to clamp
+        min_val: Minimum allowed value
+        max_val: Maximum allowed value
+        
+    Returns:
+        Clamped value
+        
+    Example:
+        >>> clamp(15, 0, 10)
+        10
+    """
+    debug.validate(min_val <= max_val, f"min_val ({min_val}) must be <= max_val ({max_val})")
     return max(min_val, min(max_val, value))

@@ -8,57 +8,57 @@
     <h1 class="display-4 fw-bold">Stegasoo</h1>
     <p class="lead text-muted">Create hidden encrypted messages in images and photos using advanced steganography.</p>
 </div>
-
 <div class="row g-4 mb-5">
-    <!-- Encode Card -->
+
     <div class="col-md-4">
-        <a href="/encode" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-lock-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Encode Message</h5>
-                    <p class="card-text text-muted">
-                        Hide your secret message inside an innocent-looking image using your daily phrase + PIN.
-                    </p>
-                </div>
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-lock-fill fs-1"></i>
             </div>
-        </a>
+            <div class="card-body text-center">
+                <h5 class="card-title">Encode Message</h5>
+                <p class="card-text text-muted">
+                    Hide your secret message inside an innocent-looking image using your daily phrase + PIN.
+                </p>
+                <a href="/encode" class="btn btn-primary">
+                    <i class="bi bi-upload me-1"></i> Encode
+                </a>
+            </div>
+        </div>
     </div>
 
-    <!-- Decode Card -->
     <div class="col-md-4">
-        <a href="/decode" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-unlock-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Decode Message</h5>
-                    <p class="card-text text-muted">
-                        Extract and decrypt hidden messages from Stegasoo-encoded images using your credentials.
-                    </p>
-                </div>
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-unlock-fill fs-1"></i>
             </div>
-        </a>
+            <div class="card-body text-center">
+                <h5 class="card-title">Decode Message</h5>
+                <p class="card-text text-muted">
+                    Extract and decrypt hidden messages from Stegasoo-encoded images using your credentials.
+                </p>
+                <a href="/decode" class="btn btn-primary">
+                    <i class="bi bi-download me-1"></i> Decode
+                </a>
+            </div>
+        </div>
     </div>
  
-    <!-- Generate Card -->
     <div class="col-md-4">
-        <a href="/generate" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-key-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Generate Keys</h5>
-                    <p class="card-text text-muted">
-                        Create your weekly phrase card and PIN. Memorize 21 words + 6 digits for maximum security.
-                    </p>
-                </div>
+        <div class="card h-100 feature-card">
+            <div class="card-header text-center py-3">
+                <i class="bi bi-key-fill fs-1"></i>
             </div>
-        </a>
+            <div class="card-body text-center">
+                <h5 class="card-title">Generate Keys</h5>
+                <p class="card-text text-muted">
+                    Create your weekly phrase card and PIN. Memorize 21 words + 6 digits for maximum security.
+                </p>
+                <a href="/generate" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i> Generate
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 

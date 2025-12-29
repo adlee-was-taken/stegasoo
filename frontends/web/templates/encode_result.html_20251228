@@ -11,21 +11,7 @@
             </div>
             <div class="card-body text-center">
                 <div class="my-4">
-                    {% if thumbnail_url %}
-                    <!-- Thumbnail of the actual encoded image -->
-                    <div class="encoded-image-thumbnail">
-                        <img src="{{ thumbnail_url }}" 
-                             alt="Encoded image thumbnail" 
-                             class="img-thumbnail rounded"
-                             style="max-width: 250px; max-height: 250px; object-fit: contain;">
-                        <div class="mt-2 small text-muted">
-                            <i class="bi bi-image me-1"></i>Encoded Image Preview
-                        </div>
-                    </div>
-                    {% else %}
-                    <!-- Fallback to icon if thumbnail not available -->
                     <i class="bi bi-file-earmark-image text-success" style="font-size: 4rem;"></i>
-                    {% endif %}
                 </div>
                 
                 <p class="lead mb-4">Your secret has been hidden in the image.</p>

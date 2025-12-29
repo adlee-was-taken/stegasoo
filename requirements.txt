@@ -9,12 +9,11 @@ Pillow>=10.0.0
 argon2-cffi>=23.1.0
 
 # QR Code Generation & Reading
-qrcode[pil]>=7.4.0
+qrcode>=7.4.0
 pyzbar>=0.1.9
 
 # Web Frontend (Flask)
 Flask>=3.0.0
-pyzbar>=0.1.8
 
 # API Frontend (FastAPI)
 fastapi>=0.109.0

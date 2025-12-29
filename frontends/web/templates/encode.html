@@ -142,7 +142,6 @@
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
-                            {% if has_qrcode_read %}
                             <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaFileTab" type="button">
@@ -158,17 +157,12 @@
                             <div class="tab-content">
                                 <div class="tab-pane fade show active" id="rsaFileTab" role="tabpanel">
                                     <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
+                                    <div class="form-text small">Shared .pem format key file.</div>
                                 </div>
                                 <div class="tab-pane fade" id="rsaQrTab" role="tabpanel">
                                     <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
                                     <div class="form-text small">PNG, JPG, or other image of QR code</div>
                                 </div>
-                            </div>
-                            {% else %}
-                            <input type="file" name="rsa_key" class="form-control" id="rsaKeyInput" accept=".pem,.key">
-                            {% endif %}
-                            <div class="form-text">
-                                Your shared .pem key file or QR code image (if configured)
                             </div>
                         </div>
                     </div>
