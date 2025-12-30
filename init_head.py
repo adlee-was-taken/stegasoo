@@ -155,30 +155,6 @@ from .utils import (
 )
 from .debug import debug  # Import debug utilities
 
-# =============================================================================
-# NEW IN v2.2.0 - Compression
-# =============================================================================
-from .compression import (
-    compress,
-    decompress,
-    CompressionAlgorithm,
-    CompressionError,
-    get_compression_ratio,
-    estimate_compressed_size,
-    get_available_algorithms,
-)
-
-# =============================================================================
-# NEW IN v2.2.0 - Batch Processing
-# =============================================================================
-from .batch import (
-    BatchProcessor,
-    BatchResult,
-    BatchItem,
-    BatchStatus,
-    batch_capacity_check,
-)
-
 # QR Code utilities (optional, depends on qrcode and pyzbar)
 try:
     from .qr_utils import (
@@ -533,8 +509,7 @@ def decode_text(
         return ""
     
     debug.print(f"Decoded text: {result.message[:100] if result.message else 'empty'}...")
-    message: str = result.message if result.message is not None else ""
-    return message
+    return result.message or ""
 
 
 __all__ = [
@@ -643,20 +618,4 @@ __all__ = [
     
     # Debugging
     'debug',
-    
-    # Compression (v2.2.0)
-    'compress',
-    'decompress',
-    'CompressionAlgorithm',
-    'CompressionError',
-    'get_compression_ratio',
-    'estimate_compressed_size',
-    'get_available_algorithms',
-    
-    # Batch processing (v2.2.0)
-    'BatchProcessor',
-    'BatchResult',
-    'BatchItem',
-    'BatchStatus',
-    'batch_capacity_check',
 ]

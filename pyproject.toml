@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stegasoo"
-version = "2.0.1"
+version = "2.2.0"
 description = "Secure steganography with hybrid photo + passphrase + PIN authentication"
 readme = "README.md"
 license = "MIT"
@@ -46,6 +46,9 @@ dependencies = [
 cli = [
     "click>=8.0.0",
     "qrcode>=7.30"
+]
+compression = [
+    "lz4>=4.0.0",
 ]
 web = [
     "flask>=3.0.0",

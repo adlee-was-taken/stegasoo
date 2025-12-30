@@ -52,8 +52,7 @@ def hash_photo(image_data: bytes) -> bytes:
     Returns:
         32-byte SHA-256 hash
     """
-    img = Image.open(io.BytesIO(image_data))
-    img = img.convert('RGB')
+    img: Image.Image = Image.open(io.BytesIO(image_data)).convert('RGB')
     pixels = img.tobytes()
     
     # Double-hash with prefix for additional mixing
