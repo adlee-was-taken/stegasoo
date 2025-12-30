@@ -634,9 +634,6 @@ def decode_page():
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
             
-            # Get encoding date from form (detected from filename in JS)
-            stego_date = request.form.get('stego_date', '').strip()
-            
             if not day_phrase:
                 flash('Day phrase is required', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
@@ -694,8 +691,7 @@ def decode_page():
                 day_phrase=day_phrase,
                 pin=pin,
                 rsa_key_data=rsa_key_data,
-                rsa_password=key_password,
-                date_str=stego_date if stego_date else None
+                rsa_password=key_password
             )
             
             if decode_result.is_file:

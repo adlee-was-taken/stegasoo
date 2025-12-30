@@ -95,6 +95,9 @@
                         </div>
                     </div>
                     
+                    <!-- Hidden field for encoding date (auto-detected from filename) -->
+                    <input type="hidden" name="stego_date" id="stegoDate" value="">
+                    
                     <div class="mb-3">
                         <label class="form-label" id="dayPhraseLabel">
                             <i class="bi bi-chat-quote me-1"></i> Day Phrase
@@ -104,6 +107,12 @@
                         <div class="form-text">
                             The phrase for the day the message was encoded
                         </div>
+                    </div>
+                    
+                    <!-- Date detection info -->
+                    <div class="alert alert-info small d-none" id="dateDetectedAlert">
+                        <i class="bi bi-calendar-check me-1"></i>
+                        <span id="dateDetectedText">Date detected from filename</span>
                     </div>
                     
                     <hr class="my-4">
@@ -253,23 +262,51 @@ if (rsaKeyQrInput) {
 // Day names for date detection
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Detect day from filename
+// Detect day AND date from filename - FIXED VERSION
 function detectDayFromFilename(filename) {
-    const dateMatch = filename.match(/_(\d{4})[-]?(\d{2})[-]?(\d{2})/);
+    // Match patterns like _20251227 or _2025-12-27
+    const compactMatch = filename.match(/_(\d{4})(\d{2})(\d{2})/);
+    const dashedMatch = filename.match(/_(\d{4})-(\d{2})-(\d{2})/);
+    
+    const dateMatch = compactMatch || dashedMatch;
     
     if (dateMatch) {
         const [, year, month, day] = dateMatch;
-        const date = new Date(year, month - 1, day);
-        return dayNames[date.getDay()];
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const dayName = dayNames[date.getDay()];
+        // Return ISO format date string for the server
+        const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        
+        console.log('Detected date from filename:', dateStr, 'Day:', dayName);
+        
+        return {
+            dayName: dayName,
+            dateStr: dateStr
+        };
     }
     return null;
 }
 
-// Update day phrase label
-function updateDayLabel(dayName) {
+// Update day phrase label AND set hidden date field
+function updateDayLabel(dayName, dateStr) {
     const label = document.getElementById('dayPhraseLabel');
     if (label && dayName) {
         label.innerHTML = `<i class="bi bi-chat-quote me-1"></i>Provide <span class="day-of-week-highlight">${dayName}</span>'s Phrase`;
+    }
+    
+    // CRITICAL FIX: Set the hidden date field for the server
+    const dateField = document.getElementById('stegoDate');
+    if (dateField && dateStr) {
+        dateField.value = dateStr;
+        console.log('Set stego_date hidden field to:', dateStr);
+    }
+    
+    // Show info alert about detected date
+    const dateAlert = document.getElementById('dateDetectedAlert');
+    const dateText = document.getElementById('dateDetectedText');
+    if (dateAlert && dateText && dateStr) {
+        dateText.textContent = `Encoding date detected: ${dateStr} (${dayName})`;
+        dateAlert.classList.remove('d-none');
     }
 }
 
@@ -337,9 +374,12 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
             const file = e.dataTransfer.files[0];
             showPreview(file);
             
+            // FIXED: Extract both day name AND date string
             if (isStegoZone) {
-                const dayName = detectDayFromFilename(file.name);
-                updateDayLabel(dayName);
+                const detected = detectDayFromFilename(file.name);
+                if (detected) {
+                    updateDayLabel(detected.dayName, detected.dateStr);
+                }
             }
         }
     });
@@ -349,9 +389,12 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
             const file = this.files[0];
             showPreview(file);
             
+            // FIXED: Extract both day name AND date string
             if (isStegoZone) {
-                const dayName = detectDayFromFilename(file.name);
-                updateDayLabel(dayName);
+                const detected = detectDayFromFilename(file.name);
+                if (detected) {
+                    updateDayLabel(detected.dayName, detected.dateStr);
+                }
             }
         }
     });
