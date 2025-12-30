@@ -56,4 +56,4 @@ htmlcov/
 *.spec
 
 # Output test files.
-*.png
+test_data/*.png
