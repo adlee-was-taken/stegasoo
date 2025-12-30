@@ -5,10 +5,14 @@
 {% block content %}
 
 <div class="row mb-4">
-    <div class="col-12 text-center">
-        <img src="{{ url_for('static', filename='logo_home.png') }}" alt="Stegasoo" height="200" class="img-fluid mb-3">
-        <h1 class="display-4 fw-bold mb-2">Stegasoo</h1>
-        <p class="lead text-muted">Hide encrypted files or messages in images with steganography.</p>
+    <div class="col-12">
+        <div class="d-flex align-items-end justify-content-center gap-4">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="230">
+            <div style="margin-bottom: 40px;">
+                <h1 class="display-4 fw-bold mb-2">Stegasoo</h1>
+                <p class="lead text-muted mb-0">Hide encrypted data in plain sight.</p>
+            </div>
+        </div>
     </div>
 </div>
 
