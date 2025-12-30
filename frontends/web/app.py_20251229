@@ -31,19 +31,15 @@ from stegasoo import (
     validate_rsa_key, validate_security_factors,
     validate_file_payload,
     get_today_day, generate_filename,
-    DAY_NAMES,
+    DAY_NAMES, __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
     FilePayload,
+    MAX_FILE_PAYLOAD_SIZE,
 )
 from stegasoo.constants import (
-    __version__,
-    MAX_MESSAGE_SIZE, MAX_MESSAGE_CHARS,
-    MIN_PIN_LENGTH, MAX_PIN_LENGTH,
+    MAX_MESSAGE_SIZE, MIN_PIN_LENGTH, MAX_PIN_LENGTH,
     VALID_RSA_SIZES, MAX_FILE_SIZE,
-    MAX_FILE_PAYLOAD_SIZE, MAX_UPLOAD_SIZE,
-    TEMP_FILE_EXPIRY, TEMP_FILE_EXPIRY_MINUTES,
-    THUMBNAIL_SIZE, THUMBNAIL_QUALITY,
 )
 
 # QR Code support
@@ -80,34 +76,24 @@ from stegasoo.qr_utils import (
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
-app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 20MB max upload
 
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
 THUMBNAIL_FILES: dict[str, bytes] = {}
-
-
-# ============================================================================
-# TEMPLATE CONTEXT PROCESSOR
-# ============================================================================
-
-@app.context_processor
-def inject_globals():
-    """Inject global variables into all templates."""
-    return {
-        'version': __version__,
-        'max_message_chars': MAX_MESSAGE_CHARS,
-        'max_payload_kb': MAX_FILE_PAYLOAD_SIZE // 1024,
-        'max_upload_mb': MAX_UPLOAD_SIZE // (1024 * 1024),
-        'temp_file_expiry_minutes': TEMP_FILE_EXPIRY_MINUTES,
-        'min_pin_length': MIN_PIN_LENGTH,
-        'max_pin_length': MAX_PIN_LENGTH,
-    }
-
+TEMP_FILE_EXPIRY = 300  # 5 minutes
+THUMBNAIL_SIZE = (250, 250)  # Maximum dimensions for thumbnail
 
 # ============================================================================
-# CONFIGURATION (for override attempts - currently using constants.py values)
+# CONFIGURATION
 # ============================================================================
+
+# Override stegasoo limits for larger files
+# Note: You might need to modify the stegasoo library itself
+# to actually increase these limits in its internal calculations
+
+# Flask upload limit (30MB)
+MAX_UPLOAD_SIZE = 30 * 1024 * 1024
 
 # Try to import and override stegasoo constants if possible
 try:
@@ -119,13 +105,13 @@ try:
     
     # Note: You might need to patch the stegasoo module
     # if MAX_FILE_PAYLOAD_SIZE is used internally
+    import stegasoo
     if hasattr(stegasoo, 'MAX_FILE_PAYLOAD_SIZE'):
         print(f"Overriding MAX_FILE_PAYLOAD_SIZE to {DESIRED_PAYLOAD_SIZE}")
         stegasoo.MAX_FILE_PAYLOAD_SIZE = DESIRED_PAYLOAD_SIZE
     
 except Exception as e:
     print(f"Could not override stegasoo limits: {e}")
-
 
 def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes:
     """Generate thumbnail from image data."""
@@ -147,7 +133,7 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
             
             # Save to bytes
             buffer = io.BytesIO()
-            img.save(buffer, format='JPEG', quality=THUMBNAIL_QUALITY, optimize=True)
+            img.save(buffer, format='JPEG', quality=85, optimize=True)
             return buffer.getvalue()
     except Exception as e:
         # Log error but don't crash
@@ -404,6 +390,7 @@ def extract_key_from_qr_route():
 @app.route('/encode', methods=['GET', 'POST'])
 def encode_page():
     day_of_week = get_today_day()
+    max_payload_kb = MAX_FILE_PAYLOAD_SIZE // 1024
     
     if request.method == 'POST':
         try:
@@ -415,11 +402,11 @@ def encode_page():
             
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             if not allowed_image(ref_photo.filename) or not allowed_image(carrier.filename):
                 flash('Invalid file type. Use PNG, JPG, or BMP', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Get form data
             message = request.form.get('message', '')
@@ -436,7 +423,7 @@ def encode_page():
                 result = validate_file_payload(file_data, payload_file.filename)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
                 
                 mime_type, _ = mimetypes.guess_type(payload_file.filename)
                 payload = FilePayload(
@@ -449,12 +436,12 @@ def encode_page():
                 result = validate_message(message)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
                 payload = message
             
             if not day_phrase:
                 flash('Day phrase is required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Read files
             ref_data = ref_photo.read()
@@ -477,20 +464,20 @@ def encode_page():
                     rsa_key_from_qr = True  # QR keys are never password-protected
                 else:
                     flash('Could not extract RSA key from QR code image. Make sure the image contains a valid QR code.', 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate security factors
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Determine key password - QR code keys are never password-protected
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
@@ -500,13 +487,13 @@ def encode_page():
                 result = validate_rsa_key(rsa_key_data, key_password)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate carrier image
             result = validate_image(carrier_data, "Carrier image")
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
             
             # Get date
             client_date = request.form.get('client_date', '').strip()
@@ -540,15 +527,15 @@ def encode_page():
             
         except CapacityError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
         except StegasooError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
         except Exception as e:
             flash(f'Error: {e}', 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
     
-    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+    return render_template('encode.html', day_of_week=day_of_week, max_payload_kb=max_payload_kb, has_qrcode_read=HAS_QRCODE_READ)
 
 
 @app.route('/encode/result/<file_id>')
@@ -699,7 +686,18 @@ def decode_page():
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
+            with open('/tmp/debug_stego.png', 'wb') as f:
+                f.write(stego_data)
+            with open('/tmp/debug_ref.png', 'wb') as f:
+                f.write(ref_data)
+            with open('/tmp/debug_params.txt', 'w') as f:
+                f.write(f"day_phrase: {day_phrase}\n")
+                f.write(f"pin: {pin}\n")
+                f.write(f"date_str: {stego_date}\n")
+                f.write(f"rsa_key: {len(rsa_key_data) if rsa_key_data else None}\n")
+
+            print(f"DEBUG: Saved inputs to /tmp/debug_*") 
             # Decode
             decode_result = decode(
                 stego_image=stego_data,
@@ -770,7 +768,8 @@ def decode_download(file_id):
 def about():
     return render_template('about.html', 
         has_argon2=has_argon2(),
-        has_qrcode_read=HAS_QRCODE_READ
+        has_qrcode_read=HAS_QRCODE_READ,
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
     )
 
 

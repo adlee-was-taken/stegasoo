@@ -2,6 +2,7 @@
 Stegasoo Constants and Configuration
 
 Central location for all magic numbers, limits, and crypto parameters.
+All version numbers, limits, and configuration values should be defined here.
 """
 
 import os
@@ -11,7 +12,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "2.1.3"
+__version__ = "2.2.0"
 
 # ============================================================================
 # FILE FORMAT
@@ -46,25 +47,45 @@ PBKDF2_ITERATIONS = 600000
 
 MAX_IMAGE_PIXELS = 24_000_000     # ~24 megapixels
 MAX_MESSAGE_SIZE = 250_000        # 250 KB (text messages)
+MAX_MESSAGE_CHARS = 250_000       # Alias for clarity in templates
 MAX_FILENAME_LENGTH = 255         # Max filename length to store
 
-# Example in constants.py
-MAX_FILE_SIZE = 30 * 1024 * 1024  # 30MB total file size
+# File size limits
+MAX_FILE_SIZE = 30 * 1024 * 1024        # 30MB total file size
 MAX_FILE_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB payload
+MAX_UPLOAD_SIZE = 30 * 1024 * 1024       # 30MB max upload (Flask)
 
+# PIN configuration
 MIN_PIN_LENGTH = 6
 MAX_PIN_LENGTH = 9
 DEFAULT_PIN_LENGTH = 6
 
+# Phrase configuration
 MIN_PHRASE_WORDS = 3
 MAX_PHRASE_WORDS = 12
 DEFAULT_PHRASE_WORDS = 3
 
+# RSA configuration
 MIN_RSA_BITS = 2048
 VALID_RSA_SIZES = (2048, 3072, 4096)
 DEFAULT_RSA_BITS = 2048
 
 MIN_KEY_PASSWORD_LENGTH = 8
+
+# ============================================================================
+# WEB/API CONFIGURATION
+# ============================================================================
+
+# Temporary file storage
+TEMP_FILE_EXPIRY = 300  # 5 minutes in seconds
+TEMP_FILE_EXPIRY_MINUTES = 5
+
+# Thumbnail settings
+THUMBNAIL_SIZE = (250, 250)  # Maximum dimensions for thumbnails
+THUMBNAIL_QUALITY = 85
+
+# QR Code limits
+QR_MAX_BINARY = 2900  # Safe limit for binary data in QR
 
 # ============================================================================
 # FILE TYPES
@@ -73,11 +94,40 @@ MIN_KEY_PASSWORD_LENGTH = 8
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif'}
 ALLOWED_KEY_EXTENSIONS = {'pem', 'key'}
 
+# Lossless image formats (safe for steganography)
+LOSSLESS_FORMATS = {'PNG', 'BMP', 'TIFF'}
+
 # ============================================================================
 # DAYS
 # ============================================================================
 
 DAY_NAMES = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+
+# ============================================================================
+# COMPRESSION
+# ============================================================================
+
+# Minimum payload size to attempt compression (smaller often expands)
+MIN_COMPRESS_SIZE = 64
+
+# Zlib compression level (1-9, higher = better ratio, slower)
+ZLIB_COMPRESSION_LEVEL = 6
+
+# Compression header magic bytes
+COMPRESSION_MAGIC = b'\x00CMP'
+
+# ============================================================================
+# BATCH PROCESSING
+# ============================================================================
+
+# Default parallel workers for batch operations
+BATCH_DEFAULT_WORKERS = 4
+
+# Maximum parallel workers
+BATCH_MAX_WORKERS = 16
+
+# Output filename suffix for batch encode
+BATCH_OUTPUT_SUFFIX = "_encoded"
 
 # ============================================================================
 # DATA FILES

@@ -5,9 +5,10 @@ Generate PINs, passphrases, and RSA keys.
 """
 
 import secrets
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.backends import default_backend
@@ -40,7 +41,7 @@ def generate_pin(length: int = DEFAULT_PIN_LENGTH) -> str:
         >>> generate_pin(6)
         "812345"
     """
-    debug.validate(length >= MIN_PIN_LENGTH and length <= MAX_PIN_LENGTH,
+    debug.validate(MIN_PIN_LENGTH <= length <= MAX_PIN_LENGTH,
                 f"PIN length must be between {MIN_PIN_LENGTH} and {MAX_PIN_LENGTH}")
     
     length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, length))
@@ -70,7 +71,7 @@ def generate_phrase(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> str:
         >>> generate_phrase(3)
         "apple forest thunder"
     """
-    debug.validate(words_per_phrase >= MIN_PHRASE_WORDS and words_per_phrase <= MAX_PHRASE_WORDS,
+    debug.validate(MIN_PHRASE_WORDS <= words_per_phrase <= MAX_PHRASE_WORDS,
                 f"Words per phrase must be between {MIN_PHRASE_WORDS} and {MAX_PHRASE_WORDS}")
     
     words_per_phrase = max(MIN_PHRASE_WORDS, min(MAX_PHRASE_WORDS, words_per_phrase))
@@ -161,17 +162,22 @@ def export_rsa_key_pem(
     """
     debug.validate(private_key is not None, "Private key cannot be None")
     
+    encryption_algorithm: Union[
+        serialization.BestAvailableEncryption,
+        serialization.NoEncryption
+    ]
+    
     if password:
-        encryption = serialization.BestAvailableEncryption(password.encode())
+        encryption_algorithm = serialization.BestAvailableEncryption(password.encode())
         debug.print("Exporting RSA key with encryption")
     else:
-        encryption = serialization.NoEncryption()
+        encryption_algorithm = serialization.NoEncryption()
         debug.print("Exporting RSA key without encryption")
     
     return private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=encryption
+        encryption_algorithm=encryption_algorithm
     )
 
 
@@ -202,7 +208,14 @@ def load_rsa_key(
     try:
         pwd_bytes = password.encode() if password else None
         debug.print(f"Loading RSA key (encrypted: {bool(password)})")
-        key = load_pem_private_key(key_data, password=pwd_bytes, backend=default_backend())
+        key: PrivateKeyTypes = load_pem_private_key(
+            key_data, password=pwd_bytes, backend=default_backend()
+        )
+        
+        # Verify it's an RSA key
+        if not isinstance(key, rsa.RSAPrivateKey):
+            raise KeyGenerationError(f"Expected RSA key, got {type(key).__name__}")
+        
         debug.print(f"RSA key loaded: {key.key_size} bits")
         return key
     except TypeError:

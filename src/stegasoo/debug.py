@@ -9,7 +9,7 @@ import time
 import traceback
 from datetime import datetime
 from functools import wraps
-from typing import Callable, Any, Optional, Dict
+from typing import Callable, Any, Optional, Dict, Union
 import sys
 
 # Global debug configuration
@@ -89,7 +89,7 @@ def validate_assertion(condition: bool, message: str) -> None:
         raise AssertionError(f"Validation failed: {message}")
 
 
-def memory_usage() -> Dict[str, float]:
+def memory_usage() -> Dict[str, Union[float, str]]:
     """Get current memory usage (if psutil is available)."""
     try:
         import psutil
@@ -154,7 +154,7 @@ class Debug:
         """Runtime validation assertion."""
         validate_assertion(condition, message)
     
-    def memory(self) -> Dict[str, float]:
+    def memory(self) -> Dict[str, Union[float, str]]:
         """Get current memory usage."""
         return memory_usage()
     

@@ -1,0 +1,95 @@
+# Publish to PyPI when a version tag is pushed
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on v1.0.0, v2.1.0, etc.
+
+jobs:
+  # First, run tests to make sure everything works
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libzbar0
+      
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      
+      - name: Run tests
+        run: pytest
+
+  # Then build and publish
+  publish:
+    needs: test  # Only run if tests pass
+    runs-on: ubuntu-latest
+    
+    # Required for PyPI trusted publishing (recommended)
+    permissions:
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: Build package
+        run: python -m build
+      
+      - name: Check package
+        run: twine check dist/*
+      
+      # Option 1: Trusted Publishing (recommended, no token needed)
+      # Set this up at: https://pypi.org/manage/project/stegasoo/settings/publishing/
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No token needed if you configure trusted publishing on PyPI
+      
+      # Option 2: API Token (uncomment if not using trusted publishing)
+      # - name: Publish to PyPI (API Token)
+      #   env:
+      #     TWINE_USERNAME: __token__
+      #     TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      #   run: twine upload dist/*
+
+  # Create GitHub Release with changelog
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # Needed to create releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            dist/*

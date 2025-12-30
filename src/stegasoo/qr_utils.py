@@ -287,7 +287,7 @@ def read_qr_code(image_data: bytes) -> Optional[str]:
         )
     
     try:
-        img = Image.open(io.BytesIO(image_data))
+        img: Image.Image = Image.open(io.BytesIO(image_data))
         
         # Convert to RGB if necessary (pyzbar works best with RGB/grayscale)
         if img.mode not in ('RGB', 'L'):
@@ -300,7 +300,8 @@ def read_qr_code(image_data: bytes) -> Optional[str]:
             return None
         
         # Return first QR code found
-        return decoded[0].data.decode('utf-8')
+        result: str = decoded[0].data.decode('utf-8')
+        return result
         
     except Exception:
         return None
@@ -345,7 +346,7 @@ def extract_key_from_qr(image_data: bytes) -> Optional[str]:
             key_pem = decompress_data(qr_data)
         else:
             key_pem = qr_data
-    except Exception as e:
+    except Exception:
         # If decompression fails, try using data as-is
         key_pem = qr_data
     
@@ -357,7 +358,7 @@ def extract_key_from_qr(image_data: bytes) -> Optional[str]:
     # This is crucial - QR codes can introduce subtle formatting issues
     try:
         key_pem = normalize_pem(key_pem)
-    except Exception as e:
+    except Exception:
         # If normalization fails, return None rather than broken PEM
         return None
     

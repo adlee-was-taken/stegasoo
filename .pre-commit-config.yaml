@@ -1,0 +1,40 @@
+# Pre-commit hooks - run formatting/linting before each commit
+# Install: pip install pre-commit && pre-commit install
+# Manual run: pre-commit run --all-files
+
+repos:
+  # Ruff - fast Python linter (replaces flake8, isort, etc.)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.6
+    hooks:
+      - id: ruff
+        args: [--fix]  # Auto-fix what's possible
+      - id: ruff-format  # Ruff's formatter (alternative to black)
+
+  # Black - code formatter (comment out if using ruff-format above)
+  # - repo: https://github.com/psf/black
+  #   rev: 23.11.0
+  #   hooks:
+  #     - id: black
+
+  # Basic file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace      # Remove trailing spaces
+      - id: end-of-file-fixer        # Ensure newline at EOF
+      - id: check-yaml               # Validate YAML
+      - id: check-toml               # Validate TOML
+      - id: check-added-large-files  # Prevent giant files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict     # No merge conflict markers
+      - id: debug-statements         # No print() or pdb left behind
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml"]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: tests/

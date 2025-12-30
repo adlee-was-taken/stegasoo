@@ -200,14 +200,15 @@ def embed_in_image(
                 f"Pixel key must be 32 bytes, got {len(pixel_key)}")
     
     try:
-        img = Image.open(io.BytesIO(carrier_data))
-        input_format = img.format
+        img_file = Image.open(io.BytesIO(carrier_data))
+        input_format = img_file.format
         
-        debug.print(f"Carrier image: {img.size[0]}x{img.size[1]}, format: {input_format}")
+        debug.print(f"Carrier image: {img_file.size[0]}x{img_file.size[1]}, format: {input_format}")
         
-        if img.mode != 'RGB':
-            debug.print(f"Converting image from {img.mode} to RGB")
-            img = img.convert('RGB')
+        # Convert to RGB - this returns Image.Image, not ImageFile
+        img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
+        if img_file.mode != 'RGB':
+            debug.print(f"Converting image from {img_file.mode} to RGB")
         
         pixels = list(img.getdata())
         num_pixels = len(pixels)
@@ -338,12 +339,13 @@ def extract_from_image(
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
     
     try:
-        img = Image.open(io.BytesIO(image_data))
-        debug.print(f"Image: {img.size[0]}x{img.size[1]}, format: {img.format}")
+        img_file = Image.open(io.BytesIO(image_data))
+        debug.print(f"Image: {img_file.size[0]}x{img_file.size[1]}, format: {img_file.format}")
         
-        if img.mode != 'RGB':
-            debug.print(f"Converting image from {img.mode} to RGB")
-            img = img.convert('RGB')
+        # Convert to RGB
+        img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
+        if img_file.mode != 'RGB':
+            debug.print(f"Converting image from {img_file.mode} to RGB")
         
         pixels = list(img.getdata())
         num_pixels = len(pixels)
@@ -437,9 +439,8 @@ def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
     debug.validate(bits_per_channel in (1, 2),
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
     
-    img = Image.open(io.BytesIO(image_data))
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
+    img_file = Image.open(io.BytesIO(image_data))
+    img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file
     
     num_pixels = img.size[0] * img.size[1]
     bits_per_pixel = 3 * bits_per_channel

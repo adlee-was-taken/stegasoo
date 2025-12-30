@@ -15,6 +15,15 @@
     --border-light: rgba(255, 255, 255, 0.1);
     --overlay-dark: rgba(0, 0, 0, 0.3);
     --overlay-light: rgba(255, 255, 255, 0.05);
+    --day-highlight: #E3FF54; /* Bright yellow/green for day of week */
+}
+
+/* ----------------------------------------------------------------------------
+   Day of Week Highlight - Simple
+   ---------------------------------------------------------------------------- */
+.day-of-week-highlight {
+    color: var(--day-highlight) !important;
+    font-weight: 700 !important;
 }
 
 /* ----------------------------------------------------------------------------

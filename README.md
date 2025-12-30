@@ -15,91 +15,43 @@ A secure steganography system for hiding encrypted messages in images using hybr
 - 🔑 **Multi-factor authentication**: PIN, RSA key, or both
 - 🖼️ **Reference photo** as "something you have"
 - 🌐 **Multiple interfaces**: CLI, Web UI, REST API
+- 📁 **File embedding** - Hide any file type (PDF, ZIP, documents)
+- 📱 **QR code support** - Encode/decode RSA keys via QR codes
+
+
+## WebUI Preview
+
+Front Page                 |  Encode                   |  Decode                  | Generate |
+:-------------------------:|:-------------------------:|:------------------------:|:--------:|
+![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI.webp)  |  ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Encode.webp)   | ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Decode.webp) | ![Screenshot](https://github.com/adlee-was-taken/stegasoo/blob/main/data/WebUI_Generate.webp)
+
 
 ## Installation
-
-### From PyPI (coming soon)
-
-```bash
-# Core library only
-pip install stegasoo
-
-# With CLI
-pip install stegasoo[cli]
-
-# With Web UI
-pip install stegasoo[web]
-
-# With REST API
-pip install stegasoo[api]
-
-# Everything
-pip install stegasoo[all]
-```
 
 ### From Source
 
 ```bash
-git clone https://github.com/example/stegasoo.git
+# Clone the repository
+git clone https://github.com/adlee-was-taken/stegasoo.git
 cd stegasoo
 
-# Install with all extras
+# Install core library
+pip install -e .
+
+# Install with CLI
+pip install -e ".[cli]"
+
+# Install with Web UI
+pip install -e ".[web]"
+
+# Install with REST API
+pip install -e ".[api]"
+
+# Install everything
 pip install -e ".[all]"
 ```
 
-### Docker
-
-```bash
-# Web UI only
-docker-compose up web
-
-# REST API only
-docker-compose up api
-
-# Both
-docker-compose up
-```
-
-## Quick Start
-
-### Python Library
-
-```python
-import stegasoo
-
-# Generate credentials
-creds = stegasoo.generate_credentials(use_pin=True, use_rsa=False)
-print(f"Today's phrase: {creds.phrases['Monday']}")
-print(f"PIN: {creds.pin}")
-
-# Encode a message
-with open('secret_photo.jpg', 'rb') as f:
-    ref_photo = f.read()
-with open('meme.png', 'rb') as f:
-    carrier = f.read()
-
-result = stegasoo.encode(
-    message="Meet at midnight",
-    reference_photo=ref_photo,
-    carrier_image=carrier,
-    day_phrase="apple forest thunder",
-    pin="123456"
-)
-
-with open('stego.png', 'wb') as f:
-    f.write(result.stego_image)
-
-# Decode a message
-message = stegasoo.decode(
-    stego_image=result.stego_image,
-    reference_photo=ref_photo,
-    day_phrase="apple forest thunder",
-    pin="123456"
-)
-print(message)  # "Meet at midnight"
-```
-
-### CLI
+### CLI Usage
 
 ```bash
 # Generate credentials
@@ -184,10 +136,10 @@ curl -X POST http://localhost:8000/decode/multipart \
 | Component | Entropy | Purpose |
 |-----------|---------|---------|
 | Reference Photo | ~80-256 bits | Something you have |
-| Day Phrase (3 words) | ~33 bits | Something you know (rotates daily) |
-| PIN (6 digits) | ~20 bits | Something you know (static) |
+| Day Phrase (3-12 words) | ~33-100+ bits | Something you know (rotates daily) |
+| PIN (6-9 digits) | ~20+ bits | Something you know (static) |
 | RSA Key (2048-bit) | ~128 bits | Something you have |
-| **Combined** | **133-400+ bits** | **Beyond brute force** |
+| **Combined** | **~133-400+ bits** | **Beyond brute force** |
 
 ### Attack Resistance
 
@@ -271,3 +223,4 @@ MIT License - Use responsibly.
 ## ⚠️ Disclaimer
 
 This tool is for educational and legitimate privacy purposes only. Users are responsible for complying with applicable laws in their jurisdiction.
+

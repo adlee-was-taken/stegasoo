@@ -38,7 +38,7 @@ def generate_filename(
         >>> generate_filename("2023-12-25", "secret_", "png")
         "secret_a1b2c3d4_20231225.png"
     """
-    debug.validate(extension and '.' not in extension,
+    debug.validate(bool(extension) and '.' not in extension,
                 f"Extension must not contain dot, got '{extension}'")
     
     if date_str is None:
@@ -284,13 +284,14 @@ def format_file_size(size_bytes: int) -> str:
     """
     debug.validate(size_bytes >= 0, f"File size cannot be negative: {size_bytes}")
     
+    size: float = float(size_bytes)
     for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
+        if size < 1024:
             if unit == 'B':
-                return f"{size_bytes} {unit}"
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f} TB"
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
 
 
 def format_number(n: int) -> str:

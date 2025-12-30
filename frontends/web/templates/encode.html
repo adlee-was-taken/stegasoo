@@ -110,7 +110,7 @@
                     
                     <div class="mb-3">
                         <label class="form-label" id="dayPhraseLabel">
-                            <i class="bi bi-chat-quote me-1"></i> {{ day_of_week }}'s Phrase
+                            <i class="bi bi-chat-quote me-1"></i> Day's Phrase
                         </label>
                         <input type="text" name="day_phrase" class="form-control" 
                                placeholder="e.g., correct horse battery" required>
@@ -227,7 +227,7 @@ const localDate = now.getFullYear() + '-' +
 // Update day label to client's local day
 const dayLabel = document.getElementById('dayPhraseLabel');
 if (dayLabel) {
-    dayLabel.innerHTML = `<i class="bi bi-chat-quote me-1"></i> ${localDay}'s Phrase`;
+    dayLabel.innerHTML = `<i class="bi bi-chat-quote me-1"></i>Secure with <span class="day-of-week-highlight">${localDay}</span>'s Phrase`;
 }
 
 // Set hidden field with client's local date for server
