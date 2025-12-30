@@ -388,6 +388,7 @@ def decode(
     pin: str = "",
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
+    date_str: Optional[str] = None,
 ) -> DecodeResult:
     """
     Decode a secret message or file from a stego image.
@@ -429,7 +430,9 @@ def decode(
         require_valid_rsa_key(rsa_key_data, rsa_password)
     
     # Try to extract with today's date first
-    date_str = date.today().isoformat()
+    # Use provided date or fall back to today
+    if date_str is None:
+        date_str = date.today().isoformat()
     pixel_key = derive_pixel_key(
         reference_photo, day_phrase, date_str, pin, rsa_key_data
     )
@@ -467,6 +470,7 @@ def decode_text(
     pin: str = "",
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
+    date_str: Optional[str] = None,
 ) -> str:
     """
     Decode a text message from a stego image.

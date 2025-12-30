@@ -686,7 +686,18 @@ def decode_page():
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
+            with open('/tmp/debug_stego.png', 'wb') as f:
+                f.write(stego_data)
+            with open('/tmp/debug_ref.png', 'wb') as f:
+                f.write(ref_data)
+            with open('/tmp/debug_params.txt', 'w') as f:
+                f.write(f"day_phrase: {day_phrase}\n")
+                f.write(f"pin: {pin}\n")
+                f.write(f"date_str: {stego_date}\n")
+                f.write(f"rsa_key: {len(rsa_key_data) if rsa_key_data else None}\n")
+
+            print(f"DEBUG: Saved inputs to /tmp/debug_*") 
             # Decode
             decode_result = decode(
                 stego_image=stego_data,
