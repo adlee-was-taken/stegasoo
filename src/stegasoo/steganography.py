@@ -1,7 +1,16 @@
 """
-Stegasoo Steganography Functions
+Stegasoo Steganography Functions (v3.0.1)
 
-LSB embedding and extraction with pseudo-random pixel selection.
+LSB and DCT embedding modes with pseudo-random pixel/coefficient selection.
+
+New in v3.0:
+- DCT domain embedding mode (requires scipy)
+- embed_mode parameter for encode/decode
+- Auto-detection of embedding mode
+- Comparison utilities
+
+New in v3.0.1:
+- dct_output_format parameter for DCT mode ('png' or 'jpeg')
 """
 
 import io
@@ -15,6 +24,12 @@ from cryptography.hazmat.backends import default_backend
 from .models import EmbedStats, FilePayload
 from .exceptions import CapacityError, ExtractionError, EmbeddingError
 from .debug import debug
+from .constants import (
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT, 
+    EMBED_MODE_AUTO,
+    VALID_EMBED_MODES,
+)
 
 
 # Lossless formats that preserve LSB data
@@ -40,6 +55,48 @@ HEADER_OVERHEAD = 104  # Magic + version + date + salt + iv + tag
 LENGTH_PREFIX = 4      # 4 bytes for payload length
 ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX
 
+# DCT output format options (v3.0.1)
+DCT_OUTPUT_PNG = 'png'
+DCT_OUTPUT_JPEG = 'jpeg'
+
+
+# =============================================================================
+# DCT MODULE LAZY LOADING
+# =============================================================================
+
+_dct_module = None
+
+
+def _get_dct_module():
+    """Lazy load DCT module to avoid scipy import if not needed."""
+    global _dct_module
+    if _dct_module is None:
+        from . import dct_steganography
+        _dct_module = dct_steganography
+    return _dct_module
+
+
+def has_dct_support() -> bool:
+    """
+    Check if DCT steganography mode is available.
+    
+    Returns:
+        True if scipy is installed and DCT functions work
+        
+    Example:
+        >>> if has_dct_support():
+        ...     result = encode(..., embed_mode='dct')
+    """
+    try:
+        dct_mod = _get_dct_module()
+        return dct_mod.has_dct_support()
+    except ImportError:
+        return False
+
+
+# =============================================================================
+# FORMAT UTILITIES
+# =============================================================================
 
 def get_output_format(input_format: Optional[str]) -> Tuple[str, str]:
     """
@@ -51,12 +108,6 @@ def get_output_format(input_format: Optional[str]) -> Tuple[str, str]:
     Returns:
         Tuple of (PIL format string, file extension) for output
         Falls back to PNG for lossy or unknown formats.
-        
-    Example:
-        >>> get_output_format('JPEG')
-        ('PNG', 'png')
-        >>> get_output_format('PNG')
-        ('PNG', 'png')
     """
     debug.validate(input_format is None or isinstance(input_format, str),
                 "Input format must be string or None")
@@ -67,10 +118,13 @@ def get_output_format(input_format: Optional[str]) -> Tuple[str, str]:
         debug.print(f"Using lossless format: {fmt} -> .{ext}")
         return fmt, ext
     
-    # Default to PNG for lossy formats (JPEG, GIF) or unknown
     debug.print(f"Input format {input_format} is lossy or unknown, defaulting to PNG")
     return 'PNG', 'png'
 
+
+# =============================================================================
+# CAPACITY FUNCTIONS
+# =============================================================================
 
 def will_fit(
     payload: Union[str, bytes, FilePayload, int],
@@ -79,38 +133,16 @@ def will_fit(
     include_compression_estimate: bool = True,
 ) -> dict:
     """
-    Check if a payload will fit in a carrier image without performing encryption.
-    
-    This is a lightweight pre-check to avoid wasted work on payloads that
-    are too large. For accurate results with compression, the actual compressed
-    size may vary.
+    Check if a payload will fit in a carrier image (LSB mode).
     
     Args:
         payload: Message string, raw bytes, FilePayload, or size in bytes
         carrier_image: Carrier image bytes
         bits_per_channel: Bits to use per color channel (1-2)
-        include_compression_estimate: Estimate compressed size (requires payload data)
+        include_compression_estimate: Estimate compressed size
         
     Returns:
-        Dict with:
-        - fits: bool - Whether payload will fit
-        - payload_size: int - Raw payload size in bytes
-        - estimated_encrypted_size: int - Estimated size after encryption + overhead
-        - capacity: int - Available capacity in bytes
-        - usage_percent: float - Estimated capacity usage (0-100)
-        - headroom: int - Bytes remaining (negative if won't fit)
-        - compressed_estimate: int | None - Estimated compressed size (if applicable)
-        
-    Example:
-        >>> result = will_fit("Hello world", carrier_bytes)
-        >>> result['fits']
-        True
-        >>> result['usage_percent']
-        0.5
-        
-        >>> result = will_fit(50000, carrier_bytes)  # Check if 50KB would fit
-        >>> result['fits']
-        False
+        Dict with fits, capacity, usage info
     """
     # Determine payload size
     if isinstance(payload, int):
@@ -121,42 +153,35 @@ def will_fit(
         payload_size = len(payload_data)
     elif isinstance(payload, FilePayload):
         payload_data = payload.data
-        # Account for filename/mime metadata
         filename_overhead = len(payload.filename.encode('utf-8')) if payload.filename else 0
         mime_overhead = len(payload.mime_type.encode('utf-8')) if payload.mime_type else 0
-        payload_size = len(payload.data) + filename_overhead + mime_overhead + 5  # +5 for length prefixes + type byte
+        payload_size = len(payload.data) + filename_overhead + mime_overhead + 5
     else:
         payload_data = payload
         payload_size = len(payload)
     
-    # Calculate capacity
     capacity = calculate_capacity(carrier_image, bits_per_channel)
     
-    # Estimate encrypted size (payload + random padding + overhead)
-    # Padding adds 64-319 bytes, averaging ~190
     estimated_padding = 190
     estimated_encrypted_size = payload_size + estimated_padding + ENCRYPTION_OVERHEAD
     
-    # Compression estimate
     compressed_estimate = None
     if include_compression_estimate and payload_data is not None and len(payload_data) >= 64:
         try:
             import zlib
             compressed = zlib.compress(payload_data, level=6)
-            # Add compression header overhead (9 bytes)
             compressed_size = len(compressed) + 9
             if compressed_size < payload_size:
                 compressed_estimate = compressed_size
-                # Use compressed size for fit calculation
                 estimated_encrypted_size = compressed_size + estimated_padding + ENCRYPTION_OVERHEAD
         except Exception:
-            pass  # Ignore compression errors
+            pass
     
     headroom = capacity - estimated_encrypted_size
     fits = headroom >= 0
     usage_percent = (estimated_encrypted_size / capacity * 100) if capacity > 0 else 100.0
     
-    result = {
+    return {
         'fits': fits,
         'payload_size': payload_size,
         'estimated_encrypted_size': estimated_encrypted_size,
@@ -164,13 +189,205 @@ def will_fit(
         'usage_percent': min(usage_percent, 100.0),
         'headroom': headroom,
         'compressed_estimate': compressed_estimate,
+        'mode': EMBED_MODE_LSB,
     }
-    
-    debug.print(f"will_fit: payload={payload_size}, encrypted~={estimated_encrypted_size}, "
-                f"capacity={capacity}, fits={fits}")
-    
-    return result
 
+
+def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
+    """
+    Calculate the maximum message capacity of an image (LSB mode).
+    
+    Args:
+        image_data: Image bytes
+        bits_per_channel: Bits to use per color channel
+        
+    Returns:
+        Maximum bytes that can be embedded (minus overhead)
+    """
+    debug.validate(bits_per_channel in (1, 2),
+                f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
+    
+    img_file = Image.open(io.BytesIO(image_data))
+    img = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file
+    
+    num_pixels = img.size[0] * img.size[1]
+    bits_per_pixel = 3 * bits_per_channel
+    max_bytes = (num_pixels * bits_per_pixel) // 8
+    
+    capacity = max(0, max_bytes - ENCRYPTION_OVERHEAD)
+    debug.print(f"LSB capacity: {capacity} bytes at {bits_per_channel} bit(s)/channel")
+    return capacity
+
+
+def calculate_capacity_by_mode(
+    image_data: bytes, 
+    embed_mode: str = EMBED_MODE_LSB,
+    bits_per_channel: int = 1,
+) -> dict:
+    """
+    Calculate capacity for specified embedding mode.
+    
+    Args:
+        image_data: Carrier image bytes
+        embed_mode: 'lsb' or 'dct'
+        bits_per_channel: Bits per channel for LSB mode
+        
+    Returns:
+        Dict with capacity information
+    """
+    if embed_mode == EMBED_MODE_DCT:
+        if not has_dct_support():
+            raise ImportError("scipy required for DCT mode. Install: pip install scipy")
+        
+        dct_mod = _get_dct_module()
+        dct_info = dct_mod.calculate_dct_capacity(image_data)
+        
+        return {
+            'mode': EMBED_MODE_DCT,
+            'capacity_bytes': dct_info.usable_capacity_bytes,
+            'capacity_bits': dct_info.total_capacity_bits,
+            'width': dct_info.width,
+            'height': dct_info.height,
+            'total_blocks': dct_info.total_blocks,
+        }
+    else:
+        capacity = calculate_capacity(image_data, bits_per_channel)
+        img = Image.open(io.BytesIO(image_data))
+        width, height = img.size
+        
+        return {
+            'mode': EMBED_MODE_LSB,
+            'capacity_bytes': capacity,
+            'capacity_bits': capacity * 8,
+            'width': width,
+            'height': height,
+            'bits_per_channel': bits_per_channel,
+        }
+
+
+def will_fit_by_mode(
+    payload: Union[str, bytes, FilePayload, int],
+    carrier_image: bytes,
+    embed_mode: str = EMBED_MODE_LSB,
+    bits_per_channel: int = 1,
+) -> dict:
+    """
+    Check if payload fits in specified mode.
+    
+    Args:
+        payload: Message, bytes, FilePayload, or size in bytes
+        carrier_image: Carrier image bytes
+        embed_mode: 'lsb' or 'dct'
+        bits_per_channel: For LSB mode
+        
+    Returns:
+        Dict with fits, capacity, usage info
+    """
+    if embed_mode == EMBED_MODE_DCT:
+        if not has_dct_support():
+            return {'fits': False, 'error': 'scipy not available', 'mode': EMBED_MODE_DCT}
+        
+        if isinstance(payload, int):
+            payload_size = payload
+        elif isinstance(payload, str):
+            payload_size = len(payload.encode('utf-8'))
+        elif hasattr(payload, 'data'):
+            payload_size = len(payload.data)
+        else:
+            payload_size = len(payload)
+        
+        estimated_size = payload_size + ENCRYPTION_OVERHEAD + 190
+        
+        dct_mod = _get_dct_module()
+        fits = dct_mod.will_fit_dct(estimated_size, carrier_image)
+        capacity_info = dct_mod.calculate_dct_capacity(carrier_image)
+        capacity = capacity_info.usable_capacity_bytes
+        
+        usage_percent = (estimated_size / capacity * 100) if capacity > 0 else 100.0
+        
+        return {
+            'fits': fits,
+            'payload_size': payload_size,
+            'capacity': capacity,
+            'usage_percent': min(usage_percent, 100.0),
+            'headroom': capacity - estimated_size,
+            'mode': EMBED_MODE_DCT,
+        }
+    else:
+        return will_fit(payload, carrier_image, bits_per_channel)
+
+
+def get_available_modes() -> dict:
+    """
+    Get available embedding modes and their status.
+    
+    Returns:
+        Dict mapping mode name to availability info
+    """
+    return {
+        EMBED_MODE_LSB: {
+            'available': True,
+            'name': 'Spatial LSB',
+            'description': 'Embed in pixel LSBs, outputs PNG/BMP',
+            'output_format': 'PNG (color)',
+        },
+        EMBED_MODE_DCT: {
+            'available': has_dct_support(),
+            'name': 'DCT Domain',
+            'description': 'Embed in DCT coefficients, outputs grayscale PNG or JPEG',
+            'output_formats': ['PNG (grayscale)', 'JPEG (grayscale)'],
+            'requires': 'scipy',
+        },
+    }
+
+
+def compare_modes(image_data: bytes) -> dict:
+    """
+    Compare embedding modes for a carrier image.
+    
+    Args:
+        image_data: Carrier image bytes
+        
+    Returns:
+        Dict with comparison of LSB vs DCT modes
+    """
+    img = Image.open(io.BytesIO(image_data))
+    width, height = img.size
+    
+    lsb_bytes = calculate_capacity(image_data, 1)
+    
+    if has_dct_support():
+        dct_mod = _get_dct_module()
+        dct_info = dct_mod.calculate_dct_capacity(image_data)
+        dct_bytes = dct_info.usable_capacity_bytes
+        dct_available = True
+    else:
+        safe_blocks = (height // 8) * (width // 8)
+        dct_bytes = (safe_blocks * 16) // 8  # Estimated
+        dct_available = False
+    
+    return {
+        'width': width,
+        'height': height,
+        'lsb': {
+            'capacity_bytes': lsb_bytes,
+            'capacity_kb': lsb_bytes / 1024,
+            'available': True,
+            'output': 'PNG (color)',
+        },
+        'dct': {
+            'capacity_bytes': dct_bytes,
+            'capacity_kb': dct_bytes / 1024,
+            'available': dct_available,
+            'output': 'PNG or JPEG (grayscale)',
+            'ratio_vs_lsb': (dct_bytes / lsb_bytes * 100) if lsb_bytes > 0 else 0,
+        },
+    }
+
+
+# =============================================================================
+# PIXEL INDEX GENERATION
+# =============================================================================
 
 @debug.time
 def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List[int]:
@@ -179,17 +396,6 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
     
     Uses ChaCha20 as a CSPRNG seeded by the key to deterministically
     select which pixels will hold hidden data.
-    
-    Args:
-        key: 32-byte key for pixel selection
-        num_pixels: Total pixels in image
-        num_needed: Number of pixels needed for embedding
-        
-    Returns:
-        List of pixel indices
-        
-    Note:
-        Optimizes for both small and large num_needed values.
     """
     debug.validate(len(key) == 32, f"Pixel key must be 32 bytes, got {len(key)}")
     debug.validate(num_pixels > 0, f"Number of pixels must be positive, got {num_pixels}")
@@ -200,7 +406,6 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
     debug.print(f"Generating {num_needed} pixel indices from {num_pixels} total pixels")
     
     if num_needed >= num_pixels // 2:
-        # If we need many pixels, shuffle all indices
         debug.print(f"Using full shuffle (needed {num_needed}/{num_pixels} pixels)")
         nonce = b'\x00' * 16
         cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
@@ -209,7 +414,6 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
         indices = list(range(num_pixels))
         random_bytes = encryptor.update(b'\x00' * (num_pixels * 4))
         
-        # Fisher-Yates shuffle using CSPRNG
         for i in range(num_pixels - 1, 0, -1):
             j_bytes = random_bytes[(num_pixels - 1 - i) * 4:(num_pixels - i) * 4]
             j = int.from_bytes(j_bytes, 'big') % (i + 1)
@@ -219,7 +423,6 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
         debug.print(f"Generated {len(selected)} indices via shuffle")
         return selected
     
-    # Optimized path: generate indices directly (for smaller selections)
     debug.print(f"Using optimized selection (needed {num_needed}/{num_pixels} pixels)")
     selected = []
     used = set()
@@ -228,7 +431,6 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
     cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
     encryptor = cipher.encryptor()
     
-    # Generate more than needed to handle collisions
     bytes_needed = (num_needed * 2) * 4
     random_bytes = encryptor.update(b'\x00' * bytes_needed)
     
@@ -244,11 +446,10 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
         else:
             collisions += 1
     
-    # Generate additional if needed (rare)
     if len(selected) < num_needed:
         debug.print(f"Need {num_needed - len(selected)} more indices, generating...")
         extra_needed = num_needed - len(selected)
-        for _ in range(extra_needed * 2):  # Try twice as many to account for collisions
+        for _ in range(extra_needed * 2):
             extra_bytes = encryptor.update(b'\x00' * 4)
             idx = int.from_bytes(extra_bytes, 'big') % num_pixels
             if idx not in used:
@@ -263,43 +464,91 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> List
     return selected
 
 
+# =============================================================================
+# EMBEDDING FUNCTIONS
+# =============================================================================
+
 @debug.time
 def embed_in_image(
-    carrier_data: bytes,
-    encrypted_data: bytes,
+    data: bytes,
+    image_data: bytes,
     pixel_key: bytes,
     bits_per_channel: int = 1,
-    output_format: Optional[str] = None
-) -> Tuple[bytes, EmbedStats, str]:
+    output_format: Optional[str] = None,
+    embed_mode: str = EMBED_MODE_LSB,
+    dct_output_format: str = DCT_OUTPUT_PNG,  # NEW in v3.0.1
+) -> Tuple[bytes, Union[EmbedStats, 'DCTEmbedStats'], str]:
     """
-    Embed encrypted data in carrier image using LSB steganography.
-    
-    Uses pseudo-random pixel selection based on pixel_key to scatter
-    the data across the image, defeating statistical analysis.
-    
-    Note: Output images have all metadata (EXIF, etc.) stripped automatically.
+    Embed data into an image using specified mode.
     
     Args:
-        carrier_data: Carrier image bytes
-        encrypted_data: Data to embed
-        pixel_key: Key for pixel selection
-        bits_per_channel: Bits to use per color channel (1-2)
-        output_format: Force specific output format (PNG, BMP). 
-                       If None, auto-detect from carrier (lossless) or default to PNG.
+        data: Data to embed (encrypted payload)
+        image_data: Carrier image bytes
+        pixel_key: Key for pixel/coefficient selection
+        bits_per_channel: Bits per channel (LSB mode only)
+        output_format: Force output format (LSB mode only)
+        embed_mode: 'lsb' (default) or 'dct'
+        dct_output_format: For DCT mode - 'png' (lossless) or 'jpeg' (smaller)
         
     Returns:
-        Tuple of (image bytes, EmbedStats, file extension)
+        Tuple of (stego image bytes, stats, file extension)
         
     Raises:
-        CapacityError: If carrier is too small
+        CapacityError: If data won't fit
         EmbeddingError: If embedding fails
-        
-    Example:
-        >>> stego_bytes, stats, ext = embed_in_image(carrier, encrypted, key)
-        >>> stats.pixels_modified
-        1500
+        ImportError: If DCT mode requested but scipy unavailable
     """
-    debug.print(f"Embedding {len(encrypted_data)} bytes into image")
+    debug.print(f"embed_in_image: mode={embed_mode}, data={len(data)} bytes")
+    debug.validate(embed_mode in VALID_EMBED_MODES, 
+                   f"Invalid embed_mode: {embed_mode}. Use 'lsb' or 'dct'")
+    
+    # DCT MODE
+    if embed_mode == EMBED_MODE_DCT:
+        if not has_dct_support():
+            raise ImportError(
+                "scipy is required for DCT embedding mode. "
+                "Install with: pip install scipy"
+            )
+        
+        # Validate DCT output format
+        if dct_output_format not in (DCT_OUTPUT_PNG, DCT_OUTPUT_JPEG):
+            debug.print(f"Invalid dct_output_format '{dct_output_format}', defaulting to PNG")
+            dct_output_format = DCT_OUTPUT_PNG
+        
+        dct_mod = _get_dct_module()
+        
+        # Pass output_format to DCT module (v3.0.1)
+        stego_bytes, dct_stats = dct_mod.embed_in_dct(
+            data, 
+            image_data, 
+            pixel_key,
+            output_format=dct_output_format,
+        )
+        
+        # Determine extension based on output format
+        if dct_output_format == DCT_OUTPUT_JPEG:
+            ext = 'jpg'
+        else:
+            ext = 'png'
+        
+        debug.print(f"DCT embedding complete: {dct_output_format.upper()} output, ext={ext}")
+        return stego_bytes, dct_stats, ext
+    
+    # LSB MODE
+    return _embed_lsb(data, image_data, pixel_key, bits_per_channel, output_format)
+
+
+def _embed_lsb(
+    data: bytes,
+    image_data: bytes,
+    pixel_key: bytes,
+    bits_per_channel: int = 1,
+    output_format: Optional[str] = None,
+) -> Tuple[bytes, EmbedStats, str]:
+    """
+    Embed data using LSB steganography (internal implementation).
+    """
+    debug.print(f"LSB embedding {len(data)} bytes into image")
     debug.data(pixel_key, "Pixel key for embedding")
     debug.validate(bits_per_channel in (1, 2), 
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
@@ -307,13 +556,12 @@ def embed_in_image(
                 f"Pixel key must be 32 bytes, got {len(pixel_key)}")
     
     try:
-        img_file = Image.open(io.BytesIO(carrier_data))
+        img_file = Image.open(io.BytesIO(image_data))
         input_format = img_file.format
         
         debug.print(f"Carrier image: {img_file.size[0]}x{img_file.size[1]}, format: {input_format}")
         
-        # Convert to RGB - this returns Image.Image, not ImageFile
-        img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
+        img = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
         if img_file.mode != 'RGB':
             debug.print(f"Converting image from {img_file.mode} to RGB")
         
@@ -325,8 +573,7 @@ def embed_in_image(
         
         debug.print(f"Image capacity: {max_bytes} bytes at {bits_per_channel} bit(s)/channel")
         
-        # Prepend length
-        data_with_len = struct.pack('>I', len(encrypted_data)) + encrypted_data
+        data_with_len = struct.pack('>I', len(data)) + data
         
         if len(data_with_len) > max_bytes:
             debug.print(f"Capacity error: need {len(data_with_len)}, have {max_bytes}")
@@ -335,16 +582,13 @@ def embed_in_image(
         debug.print(f"Total data to embed: {len(data_with_len)} bytes "
                    f"({len(data_with_len)/max_bytes*100:.1f}% of capacity)")
         
-        # Convert to binary string
         binary_data = ''.join(format(b, '08b') for b in data_with_len)
         pixels_needed = (len(binary_data) + bits_per_pixel - 1) // bits_per_pixel
         
         debug.print(f"Need {pixels_needed} pixels to embed {len(binary_data)} bits")
         
-        # Get pixel indices
         selected_indices = generate_pixel_indices(pixel_key, num_pixels, pixels_needed)
         
-        # Embed data
         new_pixels = list(pixels)
         clear_mask = 0xFF ^ ((1 << bits_per_channel) - 1)
         
@@ -381,11 +625,9 @@ def embed_in_image(
         
         debug.print(f"Modified {modified_pixels} pixels (out of {len(selected_indices)} selected)")
         
-        # Create output image (fresh image = no metadata/EXIF carried over)
         stego_img = Image.new('RGB', img.size)
         stego_img.putdata(new_pixels)
         
-        # Determine output format
         if output_format:
             out_fmt = output_format.upper()
             out_ext = FORMAT_TO_EXT.get(out_fmt, 'png')
@@ -405,42 +647,88 @@ def embed_in_image(
             bytes_embedded=len(data_with_len)
         )
         
-        debug.print(f"Embedding complete: {out_fmt} image, {len(output.getvalue())} bytes")
+        debug.print(f"LSB embedding complete: {out_fmt} image, {len(output.getvalue())} bytes")
         return output.getvalue(), stats, out_ext
         
     except CapacityError:
         raise
     except Exception as e:
-        debug.exception(e, "embed_in_image")
+        debug.exception(e, "embed_lsb")
         raise EmbeddingError(f"Failed to embed data: {e}") from e
 
+
+# =============================================================================
+# EXTRACTION FUNCTIONS
+# =============================================================================
 
 @debug.time
 def extract_from_image(
     image_data: bytes,
     pixel_key: bytes,
-    bits_per_channel: int = 1
+    bits_per_channel: int = 1,
+    embed_mode: str = EMBED_MODE_AUTO,
 ) -> Optional[bytes]:
     """
     Extract hidden data from a stego image.
     
     Args:
         image_data: Stego image bytes
-        pixel_key: Key for pixel selection (must match encoding)
-        bits_per_channel: Bits per channel (must match encoding)
+        pixel_key: Key for pixel/coefficient selection (must match encoding)
+        bits_per_channel: Bits per channel (LSB mode only)
+        embed_mode: 'auto' (try both), 'lsb', or 'dct'
         
     Returns:
         Extracted data bytes, or None if extraction fails
-        
-    Raises:
-        ExtractionError: If extraction fails critically
-        
-    Example:
-        >>> extracted = extract_from_image(stego_bytes, key)
-        >>> len(extracted)
-        1024
     """
-    debug.print(f"Extracting from {len(image_data)} byte image")
+    debug.print(f"extract_from_image: mode={embed_mode}")
+    
+    # AUTO MODE: Try LSB first, then DCT
+    if embed_mode == EMBED_MODE_AUTO:
+        result = _extract_lsb(image_data, pixel_key, bits_per_channel)
+        if result is not None:
+            debug.print("Auto-detect: LSB extraction succeeded")
+            return result
+        
+        if has_dct_support():
+            debug.print("Auto-detect: LSB failed, trying DCT")
+            result = _extract_dct(image_data, pixel_key)
+            if result is not None:
+                debug.print("Auto-detect: DCT extraction succeeded")
+                return result
+        
+        debug.print("Auto-detect: All modes failed")
+        return None
+    
+    # EXPLICIT DCT MODE
+    elif embed_mode == EMBED_MODE_DCT:
+        if not has_dct_support():
+            raise ImportError("scipy required for DCT mode")
+        return _extract_dct(image_data, pixel_key)
+    
+    # EXPLICIT LSB MODE
+    else:
+        return _extract_lsb(image_data, pixel_key, bits_per_channel)
+
+
+def _extract_dct(image_data: bytes, pixel_key: bytes) -> Optional[bytes]:
+    """Extract using DCT mode."""
+    try:
+        dct_mod = _get_dct_module()
+        return dct_mod.extract_from_dct(image_data, pixel_key)
+    except Exception as e:
+        debug.print(f"DCT extraction failed: {e}")
+        return None
+
+
+def _extract_lsb(
+    image_data: bytes,
+    pixel_key: bytes,
+    bits_per_channel: int = 1
+) -> Optional[bytes]:
+    """
+    Extract using LSB mode (internal implementation).
+    """
+    debug.print(f"LSB extracting from {len(image_data)} byte image")
     debug.data(pixel_key, "Pixel key for extraction")
     debug.validate(bits_per_channel in (1, 2),
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
@@ -449,8 +737,7 @@ def extract_from_image(
         img_file = Image.open(io.BytesIO(image_data))
         debug.print(f"Image: {img_file.size[0]}x{img_file.size[1]}, format: {img_file.format}")
         
-        # Convert to RGB
-        img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
+        img = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file.copy()
         if img_file.mode != 'RGB':
             debug.print(f"Converting image from {img_file.mode} to RGB")
         
@@ -460,7 +747,6 @@ def extract_from_image(
         
         debug.print(f"Image has {num_pixels} pixels, {bits_per_pixel} bits/pixel")
         
-        # First, extract enough to get the length (4 bytes = 32 bits)
         initial_pixels = (32 + bits_per_pixel - 1) // bits_per_pixel + 10
         debug.print(f"Extracting initial {initial_pixels} pixels to find length")
         
@@ -473,7 +759,6 @@ def extract_from_image(
                 for bit_pos in range(bits_per_channel - 1, -1, -1):
                     binary_data += str((channel >> bit_pos) & 1)
         
-        # Parse length
         try:
             length_bits = binary_data[:32]
             if len(length_bits) < 32:
@@ -486,13 +771,11 @@ def extract_from_image(
             debug.print(f"Failed to parse length: {e}")
             return None
         
-        # Sanity check
         max_possible = (num_pixels * bits_per_pixel) // 8 - 4
         if data_length > max_possible or data_length < 10:
             debug.print(f"Invalid data length: {data_length} (max possible: {max_possible})")
             return None
         
-        # Extract full data
         total_bits = (4 + data_length) * 8
         pixels_needed = (total_bits + bits_per_pixel - 1) // bits_per_pixel
         
@@ -519,63 +802,21 @@ def extract_from_image(
             if len(byte_bits) == 8:
                 data_bytes.append(int(byte_bits, 2))
         
-        debug.print(f"Successfully extracted {len(data_bytes)} bytes")
+        debug.print(f"LSB successfully extracted {len(data_bytes)} bytes")
         return bytes(data_bytes)
         
     except Exception as e:
-        debug.exception(e, "extract_from_image")
-        raise ExtractionError(f"Failed to extract data: {e}") from e
+        debug.exception(e, "extract_lsb")
+        return None
 
 
-def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
-    """
-    Calculate the maximum message capacity of an image.
-    
-    Args:
-        image_data: Image bytes
-        bits_per_channel: Bits to use per color channel
-        
-    Returns:
-        Maximum bytes that can be embedded (minus overhead)
-        
-    Example:
-        >>> capacity = calculate_capacity(image_bytes)
-        >>> capacity
-        12000
-    """
-    debug.validate(bits_per_channel in (1, 2),
-                f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
-    
-    img_file = Image.open(io.BytesIO(image_data))
-    img: Image.Image = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file
-    
-    num_pixels = img.size[0] * img.size[1]
-    bits_per_pixel = 3 * bits_per_channel
-    max_bytes = (num_pixels * bits_per_pixel) // 8
-    
-    # Subtract overhead: 4 bytes length + ~100 bytes header
-    capacity = max(0, max_bytes - ENCRYPTION_OVERHEAD)
-    debug.print(f"Image capacity: {capacity} bytes at {bits_per_channel} bit(s)/channel")
-    return capacity
-
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
 
 def get_image_dimensions(image_data: bytes) -> Tuple[int, int]:
-    """
-    Get image dimensions without loading full image.
-    
-    Args:
-        image_data: Image bytes
-        
-    Returns:
-        Tuple of (width, height)
-        
-    Example:
-        >>> width, height = get_image_dimensions(image_bytes)
-        >>> width, height
-        (800, 600)
-    """
+    """Get image dimensions without loading full image."""
     debug.validate(len(image_data) > 0, "Image data cannot be empty")
-    
     img = Image.open(io.BytesIO(image_data))
     dimensions = img.size
     debug.print(f"Image dimensions: {dimensions[0]}x{dimensions[1]}")
@@ -583,20 +824,7 @@ def get_image_dimensions(image_data: bytes) -> Tuple[int, int]:
 
 
 def get_image_format(image_data: bytes) -> Optional[str]:
-    """
-    Get image format (PIL format string like 'PNG', 'JPEG').
-    
-    Args:
-        image_data: Image bytes
-        
-    Returns:
-        Format string or None if invalid
-        
-    Example:
-        >>> format = get_image_format(image_bytes)
-        >>> format
-        'PNG'
-    """
+    """Get image format (PIL format string like 'PNG', 'JPEG')."""
     try:
         img = Image.open(io.BytesIO(image_data))
         format_str = img.format
@@ -608,19 +836,7 @@ def get_image_format(image_data: bytes) -> Optional[str]:
 
 
 def is_lossless_format(image_data: bytes) -> bool:
-    """
-    Check if image is in a lossless format suitable for steganography.
-    
-    Args:
-        image_data: Image bytes
-        
-    Returns:
-        True if format is lossless (PNG, BMP, TIFF)
-        
-    Example:
-        >>> is_lossless_format(image_bytes)
-        True
-    """
+    """Check if image is in a lossless format suitable for steganography."""
     fmt = get_image_format(image_data)
     is_lossless = fmt is not None and fmt.upper() in LOSSLESS_FORMATS
     debug.print(f"Image is lossless: {is_lossless} (format: {fmt})")

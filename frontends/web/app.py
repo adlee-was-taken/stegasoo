@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Stegasoo Web Frontend
+Stegasoo Web Frontend (v3.0.1)
 
 Flask-based web UI for steganography operations.
 Supports both text messages and file embedding.
+NEW in v3.0: LSB and DCT embedding modes with advanced options.
+NEW in v3.0.1: DCT output format selection (PNG or JPEG).
 """
 
 import io
@@ -35,6 +37,13 @@ from stegasoo import (
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
     FilePayload,
+    # NEW in v3.0 - Embedding modes
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT,
+    EMBED_MODE_AUTO,
+    has_dct_support,
+    compare_modes,
+    will_fit_by_mode,
 )
 from stegasoo.constants import (
     __version__,
@@ -102,6 +111,8 @@ def inject_globals():
         'temp_file_expiry_minutes': TEMP_FILE_EXPIRY_MINUTES,
         'min_pin_length': MIN_PIN_LENGTH,
         'max_pin_length': MAX_PIN_LENGTH,
+        # NEW in v3.0
+        'has_dct': has_dct_support(),
     }
 
 
@@ -114,6 +125,7 @@ try:
     # Check current limits
     print(f"Current MAX_FILE_SIZE from constants: {MAX_FILE_SIZE}")
     print(f"Current MAX_FILE_PAYLOAD_SIZE: {MAX_FILE_PAYLOAD_SIZE}")
+    print(f"DCT support available: {has_dct_support()}")
     
     DESIRED_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB
     
@@ -131,7 +143,7 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
     """Generate thumbnail from image data."""
     try:
         with Image.open(io.BytesIO(image_data)) as img:
-            # Convert to RGB if necessary
+            # Convert to RGB if necessary (handle grayscale too)
             if img.mode in ('RGBA', 'LA', 'P'):
                 # Create white background for transparent images
                 background = Image.new('RGB', img.size, (255, 255, 255))
@@ -139,6 +151,9 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
                     img = img.convert('RGBA')
                 background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
                 img = background
+            elif img.mode == 'L':
+                # Convert grayscale to RGB for thumbnail
+                img = img.convert('RGB')
             elif img.mode != 'RGB':
                 img = img.convert('RGB')
             
@@ -401,6 +416,85 @@ def extract_key_from_qr_route():
         }), 500
 
 
+# ============================================================================
+# NEW in v3.0 - CAPACITY COMPARISON API
+# ============================================================================
+
+@app.route('/api/compare-capacity', methods=['POST'])
+def api_compare_capacity():
+    """
+    Compare LSB and DCT capacity for an uploaded carrier image.
+    Returns JSON with capacity info for both modes.
+    """
+    carrier = request.files.get('carrier')
+    if not carrier:
+        return jsonify({'error': 'No carrier image provided'}), 400
+    
+    try:
+        carrier_data = carrier.read()
+        comparison = compare_modes(carrier_data)
+        
+        return jsonify({
+            'success': True,
+            'width': comparison['width'],
+            'height': comparison['height'],
+            'lsb': {
+                'capacity_bytes': comparison['lsb']['capacity_bytes'],
+                'capacity_kb': round(comparison['lsb']['capacity_kb'], 1),
+                'output': comparison['lsb']['output'],
+            },
+            'dct': {
+                'capacity_bytes': comparison['dct']['capacity_bytes'],
+                'capacity_kb': round(comparison['dct']['capacity_kb'], 1),
+                'output': comparison['dct']['output'],
+                'available': comparison['dct']['available'],
+                'ratio': round(comparison['dct']['ratio_vs_lsb'], 1),
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/check-fit', methods=['POST'])
+def api_check_fit():
+    """
+    Check if a payload will fit in the carrier with selected mode.
+    Returns JSON with fit status and details.
+    """
+    carrier = request.files.get('carrier')
+    payload_size = request.form.get('payload_size', type=int)
+    embed_mode = request.form.get('embed_mode', 'lsb')
+    
+    if not carrier or payload_size is None:
+        return jsonify({'error': 'Missing carrier or payload_size'}), 400
+    
+    if embed_mode not in ('lsb', 'dct'):
+        return jsonify({'error': 'Invalid embed_mode'}), 400
+    
+    if embed_mode == 'dct' and not has_dct_support():
+        return jsonify({'error': 'DCT mode requires scipy'}), 400
+    
+    try:
+        carrier_data = carrier.read()
+        result = will_fit_by_mode(payload_size, carrier_data, embed_mode=embed_mode)
+        
+        return jsonify({
+            'success': True,
+            'fits': result['fits'],
+            'payload_size': result['payload_size'],
+            'capacity': result['capacity'],
+            'usage_percent': round(result['usage_percent'], 1),
+            'headroom': result['headroom'],
+            'mode': embed_mode,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# ENCODE
+# ============================================================================
+
 @app.route('/encode', methods=['GET', 'POST'])
 def encode_page():
     day_of_week = get_today_day()
@@ -427,6 +521,21 @@ def encode_page():
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
             payload_type = request.form.get('payload_type', 'text')
+            
+            # NEW in v3.0 - Embedding mode
+            embed_mode = request.form.get('embed_mode', 'lsb')
+            if embed_mode not in ('lsb', 'dct'):
+                embed_mode = 'lsb'
+            
+            # NEW in v3.0.1 - DCT output format
+            dct_output_format = request.form.get('dct_output_format', 'png')
+            if dct_output_format not in ('png', 'jpeg'):
+                dct_output_format = 'png'
+            
+            # Check DCT availability
+            if embed_mode == 'dct' and not has_dct_support():
+                flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
+                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
             
             # Determine payload
             if payload_type == 'file' and payload_file and payload_file.filename:
@@ -515,7 +624,7 @@ def encode_page():
             else:
                 date_str = datetime.now().strftime('%Y-%m-%d')
             
-            # Encode
+            # Encode with selected mode and output format
             encode_result = encode(
                 message=payload,
                 reference_photo=ref_data,
@@ -524,16 +633,34 @@ def encode_page():
                 pin=pin,
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
-                date_str=date_str
+                date_str=date_str,
+                embed_mode=embed_mode,  # NEW in v3.0
+                dct_output_format=dct_output_format if embed_mode == 'dct' else None,  # NEW in v3.0.1
             )
+            
+            # Determine actual output format for filename and storage
+            if embed_mode == 'dct' and dct_output_format == 'jpeg':
+                output_ext = '.jpg'
+                output_mime = 'image/jpeg'
+                # Modify filename extension if needed
+                filename = encode_result.filename
+                if filename.endswith('.png'):
+                    filename = filename[:-4] + '.jpg'
+            else:
+                output_ext = '.png'
+                output_mime = 'image/png'
+                filename = encode_result.filename
             
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
             TEMP_FILES[file_id] = {
                 'data': encode_result.stego_image,
-                'filename': encode_result.filename,
-                'timestamp': time.time()
+                'filename': filename,
+                'timestamp': time.time(),
+                'embed_mode': embed_mode,
+                'output_format': dct_output_format if embed_mode == 'dct' else 'png',
+                'mime_type': output_mime,
             }
             
             return redirect(url_for('encode_result', file_id=file_id))
@@ -570,7 +697,9 @@ def encode_result(file_id):
     return render_template('encode_result.html',
         file_id=file_id,
         filename=file_info['filename'],
-        thumbnail_url=url_for('encode_thumbnail', thumb_id=thumbnail_id) if thumbnail_id else None
+        thumbnail_url=url_for('encode_thumbnail', thumb_id=thumbnail_id) if thumbnail_id else None,
+        embed_mode=file_info.get('embed_mode', 'lsb'),
+        output_format=file_info.get('output_format', 'png'),  # NEW in v3.0.1
     )
 
 
@@ -594,9 +723,11 @@ def encode_download(file_id):
         return redirect(url_for('encode_page'))
     
     file_info = TEMP_FILES[file_id]
+    mime_type = file_info.get('mime_type', 'image/png')
+    
     return send_file(
         io.BytesIO(file_info['data']),
-        mimetype='image/png',
+        mimetype=mime_type,
         as_attachment=True,
         download_name=file_info['filename']
     )
@@ -609,9 +740,11 @@ def encode_file_route(file_id):
         return "Not found", 404
     
     file_info = TEMP_FILES[file_id]
+    mime_type = file_info.get('mime_type', 'image/png')
+    
     return send_file(
         io.BytesIO(file_info['data']),
-        mimetype='image/png',
+        mimetype=mime_type,
         as_attachment=False,
         download_name=file_info['filename']
     )
@@ -628,6 +761,10 @@ def encode_cleanup(file_id):
     
     return jsonify({'status': 'ok'})
 
+
+# ============================================================================
+# DECODE
+# ============================================================================
 
 @app.route('/decode', methods=['GET', 'POST'])
 def decode_page():
@@ -646,6 +783,16 @@ def decode_page():
             day_phrase = request.form.get('day_phrase', '')
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
+            
+            # NEW in v3.0 - Extraction mode
+            embed_mode = request.form.get('embed_mode', 'auto')
+            if embed_mode not in ('auto', 'lsb', 'dct'):
+                embed_mode = 'auto'
+            
+            # Check DCT availability
+            if embed_mode == 'dct' and not has_dct_support():
+                flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
+                return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Get encoding date from form (detected from filename in JS)
             stego_date = request.form.get('stego_date', '').strip()
@@ -700,7 +847,7 @@ def decode_page():
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Decode
+            # Decode with selected mode
             decode_result = decode(
                 stego_image=stego_data,
                 reference_photo=ref_data,
@@ -708,7 +855,8 @@ def decode_page():
                 pin=pin,
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
-                date_str=stego_date if stego_date else None
+                date_str=stego_date if stego_date else None,
+                embed_mode=embed_mode,  # NEW in v3.0
             )
             
             if decode_result.is_file:

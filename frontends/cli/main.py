@@ -8,6 +8,7 @@ Usage:
     stegasoo decode [OPTIONS]
     stegasoo verify [OPTIONS]
     stegasoo info [OPTIONS]
+    stegasoo compare [OPTIONS]  # NEW in v3.0
 """
 
 import sys
@@ -29,9 +30,16 @@ from stegasoo import (
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, ExtractionError,
     FilePayload,
-    # New in 2.2.1
     will_fit,
     strip_image_metadata,
+    # NEW in v3.0 - Embedding modes
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT,
+    EMBED_MODE_AUTO,
+    has_dct_support,
+    compare_modes,
+    will_fit_by_mode,
+    calculate_capacity_by_mode,
 )
 
 # QR Code utilities
@@ -68,6 +76,11 @@ def cli():
     • Reference photo (something you have)
     • Daily passphrase (something you know)
     • Static PIN or RSA key (additional security)
+    
+    \b
+    NEW in v3.0 - Embedding Modes:
+    • LSB mode (default): Full color output, higher capacity
+    • DCT mode: Grayscale output, ~20% capacity, better stealth
     """
     pass
 
@@ -200,8 +213,10 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
 @click.option('--output', '-o', type=click.Path(), help='Output file (default: auto-generated)')
 @click.option('--date', 'date_str', help='Date override (YYYY-MM-DD)')
+@click.option('--mode', 'embed_mode', type=click.Choice(['lsb', 'dct']), default='lsb',
+              help='Embedding mode: lsb (default, color) or dct (grayscale, requires scipy)')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress output except errors')
-def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key, key_qr, key_password, output, date_str, quiet):
+def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key, key_qr, key_password, output, date_str, embed_mode, quiet):
     """
     Encode a secret message or file into an image.
     
@@ -213,19 +228,36 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
     RSA key can be provided as a .pem file (--key) or QR code image (--key-qr).
     
     \b
+    Embedding Modes (v3.0):
+        --mode lsb   Spatial LSB embedding (default)
+                     • Full color output (PNG/BMP)
+                     • Higher capacity (~375 KB/megapixel)
+        
+        --mode dct   DCT domain embedding (requires scipy)
+                     • Grayscale output only
+                     • Lower capacity (~75 KB/megapixel)
+                     • Better resistance to visual analysis
+    
+    \b
     Examples:
-        # Text message with PIN
+        # Text message with PIN (LSB mode, default)
         stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -m "secret"
+        
+        # DCT mode for better stealth
+        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -m "secret" --mode dct
         
         # With RSA key file
         stegasoo encode -r photo.jpg -c meme.png -p "words" -k mykey.pem -m "secret"
         
-        # With RSA key from QR code image
-        stegasoo encode -r photo.jpg -c meme.png -p "words" --key-qr keyqr.png -m "secret"
-        
         # Embed a binary file
         stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -e secret.pdf
     """
+    # Check DCT mode availability
+    if embed_mode == 'dct' and not has_dct_support():
+        raise click.ClickException(
+            "DCT mode requires scipy. Install with: pip install scipy"
+        )
+    
     # Determine what to encode
     payload = None
     
@@ -277,15 +309,27 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
         ref_photo = Path(ref).read_bytes()
         carrier_image = Path(carrier).read_bytes()
         
-        # Pre-check capacity
-        fit_check = will_fit(payload, carrier_image)
+        # Pre-check capacity with selected mode
+        fit_check = will_fit_by_mode(payload, carrier_image, embed_mode=embed_mode)
         if not fit_check['fits']:
+            # Suggest alternative mode if it would fit
+            alt_mode = 'lsb' if embed_mode == 'dct' else 'dct'
+            alt_check = will_fit_by_mode(payload, carrier_image, embed_mode=alt_mode)
+            
+            suggestion = ""
+            if alt_mode == 'lsb' and alt_check['fits']:
+                suggestion = f"\n  Tip: Payload would fit in LSB mode (--mode lsb)"
+            
             raise click.ClickException(
-                f"Payload too large for carrier image.\n"
+                f"Payload too large for {embed_mode.upper()} mode.\n"
                 f"  Payload: {fit_check['payload_size']:,} bytes\n"
                 f"  Capacity: {fit_check['capacity']:,} bytes\n"
                 f"  Shortfall: {-fit_check['headroom']:,} bytes"
+                f"{suggestion}"
             )
+        
+        if not quiet:
+            click.echo(f"Mode: {embed_mode.upper()} ({fit_check['usage_percent']:.1f}% capacity)")
         
         result = encode(
             message=payload,
@@ -296,6 +340,7 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
             date_str=date_str,
+            embed_mode=embed_mode,  # NEW in v3.0
         )
         
         # Determine output path
@@ -313,6 +358,8 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
             click.echo(f"  Size: {len(result.stego_image):,} bytes")
             click.echo(f"  Capacity used: {result.capacity_percent:.1f}%")
             click.echo(f"  Date: {result.date_used}")
+            if embed_mode == 'dct':
+                click.secho(f"  Note: Output is grayscale (DCT mode)", dim=True)
         
     except StegasooError as e:
         raise click.ClickException(str(e))
@@ -335,9 +382,11 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
 @click.option('--output', '-o', type=click.Path(), help='Save decoded content to file')
+@click.option('--mode', 'embed_mode', type=click.Choice(['auto', 'lsb', 'dct']), default='auto',
+              help='Extraction mode: auto (default), lsb, or dct')
 @click.option('--quiet', '-q', is_flag=True, help='Output only the content (for text) or suppress messages (for files)')
 @click.option('--force', is_flag=True, help='Overwrite existing output file')
-def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, quiet, force):
+def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, embed_mode, quiet, force):
     """
     Decode a secret message or file from a stego image.
     
@@ -346,19 +395,31 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, quiet
     RSA key can be provided as a .pem file (--key) or QR code image (--key-qr).
     
     \b
+    Extraction Modes (v3.0):
+        --mode auto  Auto-detect (default) - tries LSB first, then DCT
+        --mode lsb   Only try LSB extraction
+        --mode dct   Only try DCT extraction (requires scipy)
+    
+    \b
     Examples:
-        # Decode with PIN
+        # Decode with PIN (auto-detect mode)
         stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456
+        
+        # Explicitly specify DCT mode
+        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 --mode dct
         
         # Decode with RSA key file
         stegasoo decode -r photo.jpg -s stego.png -p "words" -k mykey.pem
         
-        # Decode with RSA key from QR code image
-        stegasoo decode -r photo.jpg -s stego.png -p "words" --key-qr keyqr.png
-        
         # Save output to file
         stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 -o output.txt
     """
+    # Check DCT mode availability
+    if embed_mode == 'dct' and not has_dct_support():
+        raise click.ClickException(
+            "DCT mode requires scipy. Install with: pip install scipy"
+        )
+    
     # Load key if provided (from .pem file or QR code image)
     rsa_key_data = None
     rsa_key_from_qr = False
@@ -400,6 +461,7 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, quiet
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
+            embed_mode=embed_mode,  # NEW in v3.0
         )
         
         if result.is_file:
@@ -459,8 +521,10 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, quiet
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
+@click.option('--mode', 'embed_mode', type=click.Choice(['auto', 'lsb', 'dct']), default='auto',
+              help='Extraction mode: auto (default), lsb, or dct')
 @click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
-def verify(ref, stego, phrase, pin, key, key_qr, key_password, as_json):
+def verify(ref, stego, phrase, pin, key, key_qr, key_password, embed_mode, as_json):
     """
     Verify that a stego image can be decoded without extracting the message.
     
@@ -472,7 +536,15 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, as_json):
         stegasoo verify -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456
         
         stegasoo verify -r photo.jpg -s stego.png -p "words" -k mykey.pem --json
+        
+        stegasoo verify -r photo.jpg -s stego.png -p "words" --pin 123456 --mode dct
     """
+    # Check DCT mode availability
+    if embed_mode == 'dct' and not has_dct_support():
+        raise click.ClickException(
+            "DCT mode requires scipy. Install with: pip install scipy"
+        )
+    
     # Load key if provided
     rsa_key_data = None
     rsa_key_from_qr = False
@@ -511,6 +583,7 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, as_json):
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
+            embed_mode=embed_mode,  # NEW in v3.0
         )
         
         # Calculate payload size
@@ -576,11 +649,13 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, as_json):
 
 @cli.command()
 @click.argument('image', type=click.Path(exists=True))
-def info(image):
+@click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
+def info(image, as_json):
     """
     Show information about an image.
     
-    Displays dimensions, capacity, and attempts to detect date from filename.
+    Displays dimensions, capacity for both LSB and DCT modes,
+    and attempts to detect date from filename.
     """
     try:
         image_data = Path(image).read_bytes()
@@ -589,11 +664,40 @@ def info(image):
         if not result.is_valid:
             raise click.ClickException(result.error_message)
         
-        capacity = calculate_capacity(image_data)
+        # Get capacity comparison
+        comparison = compare_modes(image_data)
         
         # Try to get date from filename
         date_str = parse_date_from_filename(image)
         day_name = get_day_from_date(date_str) if date_str else None
+        
+        if as_json:
+            import json
+            output = {
+                "file": image,
+                "width": result.details['width'],
+                "height": result.details['height'],
+                "pixels": result.details['pixels'],
+                "mode": result.details['mode'],
+                "format": result.details['format'],
+                "capacity": {
+                    "lsb": {
+                        "bytes": comparison['lsb']['capacity_bytes'],
+                        "kb": round(comparison['lsb']['capacity_kb'], 1),
+                    },
+                    "dct": {
+                        "bytes": comparison['dct']['capacity_bytes'],
+                        "kb": round(comparison['dct']['capacity_kb'], 1),
+                        "available": comparison['dct']['available'],
+                        "ratio_vs_lsb": round(comparison['dct']['ratio_vs_lsb'], 1),
+                    },
+                },
+            }
+            if date_str:
+                output["embed_date"] = date_str
+                output["embed_day"] = day_name
+            click.echo(json.dumps(output, indent=2))
+            return
         
         click.echo()
         click.secho(f"Image: {image}", bold=True)
@@ -601,10 +705,139 @@ def info(image):
         click.echo(f"  Pixels:      {result.details['pixels']:,}")
         click.echo(f"  Mode:        {result.details['mode']}")
         click.echo(f"  Format:      {result.details['format']}")
-        click.echo(f"  Capacity:    ~{capacity:,} bytes ({capacity // 1024} KB)")
+        click.echo()
+        
+        click.secho("  Capacity:", bold=True)
+        click.echo(f"    LSB mode:  ~{comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
+        
+        dct_status = "✓" if comparison['dct']['available'] else "✗ (scipy not installed)"
+        click.echo(f"    DCT mode:  ~{comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB) {dct_status}")
+        click.echo(f"    DCT ratio: {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB")
         
         if date_str:
+            click.echo()
             click.echo(f"  Embed date:  {date_str} ({day_name})")
+        
+        click.echo()
+        
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+
+# ============================================================================
+# COMPARE COMMAND (NEW in v3.0)
+# ============================================================================
+
+@cli.command()
+@click.argument('image', type=click.Path(exists=True))
+@click.option('--payload-size', '-s', type=int, help='Check if specific payload size fits')
+@click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
+def compare(image, payload_size, as_json):
+    """
+    Compare LSB and DCT embedding modes for an image.
+    
+    Shows capacity for each mode and recommends which to use.
+    Optionally checks if a specific payload size would fit.
+    
+    \b
+    Examples:
+        stegasoo compare carrier.png
+        stegasoo compare carrier.png --payload-size 50000
+        stegasoo compare carrier.png --json
+    """
+    try:
+        image_data = Path(image).read_bytes()
+        
+        comparison = compare_modes(image_data)
+        
+        if as_json:
+            import json
+            output = {
+                "file": image,
+                "width": comparison['width'],
+                "height": comparison['height'],
+                "modes": {
+                    "lsb": {
+                        "capacity_bytes": comparison['lsb']['capacity_bytes'],
+                        "capacity_kb": round(comparison['lsb']['capacity_kb'], 1),
+                        "available": True,
+                        "output_format": comparison['lsb']['output'],
+                    },
+                    "dct": {
+                        "capacity_bytes": comparison['dct']['capacity_bytes'],
+                        "capacity_kb": round(comparison['dct']['capacity_kb'], 1),
+                        "available": comparison['dct']['available'],
+                        "output_format": comparison['dct']['output'],
+                        "ratio_vs_lsb_percent": round(comparison['dct']['ratio_vs_lsb'], 1),
+                    },
+                },
+            }
+            
+            if payload_size:
+                output["payload_check"] = {
+                    "size_bytes": payload_size,
+                    "fits_lsb": payload_size <= comparison['lsb']['capacity_bytes'],
+                    "fits_dct": payload_size <= comparison['dct']['capacity_bytes'],
+                }
+            
+            click.echo(json.dumps(output, indent=2))
+            return
+        
+        click.echo()
+        click.secho(f"═══ Mode Comparison: {image} ═══", fg='cyan', bold=True)
+        click.echo(f"  Dimensions: {comparison['width']} × {comparison['height']}")
+        click.echo()
+        
+        # LSB mode
+        click.secho("  ┌─── LSB Mode ───", fg='green')
+        click.echo(f"  │ Capacity:  {comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
+        click.echo(f"  │ Output:    {comparison['lsb']['output']}")
+        click.echo(f"  │ Status:    ✓ Available")
+        click.echo("  │")
+        
+        # DCT mode
+        click.secho("  ├─── DCT Mode ───", fg='blue')
+        click.echo(f"  │ Capacity:  {comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB)")
+        click.echo(f"  │ Output:    {comparison['dct']['output']}")
+        click.echo(f"  │ Ratio:     {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB capacity")
+        if comparison['dct']['available']:
+            click.echo(f"  │ Status:    ✓ Available")
+        else:
+            click.secho(f"  │ Status:    ✗ Requires scipy (pip install scipy)", fg='yellow')
+        click.echo("  │")
+        
+        # Payload check
+        if payload_size:
+            click.secho("  ├─── Payload Check ───", fg='magenta')
+            click.echo(f"  │ Size:      {payload_size:,} bytes")
+            
+            fits_lsb = payload_size <= comparison['lsb']['capacity_bytes']
+            fits_dct = payload_size <= comparison['dct']['capacity_bytes']
+            
+            lsb_icon = "✓" if fits_lsb else "✗"
+            dct_icon = "✓" if fits_dct else "✗"
+            lsb_color = 'green' if fits_lsb else 'red'
+            dct_color = 'green' if fits_dct else 'red'
+            
+            click.echo(f"  │ LSB mode:  ", nl=False)
+            click.secho(f"{lsb_icon} {'Fits' if fits_lsb else 'Too large'}", fg=lsb_color)
+            click.echo(f"  │ DCT mode:  ", nl=False)
+            click.secho(f"{dct_icon} {'Fits' if fits_dct else 'Too large'}", fg=dct_color)
+            click.echo("  │")
+        
+        # Recommendation
+        click.secho("  └─── Recommendation ───", fg='yellow')
+        if not comparison['dct']['available']:
+            click.echo("  Use LSB mode (DCT unavailable)")
+        elif payload_size:
+            if fits_dct:
+                click.echo("  DCT mode for better stealth (payload fits both modes)")
+            elif fits_lsb:
+                click.echo("  LSB mode (payload too large for DCT)")
+            else:
+                click.secho("  ✗ Payload too large for both modes!", fg='red')
+        else:
+            click.echo("  LSB for larger payloads, DCT for better stealth")
         
         click.echo()
         
@@ -654,6 +887,48 @@ def strip_metadata_cmd(image, output, output_format, quiet):
         
     except Exception as e:
         raise click.ClickException(str(e))
+
+
+# ============================================================================
+# MODES COMMAND (NEW in v3.0)
+# ============================================================================
+
+@cli.command()
+def modes():
+    """
+    Show available embedding modes and their status.
+    
+    Displays which modes are available and their characteristics.
+    """
+    click.echo()
+    click.secho("═══ Stegasoo Embedding Modes ═══", fg='cyan', bold=True)
+    click.echo()
+    
+    # LSB Mode
+    click.secho("  LSB Mode (Spatial LSB)", fg='green', bold=True)
+    click.echo("    Status:      ✓ Always available")
+    click.echo("    Output:      PNG/BMP (full color)")
+    click.echo("    Capacity:    ~375 KB per megapixel")
+    click.echo("    Use case:    Larger payloads, color preservation")
+    click.echo("    CLI flag:    --mode lsb (default)")
+    click.echo()
+    
+    # DCT Mode
+    click.secho("  DCT Mode (Frequency Domain)", fg='blue', bold=True)
+    if has_dct_support():
+        click.echo("    Status:      ✓ Available")
+    else:
+        click.secho("    Status:      ✗ Requires scipy", fg='yellow')
+        click.echo("    Install:     pip install scipy")
+    click.echo("    Output:      PNG (grayscale only)")
+    click.echo("    Capacity:    ~75 KB per megapixel (~20% of LSB)")
+    click.echo("    Use case:    Better stealth, smaller messages")
+    click.echo("    CLI flag:    --mode dct")
+    click.echo()
+    
+    click.secho("  Tip:", dim=True)
+    click.echo("    Use 'stegasoo compare <image>' to see capacity for both modes")
+    click.echo()
 
 
 # ============================================================================

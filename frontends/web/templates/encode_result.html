@@ -34,6 +34,34 @@
                     <code class="fs-5">{{ filename }}</code>
                 </div>
                 
+                <!-- Mode and format badges (v3.0) -->
+                <div class="mb-4">
+                    {% if embed_mode == 'dct' %}
+                        <span class="badge bg-info fs-6">
+                            <i class="bi bi-soundwave me-1"></i>DCT Mode
+                        </span>
+                        {% if output_format == 'jpeg' %}
+                        <span class="badge bg-warning text-dark fs-6 ms-1">
+                            <i class="bi bi-file-earmark-richtext me-1"></i>JPEG
+                        </span>
+                        <div class="small text-muted mt-1">Grayscale JPEG, frequency domain embedding (Q=95)</div>
+                        {% else %}
+                        <span class="badge bg-success fs-6 ms-1">
+                            <i class="bi bi-file-earmark-image me-1"></i>PNG
+                        </span>
+                        <div class="small text-muted mt-1">Grayscale PNG, frequency domain embedding (lossless)</div>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge bg-primary fs-6">
+                            <i class="bi bi-grid-3x3-gap me-1"></i>LSB Mode
+                        </span>
+                        <span class="badge bg-success fs-6 ms-1">
+                            <i class="bi bi-file-earmark-image me-1"></i>PNG
+                        </span>
+                        <div class="small text-muted mt-1">Full color PNG, spatial LSB embedding</div>
+                    {% endif %}
+                </div>
+                
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('encode_download', file_id=file_id) }}" 
                        class="btn btn-primary btn-lg" id="downloadBtn">
@@ -53,7 +81,14 @@
                     <ul class="mb-0 mt-2">
                         <li>This file expires in <strong>5 minutes</strong></li>
                         <li>Do <strong>not</strong> resize or recompress the image</li>
+                        {% if embed_mode == 'dct' and output_format == 'jpeg' %}
+                        <li>JPEG format is lossy - avoid re-saving or editing</li>
+                        {% else %}
                         <li>PNG format preserves your hidden data</li>
+                        {% endif %}
+                        {% if embed_mode == 'dct' %}
+                        <li>Recipient needs <strong>DCT mode</strong> or <strong>Auto</strong> detection to decode</li>
+                        {% endif %}
                     </ul>
                 </div>
                 
@@ -72,13 +107,14 @@
 const shareBtn = document.getElementById('shareBtn');
 const fileUrl = "{{ url_for('encode_file_route', file_id=file_id, _external=True) }}";
 const fileName = "{{ filename }}";
+const mimeType = "{{ 'image/jpeg' if embed_mode == 'dct' and output_format == 'jpeg' else 'image/png' }}";
 
 if (navigator.share && navigator.canShare) {
     // Check if we can share files
     fetch(fileUrl)
         .then(response => response.blob())
         .then(blob => {
-            const file = new File([blob], fileName, { type: 'image/png' });
+            const file = new File([blob], fileName, { type: mimeType });
             if (navigator.canShare({ files: [file] })) {
                 shareBtn.style.display = 'block';
                 shareBtn.addEventListener('click', async () => {

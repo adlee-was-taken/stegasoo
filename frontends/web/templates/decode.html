@@ -181,6 +181,78 @@
                         </div>
                     </div>
                     
+                    <!-- ================================================================
+                         ADVANCED OPTIONS (v3.0) - Extraction Mode
+                         ================================================================ -->
+                    <div class="mb-4">
+                        <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptionsDec" role="button" aria-expanded="false">
+                            <i class="bi bi-gear me-1"></i> Advanced Options
+                            <i class="bi bi-chevron-down ms-1" id="advancedChevronDec"></i>
+                        </a>
+                        
+                        <div class="collapse" id="advancedOptionsDec">
+                            <div class="card card-body mt-2 bg-dark border-secondary">
+                                
+                                <!-- Extraction Mode Selection -->
+                                <div class="mb-0">
+                                    <label class="form-label">
+                                        <i class="bi bi-cpu me-1"></i> Extraction Mode
+                                        <span class="badge bg-info ms-1">v3.0</span>
+                                    </label>
+                                    
+                                    <div class="row g-2">
+                                        <!-- Auto Mode -->
+                                        <div class="col-4">
+                                            <div class="form-check card p-2 text-center h-100" id="autoModeCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
+                                                <label class="form-check-label w-100" for="modeAuto">
+                                                    <i class="bi bi-magic text-success fs-4 d-block mb-1"></i>
+                                                    <strong>Auto</strong>
+                                                    <div class="small text-muted">Try both</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- LSB Mode -->
+                                        <div class="col-4">
+                                            <div class="form-check card p-2 text-center h-100" id="lsbModeCardDec">
+                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeLsbDec" value="lsb">
+                                                <label class="form-check-label w-100" for="modeLsbDec">
+                                                    <i class="bi bi-grid-3x3-gap text-primary fs-4 d-block mb-1"></i>
+                                                    <strong>LSB</strong>
+                                                    <div class="small text-muted">Spatial only</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- DCT Mode -->
+                                        <div class="col-4">
+                                            <div class="form-check card p-2 text-center h-100 {% if not has_dct %}opacity-50{% endif %}" id="dctModeCardDec">
+                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeDctDec" value="dct" {% if not has_dct %}disabled{% endif %}>
+                                                <label class="form-check-label w-100" for="modeDctDec">
+                                                    <i class="bi bi-soundwave text-info fs-4 d-block mb-1"></i>
+                                                    <strong>DCT</strong>
+                                                    <div class="small text-muted">
+                                                        {% if has_dct %}Frequency only{% else %}N/A{% endif %}
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-text mt-2">
+                                        <i class="bi bi-lightbulb me-1"></i>
+                                        <strong>Auto</strong> tries LSB first, then DCT. Use specific mode if you know how it was encoded.
+                                        {% if not has_dct %}
+                                        <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>DCT requires scipy: <code>pip install scipy</code></span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-primary btn-lg w-100" id="decodeBtn">
                         <i class="bi bi-unlock me-2"></i>Decode
                     </button>
@@ -211,9 +283,13 @@
                         <i class="bi bi-dot"></i>
                         Ensure the stego image hasn't been <strong>resized or recompressed</strong>
                     </li>
-                    <li class="mb-0">
+                    <li class="mb-2">
                         <i class="bi bi-dot"></i>
                         If using an RSA key, make sure the <strong>password is correct</strong>
+                    </li>
+                    <li class="mb-0">
+                        <i class="bi bi-dot"></i>
+                        <strong>v3.0:</strong> If auto-detection fails, try specifying <strong>LSB or DCT mode</strong> in Advanced Options
                     </li>
                 </ul>
             </div>
@@ -228,7 +304,8 @@
 // Form submit loading state
 document.getElementById('decodeForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('decodeBtn');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Decoding...';
+    const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
     btn.disabled = true;
 });
 
@@ -321,6 +398,38 @@ document.getElementById('togglePin')?.addEventListener('click', function() {
         input.type = 'password';
         icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
+});
+
+// Mode card highlighting
+const autoModeCard = document.getElementById('autoModeCard');
+const lsbModeCardDec = document.getElementById('lsbModeCardDec');
+const dctModeCardDec = document.getElementById('dctModeCardDec');
+const modeAuto = document.getElementById('modeAuto');
+const modeLsbDec = document.getElementById('modeLsbDec');
+const modeDctDec = document.getElementById('modeDctDec');
+
+function updateModeCardHighlightDec() {
+    autoModeCard?.classList.toggle('border-success', modeAuto?.checked);
+    autoModeCard?.classList.toggle('border-2', modeAuto?.checked);
+    lsbModeCardDec?.classList.toggle('border-primary', modeLsbDec?.checked);
+    lsbModeCardDec?.classList.toggle('border-2', modeLsbDec?.checked);
+    dctModeCardDec?.classList.toggle('border-info', modeDctDec?.checked);
+    dctModeCardDec?.classList.toggle('border-2', modeDctDec?.checked);
+}
+
+modeAuto?.addEventListener('change', updateModeCardHighlightDec);
+modeLsbDec?.addEventListener('change', updateModeCardHighlightDec);
+modeDctDec?.addEventListener('change', updateModeCardHighlightDec);
+updateModeCardHighlightDec(); // Initial state
+
+// Advanced options chevron rotation
+document.getElementById('advancedOptionsDec')?.addEventListener('show.bs.collapse', function() {
+    document.getElementById('advancedChevronDec').classList.add('bi-chevron-up');
+    document.getElementById('advancedChevronDec').classList.remove('bi-chevron-down');
+});
+document.getElementById('advancedOptionsDec')?.addEventListener('hide.bs.collapse', function() {
+    document.getElementById('advancedChevronDec').classList.remove('bi-chevron-up');
+    document.getElementById('advancedChevronDec').classList.add('bi-chevron-down');
 });
 
 // Paste from Clipboard

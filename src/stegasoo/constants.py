@@ -12,7 +12,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "2.2.1"
+__version__ = "3.1.0"
 
 # ============================================================================
 # FILE FORMAT
@@ -181,3 +181,44 @@ def get_wordlist() -> list[str]:
     if _bip39_words is None:
         _bip39_words = get_bip39_words()
     return _bip39_words
+
+
+# =============================================================================
+# DCT STEGANOGRAPHY (v3.0)
+# =============================================================================
+
+# Embedding modes
+EMBED_MODE_LSB = 'lsb'       # Spatial LSB embedding (default, original mode)
+EMBED_MODE_DCT = 'dct'       # DCT domain embedding (new in v3.0)
+EMBED_MODE_AUTO = 'auto'     # Auto-detect on decode
+
+# DCT-specific constants
+DCT_MAGIC_HEADER = b'\x89DCT'  # Magic header for DCT mode
+DCT_FORMAT_VERSION = 1
+DCT_STEP_SIZE = 8              # QIM quantization step
+
+# Valid embedding modes
+VALID_EMBED_MODES = {EMBED_MODE_LSB, EMBED_MODE_DCT}
+
+
+def detect_stego_mode(encrypted_data: bytes) -> str:
+    """
+    Detect embedding mode from encrypted payload header.
+    
+    Args:
+        encrypted_data: First few bytes of extracted payload
+        
+    Returns:
+        'lsb' or 'dct' or 'unknown'
+    """
+    if len(encrypted_data) < 4:
+        return 'unknown'
+    
+    header = encrypted_data[:4]
+    
+    if header == b'\x89ST3':
+        return EMBED_MODE_LSB
+    elif header == b'\x89DCT':
+        return EMBED_MODE_DCT
+    else:
+        return 'unknown'

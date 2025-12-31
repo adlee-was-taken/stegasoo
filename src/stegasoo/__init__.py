@@ -1,5 +1,5 @@
 """
-Stegasoo - Secure Steganography Library
+Stegasoo - Secure Steganography Library (v3.0.1)
 
 A Python library for hiding encrypted messages and files in images using
 hybrid photo + passphrase + PIN authentication.
@@ -58,7 +58,7 @@ File Embedding:
     else:
         print(decoded.message)
 
-Capacity Pre-check (v2.2.1):
+Capacity Pre-check:
     from stegasoo import will_fit
     
     # Check if payload will fit before encoding
@@ -68,13 +68,52 @@ Capacity Pre-check (v2.2.1):
     else:
         print(f"Need {-result['headroom']} more bytes")
 
+NEW in v3.0 - DCT Embedding Mode:
+    from stegasoo import encode, has_dct_support, compare_modes
+    
+    # Check if DCT mode is available (requires scipy)
+    if has_dct_support():
+        # DCT mode: smaller capacity, grayscale output, frequency domain
+        result = encode(
+            message="Secret",
+            reference_photo=ref_photo,
+            carrier_image=carrier,
+            day_phrase="apple forest thunder",
+            pin="123456",
+            embed_mode='dct',  # NEW parameter
+        )
+    
+    # Compare mode capacities
+    info = compare_modes(carrier_image)
+    print(f"LSB capacity: {info['lsb']['capacity_kb']:.1f} KB")
+    print(f"DCT capacity: {info['dct']['capacity_kb']:.1f} KB")
+
+NEW in v3.0.1 - DCT Output Format:
+    # DCT mode can output PNG (lossless) or JPEG (smaller, natural)
+    result = encode(
+        message="Secret",
+        ...,
+        embed_mode='dct',
+        dct_output_format='jpeg',  # 'png' (default) or 'jpeg'
+    )
+
 Debugging:
     from stegasoo.debug import debug
     debug.enable(True)  # Enable debug output
     debug.enable_performance(True)  # Enable timing
 """
 
-from .constants import __version__, DAY_NAMES, MAX_MESSAGE_SIZE, MAX_FILE_PAYLOAD_SIZE
+from .constants import (
+    __version__,
+    DAY_NAMES,
+    MAX_MESSAGE_SIZE,
+    MAX_FILE_PAYLOAD_SIZE,
+    # NEW in v3.0 - Embedding modes
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT,
+    EMBED_MODE_AUTO,
+    detect_stego_mode,
+)
 from .models import (
     Credentials,
     EncodeInput,
@@ -152,8 +191,13 @@ from .steganography import (
     get_image_format,
     is_lossless_format,
     LOSSLESS_FORMATS,
-    # NEW in v2.2.1
     will_fit,
+    # NEW in v3.0
+    has_dct_support,
+    calculate_capacity_by_mode,
+    will_fit_by_mode,
+    get_available_modes,
+    compare_modes,
 )
 from .utils import (
     generate_filename,
@@ -164,7 +208,6 @@ from .utils import (
     secure_delete,
     SecureDeleter,
     format_file_size,
-    # NEW in v2.2.1
     strip_image_metadata,
 )
 from .debug import debug  # Import debug utilities
@@ -183,7 +226,7 @@ from .compression import (
 )
 
 # =============================================================================
-# NEW IN v2.2.0 - Batch Processing
+# Batch Processing
 # =============================================================================
 from .batch import (
     BatchProcessor,
@@ -191,9 +234,42 @@ from .batch import (
     BatchItem,
     BatchStatus,
     batch_capacity_check,
-    # NEW in v2.2.1
     BatchCredentials,
 )
+
+# =============================================================================
+# NEW in v3.0 - DCT Steganography (optional, requires scipy)
+# =============================================================================
+try:
+    from .dct_steganography import (
+        embed_in_dct,
+        extract_from_dct,
+        calculate_dct_capacity,
+        will_fit_dct,
+        estimate_capacity_comparison,
+        DCTEmbedStats,
+        DCTCapacityInfo,
+    )
+    HAS_DCT = True
+except ImportError:
+    HAS_DCT = False
+    # Provide stub functions that raise helpful errors
+    def embed_in_dct(*args, **kwargs):
+        raise ImportError("DCT mode requires scipy. Install: pip install scipy")
+    def extract_from_dct(*args, **kwargs):
+        raise ImportError("DCT mode requires scipy. Install: pip install scipy")
+    def calculate_dct_capacity(*args, **kwargs):
+        raise ImportError("DCT mode requires scipy. Install: pip install scipy")
+    def will_fit_dct(*args, **kwargs):
+        raise ImportError("DCT mode requires scipy. Install: pip install scipy")
+    def estimate_capacity_comparison(*args, **kwargs):
+        raise ImportError("DCT mode requires scipy. Install: pip install scipy")
+    
+    # Stub classes
+    class DCTEmbedStats:
+        pass
+    class DCTCapacityInfo:
+        pass
 
 # QR Code utilities (optional, depends on qrcode and pyzbar)
 try:
@@ -223,16 +299,22 @@ from pathlib import Path
 from typing import Optional, Union, Dict, Any
 
 
+# =============================================================================
+# ENCODE FUNCTION (v3.0.1 - with dct_output_format)
+# =============================================================================
+
 def encode(
-    message: Union[str, bytes, FilePayload],
+    message,  # Union[str, bytes, FilePayload]
     reference_photo: bytes,
     carrier_image: bytes,
     day_phrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None,
-    rsa_password: Optional[str] = None,
-    date_str: Optional[str] = None,
-    output_format: Optional[str] = None,
+    rsa_key_data = None,  # Optional[bytes]
+    rsa_password = None,  # Optional[str]
+    date_str = None,  # Optional[str]
+    output_format = None,  # Optional[str]
+    embed_mode: str = EMBED_MODE_LSB,
+    dct_output_format: str = "png",  # NEW in v3.0.1: 'png' or 'jpeg'
 ) -> EncodeResult:
     """
     Encode a secret message or file into an image.
@@ -249,8 +331,9 @@ def encode(
         rsa_key_data: RSA private key PEM bytes (optional if using PIN)
         rsa_password: Password for RSA key if encrypted
         date_str: Date string YYYY-MM-DD (defaults to today)
-        output_format: Force output format ('PNG', 'BMP'). If None, preserves
-                       carrier format for lossless types, defaults to PNG for lossy.
+        output_format: Force output format ('PNG', 'BMP') - LSB mode only
+        embed_mode: Embedding mode - 'lsb' (default) or 'dct' (v3.0+)
+        dct_output_format: For DCT mode - 'png' (lossless) or 'jpeg' (smaller)
         
     Returns:
         EncodeResult with stego image and metadata
@@ -260,14 +343,37 @@ def encode(
         SecurityFactorError: If no PIN or RSA key provided
         CapacityError: If carrier is too small
         EncryptionError: If encryption fails
+        ImportError: If DCT mode requested but scipy unavailable
         
-    Note:
-        Output format is always lossless (PNG or BMP) to preserve hidden data.
-        If carrier is JPEG/GIF, output will be PNG to maintain data integrity.
+    Example:
+        # Default LSB mode
+        >>> result = encode(message="Secret", ...)
+        
+        # DCT mode with PNG output (lossless)
+        >>> result = encode(message="Secret", ..., embed_mode='dct')
+        
+        # DCT mode with JPEG output (smaller, natural)
+        >>> result = encode(message="Secret", ..., embed_mode='dct', dct_output_format='jpeg')
     """
     # Debug logging
     debug.print(f"encode called: message type={type(message).__name__}, "
-                f"day_phrase='{day_phrase[:20]}...', pin_length={len(pin)}")
+                f"day_phrase='{day_phrase[:20]}...', pin_length={len(pin)}, "
+                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}")
+    
+    # Validate embed_mode
+    if embed_mode not in (EMBED_MODE_LSB, EMBED_MODE_DCT):
+        raise ValidationError(f"Invalid embed_mode: {embed_mode}. Use 'lsb' or 'dct'")
+    
+    if embed_mode == EMBED_MODE_DCT and not has_dct_support():
+        raise ImportError(
+            "DCT embedding mode requires scipy. "
+            "Install with: pip install scipy"
+        )
+    
+    # Validate dct_output_format
+    if dct_output_format not in ('png', 'jpeg'):
+        debug.print(f"Invalid dct_output_format '{dct_output_format}', defaulting to 'png'")
+        dct_output_format = 'png'
     
     # Validate inputs
     require_valid_payload(message)
@@ -301,26 +407,53 @@ def encode(
     debug.data(pixel_key, "Pixel key")
     
     # Embed in image (returns extension too)
+    # CRITICAL: Pass dct_output_format to embed_in_image
     stego_data, stats, extension = embed_in_image(
-        carrier_image, encrypted, pixel_key, output_format=output_format
+        encrypted,
+        carrier_image,
+        pixel_key,
+        output_format=output_format,
+        embed_mode=embed_mode,
+        dct_output_format=dct_output_format,  # NEW in v3.0.1
     )
     
     # Generate filename with correct extension
     filename = generate_filename(date_str, extension=extension)
     
-    debug.print(f"Encoding complete: {filename}, "
-                f"modified {stats.pixels_modified}/{stats.total_pixels} pixels "
-                f"({stats.modification_percent:.2f}%)")
-    
-    return EncodeResult(
-        stego_image=stego_data,
-        filename=filename,
-        pixels_modified=stats.pixels_modified,
-        total_pixels=stats.total_pixels,
-        capacity_used=stats.capacity_used,
-        date_used=date_str
-    )
+    # Handle stats from either LSB or DCT mode
+    if hasattr(stats, 'pixels_modified'):
+        # LSB mode stats
+        debug.print(f"Encoding complete: {filename}, "
+                    f"modified {stats.pixels_modified}/{stats.total_pixels} pixels "
+                    f"({stats.modification_percent:.2f}%)")
+        
+        return EncodeResult(
+            stego_image=stego_data,
+            filename=filename,
+            pixels_modified=stats.pixels_modified,
+            total_pixels=stats.total_pixels,
+            capacity_used=stats.capacity_used,
+            date_used=date_str
+        )
+    else:
+        # DCT mode stats
+        debug.print(f"Encoding complete (DCT): {filename}, "
+                    f"embedded {stats.bits_embedded // 8} bytes "
+                    f"({stats.usage_percent:.2f}% capacity)")
+        
+        return EncodeResult(
+            stego_image=stego_data,
+            filename=filename,
+            pixels_modified=stats.blocks_used * 64,  # Approximate
+            total_pixels=stats.blocks_available * 64,
+            capacity_used=stats.usage_percent / 100.0,
+            date_used=date_str
+        )
 
+
+# =============================================================================
+# ENCODE_FILE FUNCTION (v3.0.1 - with dct_output_format)
+# =============================================================================
 
 def encode_file(
     filepath: Union[str, Path],
@@ -333,6 +466,8 @@ def encode_file(
     date_str: Optional[str] = None,
     output_format: Optional[str] = None,
     filename_override: Optional[str] = None,
+    embed_mode: str = EMBED_MODE_LSB,
+    dct_output_format: str = "png",  # NEW in v3.0.1
 ) -> EncodeResult:
     """
     Encode a file into an image.
@@ -348,13 +483,16 @@ def encode_file(
         rsa_key_data: RSA private key PEM bytes (optional if using PIN)
         rsa_password: Password for RSA key if encrypted
         date_str: Date string YYYY-MM-DD (defaults to today)
-        output_format: Force output format ('PNG', 'BMP')
+        output_format: Force output format ('PNG', 'BMP') - LSB mode only
         filename_override: Override the stored filename
+        embed_mode: 'lsb' (default) or 'dct' (v3.0+)
+        dct_output_format: For DCT mode - 'png' or 'jpeg' (v3.0.1+)
         
     Returns:
         EncodeResult with stego image and metadata
     """
-    debug.print(f"encode_file called: filepath={filepath}")
+    debug.print(f"encode_file called: filepath={filepath}, embed_mode={embed_mode}, "
+                f"dct_output_format={dct_output_format}")
     payload = FilePayload.from_file(str(filepath), filename_override)
     
     return encode(
@@ -367,8 +505,14 @@ def encode_file(
         rsa_password=rsa_password,
         date_str=date_str,
         output_format=output_format,
+        embed_mode=embed_mode,
+        dct_output_format=dct_output_format,  # NEW in v3.0.1
     )
 
+
+# =============================================================================
+# ENCODE_BYTES FUNCTION (v3.0.1 - with dct_output_format)
+# =============================================================================
 
 def encode_bytes(
     data: bytes,
@@ -382,6 +526,8 @@ def encode_bytes(
     date_str: Optional[str] = None,
     output_format: Optional[str] = None,
     mime_type: Optional[str] = None,
+    embed_mode: str = EMBED_MODE_LSB,
+    dct_output_format: str = "png",  # NEW in v3.0.1
 ) -> EncodeResult:
     """
     Encode raw bytes with a filename into an image.
@@ -398,13 +544,16 @@ def encode_bytes(
         rsa_key_data: RSA private key PEM bytes (optional if using PIN)
         rsa_password: Password for RSA key if encrypted
         date_str: Date string YYYY-MM-DD (defaults to today)
-        output_format: Force output format ('PNG', 'BMP')
+        output_format: Force output format ('PNG', 'BMP') - LSB mode only
         mime_type: MIME type of the data
+        embed_mode: 'lsb' (default) or 'dct' (v3.0+)
+        dct_output_format: For DCT mode - 'png' or 'jpeg' (v3.0.1+)
         
     Returns:
         EncodeResult with stego image and metadata
     """
-    debug.print(f"encode_bytes called: filename={filename}, data_size={len(data)}")
+    debug.print(f"encode_bytes called: filename={filename}, data_size={len(data)}, "
+                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}")
     payload = FilePayload(data=data, filename=filename, mime_type=mime_type)
     
     return encode(
@@ -417,8 +566,14 @@ def encode_bytes(
         rsa_password=rsa_password,
         date_str=date_str,
         output_format=output_format,
+        embed_mode=embed_mode,
+        dct_output_format=dct_output_format,  # NEW in v3.0.1
     )
 
+
+# =============================================================================
+# DECODE FUNCTION
+# =============================================================================
 
 @debug.time
 def decode(
@@ -429,6 +584,7 @@ def decode(
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
     date_str: Optional[str] = None,
+    embed_mode: str = EMBED_MODE_AUTO,
 ) -> DecodeResult:
     """
     Decode a secret message or file from a stego image.
@@ -443,6 +599,11 @@ def decode(
         pin: Static PIN (if used during encoding)
         rsa_key_data: RSA private key PEM bytes (if used during encoding)
         rsa_password: Password for RSA key if encrypted
+        date_str: Date override (defaults to today, then checks header)
+        embed_mode: 'auto' (default), 'lsb', or 'dct' (v3.0+)
+                    - 'auto': Try LSB first, then DCT if available
+                    - 'lsb': Only try LSB extraction
+                    - 'dct': Only try DCT extraction (requires scipy)
         
     Returns:
         DecodeResult with:
@@ -457,9 +618,24 @@ def decode(
         SecurityFactorError: If no PIN or RSA key provided
         ExtractionError: If data cannot be extracted
         DecryptionError: If decryption fails
+        ImportError: If DCT mode explicitly requested but scipy unavailable
+        
+    Note:
+        With embed_mode='auto' (default), tries LSB first then DCT.
+        For best performance, specify the mode if you know it.
     """
     debug.print(f"decode called: stego_image_size={len(stego_image)}, "
-                f"day_phrase='{day_phrase[:20]}...'")
+                f"day_phrase='{day_phrase[:20]}...', embed_mode={embed_mode}")
+    
+    # Validate embed_mode
+    if embed_mode not in (EMBED_MODE_AUTO, EMBED_MODE_LSB, EMBED_MODE_DCT):
+        raise ValidationError(f"Invalid embed_mode: {embed_mode}. Use 'auto', 'lsb', or 'dct'")
+    
+    if embed_mode == EMBED_MODE_DCT and not has_dct_support():
+        raise ImportError(
+            "DCT extraction mode requires scipy. "
+            "Install with: pip install scipy"
+        )
     
     # Validate inputs
     require_security_factors(pin, rsa_key_data)
@@ -479,7 +655,12 @@ def decode(
     
     debug.data(pixel_key, "Pixel key for extraction")
     
-    encrypted = extract_from_image(stego_image, pixel_key)
+    # Extract with specified mode
+    encrypted = extract_from_image(
+        stego_image,
+        pixel_key,
+        embed_mode=embed_mode,
+    )
     
     # If we got data, check if it's from a different date
     if encrypted:
@@ -490,7 +671,11 @@ def decode(
             pixel_key = derive_pixel_key(
                 reference_photo, day_phrase, header['date'], pin, rsa_key_data
             )
-            encrypted = extract_from_image(stego_image, pixel_key)
+            encrypted = extract_from_image(
+                stego_image,
+                pixel_key,
+                embed_mode=embed_mode,
+            )
     
     if not encrypted:
         debug.print("No data extracted from image")
@@ -503,6 +688,10 @@ def decode(
     return decrypt_message(encrypted, reference_photo, day_phrase, pin, rsa_key_data)
 
 
+# =============================================================================
+# DECODE_TEXT FUNCTION
+# =============================================================================
+
 def decode_text(
     stego_image: bytes,
     reference_photo: bytes,
@@ -511,6 +700,7 @@ def decode_text(
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
     date_str: Optional[str] = None,
+    embed_mode: str = EMBED_MODE_AUTO,
 ) -> str:
     """
     Decode a text message from a stego image.
@@ -525,6 +715,8 @@ def decode_text(
         pin: Static PIN (if used during encoding)
         rsa_key_data: RSA private key PEM bytes (if used during encoding)
         rsa_password: Password for RSA key if encrypted
+        date_str: Date override
+        embed_mode: 'auto' (default), 'lsb', or 'dct' (v3.0+)
         
     Returns:
         Decrypted message string
@@ -532,8 +724,17 @@ def decode_text(
     Raises:
         DecryptionError: If content is a binary file, not text
     """
-    debug.print("decode_text called")
-    result = decode(stego_image, reference_photo, day_phrase, pin, rsa_key_data, rsa_password)
+    debug.print(f"decode_text called, embed_mode={embed_mode}")
+    result = decode(
+        stego_image,
+        reference_photo,
+        day_phrase,
+        pin,
+        rsa_key_data,
+        rsa_password,
+        date_str,
+        embed_mode,
+    )
     
     if result.is_file:
         # Try to decode file as text
@@ -553,6 +754,10 @@ def decode_text(
     return message
 
 
+# =============================================================================
+# EXPORTS
+# =============================================================================
+
 __all__ = [
     # Version
     '__version__',
@@ -564,6 +769,27 @@ __all__ = [
     'decode',
     'decode_text',
     'generate_credentials',
+    
+    # NEW in v3.0 - Embedding modes
+    'EMBED_MODE_LSB',
+    'EMBED_MODE_DCT',
+    'EMBED_MODE_AUTO',
+    'has_dct_support',
+    'compare_modes',
+    'get_available_modes',
+    'calculate_capacity_by_mode',
+    'will_fit_by_mode',
+    'detect_stego_mode',
+    'HAS_DCT',
+    
+    # NEW in v3.0 - DCT functions (available if scipy installed)
+    'embed_in_dct',
+    'extract_from_dct',
+    'calculate_dct_capacity',
+    'will_fit_dct',
+    'estimate_capacity_comparison',
+    'DCTEmbedStats',
+    'DCTCapacityInfo',
     
     # Constants
     'DAY_NAMES',
@@ -646,7 +872,7 @@ __all__ = [
     'get_image_dimensions',
     'get_image_format',
     'is_lossless_format',
-    'will_fit',  # NEW in v2.2.1
+    'will_fit',
     
     # Utilities
     'generate_filename',
@@ -657,12 +883,12 @@ __all__ = [
     'secure_delete',
     'SecureDeleter',
     'format_file_size',
-    'strip_image_metadata',  # NEW in v2.2.1
+    'strip_image_metadata',
     
     # Debugging
     'debug',
     
-    # Compression (v2.2.0)
+    # Compression
     'compress',
     'decompress',
     'CompressionAlgorithm',
@@ -671,11 +897,11 @@ __all__ = [
     'estimate_compressed_size',
     'get_available_algorithms',
     
-    # Batch processing (v2.2.0)
+    # Batch processing
     'BatchProcessor',
     'BatchResult',
     'BatchItem',
     'BatchStatus',
     'batch_capacity_check',
-    'BatchCredentials',  # NEW in v2.2.1
+    'BatchCredentials',
 ]

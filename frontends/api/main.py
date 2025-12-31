@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API
+Stegasoo REST API (v3.0)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
+NEW in v3.0: LSB and DCT embedding modes.
 """
 
 import io
 import sys
 import base64
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 from datetime import date
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,14 @@ from stegasoo import (
     has_argon2,
     FilePayload,
     MAX_FILE_PAYLOAD_SIZE,
+    # NEW in v3.0 - Embedding modes
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT,
+    EMBED_MODE_AUTO,
+    has_dct_support,
+    compare_modes,
+    will_fit_by_mode,
+    calculate_capacity_by_mode,
 )
 from stegasoo.constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
@@ -55,11 +64,28 @@ except ImportError:
 
 app = FastAPI(
     title="Stegasoo API",
-    description="Secure steganography with hybrid authentication. Supports text messages and file embedding.",
+    description="""
+Secure steganography with hybrid authentication. Supports text messages and file embedding.
+
+## Embedding Modes (v3.0)
+
+- **LSB mode** (default): Spatial LSB embedding, full color output, higher capacity
+- **DCT mode**: Frequency domain embedding, grayscale output, ~20% capacity, better stealth
+
+Use the `/modes` endpoint to check availability and `/compare` to compare capacities.
+""",
     version=__version__,
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+# ============================================================================
+# TYPE ALIASES
+# ============================================================================
+
+EmbedModeType = Literal["lsb", "dct"]
+ExtractModeType = Literal["auto", "lsb", "dct"]
 
 
 # ============================================================================
@@ -90,6 +116,10 @@ class EncodeRequest(BaseModel):
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
     date_str: Optional[str] = None
+    embed_mode: EmbedModeType = Field(
+        default="lsb",
+        description="Embedding mode: 'lsb' (default, color) or 'dct' (grayscale, requires scipy)"
+    )
 
 
 class EncodeFileRequest(BaseModel):
@@ -104,6 +134,10 @@ class EncodeFileRequest(BaseModel):
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
     date_str: Optional[str] = None
+    embed_mode: EmbedModeType = Field(
+        default="lsb",
+        description="Embedding mode: 'lsb' (default, color) or 'dct' (grayscale, requires scipy)"
+    )
 
 
 class EncodeResponse(BaseModel):
@@ -112,6 +146,7 @@ class EncodeResponse(BaseModel):
     capacity_used_percent: float
     date_used: str
     day_of_week: str
+    embed_mode: str = Field(description="Embedding mode used: 'lsb' or 'dct'")
 
 
 class DecodeRequest(BaseModel):
@@ -121,6 +156,10 @@ class DecodeRequest(BaseModel):
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
+    embed_mode: ExtractModeType = Field(
+        default="auto",
+        description="Extraction mode: 'auto' (default), 'lsb', or 'dct'"
+    )
 
 
 class DecodeResponse(BaseModel):
@@ -132,20 +171,60 @@ class DecodeResponse(BaseModel):
     mime_type: Optional[str] = None  # For file
 
 
+class ModeCapacity(BaseModel):
+    """Capacity info for a single mode."""
+    capacity_bytes: int
+    capacity_kb: float
+    available: bool
+    output_format: str
+
+
 class ImageInfoResponse(BaseModel):
     width: int
     height: int
     pixels: int
-    capacity_bytes: int
-    capacity_kb: int
+    capacity_bytes: int = Field(description="LSB mode capacity (for backwards compatibility)")
+    capacity_kb: int = Field(description="LSB mode capacity in KB")
+    # NEW in v3.0
+    modes: Optional[dict[str, ModeCapacity]] = Field(
+        default=None,
+        description="Capacity by embedding mode (v3.0+)"
+    )
+
+
+class CompareModesRequest(BaseModel):
+    """Request for comparing embedding modes."""
+    carrier_image_base64: str
+    payload_size: Optional[int] = Field(
+        default=None,
+        description="Optional payload size to check if it fits"
+    )
+
+
+class CompareModesResponse(BaseModel):
+    """Response comparing LSB and DCT modes."""
+    width: int
+    height: int
+    lsb: dict
+    dct: dict
+    payload_check: Optional[dict] = None
+    recommendation: str
+
+
+class ModesResponse(BaseModel):
+    """Response showing available embedding modes."""
+    lsb: dict
+    dct: dict
 
 
 class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
     has_qrcode_read: bool
+    has_dct: bool  # NEW in v3.0
     day_names: list[str]
     max_payload_kb: int
+    available_modes: list[str]  # NEW in v3.0
 
 
 class QrExtractResponse(BaseModel):
@@ -154,26 +233,164 @@ class QrExtractResponse(BaseModel):
     error: Optional[str] = None
 
 
+class WillFitRequest(BaseModel):
+    """Request to check if payload will fit."""
+    carrier_image_base64: str
+    payload_size: int
+    embed_mode: EmbedModeType = "lsb"
+
+
+class WillFitResponse(BaseModel):
+    """Response for will_fit check."""
+    fits: bool
+    payload_size: int
+    capacity: int
+    usage_percent: float
+    headroom: int
+    mode: str
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
 
 
 # ============================================================================
-# ROUTES
+# ROUTES - STATUS & INFO
 # ============================================================================
 
 @app.get("/", response_model=StatusResponse)
 async def root():
     """Get API status and configuration."""
+    available_modes = ["lsb"]
+    if has_dct_support():
+        available_modes.append("dct")
+    
     return StatusResponse(
         version=__version__,
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QR_READ,
+        has_dct=has_dct_support(),
         day_names=list(DAY_NAMES),
-        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
+        available_modes=available_modes
     )
 
+
+@app.get("/modes", response_model=ModesResponse)
+async def api_modes():
+    """
+    Get available embedding modes and their status.
+    
+    NEW in v3.0: Shows LSB and DCT mode availability.
+    """
+    return ModesResponse(
+        lsb={
+            "available": True,
+            "name": "Spatial LSB",
+            "description": "Embed in pixel LSBs, outputs PNG/BMP",
+            "output_format": "PNG (color)",
+            "capacity_ratio": "100%",
+        },
+        dct={
+            "available": has_dct_support(),
+            "name": "DCT Domain",
+            "description": "Embed in DCT coefficients, outputs grayscale PNG",
+            "output_format": "PNG (grayscale)",
+            "capacity_ratio": "~20% of LSB",
+            "requires": "scipy",
+        }
+    )
+
+
+@app.post("/compare", response_model=CompareModesResponse)
+async def api_compare_modes(request: CompareModesRequest):
+    """
+    Compare LSB and DCT embedding modes for a carrier image.
+    
+    NEW in v3.0: Returns capacity for both modes and recommendation.
+    Optionally checks if a specific payload size would fit.
+    """
+    try:
+        carrier = base64.b64decode(request.carrier_image_base64)
+        comparison = compare_modes(carrier)
+        
+        response = CompareModesResponse(
+            width=comparison['width'],
+            height=comparison['height'],
+            lsb={
+                "capacity_bytes": comparison['lsb']['capacity_bytes'],
+                "capacity_kb": round(comparison['lsb']['capacity_kb'], 1),
+                "available": True,
+                "output_format": comparison['lsb']['output'],
+            },
+            dct={
+                "capacity_bytes": comparison['dct']['capacity_bytes'],
+                "capacity_kb": round(comparison['dct']['capacity_kb'], 1),
+                "available": comparison['dct']['available'],
+                "output_format": comparison['dct']['output'],
+                "ratio_vs_lsb_percent": round(comparison['dct']['ratio_vs_lsb'], 1),
+            },
+            recommendation="lsb" if not comparison['dct']['available'] else "dct for stealth, lsb for capacity"
+        )
+        
+        if request.payload_size:
+            fits_lsb = request.payload_size <= comparison['lsb']['capacity_bytes']
+            fits_dct = request.payload_size <= comparison['dct']['capacity_bytes']
+            
+            response.payload_check = {
+                "size_bytes": request.payload_size,
+                "fits_lsb": fits_lsb,
+                "fits_dct": fits_dct,
+            }
+            
+            # Update recommendation based on payload
+            if fits_dct and comparison['dct']['available']:
+                response.recommendation = "dct (payload fits, better stealth)"
+            elif fits_lsb:
+                response.recommendation = "lsb (payload too large for dct)"
+            else:
+                response.recommendation = "none (payload too large for both modes)"
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/will-fit", response_model=WillFitResponse)
+async def api_will_fit(request: WillFitRequest):
+    """
+    Check if a payload of given size will fit in the carrier image.
+    
+    NEW in v3.0: Supports both LSB and DCT modes.
+    """
+    try:
+        # Validate mode
+        if request.embed_mode == "dct" and not has_dct_support():
+            raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+        
+        carrier = base64.b64decode(request.carrier_image_base64)
+        result = will_fit_by_mode(request.payload_size, carrier, embed_mode=request.embed_mode)
+        
+        return WillFitResponse(
+            fits=result['fits'],
+            payload_size=result['payload_size'],
+            capacity=result['capacity'],
+            usage_percent=round(result['usage_percent'], 1),
+            headroom=result['headroom'],
+            mode=request.embed_mode
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ============================================================================
+# ROUTES - QR CODE
+# ============================================================================
 
 @app.post("/extract-key-from-qr", response_model=QrExtractResponse)
 async def api_extract_key_from_qr(
@@ -205,6 +422,10 @@ async def api_extract_key_from_qr(
     except Exception as e:
         return QrExtractResponse(success=False, error=str(e))
 
+
+# ============================================================================
+# ROUTES - GENERATE
+# ============================================================================
 
 @app.post("/generate", response_model=GenerateResponse)
 async def api_generate(request: GenerateRequest):
@@ -243,13 +464,23 @@ async def api_generate(request: GenerateRequest):
         raise HTTPException(500, str(e))
 
 
+# ============================================================================
+# ROUTES - ENCODE (JSON)
+# ============================================================================
+
 @app.post("/encode", response_model=EncodeResponse)
 async def api_encode(request: EncodeRequest):
     """
     Encode a text message into an image.
     
     Images must be base64-encoded. Returns base64-encoded stego image.
+    
+    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     """
+    # Validate mode
+    if request.embed_mode == "dct" and not has_dct_support():
+        raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
     try:
         ref_photo = base64.b64decode(request.reference_photo_base64)
         carrier = base64.b64decode(request.carrier_image_base64)
@@ -263,7 +494,8 @@ async def api_encode(request: EncodeRequest):
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            date_str=request.date_str
+            date_str=request.date_str,
+            embed_mode=request.embed_mode,  # NEW in v3.0
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
@@ -274,7 +506,8 @@ async def api_encode(request: EncodeRequest):
             filename=result.filename,
             capacity_used_percent=result.capacity_percent,
             date_used=result.date_used,
-            day_of_week=day_of_week
+            day_of_week=day_of_week,
+            embed_mode=request.embed_mode,
         )
         
     except CapacityError as e:
@@ -291,7 +524,13 @@ async def api_encode_file(request: EncodeFileRequest):
     Encode a file into an image (JSON with base64).
     
     File data must be base64-encoded.
+    
+    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     """
+    # Validate mode
+    if request.embed_mode == "dct" and not has_dct_support():
+        raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
     try:
         file_data = base64.b64decode(request.file_data_base64)
         ref_photo = base64.b64decode(request.reference_photo_base64)
@@ -312,7 +551,8 @@ async def api_encode_file(request: EncodeFileRequest):
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            date_str=request.date_str
+            date_str=request.date_str,
+            embed_mode=request.embed_mode,  # NEW in v3.0
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
@@ -323,7 +563,8 @@ async def api_encode_file(request: EncodeFileRequest):
             filename=result.filename,
             capacity_used_percent=result.capacity_percent,
             date_used=result.date_used,
-            day_of_week=day_of_week
+            day_of_week=day_of_week,
+            embed_mode=request.embed_mode,
         )
         
     except CapacityError as e:
@@ -334,13 +575,24 @@ async def api_encode_file(request: EncodeFileRequest):
         raise HTTPException(500, str(e))
 
 
+# ============================================================================
+# ROUTES - DECODE (JSON)
+# ============================================================================
+
 @app.post("/decode", response_model=DecodeResponse)
 async def api_decode(request: DecodeRequest):
     """
     Decode a message or file from a stego image.
     
     Returns payload_type to indicate if result is text or file.
+    
+    NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
+    With 'auto' (default), tries LSB first then DCT.
     """
+    # Validate mode
+    if request.embed_mode == "dct" and not has_dct_support():
+        raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
     try:
         stego = base64.b64decode(request.stego_image_base64)
         ref_photo = base64.b64decode(request.reference_photo_base64)
@@ -352,7 +604,8 @@ async def api_decode(request: DecodeRequest):
             day_phrase=request.day_phrase,
             pin=request.pin,
             rsa_key_data=rsa_key,
-            rsa_password=request.rsa_password
+            rsa_password=request.rsa_password,
+            embed_mode=request.embed_mode,  # NEW in v3.0
         )
         
         if result.is_file:
@@ -376,6 +629,10 @@ async def api_decode(request: DecodeRequest):
         raise HTTPException(500, str(e))
 
 
+# ============================================================================
+# ROUTES - ENCODE/DECODE (MULTIPART)
+# ============================================================================
+
 @app.post("/encode/multipart")
 async def api_encode_multipart(
     day_phrase: str = Form(...),
@@ -387,7 +644,8 @@ async def api_encode_multipart(
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
-    date_str: str = Form("")
+    date_str: str = Form(""),
+    embed_mode: str = Form("lsb"),  # NEW in v3.0
 ):
     """
     Encode using multipart form data (file uploads).
@@ -395,7 +653,15 @@ async def api_encode_multipart(
     Provide either 'message' (text) or 'payload_file' (binary file).
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns the stego image directly as PNG with metadata headers.
+    
+    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     """
+    # Validate mode
+    if embed_mode not in ("lsb", "dct"):
+        raise HTTPException(400, "embed_mode must be 'lsb' or 'dct'")
+    if embed_mode == "dct" and not has_dct_support():
+        raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
     try:
         ref_data = await reference_photo.read()
         carrier_data = await carrier.read()
@@ -443,7 +709,8 @@ async def api_encode_multipart(
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
-            date_str=date_str if date_str else None
+            date_str=date_str if date_str else None,
+            embed_mode=embed_mode,  # NEW in v3.0
         )
         
         day_of_week = get_day_from_date(result.date_used)
@@ -455,7 +722,8 @@ async def api_encode_multipart(
                 "Content-Disposition": f"attachment; filename={result.filename}",
                 "X-Stegasoo-Date": result.date_used,
                 "X-Stegasoo-Day": day_of_week,
-                "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}"
+                "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}",
+                "X-Stegasoo-Embed-Mode": embed_mode,  # NEW in v3.0
             }
         )
         
@@ -463,6 +731,8 @@ async def api_encode_multipart(
         raise HTTPException(400, str(e))
     except StegasooError as e:
         raise HTTPException(400, str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -475,14 +745,23 @@ async def api_decode_multipart(
     pin: str = Form(""),
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
-    rsa_password: str = Form("")
+    rsa_password: str = Form(""),
+    embed_mode: str = Form("auto"),  # NEW in v3.0
 ):
     """
     Decode using multipart form data (file uploads).
     
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns JSON with payload_type indicating text or file.
+    
+    NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
     """
+    # Validate mode
+    if embed_mode not in ("auto", "lsb", "dct"):
+        raise HTTPException(400, "embed_mode must be 'auto', 'lsb', or 'dct'")
+    if embed_mode == "dct" and not has_dct_support():
+        raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
     try:
         ref_data = await reference_photo.read()
         stego_data = await stego_image.read()
@@ -515,7 +794,8 @@ async def api_decode_multipart(
             day_phrase=day_phrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
-            rsa_password=effective_password
+            rsa_password=effective_password,
+            embed_mode=embed_mode,  # NEW in v3.0
         )
         
         if result.is_file:
@@ -535,13 +815,26 @@ async def api_decode_multipart(
         raise HTTPException(401, "Decryption failed. Check credentials.")
     except StegasooError as e:
         raise HTTPException(400, str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
+# ============================================================================
+# ROUTES - IMAGE INFO
+# ============================================================================
+
 @app.post("/image/info", response_model=ImageInfoResponse)
-async def api_image_info(image: UploadFile = File(...)):
-    """Get information about an image's capacity."""
+async def api_image_info(
+    image: UploadFile = File(...),
+    include_modes: bool = Query(True, description="Include capacity by mode (v3.0+)")
+):
+    """
+    Get information about an image's capacity.
+    
+    NEW in v3.0: Optionally includes capacity for both LSB and DCT modes.
+    """
     try:
         image_data = await image.read()
         
@@ -551,13 +844,33 @@ async def api_image_info(image: UploadFile = File(...)):
         
         capacity = calculate_capacity(image_data)
         
-        return ImageInfoResponse(
+        response = ImageInfoResponse(
             width=result.details['width'],
             height=result.details['height'],
             pixels=result.details['pixels'],
             capacity_bytes=capacity,
             capacity_kb=capacity // 1024
         )
+        
+        # NEW in v3.0 - include mode comparison
+        if include_modes:
+            comparison = compare_modes(image_data)
+            response.modes = {
+                "lsb": ModeCapacity(
+                    capacity_bytes=comparison['lsb']['capacity_bytes'],
+                    capacity_kb=round(comparison['lsb']['capacity_kb'], 1),
+                    available=True,
+                    output_format=comparison['lsb']['output'],
+                ),
+                "dct": ModeCapacity(
+                    capacity_bytes=comparison['dct']['capacity_bytes'],
+                    capacity_kb=round(comparison['dct']['capacity_kb'], 1),
+                    available=comparison['dct']['available'],
+                    output_format=comparison['dct']['output'],
+                ),
+            }
+        
+        return response
         
     except HTTPException:
         raise

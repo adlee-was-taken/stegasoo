@@ -36,7 +36,7 @@
                                 <i class="bi bi-file-image me-1"></i> Carrier Image
                             </label>
                             <div class="drop-zone" id="carrierDropZone">
-                                <input type="file" name="carrier" accept="image/*" required>
+                                <input type="file" name="carrier" accept="image/*" required id="carrierInput">
                                 <div class="drop-zone-label">
                                     <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
                                     <span class="text-muted">Drop image or click to browse</span>
@@ -45,6 +45,20 @@
                             </div>
                             <div class="form-text">
                                 The image to hide your message in (e.g., a meme)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Capacity Info Panel (shown when carrier loaded) -->
+                    <div class="alert alert-info small d-none" id="capacityPanel">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <i class="bi bi-rulers me-1"></i>
+                                <strong>Carrier:</strong> <span id="carrierDimensions">-</span>
+                            </div>
+                            <div class="col-auto">
+                                <span class="badge bg-primary me-1" id="lsbCapacityBadge">LSB: -</span>
+                                <span class="badge bg-secondary" id="dctCapacityBadge">DCT: -</span>
                             </div>
                         </div>
                     </div>
@@ -176,6 +190,141 @@
                                placeholder="Password for the .pem file (if encrypted)">
                         <div class="form-text">
                             Leave blank if your key file is not password-protected (not needed for QR codes)
+                        </div>
+                    </div>
+                    
+                    <!-- ================================================================
+                         ADVANCED OPTIONS (v3.0) - Collapsible Section
+                         ================================================================ -->
+                    <div class="mb-4">
+                        <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptions" role="button" aria-expanded="false">
+                            <i class="bi bi-gear me-1"></i> Advanced Options
+                            <i class="bi bi-chevron-down ms-1" id="advancedChevron"></i>
+                        </a>
+                        
+                        <div class="collapse" id="advancedOptions">
+                            <div class="card card-body mt-2 bg-dark border-secondary">
+                                
+                                <!-- Embedding Mode Selection -->
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-cpu me-1"></i> Embedding Mode
+                                        <span class="badge bg-info ms-1">v3.0</span>
+                                    </label>
+                                    
+                                    <div class="row g-2">
+                                        <!-- LSB Mode Card -->
+                                        <div class="col-md-6">
+                                            <div class="form-check card p-3 h-100 border-primary border-2" id="lsbModeCard">
+                                                <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" checked>
+                                                <label class="form-check-label w-100" for="modeLsb">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-grid-3x3-gap text-primary fs-4 me-2"></i>
+                                                        <strong>LSB Mode</strong>
+                                                        <span class="badge bg-success ms-auto">Default</span>
+                                                    </div>
+                                                    <ul class="small text-muted mb-0 ps-3">
+                                                        <li>Full color PNG output</li>
+                                                        <li>Higher capacity (~375 KB/MP)</li>
+                                                        <li>Faster processing</li>
+                                                    </ul>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- DCT Mode Card -->
+                                        <div class="col-md-6">
+                                            <div class="form-check card p-3 h-100 {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard">
+                                                <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
+                                                <label class="form-check-label w-100" for="modeDct">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-soundwave text-info fs-4 me-2"></i>
+                                                        <strong>DCT Mode</strong>
+                                                        {% if has_dct %}
+                                                        <span class="badge bg-info ms-auto">Stealth</span>
+                                                        {% else %}
+                                                        <span class="badge bg-secondary ms-auto">Unavailable</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <ul class="small text-muted mb-0 ps-3">
+                                                        <li>Grayscale output (PNG/JPEG)</li>
+                                                        <li>Lower capacity (~75 KB/MP)</li>
+                                                        <li>Better detection resistance</li>
+                                                    </ul>
+                                                    {% if not has_dct %}
+                                                    <div class="alert alert-warning small mt-2 mb-0 py-1 px-2">
+                                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                                        Requires scipy: <code>pip install scipy</code>
+                                                    </div>
+                                                    {% endif %}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Mode comparison hint -->
+                                    <div class="form-text mt-2" id="modeHint">
+                                        <i class="bi bi-lightbulb me-1"></i>
+                                        <strong>LSB</strong> is best for most uses. 
+                                        <strong>DCT</strong> provides better stealth but smaller capacity and grayscale output.
+                                    </div>
+                                </div>
+                                
+                                <!-- DCT Output Format (shown only when DCT selected) -->
+                                <div class="mb-3 d-none" id="dctOutputFormatGroup">
+                                    <label class="form-label">
+                                        <i class="bi bi-file-image me-1"></i> DCT Output Format
+                                    </label>
+                                    
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center" id="dctPngCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png" checked>
+                                                <label class="form-check-label w-100" for="dctFormatPng">
+                                                    <i class="bi bi-file-earmark-image text-success fs-5 d-block"></i>
+                                                    <strong>PNG</strong>
+                                                    <div class="small text-muted">Lossless, larger</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center" id="dctJpegCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg">
+                                                <label class="form-check-label w-100" for="dctFormatJpeg">
+                                                    <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
+                                                    <strong>JPEG</strong>
+                                                    <div class="small text-muted">Smaller, natural</div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-text mt-2">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        <strong>PNG</strong> is 100% reliable. <strong>JPEG</strong> produces smaller, more natural-looking files but uses lossy compression (Q=95).
+                                    </div>
+                                </div>
+                                
+                                <!-- Capacity Comparison (populated by JS) -->
+                                <div class="d-none" id="modeCapacityComparison">
+                                    <div class="alert alert-secondary small mb-0">
+                                        <div class="row text-center">
+                                            <div class="col-6 border-end">
+                                                <div class="text-muted">LSB Capacity</div>
+                                                <div class="fs-5 text-primary" id="lsbCapacityDetail">-</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted">DCT Capacity</div>
+                                                <div class="fs-5 text-info" id="dctCapacityDetail">-</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-center mt-2 small text-muted" id="capacityRatio">
+                                            DCT is ~20% of LSB capacity
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
                         </div>
                     </div>
                     
@@ -317,7 +466,15 @@ if (rsaKeyQrInput) {
 // Form submit loading state
 document.getElementById('encodeForm').addEventListener('submit', function(e) {
     const btn = document.getElementById('encodeBtn');
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+    const selectedMode = document.querySelector('input[name="embed_mode"]:checked').value;
+    let modeLabel = selectedMode.toUpperCase();
+    
+    if (selectedMode === 'dct') {
+        const outputFormat = document.querySelector('input[name="dct_output_format"]:checked')?.value || 'png';
+        modeLabel += ` → ${outputFormat.toUpperCase()}`;
+    }
+    
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Encoding (${modeLabel})...`;
     btn.disabled = true;
 });
 
@@ -338,12 +495,147 @@ messageInput.addEventListener('input', function() {
     charCount.classList.toggle('text-danger', len > maxChars * 0.95);
 });
 
+// ============================================================================
+// v3.0 - Capacity Comparison API
+// ============================================================================
+
+const carrierInput = document.getElementById('carrierInput');
+const capacityPanel = document.getElementById('capacityPanel');
+const carrierDimensions = document.getElementById('carrierDimensions');
+const lsbCapacityBadge = document.getElementById('lsbCapacityBadge');
+const dctCapacityBadge = document.getElementById('dctCapacityBadge');
+const lsbCapacityDetail = document.getElementById('lsbCapacityDetail');
+const dctCapacityDetail = document.getElementById('dctCapacityDetail');
+const modeCapacityComparison = document.getElementById('modeCapacityComparison');
+const capacityRatio = document.getElementById('capacityRatio');
+
+let currentCapacity = null;
+
+async function fetchCapacityComparison(file) {
+    const formData = new FormData();
+    formData.append('carrier', file);
+    
+    try {
+        const response = await fetch('/api/compare-capacity', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                currentCapacity = data;
+                updateCapacityDisplay(data);
+            }
+        }
+    } catch (err) {
+        console.error('Capacity comparison failed:', err);
+    }
+}
+
+function updateCapacityDisplay(data) {
+    // Update top panel
+    carrierDimensions.textContent = `${data.width} × ${data.height}`;
+    lsbCapacityBadge.textContent = `LSB: ${data.lsb.capacity_kb} KB`;
+    
+    if (data.dct.available) {
+        dctCapacityBadge.textContent = `DCT: ${data.dct.capacity_kb} KB`;
+        dctCapacityBadge.classList.remove('bg-secondary');
+        dctCapacityBadge.classList.add('bg-info');
+    } else {
+        dctCapacityBadge.textContent = `DCT: N/A`;
+        dctCapacityBadge.classList.remove('bg-info');
+        dctCapacityBadge.classList.add('bg-secondary');
+    }
+    
+    capacityPanel.classList.remove('d-none');
+    
+    // Update advanced options panel
+    lsbCapacityDetail.textContent = `${data.lsb.capacity_kb} KB`;
+    dctCapacityDetail.textContent = data.dct.available ? `${data.dct.capacity_kb} KB` : 'N/A';
+    capacityRatio.textContent = data.dct.available 
+        ? `DCT is ${data.dct.ratio}% of LSB capacity` 
+        : 'DCT mode not available';
+    modeCapacityComparison.classList.remove('d-none');
+}
+
+// Listen for carrier file selection
+if (carrierInput) {
+    carrierInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            fetchCapacityComparison(this.files[0]);
+        } else {
+            capacityPanel.classList.add('d-none');
+            modeCapacityComparison.classList.add('d-none');
+            currentCapacity = null;
+        }
+    });
+}
+
+// ============================================================================
+// Mode card highlighting & DCT output format visibility
+// ============================================================================
+
+const lsbModeCard = document.getElementById('lsbModeCard');
+const dctModeCard = document.getElementById('dctModeCard');
+const modeLsb = document.getElementById('modeLsb');
+const modeDct = document.getElementById('modeDct');
+const dctOutputFormatGroup = document.getElementById('dctOutputFormatGroup');
+const dctPngCard = document.getElementById('dctPngCard');
+const dctJpegCard = document.getElementById('dctJpegCard');
+const dctFormatPng = document.getElementById('dctFormatPng');
+const dctFormatJpeg = document.getElementById('dctFormatJpeg');
+
+function updateModeCardHighlight() {
+    // Mode cards
+    lsbModeCard.classList.toggle('border-primary', modeLsb.checked);
+    lsbModeCard.classList.toggle('border-2', modeLsb.checked);
+    dctModeCard.classList.toggle('border-info', modeDct.checked);
+    dctModeCard.classList.toggle('border-2', modeDct.checked);
+    
+    // Show/hide DCT output format selector
+    if (dctOutputFormatGroup) {
+        dctOutputFormatGroup.classList.toggle('d-none', !modeDct.checked);
+    }
+}
+
+function updateDctFormatCardHighlight() {
+    if (dctPngCard && dctJpegCard) {
+        dctPngCard.classList.toggle('border-success', dctFormatPng.checked);
+        dctPngCard.classList.toggle('border-2', dctFormatPng.checked);
+        dctJpegCard.classList.toggle('border-warning', dctFormatJpeg.checked);
+        dctJpegCard.classList.toggle('border-2', dctFormatJpeg.checked);
+    }
+}
+
+modeLsb.addEventListener('change', updateModeCardHighlight);
+modeDct.addEventListener('change', updateModeCardHighlight);
+dctFormatPng?.addEventListener('change', updateDctFormatCardHighlight);
+dctFormatJpeg?.addEventListener('change', updateDctFormatCardHighlight);
+
+updateModeCardHighlight(); // Initial state
+updateDctFormatCardHighlight(); // Initial state
+
+// Advanced options chevron rotation
+document.getElementById('advancedOptions').addEventListener('show.bs.collapse', function() {
+    document.getElementById('advancedChevron').classList.add('bi-chevron-up');
+    document.getElementById('advancedChevron').classList.remove('bi-chevron-down');
+});
+document.getElementById('advancedOptions').addEventListener('hide.bs.collapse', function() {
+    document.getElementById('advancedChevron').classList.remove('bi-chevron-up');
+    document.getElementById('advancedChevron').classList.add('bi-chevron-down');
+});
+
+// ============================================================================
 // Drag & drop with preview for images
+// ============================================================================
+
 document.querySelectorAll('.drop-zone').forEach(zone => {
     const input = zone.querySelector('input[type="file"]');
     const label = zone.querySelector('.drop-zone-label');
     const preview = zone.querySelector('.drop-zone-preview');
     const isPayloadZone = zone.id === 'payloadDropZone';
+    const isCarrierZone = zone.id === 'carrierDropZone';
     
     ['dragenter', 'dragover'].forEach(evt => {
         zone.addEventListener(evt, e => {
@@ -366,6 +658,11 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
             
             if (!isPayloadZone) {
                 showPreview(e.dataTransfer.files[0]);
+            }
+            
+            // Trigger capacity check for carrier
+            if (isCarrierZone && e.dataTransfer.files[0]) {
+                fetchCapacityComparison(e.dataTransfer.files[0]);
             }
         }
     });
@@ -420,6 +717,7 @@ function checkDuplicateFiles() {
             document.querySelector('#carrierDropZone .drop-zone-label').innerHTML = 
                 '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>' +
                 '<span class="text-muted">Drop image or click to browse</span>';
+            capacityPanel.classList.add('d-none');
         }
     }
 }
@@ -443,6 +741,11 @@ document.addEventListener('paste', function(e) {
             targetInput.files = container.files;
             
             targetInput.dispatchEvent(new Event('change'));
+            
+            // Trigger capacity check if pasted to carrier
+            if (targetInput === carrierInput) {
+                fetchCapacityComparison(blob);
+            }
             break;
         }
     }
