@@ -170,7 +170,7 @@ from .utils import (
 from .debug import debug  # Import debug utilities
 
 # =============================================================================
-# NEW IN v2.2.0 - Compression
+# Compression
 # =============================================================================
 from .compression import (
     compress,

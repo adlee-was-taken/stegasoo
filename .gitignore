@@ -57,3 +57,7 @@ htmlcov/
 
 # Output test files.
 test_data/*.png
+
+#Project root scripts.
+rbld_containers.sh
+quick_web.sh
