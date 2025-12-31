@@ -13,6 +13,66 @@
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
                     <input type="hidden" name="client_date" id="clientDate" value="">
                     
+                    <!-- Embedding Mode Selection - NOW AT THE TOP -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-cpu me-1"></i> Embedding Mode
+                        </label>
+                        
+                        <div class="row g-2">
+                            <!-- LSB Mode Card -->
+                            <div class="col-md-6">
+                                <label class="card p-3 h-100 border-primary border-2 cursor-pointer" id="lsbModeCard" for="modeLsb" style="cursor: pointer;">
+                                    <input class="form-check-input position-absolute" type="radio" name="embed_mode" id="modeLsb" value="lsb" checked style="top: 1rem; right: 1rem;">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-grid-3x3-gap text-primary fs-4 me-2"></i>
+                                        <strong>LSB Mode</strong>
+                                        <span class="badge bg-success ms-auto me-4">Default</span>
+                                    </div>
+                                    <ul class="small text-muted mb-0 ps-3">
+                                        <li>Full color PNG output</li>
+                                        <li>Higher capacity (~375 KB/MP)</li>
+                                        <li>Best for email & file transfer</li>
+                                    </ul>
+                                </label>
+                            </div>
+                            
+                            <!-- DCT Mode Card -->
+                            <div class="col-md-6">
+                                <label class="card p-3 h-100 {% if not has_dct %}opacity-50{% endif %} cursor-pointer" id="dctModeCard" for="modeDct" style="cursor: pointer;">
+                                    <input class="form-check-input position-absolute" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %} style="top: 1rem; right: 1rem;">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-soundwave text-warning fs-4 me-2"></i>
+                                        <strong>DCT Mode</strong>
+                                        {% if has_dct %}
+                                        <span class="badge bg-warning text-dark ms-auto me-4">Social Media</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary ms-auto me-4">Unavailable</span>
+                                        {% endif %}
+                                    </div>
+                                    <ul class="small text-muted mb-0 ps-3">
+                                        <li>JPEG output, survives recompression</li>
+                                        <li>Lower capacity (~75 KB/MP)</li>
+                                        <li>Best for Instagram, WhatsApp, etc.</li>
+                                    </ul>
+                                    {% if not has_dct %}
+                                    <div class="alert alert-warning small mt-2 mb-0 py-1 px-2">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        Requires scipy: <code>pip install scipy</code>
+                                    </div>
+                                    {% endif %}
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Mode hint -->
+                        <div class="form-text mt-2" id="modeHint">
+                            <i class="bi bi-lightbulb me-1"></i>
+                            <strong>LSB</strong> for private channels (email, cloud storage). 
+                            <strong>DCT</strong> for social media that recompresses images.
+                        </div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
@@ -58,7 +118,7 @@
                             </div>
                             <div class="col-auto">
                                 <span class="badge bg-primary me-1" id="lsbCapacityBadge">LSB: -</span>
-                                <span class="badge bg-secondary" id="dctCapacityBadge">DCT: -</span>
+                                <span class="badge bg-warning text-dark" id="dctCapacityBadge">DCT: -</span>
                             </div>
                         </div>
                     </div>
@@ -141,236 +201,133 @@
                     </h6>
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                           <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                           <div class="input-group">
-                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9">
+                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9" style="max-width: 140px;">
                             <button class="btn btn-outline-secondary" type="button" id="togglePin">
                               <i class="bi bi-eye"></i>
                             </button>
                           </div>
-                        <div class="form-text">Your static 6-9 digit PIN (if configured)</div>
+                        <div class="form-text">Static 6-9 digit PIN</div>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-8 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
-                            <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaFileTab" type="button">
-                                        <i class="bi bi-file-earmark me-1"></i>.pem File
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaQrTab" type="button">
-                                        <i class="bi bi-qr-code me-1"></i>QR Code
-                                    </button>
-                                </li>
-                            </ul>
-                            <div class="tab-content">
-                                <div class="tab-pane fade show active" id="rsaFileTab" role="tabpanel">
-                                    <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
-                                    <div class="form-text small">Shared .pem format key file.</div>
+                            
+                            <!-- RSA Input Method Toggle -->
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
+                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
+                                    <i class="bi bi-file-earmark me-1"></i>.pem File
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
+                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
+                                    <i class="bi bi-qr-code me-1"></i>QR Code
+                                </label>
+                            </div>
+                            
+                            <!-- .pem File Input -->
+                            <div id="rsaFileSection">
+                                <input type="file" name="rsa_key_file" class="form-control form-control-sm" accept=".pem">
+                            </div>
+                            
+                            <!-- QR Code Input -->
+                            <div id="rsaQrSection" class="d-none">
+                                <div class="drop-zone p-3" id="qrDropZone">
+                                    <input type="file" name="rsa_qr_image" accept="image/*" id="rsaQrInput">
+                                    <div class="drop-zone-label text-center">
+                                        <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
+                                        <span class="text-muted small">Drop QR image or click to browse</span>
+                                    </div>
                                 </div>
-                                <div class="tab-pane fade" id="rsaQrTab" role="tabpanel">
-                                    <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
-                                    <div class="form-text small">PNG, JPG, or other image of QR code</div>
-                                </div>
+                                <input type="hidden" name="rsa_key_pem_from_qr" id="rsaKeyFromQr">
+                            </div>
+                            
+                            <!-- Key Password (always visible) -->
+                            <div class="input-group input-group-sm mt-2">
+                                <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
+                                <button class="btn btn-outline-secondary" type="button" id="toggleRsaPassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- RSA Key Password (shown when key selected) -->
-                    <div class="mb-3 d-none" id="rsaPasswordGroup">
-                        <label class="form-label">
-                            <i class="bi bi-key me-1"></i> RSA Key Password
-                        </label>
-                        <input type="password" name="rsa_password" class="form-control"
-                               placeholder="Password for the .pem file (if encrypted)">
-                        <div class="form-text">
-                            Leave blank if your key file is not password-protected (not needed for QR codes)
-                        </div>
-                    </div>
-                    
-                    <!-- ================================================================
-                         ADVANCED OPTIONS (v3.0) - Collapsible Section
-                         ================================================================ -->
-                    <div class="mb-4">
+                    <!-- Advanced Options (DCT sub-options only) -->
+                    <div class="mb-4 d-none" id="advancedOptionsContainer">
                         <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptions" role="button" aria-expanded="false">
-                            <i class="bi bi-gear me-1"></i> Advanced Options
+                            <i class="bi bi-gear me-1"></i> DCT Options
                             <i class="bi bi-chevron-down ms-1" id="advancedChevron"></i>
                         </a>
                         
                         <div class="collapse" id="advancedOptions">
                             <div class="card card-body mt-2 bg-dark border-secondary">
                                 
-                                <!-- Embedding Mode Selection -->
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    <strong>DCT defaults:</strong> Color mode + JPEG output for best social media compatibility.
+                                </div>
+                                
+                                <!-- DCT Color Mode -->
                                 <div class="mb-3">
                                     <label class="form-label">
-                                        <i class="bi bi-cpu me-1"></i> Embedding Mode
-                                        <span class="badge bg-info ms-1">v3.0</span>
+                                        <i class="bi bi-palette me-1"></i> Color Mode
                                     </label>
                                     
                                     <div class="row g-2">
-                                        <!-- LSB Mode Card -->
-                                        <div class="col-md-6">
-                                            <div class="form-check card p-3 h-100 border-primary border-2" id="lsbModeCard">
-                                                <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" checked>
-                                                <label class="form-check-label w-100" for="modeLsb">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <i class="bi bi-grid-3x3-gap text-primary fs-4 me-2"></i>
-                                                        <strong>LSB Mode</strong>
-                                                        <span class="badge bg-success ms-auto">Default</span>
-                                                    </div>
-                                                    <ul class="small text-muted mb-0 ps-3">
-                                                        <li>Full color PNG output</li>
-                                                        <li>Higher capacity (~375 KB/MP)</li>
-                                                        <li>Faster processing</li>
-                                                    </ul>
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center border-success border-2" id="dctColorCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
+                                                <label class="form-check-label w-100" for="dctColorColor">
+                                                    <i class="bi bi-palette-fill text-success fs-5 d-block"></i>
+                                                    <strong>Color</strong>
+                                                    <div class="small text-muted">Recommended</div>
                                                 </label>
                                             </div>
                                         </div>
-                                        
-                                        <!-- DCT Mode Card -->
-                                        <div class="col-md-6">
-                                            <div class="form-check card p-3 h-100 {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard">
-                                                <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                                <label class="form-check-label w-100" for="modeDct">
-                                                    <div class="d-flex align-items-center mb-2">
-                                                        <i class="bi bi-soundwave text-info fs-4 me-2"></i>
-                                                        <strong>DCT Mode</strong>
-                                                        {% if has_dct %}
-                                                        <span class="badge bg-warning text-dark ms-auto">Experimental</span>
-                                                        {% else %}
-                                                        <span class="badge bg-secondary ms-auto">Unavailable</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <ul class="small text-muted mb-0 ps-3">
-                                                        <li>Color or grayscale output</li>
-                                                        <li>Lower capacity (~75 KB/MP)</li>
-                                                        <li>Better detection resistance</li>
-                                                    </ul>
-                                                    {% if not has_dct %}
-                                                    <div class="alert alert-warning small mt-2 mb-0 py-1 px-2">
-                                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                                        Requires scipy: <code>pip install scipy</code>
-                                                    </div>
-                                                    {% endif %}
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center" id="dctGrayscaleCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
+                                                <label class="form-check-label w-100" for="dctColorGrayscale">
+                                                    <i class="bi bi-circle-half text-secondary fs-5 d-block"></i>
+                                                    <strong>Grayscale</strong>
+                                                    <div class="small text-muted">B&W output</div>
                                                 </label>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Mode comparison hint -->
-                                    <div class="form-text mt-2" id="modeHint">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        <strong>LSB</strong> is best for most uses. 
-                                        <strong>DCT</strong> provides better stealth but lower capacity.
-                                    </div>
                                 </div>
                                 
-                                <!-- DCT Options Panel (shown only when DCT selected) -->
-                                <div class="d-none" id="dctOptionsPanel">
+                                <!-- DCT Output Format -->
+                                <div class="mb-0">
+                                    <label class="form-label">
+                                        <i class="bi bi-file-image me-1"></i> Output Format
+                                    </label>
                                     
-                                    <hr class="my-3">
-                                    
-                                    <div class="alert alert-warning small mb-3">
-                                        <i class="bi bi-flask me-1"></i>
-                                        <strong>Experimental Feature:</strong> DCT embedding is still being refined. 
-                                        Color mode preserves original colors but extraction uses Y channel only.
-                                    </div>
-                                    
-                                    <!-- DCT Color Mode (NEW in v3.0.1) -->
-                                    <div class="mb-3">
-                                        <label class="form-label">
-                                            <i class="bi bi-palette me-1"></i> DCT Color Mode
-                                            <span class="badge bg-success ms-1">v3.0.1</span>
-                                        </label>
-                                        
-                                        <div class="row g-2">
-                                            <div class="col-6">
-                                                <div class="form-check card p-2 text-center border-success border-2" id="dctColorCard">
-                                                    <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
-                                                    <label class="form-check-label w-100" for="dctColorColor">
-                                                        <i class="bi bi-palette-fill text-success fs-5 d-block"></i>
-                                                        <strong>Color</strong>
-                                                        <div class="small text-muted">Preserve colors</div>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="form-check card p-2 text-center" id="dctGrayscaleCard">
-                                                    <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
-                                                    <label class="form-check-label w-100" for="dctColorGrayscale">
-                                                        <i class="bi bi-circle-half text-secondary fs-5 d-block"></i>
-                                                        <strong>Grayscale</strong>
-                                                        <div class="small text-muted">Traditional DCT</div>
-                                                    </label>
-                                                </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center" id="dctPngCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png">
+                                                <label class="form-check-label w-100" for="dctFormatPng">
+                                                    <i class="bi bi-file-earmark-image text-primary fs-5 d-block"></i>
+                                                    <strong>PNG</strong>
+                                                    <div class="small text-muted">Lossless, larger</div>
+                                                </label>
                                             </div>
                                         </div>
-                                        
-                                        <div class="form-text mt-2">
-                                            <i class="bi bi-info-circle me-1"></i>
-                                            <strong>Color</strong> preserves original image colors (recommended).
-                                            <strong>Grayscale</strong> converts to B&W (traditional DCT steganography).
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- DCT Output Format -->
-                                    <div class="mb-3">
-                                        <label class="form-label">
-                                            <i class="bi bi-file-image me-1"></i> DCT Output Format
-                                        </label>
-                                        
-                                        <div class="row g-2">
-                                            <div class="col-6">
-                                                <div class="form-check card p-2 text-center border-primary border-2" id="dctPngCard">
-                                                    <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png" checked>
-                                                    <label class="form-check-label w-100" for="dctFormatPng">
-                                                        <i class="bi bi-file-earmark-image text-primary fs-5 d-block"></i>
-                                                        <strong>PNG</strong>
-                                                        <div class="small text-muted">Lossless, larger</div>
-                                                    </label>
-                                                </div>
+                                        <div class="col-6">
+                                            <div class="form-check card p-2 text-center border-warning border-2" id="dctJpegCard">
+                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg" checked>
+                                                <label class="form-check-label w-100" for="dctFormatJpeg">
+                                                    <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
+                                                    <strong>JPEG</strong>
+                                                    <div class="small text-muted">Recommended</div>
+                                                </label>
                                             </div>
-                                            <div class="col-6">
-                                                <div class="form-check card p-2 text-center" id="dctJpegCard">
-                                                    <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg">
-                                                    <label class="form-check-label w-100" for="dctFormatJpeg">
-                                                        <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
-                                                        <strong>JPEG</strong>
-                                                        <div class="small text-muted">Smaller, natural</div>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="form-text mt-2">
-                                            <i class="bi bi-info-circle me-1"></i>
-                                            <strong>PNG</strong> is 100% reliable. <strong>JPEG</strong> produces smaller, more natural-looking files but uses lossy compression (Q=95).
-                                        </div>
-                                    </div>
-                                    
-                                </div>
-                                
-                                <!-- Capacity Comparison (populated by JS) -->
-                                <div class="d-none" id="modeCapacityComparison">
-                                    <hr class="my-3">
-                                    <div class="alert alert-secondary small mb-0">
-                                        <div class="row text-center">
-                                            <div class="col-6 border-end">
-                                                <div class="text-muted">LSB Capacity</div>
-                                                <div class="fs-5 text-primary" id="lsbCapacityDetail">-</div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="text-muted">DCT Capacity</div>
-                                                <div class="fs-5 text-info" id="dctCapacityDetail">-</div>
-                                            </div>
-                                        </div>
-                                        <div class="text-center mt-2 small text-muted" id="capacityRatio">
-                                            DCT is ~20% of LSB capacity
                                         </div>
                                     </div>
                                 </div>
@@ -449,214 +406,124 @@ function updatePayloadSection() {
     textSection.classList.toggle('d-none', !isText);
     fileSection.classList.toggle('d-none', isText);
     
-    // Update required attribute
     if (isText) {
-        messageInput.required = true;
-        payloadFileInput.required = false;
+        messageInput.setAttribute('required', '');
+        payloadFileInput.removeAttribute('required');
     } else {
-        messageInput.required = false;
-        payloadFileInput.required = true;
+        messageInput.removeAttribute('required');
+        payloadFileInput.setAttribute('required', '');
     }
 }
 
 payloadTextRadio.addEventListener('change', updatePayloadSection);
 payloadFileRadio.addEventListener('change', updatePayloadSection);
 
-// File payload info display
-const fileInfo = document.getElementById('fileInfo');
-const fileInfoName = document.getElementById('fileInfoName');
-const fileInfoSize = document.getElementById('fileInfoSize');
-const payloadDropLabel = document.getElementById('payloadDropLabel');
-
+// Payload file info display
 payloadFileInput.addEventListener('change', function() {
+    const fileInfo = document.getElementById('fileInfo');
+    const fileInfoName = document.getElementById('fileInfoName');
+    const fileInfoSize = document.getElementById('fileInfoSize');
+    
     if (this.files && this.files[0]) {
         const file = this.files[0];
-        fileInfoName.textContent = file.name;
-        fileInfoSize.textContent = formatFileSize(file.size);
         fileInfo.classList.remove('d-none');
-        payloadDropLabel.innerHTML = `<i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i><span>${file.name}</span>`;
+        fileInfoName.textContent = file.name;
+        
+        const sizeKB = (file.size / 1024).toFixed(1);
+        fileInfoSize.textContent = sizeKB + ' KB';
+        
+        // Update drop zone label
+        const label = document.getElementById('payloadDropLabel');
+        label.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>${file.name}`;
     } else {
         fileInfo.classList.add('d-none');
-        payloadDropLabel.innerHTML = `<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i><span class="text-muted">Drop any file or click to browse</span><div class="small text-muted mt-1">Max {{ max_payload_kb }} KB</div>`;
     }
 });
 
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-// Show RSA password field when key is selected (only for .pem files, not QR)
-const rsaKeyInput = document.getElementById('rsaKeyInput');
-const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
-const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
-
-if (rsaKeyInput) {
-    rsaKeyInput.addEventListener('change', function() {
-        // Show password field only for .pem files
-        rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
-        // Clear QR input if file is selected
-        if (rsaKeyQrInput && this.files.length) {
-            rsaKeyQrInput.value = '';
-        }
-    });
-}
-
-if (rsaKeyQrInput) {
-    rsaKeyQrInput.addEventListener('change', function() {
-        // Hide password field for QR codes (they're unencrypted)
-        rsaPasswordGroup.classList.add('d-none');
-        // Clear file input if QR is selected
-        if (rsaKeyInput && this.files.length) {
-            rsaKeyInput.value = '';
-        }
-    });
-}
-
-// Form submit loading state
-document.getElementById('encodeForm').addEventListener('submit', function(e) {
-    const btn = document.getElementById('encodeBtn');
-    const selectedMode = document.querySelector('input[name="embed_mode"]:checked').value;
-    let modeLabel = selectedMode.toUpperCase();
-    
-    if (selectedMode === 'dct') {
-        const colorMode = document.querySelector('input[name="dct_color_mode"]:checked')?.value || 'color';
-        const outputFormat = document.querySelector('input[name="dct_output_format"]:checked')?.value || 'png';
-        modeLabel += ` (${colorMode}, ${outputFormat.toUpperCase()})`;
-    }
-    
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Encoding (${modeLabel})...`;
-    btn.disabled = true;
-});
-
-// Character counter for text
-const charCount = document.getElementById('charCount');
-const charWarning = document.getElementById('charWarning');
-const charPercent = document.getElementById('charPercent');
-const maxChars = 250000;
-
-messageInput.addEventListener('input', function() {
-    const len = this.value.length;
-    charCount.textContent = len.toLocaleString();
-    
-    const pct = Math.round((len / maxChars) * 100);
-    charPercent.textContent = pct + '%';
-    
-    charWarning.classList.toggle('d-none', len < maxChars * 0.8);
-    charCount.classList.toggle('text-danger', len > maxChars * 0.95);
-});
-
-// ============================================================================
-// v3.0 - Capacity Comparison API
-// ============================================================================
-
-const carrierInput = document.getElementById('carrierInput');
-const capacityPanel = document.getElementById('capacityPanel');
-const carrierDimensions = document.getElementById('carrierDimensions');
-const lsbCapacityBadge = document.getElementById('lsbCapacityBadge');
-const dctCapacityBadge = document.getElementById('dctCapacityBadge');
-const lsbCapacityDetail = document.getElementById('lsbCapacityDetail');
-const dctCapacityDetail = document.getElementById('dctCapacityDetail');
-const modeCapacityComparison = document.getElementById('modeCapacityComparison');
-const capacityRatio = document.getElementById('capacityRatio');
-
-let currentCapacity = null;
-
-async function fetchCapacityComparison(file) {
-    const formData = new FormData();
-    formData.append('carrier', file);
-    
-    try {
-        const response = await fetch('/api/compare-capacity', {
-            method: 'POST',
-            body: formData
-        });
+// Character counter
+if (messageInput) {
+    messageInput.addEventListener('input', function() {
+        const count = this.value.length;
+        const max = 250000;
+        const percent = Math.round((count / max) * 100);
         
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                currentCapacity = data;
-                updateCapacityDisplay(data);
-            }
-        }
-    } catch (err) {
-        console.error('Capacity comparison failed:', err);
-    }
-}
-
-function updateCapacityDisplay(data) {
-    // Update top panel
-    carrierDimensions.textContent = `${data.width} x ${data.height}`;
-    lsbCapacityBadge.textContent = `LSB: ${data.lsb.capacity_kb} KB`;
-    
-    if (data.dct.available) {
-        dctCapacityBadge.textContent = `DCT: ${data.dct.capacity_kb} KB`;
-        dctCapacityBadge.classList.remove('bg-secondary');
-        dctCapacityBadge.classList.add('bg-info');
-    } else {
-        dctCapacityBadge.textContent = `DCT: N/A`;
-        dctCapacityBadge.classList.remove('bg-info');
-        dctCapacityBadge.classList.add('bg-secondary');
-    }
-    
-    capacityPanel.classList.remove('d-none');
-    
-    // Update advanced options panel
-    lsbCapacityDetail.textContent = `${data.lsb.capacity_kb} KB`;
-    dctCapacityDetail.textContent = data.dct.available ? `${data.dct.capacity_kb} KB` : 'N/A';
-    capacityRatio.textContent = data.dct.available 
-        ? `DCT is ${data.dct.ratio}% of LSB capacity` 
-        : 'DCT mode not available';
-    modeCapacityComparison.classList.remove('d-none');
-}
-
-// Listen for carrier file selection
-if (carrierInput) {
-    carrierInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            fetchCapacityComparison(this.files[0]);
+        document.getElementById('charCount').textContent = count.toLocaleString();
+        document.getElementById('charPercent').textContent = percent + '%';
+        
+        const warning = document.getElementById('charWarning');
+        if (percent >= 80) {
+            warning.classList.remove('d-none');
         } else {
-            capacityPanel.classList.add('d-none');
-            modeCapacityComparison.classList.add('d-none');
-            currentCapacity = null;
+            warning.classList.add('d-none');
         }
     });
 }
 
+// Carrier capacity fetching
+const capacityPanel = document.getElementById('capacityPanel');
+const carrierInput = document.getElementById('carrierInput');
+
+carrierInput.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+        fetchCapacityComparison(this.files[0]);
+    }
+});
+
+function fetchCapacityComparison(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    fetch('/api/capacity', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Capacity error:', data.error);
+            return;
+        }
+        
+        document.getElementById('carrierDimensions').textContent = 
+            `${data.width} × ${data.height} (${(data.pixels / 1000000).toFixed(1)} MP)`;
+        document.getElementById('lsbCapacityBadge').textContent = 
+            `LSB: ${data.lsb_capacity_kb} KB`;
+        document.getElementById('dctCapacityBadge').textContent = 
+            `DCT: ${data.dct_capacity_kb} KB`;
+        
+        capacityPanel.classList.remove('d-none');
+    })
+    .catch(err => console.error('Capacity fetch failed:', err));
+}
+
 // ============================================================================
-// Mode card highlighting & DCT options visibility
+// LSB/DCT Mode Switching
 // ============================================================================
 
-const lsbModeCard = document.getElementById('lsbModeCard');
-const dctModeCard = document.getElementById('dctModeCard');
 const modeLsb = document.getElementById('modeLsb');
 const modeDct = document.getElementById('modeDct');
-const dctOptionsPanel = document.getElementById('dctOptionsPanel');
+const lsbModeCard = document.getElementById('lsbModeCard');
+const dctModeCard = document.getElementById('dctModeCard');
+const advancedOptionsContainer = document.getElementById('advancedOptionsContainer');
 
-// DCT format cards
-const dctPngCard = document.getElementById('dctPngCard');
-const dctJpegCard = document.getElementById('dctJpegCard');
+// DCT Options elements
 const dctFormatPng = document.getElementById('dctFormatPng');
 const dctFormatJpeg = document.getElementById('dctFormatJpeg');
-
-// DCT color mode cards
-const dctColorCard = document.getElementById('dctColorCard');
-const dctGrayscaleCard = document.getElementById('dctGrayscaleCard');
 const dctColorColor = document.getElementById('dctColorColor');
 const dctColorGrayscale = document.getElementById('dctColorGrayscale');
+const dctPngCard = document.getElementById('dctPngCard');
+const dctJpegCard = document.getElementById('dctJpegCard');
+const dctColorCard = document.getElementById('dctColorCard');
+const dctGrayscaleCard = document.getElementById('dctGrayscaleCard');
 
 function updateModeCardHighlight() {
-    // Mode cards
     lsbModeCard.classList.toggle('border-primary', modeLsb.checked);
     lsbModeCard.classList.toggle('border-2', modeLsb.checked);
-    dctModeCard.classList.toggle('border-info', modeDct.checked);
+    dctModeCard.classList.toggle('border-warning', modeDct.checked);
     dctModeCard.classList.toggle('border-2', modeDct.checked);
     
-    // Show/hide DCT options panel
-    if (dctOptionsPanel) {
-        dctOptionsPanel.classList.toggle('d-none', !modeDct.checked);
-    }
+    // Show/hide DCT options when DCT is selected
+    advancedOptionsContainer.classList.toggle('d-none', !modeDct.checked);
 }
 
 function updateDctFormatCardHighlight() {
@@ -689,14 +556,17 @@ updateDctFormatCardHighlight(); // Initial state
 updateDctColorCardHighlight(); // Initial state
 
 // Advanced options chevron rotation
-document.getElementById('advancedOptions').addEventListener('show.bs.collapse', function() {
-    document.getElementById('advancedChevron').classList.add('bi-chevron-up');
-    document.getElementById('advancedChevron').classList.remove('bi-chevron-down');
-});
-document.getElementById('advancedOptions').addEventListener('hide.bs.collapse', function() {
-    document.getElementById('advancedChevron').classList.remove('bi-chevron-up');
-    document.getElementById('advancedChevron').classList.add('bi-chevron-down');
-});
+const advancedOptionsEl = document.getElementById('advancedOptions');
+if (advancedOptionsEl) {
+    advancedOptionsEl.addEventListener('show.bs.collapse', function() {
+        document.getElementById('advancedChevron').classList.add('bi-chevron-up');
+        document.getElementById('advancedChevron').classList.remove('bi-chevron-down');
+    });
+    advancedOptionsEl.addEventListener('hide.bs.collapse', function() {
+        document.getElementById('advancedChevron').classList.remove('bi-chevron-up');
+        document.getElementById('advancedChevron').classList.add('bi-chevron-down');
+    });
+}
 
 // ============================================================================
 // Drag & drop with preview for images
@@ -775,6 +645,34 @@ document.getElementById('togglePin').addEventListener('click', function() {
     }
 });
 
+// RSA Password Toggle Logic
+document.getElementById('toggleRsaPassword')?.addEventListener('click', function() {
+    const input = document.getElementById('rsaPasswordInput');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+
+// RSA Input Method Toggle (File vs QR)
+const rsaMethodFile = document.getElementById('rsaMethodFile');
+const rsaMethodQr = document.getElementById('rsaMethodQr');
+const rsaFileSection = document.getElementById('rsaFileSection');
+const rsaQrSection = document.getElementById('rsaQrSection');
+
+function updateRsaInputMethod() {
+    const isFile = rsaMethodFile.checked;
+    rsaFileSection.classList.toggle('d-none', !isFile);
+    rsaQrSection.classList.toggle('d-none', isFile);
+}
+
+rsaMethodFile?.addEventListener('change', updateRsaInputMethod);
+rsaMethodQr?.addEventListener('change', updateRsaInputMethod);
+
 // Prevent Same File Selection
 function checkDuplicateFiles() {
     const refInput = document.querySelector('input[name="reference_photo"]');
@@ -821,6 +719,42 @@ document.addEventListener('paste', function(e) {
             break;
         }
     }
+});
+
+// QR Code RSA Key scanning
+const rsaQrInput = document.getElementById('rsaQrInput');
+if (rsaQrInput) {
+    rsaQrInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const formData = new FormData();
+            formData.append('qr_image', this.files[0]);
+            
+            fetch('/api/decode-qr', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('QR decode failed: ' + data.error);
+                    return;
+                }
+                document.getElementById('rsaKeyFromQr').value = data.pem_data;
+                document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
+                    '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded from QR';
+            })
+            .catch(err => {
+                alert('QR decode failed: ' + err);
+            });
+        }
+    });
+}
+
+// Form submission with loading state
+document.getElementById('encodeForm').addEventListener('submit', function() {
+    const btn = document.getElementById('encodeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
 });
 </script>
 {% endblock %}

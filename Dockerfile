@@ -12,9 +12,11 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_ROOT_USER_ACTION=ignore
 
 # Install system dependencies
-# NOTE: libjpeg-dev is required for jpegio compilation
+# NOTE: g++ is required for jpegio C++ compilation
+# NOTE: libjpeg-dev is required for jpegio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     libc-dev \
     libffi-dev \
     libzbar0 \
