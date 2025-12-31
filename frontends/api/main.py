@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API (v3.0)
+Stegasoo REST API (v3.0.1)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
 NEW in v3.0: LSB and DCT embedding modes.
+NEW in v3.0.1: DCT color mode and JPEG output format.
 """
 
 import io
@@ -70,7 +71,12 @@ Secure steganography with hybrid authentication. Supports text messages and file
 ## Embedding Modes (v3.0)
 
 - **LSB mode** (default): Spatial LSB embedding, full color output, higher capacity
-- **DCT mode**: Frequency domain embedding, grayscale output, ~20% capacity, better stealth
+- **DCT mode**: Frequency domain embedding, ~20% capacity, better stealth
+
+## DCT Options (v3.0.1)
+
+- **dct_color_mode**: 'grayscale' (default) or 'color' (preserves original colors)
+- **dct_output_format**: 'png' (lossless) or 'jpeg' (smaller, more natural)
 
 Use the `/modes` endpoint to check availability and `/compare` to compare capacities.
 """,
@@ -86,6 +92,8 @@ Use the `/modes` endpoint to check availability and `/compare` to compare capaci
 
 EmbedModeType = Literal["lsb", "dct"]
 ExtractModeType = Literal["auto", "lsb", "dct"]
+DctColorModeType = Literal["grayscale", "color"]
+DctOutputFormatType = Literal["png", "jpeg"]
 
 
 # ============================================================================
@@ -118,7 +126,16 @@ class EncodeRequest(BaseModel):
     date_str: Optional[str] = None
     embed_mode: EmbedModeType = Field(
         default="lsb",
-        description="Embedding mode: 'lsb' (default, color) or 'dct' (grayscale, requires scipy)"
+        description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
+    )
+    # NEW in v3.0.1
+    dct_output_format: DctOutputFormatType = Field(
+        default="png",
+        description="DCT output format: 'png' (lossless) or 'jpeg' (smaller). Only applies to DCT mode."
+    )
+    dct_color_mode: DctColorModeType = Field(
+        default="grayscale",
+        description="DCT color mode: 'grayscale' (default) or 'color' (preserves colors). Only applies to DCT mode."
     )
 
 
@@ -136,7 +153,16 @@ class EncodeFileRequest(BaseModel):
     date_str: Optional[str] = None
     embed_mode: EmbedModeType = Field(
         default="lsb",
-        description="Embedding mode: 'lsb' (default, color) or 'dct' (grayscale, requires scipy)"
+        description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
+    )
+    # NEW in v3.0.1
+    dct_output_format: DctOutputFormatType = Field(
+        default="png",
+        description="DCT output format: 'png' (lossless) or 'jpeg' (smaller). Only applies to DCT mode."
+    )
+    dct_color_mode: DctColorModeType = Field(
+        default="grayscale",
+        description="DCT color mode: 'grayscale' (default) or 'color' (preserves colors). Only applies to DCT mode."
     )
 
 
@@ -147,6 +173,15 @@ class EncodeResponse(BaseModel):
     date_used: str
     day_of_week: str
     embed_mode: str = Field(description="Embedding mode used: 'lsb' or 'dct'")
+    # NEW in v3.0.1
+    output_format: str = Field(
+        default="png",
+        description="Output format: 'png' or 'jpeg' (for DCT mode)"
+    )
+    color_mode: str = Field(
+        default="color",
+        description="Color mode: 'color' (LSB/DCT color) or 'grayscale' (DCT grayscale)"
+    )
 
 
 class DecodeRequest(BaseModel):
@@ -211,20 +246,36 @@ class CompareModesResponse(BaseModel):
     recommendation: str
 
 
+class DctModeInfo(BaseModel):
+    """Detailed DCT mode information."""
+    available: bool
+    name: str
+    description: str
+    output_formats: list[str]
+    color_modes: list[str]
+    capacity_ratio: str
+    requires: str
+
+
 class ModesResponse(BaseModel):
     """Response showing available embedding modes."""
     lsb: dict
-    dct: dict
+    dct: DctModeInfo
 
 
 class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
     has_qrcode_read: bool
-    has_dct: bool  # NEW in v3.0
+    has_dct: bool
     day_names: list[str]
     max_payload_kb: int
-    available_modes: list[str]  # NEW in v3.0
+    available_modes: list[str]
+    # NEW in v3.0.1
+    dct_features: Optional[dict] = Field(
+        default=None,
+        description="DCT mode features (v3.0.1+)"
+    )
 
 
 class QrExtractResponse(BaseModel):
@@ -263,8 +314,16 @@ class ErrorResponse(BaseModel):
 async def root():
     """Get API status and configuration."""
     available_modes = ["lsb"]
+    dct_features = None
+    
     if has_dct_support():
         available_modes.append("dct")
+        dct_features = {
+            "output_formats": ["png", "jpeg"],
+            "color_modes": ["grayscale", "color"],
+            "default_output_format": "png",
+            "default_color_mode": "grayscale",
+        }
     
     return StatusResponse(
         version=__version__,
@@ -273,7 +332,8 @@ async def root():
         has_dct=has_dct_support(),
         day_names=list(DAY_NAMES),
         max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
-        available_modes=available_modes
+        available_modes=available_modes,
+        dct_features=dct_features,
     )
 
 
@@ -283,6 +343,7 @@ async def api_modes():
     Get available embedding modes and their status.
     
     NEW in v3.0: Shows LSB and DCT mode availability.
+    NEW in v3.0.1: Shows DCT color modes and output formats.
     """
     return ModesResponse(
         lsb={
@@ -292,14 +353,15 @@ async def api_modes():
             "output_format": "PNG (color)",
             "capacity_ratio": "100%",
         },
-        dct={
-            "available": has_dct_support(),
-            "name": "DCT Domain",
-            "description": "Embed in DCT coefficients, outputs grayscale PNG",
-            "output_format": "PNG (grayscale)",
-            "capacity_ratio": "~20% of LSB",
-            "requires": "scipy",
-        }
+        dct=DctModeInfo(
+            available=has_dct_support(),
+            name="DCT Domain",
+            description="Embed in DCT coefficients, frequency domain steganography",
+            output_formats=["png", "jpeg"],
+            color_modes=["grayscale", "color"],
+            capacity_ratio="~20% of LSB",
+            requires="scipy",
+        )
     )
 
 
@@ -328,7 +390,8 @@ async def api_compare_modes(request: CompareModesRequest):
                 "capacity_bytes": comparison['dct']['capacity_bytes'],
                 "capacity_kb": round(comparison['dct']['capacity_kb'], 1),
                 "available": comparison['dct']['available'],
-                "output_format": comparison['dct']['output'],
+                "output_formats": ["png", "jpeg"],
+                "color_modes": ["grayscale", "color"],
                 "ratio_vs_lsb_percent": round(comparison['dct']['ratio_vs_lsb'], 1),
             },
             recommendation="lsb" if not comparison['dct']['available'] else "dct for stealth, lsb for capacity"
@@ -465,6 +528,41 @@ async def api_generate(request: GenerateRequest):
 
 
 # ============================================================================
+# HELPER FUNCTION FOR DCT PARAMETERS
+# ============================================================================
+
+def _get_dct_params(embed_mode: str, dct_output_format: str, dct_color_mode: str) -> dict:
+    """
+    Get DCT-specific parameters if DCT mode is selected.
+    Returns kwargs to pass to encode().
+    """
+    if embed_mode != "dct":
+        return {}
+    
+    return {
+        "dct_output_format": dct_output_format,
+        "dct_color_mode": dct_color_mode,
+    }
+
+
+def _get_output_info(embed_mode: str, dct_output_format: str, dct_color_mode: str) -> tuple:
+    """
+    Get output format and color mode strings for response.
+    Returns (output_format, color_mode, mime_type).
+    """
+    if embed_mode == "dct":
+        output_format = dct_output_format
+        color_mode = dct_color_mode
+        mime_type = "image/jpeg" if dct_output_format == "jpeg" else "image/png"
+    else:
+        output_format = "png"
+        color_mode = "color"
+        mime_type = "image/png"
+    
+    return output_format, color_mode, mime_type
+
+
+# ============================================================================
 # ROUTES - ENCODE (JSON)
 # ============================================================================
 
@@ -476,6 +574,7 @@ async def api_encode(request: EncodeRequest):
     Images must be base64-encoded. Returns base64-encoded stego image.
     
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
+    NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
@@ -486,6 +585,13 @@ async def api_encode(request: EncodeRequest):
         carrier = base64.b64decode(request.carrier_image_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
         
+        # Get DCT parameters
+        dct_params = _get_dct_params(
+            request.embed_mode,
+            request.dct_output_format,
+            request.dct_color_mode
+        )
+        
         result = encode(
             message=request.message,
             reference_photo=ref_photo,
@@ -495,11 +601,18 @@ async def api_encode(request: EncodeRequest):
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
             date_str=request.date_str,
-            embed_mode=request.embed_mode,  # NEW in v3.0
+            embed_mode=request.embed_mode,
+            **dct_params,  # NEW in v3.0.1
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
         day_of_week = get_day_from_date(result.date_used)
+        
+        output_format, color_mode, _ = _get_output_info(
+            request.embed_mode,
+            request.dct_output_format,
+            request.dct_color_mode
+        )
         
         return EncodeResponse(
             stego_image_base64=stego_b64,
@@ -508,6 +621,8 @@ async def api_encode(request: EncodeRequest):
             date_used=result.date_used,
             day_of_week=day_of_week,
             embed_mode=request.embed_mode,
+            output_format=output_format,
+            color_mode=color_mode,
         )
         
     except CapacityError as e:
@@ -526,6 +641,7 @@ async def api_encode_file(request: EncodeFileRequest):
     File data must be base64-encoded.
     
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
+    NEW in v3.0.1: Supports dct_output_format and dct_color_mode.
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
@@ -543,6 +659,13 @@ async def api_encode_file(request: EncodeFileRequest):
             mime_type=request.mime_type
         )
         
+        # Get DCT parameters
+        dct_params = _get_dct_params(
+            request.embed_mode,
+            request.dct_output_format,
+            request.dct_color_mode
+        )
+        
         result = encode(
             message=payload,
             reference_photo=ref_photo,
@@ -552,11 +675,18 @@ async def api_encode_file(request: EncodeFileRequest):
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
             date_str=request.date_str,
-            embed_mode=request.embed_mode,  # NEW in v3.0
+            embed_mode=request.embed_mode,
+            **dct_params,  # NEW in v3.0.1
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
         day_of_week = get_day_from_date(result.date_used)
+        
+        output_format, color_mode, _ = _get_output_info(
+            request.embed_mode,
+            request.dct_output_format,
+            request.dct_color_mode
+        )
         
         return EncodeResponse(
             stego_image_base64=stego_b64,
@@ -565,6 +695,8 @@ async def api_encode_file(request: EncodeFileRequest):
             date_used=result.date_used,
             day_of_week=day_of_week,
             embed_mode=request.embed_mode,
+            output_format=output_format,
+            color_mode=color_mode,
         )
         
     except CapacityError as e:
@@ -588,6 +720,9 @@ async def api_decode(request: DecodeRequest):
     
     NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
     With 'auto' (default), tries LSB first then DCT.
+    
+    Note: Extraction works regardless of whether the image was created with
+    color mode or grayscale mode - both use the same Y channel for data.
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
@@ -605,7 +740,7 @@ async def api_decode(request: DecodeRequest):
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            embed_mode=request.embed_mode,  # NEW in v3.0
+            embed_mode=request.embed_mode,
         )
         
         if result.is_file:
@@ -645,22 +780,32 @@ async def api_encode_multipart(
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
     date_str: str = Form(""),
-    embed_mode: str = Form("lsb"),  # NEW in v3.0
+    embed_mode: str = Form("lsb"),
+    # NEW in v3.0.1
+    dct_output_format: str = Form("png"),
+    dct_color_mode: str = Form("grayscale"),
 ):
     """
     Encode using multipart form data (file uploads).
     
     Provide either 'message' (text) or 'payload_file' (binary file).
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
-    Returns the stego image directly as PNG with metadata headers.
+    Returns the stego image directly with metadata headers.
     
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
+    NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
     """
     # Validate mode
     if embed_mode not in ("lsb", "dct"):
         raise HTTPException(400, "embed_mode must be 'lsb' or 'dct'")
     if embed_mode == "dct" and not has_dct_support():
         raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
+    # Validate DCT options
+    if dct_output_format not in ("png", "jpeg"):
+        raise HTTPException(400, "dct_output_format must be 'png' or 'jpeg'")
+    if dct_color_mode not in ("grayscale", "color"):
+        raise HTTPException(400, "dct_color_mode must be 'grayscale' or 'color'")
     
     try:
         ref_data = await reference_photo.read()
@@ -701,6 +846,9 @@ async def api_encode_multipart(
         else:
             raise HTTPException(400, "Must provide either 'message' or 'payload_file'")
         
+        # Get DCT parameters
+        dct_params = _get_dct_params(embed_mode, dct_output_format, dct_color_mode)
+        
         result = encode(
             message=payload,
             reference_photo=ref_data,
@@ -710,20 +858,26 @@ async def api_encode_multipart(
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
             date_str=date_str if date_str else None,
-            embed_mode=embed_mode,  # NEW in v3.0
+            embed_mode=embed_mode,
+            **dct_params,  # NEW in v3.0.1
         )
         
         day_of_week = get_day_from_date(result.date_used)
+        output_format, color_mode, mime_type = _get_output_info(
+            embed_mode, dct_output_format, dct_color_mode
+        )
         
         return Response(
             content=result.stego_image,
-            media_type="image/png",
+            media_type=mime_type,
             headers={
                 "Content-Disposition": f"attachment; filename={result.filename}",
                 "X-Stegasoo-Date": result.date_used,
                 "X-Stegasoo-Day": day_of_week,
                 "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}",
-                "X-Stegasoo-Embed-Mode": embed_mode,  # NEW in v3.0
+                "X-Stegasoo-Embed-Mode": embed_mode,
+                "X-Stegasoo-Output-Format": output_format,  # NEW in v3.0.1
+                "X-Stegasoo-Color-Mode": color_mode,  # NEW in v3.0.1
             }
         )
         
@@ -746,7 +900,7 @@ async def api_decode_multipart(
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
-    embed_mode: str = Form("auto"),  # NEW in v3.0
+    embed_mode: str = Form("auto"),
 ):
     """
     Decode using multipart form data (file uploads).
@@ -755,6 +909,8 @@ async def api_decode_multipart(
     Returns JSON with payload_type indicating text or file.
     
     NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
+    
+    Note: Extraction works the same regardless of color mode used during encoding.
     """
     # Validate mode
     if embed_mode not in ("auto", "lsb", "dct"):
@@ -795,7 +951,7 @@ async def api_decode_multipart(
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
-            embed_mode=embed_mode,  # NEW in v3.0
+            embed_mode=embed_mode,
         )
         
         if result.is_file:
@@ -866,7 +1022,7 @@ async def api_image_info(
                     capacity_bytes=comparison['dct']['capacity_bytes'],
                     capacity_kb=round(comparison['dct']['capacity_kb'], 1),
                     available=comparison['dct']['available'],
-                    output_format=comparison['dct']['output'],
+                    output_format="PNG/JPEG (grayscale or color)",  # Updated for v3.0.1
                 ),
             }
         

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stegasoo"
-version = "2.2.1"
+version = "3.0.2"
 description = "Secure steganography with hybrid photo + passphrase + PIN authentication"
 readme = "README.md"
 license = "MIT"
@@ -43,6 +43,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# DCT steganography support (v3.0+)
+dct = [
+    "scipy>=1.10.0",
+    "jpegio>=0.2.0",
+]
 cli = [
     "click>=8.0.0",
     "qrcode>=7.30"
@@ -55,6 +60,9 @@ web = [
     "gunicorn>=21.0.0",
     "qrcode>=7.3.0",
     "pyzbar>=0.1.9",
+    # Include DCT support for web UI
+    "scipy>=1.10.0",
+    "jpegio>=0.2.0",
 ]
 api = [
     "fastapi>=0.100.0",
@@ -62,9 +70,12 @@ api = [
     "python-multipart>=0.0.6",
     "qrcode>=7.30",
     "pyzbar>=0.1.9",
+    # Include DCT support for API
+    "scipy>=1.10.0",
+    "jpegio>=0.2.0",
 ]
 all = [
-    "stegasoo[cli,web,api]",
+    "stegasoo[cli,web,api,dct,compression]",
 ]
 dev = [
     "stegasoo[all]",

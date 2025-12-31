@@ -241,13 +241,13 @@
                                                         <i class="bi bi-soundwave text-info fs-4 me-2"></i>
                                                         <strong>DCT Mode</strong>
                                                         {% if has_dct %}
-                                                        <span class="badge bg-info ms-auto">Stealth</span>
+                                                        <span class="badge bg-warning text-dark ms-auto">Experimental</span>
                                                         {% else %}
                                                         <span class="badge bg-secondary ms-auto">Unavailable</span>
                                                         {% endif %}
                                                     </div>
                                                     <ul class="small text-muted mb-0 ps-3">
-                                                        <li>Grayscale output (PNG/JPEG)</li>
+                                                        <li>Color or grayscale output</li>
                                                         <li>Lower capacity (~75 KB/MP)</li>
                                                         <li>Better detection resistance</li>
                                                     </ul>
@@ -266,47 +266,98 @@
                                     <div class="form-text mt-2" id="modeHint">
                                         <i class="bi bi-lightbulb me-1"></i>
                                         <strong>LSB</strong> is best for most uses. 
-                                        <strong>DCT</strong> provides better stealth but smaller capacity and grayscale output.
+                                        <strong>DCT</strong> provides better stealth but lower capacity.
                                     </div>
                                 </div>
                                 
-                                <!-- DCT Output Format (shown only when DCT selected) -->
-                                <div class="mb-3 d-none" id="dctOutputFormatGroup">
-                                    <label class="form-label">
-                                        <i class="bi bi-file-image me-1"></i> DCT Output Format
-                                    </label>
+                                <!-- DCT Options Panel (shown only when DCT selected) -->
+                                <div class="d-none" id="dctOptionsPanel">
                                     
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center" id="dctPngCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png" checked>
-                                                <label class="form-check-label w-100" for="dctFormatPng">
-                                                    <i class="bi bi-file-earmark-image text-success fs-5 d-block"></i>
-                                                    <strong>PNG</strong>
-                                                    <div class="small text-muted">Lossless, larger</div>
-                                                </label>
+                                    <hr class="my-3">
+                                    
+                                    <div class="alert alert-warning small mb-3">
+                                        <i class="bi bi-flask me-1"></i>
+                                        <strong>Experimental Feature:</strong> DCT embedding is still being refined. 
+                                        Color mode preserves original colors but extraction uses Y channel only.
+                                    </div>
+                                    
+                                    <!-- DCT Color Mode (NEW in v3.0.1) -->
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <i class="bi bi-palette me-1"></i> DCT Color Mode
+                                            <span class="badge bg-success ms-1">v3.0.1</span>
+                                        </label>
+                                        
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <div class="form-check card p-2 text-center border-success border-2" id="dctColorCard">
+                                                    <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
+                                                    <label class="form-check-label w-100" for="dctColorColor">
+                                                        <i class="bi bi-palette-fill text-success fs-5 d-block"></i>
+                                                        <strong>Color</strong>
+                                                        <div class="small text-muted">Preserve colors</div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="form-check card p-2 text-center" id="dctGrayscaleCard">
+                                                    <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
+                                                    <label class="form-check-label w-100" for="dctColorGrayscale">
+                                                        <i class="bi bi-circle-half text-secondary fs-5 d-block"></i>
+                                                        <strong>Grayscale</strong>
+                                                        <div class="small text-muted">Traditional DCT</div>
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center" id="dctJpegCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg">
-                                                <label class="form-check-label w-100" for="dctFormatJpeg">
-                                                    <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
-                                                    <strong>JPEG</strong>
-                                                    <div class="small text-muted">Smaller, natural</div>
-                                                </label>
-                                            </div>
+                                        
+                                        <div class="form-text mt-2">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <strong>Color</strong> preserves original image colors (recommended).
+                                            <strong>Grayscale</strong> converts to B&W (traditional DCT steganography).
                                         </div>
                                     </div>
                                     
-                                    <div class="form-text mt-2">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        <strong>PNG</strong> is 100% reliable. <strong>JPEG</strong> produces smaller, more natural-looking files but uses lossy compression (Q=95).
+                                    <!-- DCT Output Format -->
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <i class="bi bi-file-image me-1"></i> DCT Output Format
+                                        </label>
+                                        
+                                        <div class="row g-2">
+                                            <div class="col-6">
+                                                <div class="form-check card p-2 text-center border-primary border-2" id="dctPngCard">
+                                                    <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png" checked>
+                                                    <label class="form-check-label w-100" for="dctFormatPng">
+                                                        <i class="bi bi-file-earmark-image text-primary fs-5 d-block"></i>
+                                                        <strong>PNG</strong>
+                                                        <div class="small text-muted">Lossless, larger</div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="form-check card p-2 text-center" id="dctJpegCard">
+                                                    <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg">
+                                                    <label class="form-check-label w-100" for="dctFormatJpeg">
+                                                        <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
+                                                        <strong>JPEG</strong>
+                                                        <div class="small text-muted">Smaller, natural</div>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-text mt-2">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <strong>PNG</strong> is 100% reliable. <strong>JPEG</strong> produces smaller, more natural-looking files but uses lossy compression (Q=95).
+                                        </div>
                                     </div>
+                                    
                                 </div>
                                 
                                 <!-- Capacity Comparison (populated by JS) -->
                                 <div class="d-none" id="modeCapacityComparison">
+                                    <hr class="my-3">
                                     <div class="alert alert-secondary small mb-0">
                                         <div class="row text-center">
                                             <div class="col-6 border-end">
@@ -353,7 +404,7 @@
                 <div class="alert alert-secondary mt-4 small">
                     <i class="bi bi-info-circle me-1"></i>
                     <strong>Limits:</strong> 
-                    Carrier image max ~24 megapixels (6000×4000). 
+                    Carrier image max ~24 megapixels (6000x4000). 
                     Files max 30MB upload. 
                     Payload max {{ max_payload_kb }} KB.
                 </div>
@@ -470,8 +521,9 @@ document.getElementById('encodeForm').addEventListener('submit', function(e) {
     let modeLabel = selectedMode.toUpperCase();
     
     if (selectedMode === 'dct') {
+        const colorMode = document.querySelector('input[name="dct_color_mode"]:checked')?.value || 'color';
         const outputFormat = document.querySelector('input[name="dct_output_format"]:checked')?.value || 'png';
-        modeLabel += ` → ${outputFormat.toUpperCase()}`;
+        modeLabel += ` (${colorMode}, ${outputFormat.toUpperCase()})`;
     }
     
     btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Encoding (${modeLabel})...`;
@@ -535,7 +587,7 @@ async function fetchCapacityComparison(file) {
 
 function updateCapacityDisplay(data) {
     // Update top panel
-    carrierDimensions.textContent = `${data.width} × ${data.height}`;
+    carrierDimensions.textContent = `${data.width} x ${data.height}`;
     lsbCapacityBadge.textContent = `LSB: ${data.lsb.capacity_kb} KB`;
     
     if (data.dct.available) {
@@ -573,18 +625,26 @@ if (carrierInput) {
 }
 
 // ============================================================================
-// Mode card highlighting & DCT output format visibility
+// Mode card highlighting & DCT options visibility
 // ============================================================================
 
 const lsbModeCard = document.getElementById('lsbModeCard');
 const dctModeCard = document.getElementById('dctModeCard');
 const modeLsb = document.getElementById('modeLsb');
 const modeDct = document.getElementById('modeDct');
-const dctOutputFormatGroup = document.getElementById('dctOutputFormatGroup');
+const dctOptionsPanel = document.getElementById('dctOptionsPanel');
+
+// DCT format cards
 const dctPngCard = document.getElementById('dctPngCard');
 const dctJpegCard = document.getElementById('dctJpegCard');
 const dctFormatPng = document.getElementById('dctFormatPng');
 const dctFormatJpeg = document.getElementById('dctFormatJpeg');
+
+// DCT color mode cards
+const dctColorCard = document.getElementById('dctColorCard');
+const dctGrayscaleCard = document.getElementById('dctGrayscaleCard');
+const dctColorColor = document.getElementById('dctColorColor');
+const dctColorGrayscale = document.getElementById('dctColorGrayscale');
 
 function updateModeCardHighlight() {
     // Mode cards
@@ -593,18 +653,27 @@ function updateModeCardHighlight() {
     dctModeCard.classList.toggle('border-info', modeDct.checked);
     dctModeCard.classList.toggle('border-2', modeDct.checked);
     
-    // Show/hide DCT output format selector
-    if (dctOutputFormatGroup) {
-        dctOutputFormatGroup.classList.toggle('d-none', !modeDct.checked);
+    // Show/hide DCT options panel
+    if (dctOptionsPanel) {
+        dctOptionsPanel.classList.toggle('d-none', !modeDct.checked);
     }
 }
 
 function updateDctFormatCardHighlight() {
     if (dctPngCard && dctJpegCard) {
-        dctPngCard.classList.toggle('border-success', dctFormatPng.checked);
+        dctPngCard.classList.toggle('border-primary', dctFormatPng.checked);
         dctPngCard.classList.toggle('border-2', dctFormatPng.checked);
         dctJpegCard.classList.toggle('border-warning', dctFormatJpeg.checked);
         dctJpegCard.classList.toggle('border-2', dctFormatJpeg.checked);
+    }
+}
+
+function updateDctColorCardHighlight() {
+    if (dctColorCard && dctGrayscaleCard) {
+        dctColorCard.classList.toggle('border-success', dctColorColor.checked);
+        dctColorCard.classList.toggle('border-2', dctColorColor.checked);
+        dctGrayscaleCard.classList.toggle('border-secondary', dctColorGrayscale.checked);
+        dctGrayscaleCard.classList.toggle('border-2', dctColorGrayscale.checked);
     }
 }
 
@@ -612,9 +681,12 @@ modeLsb.addEventListener('change', updateModeCardHighlight);
 modeDct.addEventListener('change', updateModeCardHighlight);
 dctFormatPng?.addEventListener('change', updateDctFormatCardHighlight);
 dctFormatJpeg?.addEventListener('change', updateDctFormatCardHighlight);
+dctColorColor?.addEventListener('change', updateDctColorCardHighlight);
+dctColorGrayscale?.addEventListener('change', updateDctColorCardHighlight);
 
 updateModeCardHighlight(); // Initial state
 updateDctFormatCardHighlight(); // Initial state
+updateDctColorCardHighlight(); // Initial state
 
 // Advanced options chevron rotation
 document.getElementById('advancedOptions').addEventListener('show.bs.collapse', function() {

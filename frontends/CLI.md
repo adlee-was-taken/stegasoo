@@ -11,6 +11,7 @@ Complete command-line interface reference for Stegasoo steganography operations.
   - [encode](#encode-command)
   - [decode](#decode-command)
   - [info](#info-command)
+- [Embedding Modes](#embedding-modes)
 - [Security Factors](#security-factors)
 - [Workflow Examples](#workflow-examples)
 - [Piping & Scripting](#piping--scripting)
@@ -27,6 +28,9 @@ Complete command-line interface reference for Stegasoo steganography operations.
 # CLI only
 pip install stegasoo[cli]
 
+# CLI with DCT support
+pip install stegasoo[cli,dct]
+
 # With all extras
 pip install stegasoo[all]
 ```
@@ -36,7 +40,7 @@ pip install stegasoo[all]
 ```bash
 git clone https://github.com/example/stegasoo.git
 cd stegasoo
-pip install -e ".[cli]"
+pip install -e ".[cli,dct]"
 ```
 
 ### Verify Installation
@@ -44,6 +48,9 @@ pip install -e ".[cli]"
 ```bash
 stegasoo --version
 stegasoo --help
+
+# Check DCT support
+python -c "from stegasoo.dct_steganography import has_jpegio_support; print('jpegio:', has_jpegio_support())"
 ```
 
 ---
@@ -54,7 +61,7 @@ stegasoo --help
 # 1. Generate credentials (do this once, memorize results)
 stegasoo generate --pin --words 3
 
-# 2. Encode a message
+# 2. Encode a message (LSB mode - default)
 stegasoo encode \
   --ref secret_photo.jpg \
   --carrier meme.png \
@@ -62,7 +69,17 @@ stegasoo encode \
   --pin 123456 \
   --message "Meet at midnight"
 
-# 3. Decode a message
+# 3. Encode for social media (DCT mode)
+stegasoo encode \
+  --ref secret_photo.jpg \
+  --carrier meme.png \
+  --phrase "apple forest thunder" \
+  --pin 123456 \
+  --message "Meet at midnight" \
+  --mode dct \
+  --format jpeg
+
+# 4. Decode a message (auto-detects mode)
 stegasoo decode \
   --ref secret_photo.jpg \
   --stego stego_abc123_20251227.png \
@@ -106,9 +123,9 @@ stegasoo generate
 
 Output:
 ```
-════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
   STEGASOO CREDENTIALS
-════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
 
 ⚠️  MEMORIZE THESE AND CLOSE THIS WINDOW
     Do not screenshot or save to file!
@@ -171,19 +188,22 @@ stegasoo encode [OPTIONS]
 
 #### Options
 
-| Option | Short | Type | Required | Description |
-|--------|-------|------|----------|-------------|
-| `--ref` | `-r` | path | ✓ | Reference photo (shared secret) |
-| `--carrier` | `-c` | path | ✓ | Carrier image to hide message in |
-| `--phrase` | `-p` | string | ✓ | Today's passphrase |
-| `--message` | `-m` | string | | Message to encode |
-| `--message-file` | `-f` | path | | Read message from file |
-| `--pin` | | string | * | Static PIN (6-9 digits) |
-| `--key` | `-k` | path | * | RSA key file |
-| `--key-password` | | string | | Password for RSA key |
-| `--output` | `-o` | path | | Output filename |
-| `--date` | | YYYY-MM-DD | | Date override |
-| `--quiet` | `-q` | flag | | Suppress output |
+| Option | Short | Type | Required | Default | Description |
+|--------|-------|------|----------|---------|-------------|
+| `--ref` | `-r` | path | ✓ | | Reference photo (shared secret) |
+| `--carrier` | `-c` | path | ✓ | | Carrier image to hide message in |
+| `--phrase` | `-p` | string | ✓ | | Today's passphrase |
+| `--message` | `-m` | string | | | Message to encode |
+| `--message-file` | `-f` | path | | | Read message from file |
+| `--pin` | | string | * | | Static PIN (6-9 digits) |
+| `--key` | `-k` | path | * | | RSA key file |
+| `--key-password` | | string | | | Password for RSA key |
+| `--output` | `-o` | path | | | Output filename |
+| `--date` | | YYYY-MM-DD | | | Date override |
+| `--mode` | | choice | | `lsb` | Embedding mode: `lsb` or `dct` |
+| `--format` | | choice | | `png` | Output format: `png` or `jpeg` (DCT only) |
+| `--color` | | choice | | `color` | Color mode: `color` or `grayscale` (DCT only) |
+| `--quiet` | `-q` | flag | | | Suppress output |
 
 \* At least one of `--pin` or `--key` is required.
 
@@ -206,7 +226,7 @@ stegasoo encode [OPTIONS]
 
 #### Examples
 
-**Basic encoding with PIN:**
+**Basic encoding with PIN (LSB mode - default):**
 ```bash
 stegasoo encode \
   --ref photos/vacation.jpg \
@@ -221,8 +241,58 @@ Output:
 ✓ Encoded successfully!
   Output: a1b2c3d4_20251227.png
   Size: 245,832 bytes
+  Mode: LSB
   Capacity used: 12.4%
   Date: 2025-12-27
+```
+
+**DCT mode for social media (JPEG output):**
+```bash
+stegasoo encode \
+  --ref photos/vacation.jpg \
+  --carrier memes/funny_cat.png \
+  --phrase "correct horse battery" \
+  --pin 847293 \
+  --message "The package arrives Tuesday" \
+  --mode dct \
+  --format jpeg
+```
+
+Output:
+```
+✓ Encoded successfully!
+  Output: a1b2c3d4_20251227.jpg
+  Size: 89,432 bytes
+  Mode: DCT (color, jpeg)
+  Capacity used: 45.2%
+  Date: 2025-12-27
+  
+  ⚠️  DCT mode is experimental
+```
+
+**DCT mode with PNG output (maximum DCT capacity):**
+```bash
+stegasoo encode \
+  -r ref.jpg \
+  -c carrier.png \
+  -p "phrase words here" \
+  --pin 123456 \
+  -m "Longer message that needs more space" \
+  --mode dct \
+  --format png \
+  --color color
+```
+
+**DCT grayscale mode:**
+```bash
+stegasoo encode \
+  -r ref.jpg \
+  -c bw_photo.png \
+  -p "phrase" \
+  --pin 123456 \
+  -m "Message" \
+  --mode dct \
+  --color grayscale
 ```
 
 **With RSA key:**
@@ -291,7 +361,7 @@ stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456 -m "msg" -q -
 
 ### Decode Command
 
-Decode a secret message from a stego image.
+Decode a secret message from a stego image. **Automatically detects LSB vs DCT mode.**
 
 #### Synopsis
 
@@ -328,6 +398,24 @@ stegasoo decode \
 Output:
 ```
 ✓ Decoded successfully!
+  Mode detected: LSB
+
+The package arrives Tuesday
+```
+
+**Decoding DCT image (auto-detected):**
+```bash
+stegasoo decode \
+  --ref photos/vacation.jpg \
+  --stego received_image.jpg \
+  --phrase "correct horse battery" \
+  --pin 847293
+```
+
+Output:
+```
+✓ Decoded successfully!
+  Mode detected: DCT
 
 The package arrives Tuesday
 ```
@@ -377,7 +465,7 @@ stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q | gpg --decr
 
 ### Info Command
 
-Display information about an image's capacity and embedded date.
+Display information about an image's capacity for both LSB and DCT modes.
 
 #### Synopsis
 
@@ -405,10 +493,15 @@ Image: vacation_photo.png
   Pixels:      2,073,600
   Mode:        RGB
   Format:      PNG
-  Capacity:    ~776,970 bytes (758 KB)
+
+Capacity:
+  LSB Mode:    ~776,970 bytes (758 KB)
+  DCT Mode:    ~64,800 bytes (63 KB)  [approximate]
+  
+  Note: DCT capacity varies based on image content
 ```
 
-**Check stego image (shows encoding date):**
+**Check stego image (shows encoding date and mode):**
 ```bash
 stegasoo info stego_a1b2c3d4_20251227.png
 ```
@@ -420,9 +513,85 @@ Image: stego_a1b2c3d4_20251227.png
   Pixels:      2,073,600
   Mode:        RGB
   Format:      PNG
-  Capacity:    ~776,970 bytes (758 KB)
+
+Stego Info:
   Embed date:  2025-12-27 (Saturday)
+  Embed mode:  DCT (detected)
+
+Capacity:
+  LSB Mode:    ~776,970 bytes (758 KB)
+  DCT Mode:    ~64,800 bytes (63 KB)  [approximate]
 ```
+
+---
+
+## Embedding Modes
+
+Stegasoo v3.0+ supports two steganography algorithms.
+
+### LSB Mode (Default)
+
+**Least Significant Bit** embedding modifies pixel values directly.
+
+```bash
+stegasoo encode ... --mode lsb
+# or just omit --mode (LSB is default)
+```
+
+| Aspect | Details |
+|--------|---------|
+| **Capacity** | ~3 bits/pixel (~770 KB for 1920×1080) |
+| **Output** | PNG only (lossless required) |
+| **Resilience** | ❌ Destroyed by JPEG compression |
+| **Best For** | Maximum capacity, controlled channels |
+
+### DCT Mode (Experimental)
+
+**Discrete Cosine Transform** embedding hides data in frequency coefficients.
+
+```bash
+stegasoo encode ... --mode dct --format jpeg --color color
+```
+
+| Aspect | Details |
+|--------|---------|
+| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080) |
+| **Output** | PNG or JPEG |
+| **Resilience** | ✅ Survives JPEG compression |
+| **Best For** | Social media, messaging apps |
+
+> ⚠️ **Experimental**: DCT mode may have edge cases. Test with your workflow.
+
+### DCT Options
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `--format` | `png`, `jpeg` | `png` | Output image format |
+| `--color` | `color`, `grayscale` | `color` | Color processing |
+
+### Choosing the Right Mode
+
+```
+Will the image be recompressed?
+(social media, messaging apps, etc.)
+           │
+    ┌──────┴──────┐
+    ▼             ▼
+   YES           NO
+    │             │
+    ▼             ▼
+Use DCT       Use LSB
+--mode dct    (default)
+--format jpeg
+```
+
+### Capacity Comparison
+
+| Mode | 1920×1080 Capacity |
+|------|-------------------|
+| LSB (PNG) | ~770 KB |
+| DCT (PNG) | ~65 KB |
+| DCT (JPEG) | ~30-50 KB |
 
 ---
 
@@ -468,25 +637,33 @@ stegasoo generate --rsa -o shared_key.pem -p "agreedpassword"
 # Securely transfer shared_key.pem to recipient
 ```
 
-**Sender (daily):**
+**Sender (daily - private channel):**
 ```bash
-# Get today's phrase from your memorized list
-TODAY_PHRASE="monday phrase words"
-
-# Encode message
+# For email, file transfer, etc. (no recompression)
 stegasoo encode \
   -r our_shared_photo.jpg \
   -c random_meme.png \
   -p "$TODAY_PHRASE" \
   --pin 847293 \
   -m "Meeting moved to 3pm"
+```
 
-# Share output image via normal channels (email, chat, etc.)
+**Sender (daily - social media):**
+```bash
+# For Instagram, Twitter, WhatsApp, etc.
+stegasoo encode \
+  -r our_shared_photo.jpg \
+  -c random_meme.png \
+  -p "$TODAY_PHRASE" \
+  --pin 847293 \
+  -m "Meeting moved to 3pm" \
+  --mode dct \
+  --format jpeg
 ```
 
 **Recipient (daily):**
 ```bash
-# Use the phrase for the day the message was SENT
+# Works for both LSB and DCT (auto-detected)
 stegasoo decode \
   -r our_shared_photo.jpg \
   -s received_image.png \
@@ -496,7 +673,7 @@ stegasoo decode \
 
 ### Batch Processing
 
-**Encode multiple messages:**
+**Encode multiple messages (LSB):**
 ```bash
 #!/bin/bash
 PHRASE="apple forest thunder"
@@ -517,6 +694,25 @@ for file in messages/*.txt; do
 done
 ```
 
+**Encode for social media (DCT):**
+```bash
+#!/bin/bash
+for file in messages/*.txt; do
+  name=$(basename "$file" .txt)
+  stegasoo encode \
+    -r "$REF" \
+    -c "carriers/${name}.png" \
+    -p "$PHRASE" \
+    --pin "$PIN" \
+    -f "$file" \
+    --mode dct \
+    --format jpeg \
+    -o "output/${name}_social.jpg" \
+    -q
+  echo "Encoded for social: $name"
+done
+```
+
 ### Archive with Date Preservation
 
 ```bash
@@ -529,6 +725,31 @@ stegasoo encode \
   -m "Historical record" \
   --date 2025-01-15 \
   -o archive_2025-01-15.png
+```
+
+### Testing Mode Compatibility
+
+```bash
+# Encode with DCT
+stegasoo encode \
+  -r ref.jpg \
+  -c carrier.png \
+  -p "test phrase" \
+  --pin 123456 \
+  -m "Test message" \
+  --mode dct \
+  --format jpeg \
+  -o test_dct.jpg
+
+# Simulate social media recompression
+convert test_dct.jpg -quality 85 test_recompressed.jpg
+
+# Decode (should still work!)
+stegasoo decode \
+  -r ref.jpg \
+  -s test_recompressed.jpg \
+  -p "test phrase" \
+  --pin 123456
 ```
 
 ---
@@ -585,6 +806,15 @@ if ! stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q 2>/dev/
 fi
 ```
 
+### Mode Detection in Scripts
+
+```bash
+#!/bin/bash
+# Get mode from verbose output
+MODE=$(stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 2>&1 | grep "Mode detected" | awk '{print $3}')
+echo "Image was encoded with: $MODE mode"
+```
+
 ---
 
 ## Error Handling
@@ -596,16 +826,31 @@ fi
 | "Must provide --pin or --key" | No security factor given | Add `--pin` or `--key` option |
 | "PIN must be 6-9 digits" | Invalid PIN format | Use numeric PIN, 6-9 chars |
 | "PIN cannot start with zero" | Leading zero in PIN | Use PIN starting with 1-9 |
-| "Carrier image too small" | Message exceeds capacity | Use larger carrier image |
+| "Carrier image too small" | Message exceeds capacity | Use larger carrier or LSB mode |
+| "Message too long for DCT capacity" | DCT has less space | Shorten message or use LSB |
 | "Decryption failed" | Wrong credentials | Verify phrase, PIN, ref photo |
+| "Invalid or missing Stegasoo header" | Wrong mode or corruption | Check mode, try other credentials |
 | "RSA key is password-protected" | Missing key password | Add `--key-password` option |
+| "jpegio not available" | Missing library | Install: `pip install jpegio` |
+| "Invalid --format for LSB mode" | JPEG with LSB | Use `--mode dct` for JPEG output |
 
 ### Troubleshooting Decryption Failures
 
 1. **Check the encoding date:** The filename often contains the date (e.g., `_20251227`)
 2. **Use correct phrase:** The phrase must match the day the message was encoded, not today
 3. **Verify reference photo:** Must be the exact same file, not a resized copy
-4. **Check stego image:** Ensure it wasn't resized, recompressed, or converted
+4. **Check stego image:** 
+   - LSB: Ensure it wasn't resized, recompressed, or converted
+   - DCT: More resilient, but heavy recompression may still destroy data
+5. **Check embedding mode:** The decoder auto-detects, but if issues persist, verify the original was encoded with the expected mode
+
+### DCT-Specific Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Invalid or missing Stegasoo header" after social media | Heavy recompression | Try higher quality original or shorter message |
+| JPEG output not working | jpegio not installed | `pip install jpegio` |
+| Lower capacity than expected | Normal for DCT | DCT has ~10% of LSB capacity |
 
 ---
 
@@ -624,6 +869,33 @@ fi
 | Variable | Description |
 |----------|-------------|
 | `PYTHONPATH` | Include `src/` for development |
+
+---
+
+## Dependencies
+
+### Core Dependencies
+
+- `pillow` - Image processing
+- `cryptography` - Encryption
+- `argon2-cffi` - Key derivation
+- `click` - CLI framework
+
+### DCT Mode Dependencies
+
+- `scipy` - DCT transformations
+- `jpegio` - Native JPEG coefficient access (recommended)
+
+Install DCT dependencies:
+```bash
+pip install scipy jpegio
+```
+
+Check availability:
+```bash
+python -c "import scipy; print('scipy:', scipy.__version__)"
+python -c "import jpegio; print('jpegio: available')"
+```
 
 ---
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stegasoo CLI - Command-line interface for steganography operations.
+Stegasoo CLI - Command-line interface for steganography operations (v3.0.1).
 
 Usage:
     stegasoo generate [OPTIONS]
@@ -8,7 +8,12 @@ Usage:
     stegasoo decode [OPTIONS]
     stegasoo verify [OPTIONS]
     stegasoo info [OPTIONS]
-    stegasoo compare [OPTIONS]  # NEW in v3.0
+    stegasoo compare [OPTIONS]
+    stegasoo modes [OPTIONS]
+
+New in v3.0.1:
+    - DCT color mode: --dct-color (grayscale or color)
+    - DCT output format: --dct-format (png or jpeg)
 """
 
 import sys
@@ -73,14 +78,19 @@ def cli():
     Hide encrypted messages or files in images using a combination of:
     
     \b
-    • Reference photo (something you have)
-    • Daily passphrase (something you know)
-    • Static PIN or RSA key (additional security)
+    - Reference photo (something you have)
+    - Daily passphrase (something you know)
+    - Static PIN or RSA key (additional security)
     
     \b
-    NEW in v3.0 - Embedding Modes:
-    • LSB mode (default): Full color output, higher capacity
-    • DCT mode: Grayscale output, ~20% capacity, better stealth
+    Embedding Modes (v3.0):
+    - LSB mode (default): Full color output, higher capacity
+    - DCT mode: Frequency domain, ~20% capacity, better stealth
+    
+    \b
+    DCT Options (v3.0.1):
+    - Color mode: grayscale (default) or color (preserves colors)
+    - Output format: png (lossless) or jpeg (smaller, natural)
     """
     pass
 
@@ -148,29 +158,29 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         
         # Pretty output
         click.echo()
-        click.secho("═" * 60, fg='cyan')
+        click.secho("=" * 60, fg='cyan')
         click.secho("  STEGASOO CREDENTIALS", fg='cyan', bold=True)
-        click.secho("═" * 60, fg='cyan')
+        click.secho("=" * 60, fg='cyan')
         click.echo()
         
-        click.secho("⚠️  MEMORIZE THESE AND CLOSE THIS WINDOW", fg='yellow', bold=True)
+        click.secho("  MEMORIZE THESE AND CLOSE THIS WINDOW", fg='yellow', bold=True)
         click.secho("    Do not screenshot or save to file!", fg='yellow')
         click.echo()
         
         if creds.pin:
-            click.secho("─── STATIC PIN ───", fg='green')
+            click.secho("--- STATIC PIN ---", fg='green')
             click.secho(f"    {creds.pin}", fg='bright_yellow', bold=True)
             click.echo()
         
-        click.secho("─── DAILY PHRASES ───", fg='green')
+        click.secho("--- DAILY PHRASES ---", fg='green')
         for day in DAY_NAMES:
             phrase = creds.phrases[day]
-            click.echo(f"    {day:9} │ ", nl=False)
+            click.echo(f"    {day:9} | ", nl=False)
             click.secho(phrase, fg='bright_white')
         click.echo()
         
         if creds.rsa_key_pem:
-            click.secho("─── RSA KEY ───", fg='green')
+            click.secho("--- RSA KEY ---", fg='green')
             if output:
                 # Save to file
                 private_key = load_rsa_key(creds.rsa_key_pem.encode())
@@ -182,7 +192,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
                 click.echo(creds.rsa_key_pem)
             click.echo()
         
-        click.secho("─── SECURITY ───", fg='green')
+        click.secho("--- SECURITY ---", fg='green')
         click.echo(f"    Phrase entropy:  {creds.phrase_entropy} bits")
         if creds.pin:
             click.echo(f"    PIN entropy:     {creds.pin_entropy} bits")
@@ -214,9 +224,14 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
 @click.option('--output', '-o', type=click.Path(), help='Output file (default: auto-generated)')
 @click.option('--date', 'date_str', help='Date override (YYYY-MM-DD)')
 @click.option('--mode', 'embed_mode', type=click.Choice(['lsb', 'dct']), default='lsb',
-              help='Embedding mode: lsb (default, color) or dct (grayscale, requires scipy)')
+              help='Embedding mode: lsb (default, color) or dct (requires scipy)')
+@click.option('--dct-format', 'dct_output_format', type=click.Choice(['png', 'jpeg']), default='png',
+              help='DCT output format: png (lossless, default) or jpeg (smaller)')
+@click.option('--dct-color', 'dct_color_mode', type=click.Choice(['grayscale', 'color']), default='grayscale',
+              help='DCT color mode: grayscale (default) or color (preserves original colors)')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress output except errors')
-def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key, key_qr, key_password, output, date_str, embed_mode, quiet):
+def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key, key_qr, 
+               key_password, output, date_str, embed_mode, dct_output_format, dct_color_mode, quiet):
     """
     Encode a secret message or file into an image.
     
@@ -230,33 +245,49 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
     \b
     Embedding Modes (v3.0):
         --mode lsb   Spatial LSB embedding (default)
-                     • Full color output (PNG/BMP)
-                     • Higher capacity (~375 KB/megapixel)
+                     - Full color output (PNG/BMP)
+                     - Higher capacity (~375 KB/megapixel)
         
         --mode dct   DCT domain embedding (requires scipy)
-                     • Grayscale output only
-                     • Lower capacity (~75 KB/megapixel)
-                     • Better resistance to visual analysis
+                     - Configurable color/grayscale output
+                     - Lower capacity (~75 KB/megapixel)
+                     - Better resistance to visual analysis
+    
+    \b
+    DCT Options (v3.0.1):
+        --dct-format png     Lossless output (default)
+        --dct-format jpeg    Smaller file, more natural appearance
+        
+        --dct-color grayscale   Convert to grayscale (default, traditional)
+        --dct-color color       Preserve original colors (experimental)
     
     \b
     Examples:
         # Text message with PIN (LSB mode, default)
-        stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -m "secret"
+        stegasoo encode -r photo.jpg -c meme.png -p "apple forest" --pin 123456 -m "secret"
         
-        # DCT mode for better stealth
+        # DCT mode - grayscale PNG (traditional)
         stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -m "secret" --mode dct
         
-        # With RSA key file
-        stegasoo encode -r photo.jpg -c meme.png -p "words" -k mykey.pem -m "secret"
+        # DCT mode - color JPEG (v3.0.1)
+        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -m "secret" \
+            --mode dct --dct-color color --dct-format jpeg
         
-        # Embed a binary file
-        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -e secret.pdf
+        # DCT mode - color PNG (best quality + color preservation)
+        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -m "secret" \
+            --mode dct --dct-color color --dct-format png
     """
     # Check DCT mode availability
     if embed_mode == 'dct' and not has_dct_support():
         raise click.ClickException(
             "DCT mode requires scipy. Install with: pip install scipy"
         )
+    
+    # Warn if DCT options used with LSB mode
+    if embed_mode == 'lsb':
+        if dct_output_format != 'png' or dct_color_mode != 'grayscale':
+            if not quiet:
+                click.secho("Note: --dct-format and --dct-color only apply to DCT mode", fg='yellow', dim=True)
     
     # Determine what to encode
     payload = None
@@ -329,7 +360,10 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
             )
         
         if not quiet:
-            click.echo(f"Mode: {embed_mode.upper()} ({fit_check['usage_percent']:.1f}% capacity)")
+            mode_desc = embed_mode.upper()
+            if embed_mode == 'dct':
+                mode_desc += f" ({dct_color_mode}, {dct_output_format.upper()})"
+            click.echo(f"Mode: {mode_desc} ({fit_check['usage_percent']:.1f}% capacity)")
         
         result = encode(
             message=payload,
@@ -340,7 +374,9 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
             date_str=date_str,
-            embed_mode=embed_mode,  # NEW in v3.0
+            embed_mode=embed_mode,
+            dct_output_format=dct_output_format,
+            dct_color_mode=dct_color_mode,
         )
         
         # Determine output path
@@ -353,13 +389,15 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
         out_path.write_bytes(result.stego_image)
         
         if not quiet:
-            click.secho(f"✓ Encoded successfully!", fg='green')
+            click.secho(f"[OK] Encoded successfully!", fg='green')
             click.echo(f"  Output: {out_path}")
             click.echo(f"  Size: {len(result.stego_image):,} bytes")
             click.echo(f"  Capacity used: {result.capacity_percent:.1f}%")
             click.echo(f"  Date: {result.date_used}")
             if embed_mode == 'dct':
-                click.secho(f"  Note: Output is grayscale (DCT mode)", dim=True)
+                color_note = "color preserved" if dct_color_mode == 'color' else "grayscale"
+                format_note = dct_output_format.upper()
+                click.secho(f"  DCT output: {format_note} ({color_note})", dim=True)
         
     except StegasooError as e:
         raise click.ClickException(str(e))
@@ -393,6 +431,9 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, embed
     Must use the same credentials that were used for encoding.
     Automatically detects whether content is text or a file.
     RSA key can be provided as a .pem file (--key) or QR code image (--key-qr).
+    
+    Note: Extraction works the same regardless of whether the image was
+    created with color mode or grayscale mode - both use the same Y channel.
     
     \b
     Extraction Modes (v3.0):
@@ -461,7 +502,7 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, embed
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
-            embed_mode=embed_mode,  # NEW in v3.0
+            embed_mode=embed_mode,
         )
         
         if result.is_file:
@@ -481,7 +522,7 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, embed
             out_path.write_bytes(result.file_data)
             
             if not quiet:
-                click.secho("✓ Decoded file successfully!", fg='green')
+                click.secho("[OK] Decoded file successfully!", fg='green')
                 click.echo(f"  Saved to: {out_path}")
                 click.echo(f"  Size: {len(result.file_data):,} bytes")
                 if result.mime_type:
@@ -491,13 +532,13 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, embed
             if output:
                 Path(output).write_text(result.message)
                 if not quiet:
-                    click.secho("✓ Decoded successfully!", fg='green')
+                    click.secho("[OK] Decoded successfully!", fg='green')
                     click.echo(f"  Saved to: {output}")
             else:
                 if quiet:
                     click.echo(result.message)
                 else:
-                    click.secho("✓ Decoded successfully!", fg='green')
+                    click.secho("[OK] Decoded successfully!", fg='green')
                     click.echo()
                     click.echo(result.message)
         
@@ -583,7 +624,7 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, embed_mode, as_js
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
-            embed_mode=embed_mode,  # NEW in v3.0
+            embed_mode=embed_mode,
         )
         
         # Calculate payload size
@@ -617,7 +658,7 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, embed_mode, as_js
                 output["mime_type"] = result.mime_type
             click.echo(json.dumps(output, indent=2))
         else:
-            click.secho("✓ Valid stego image", fg='green', bold=True)
+            click.secho("[OK] Valid stego image", fg='green', bold=True)
             click.echo(f"  Payload:  {payload_type} ({payload_desc})")
             click.echo(f"  Size:     {payload_size:,} bytes")
             if date_encoded:
@@ -634,7 +675,7 @@ def verify(ref, stego, phrase, pin, key, key_qr, key_password, embed_mode, as_js
             click.echo(json.dumps(output, indent=2))
             sys.exit(1)
         else:
-            click.secho("✗ Verification failed", fg='red', bold=True)
+            click.secho("[FAIL] Verification failed", fg='red', bold=True)
             click.echo(f"  Error: {e}")
             sys.exit(1)
     except StegasooError as e:
@@ -690,6 +731,8 @@ def info(image, as_json):
                         "kb": round(comparison['dct']['capacity_kb'], 1),
                         "available": comparison['dct']['available'],
                         "ratio_vs_lsb": round(comparison['dct']['ratio_vs_lsb'], 1),
+                        "output_formats": ["png", "jpeg"],
+                        "color_modes": ["grayscale", "color"],
                     },
                 },
             }
@@ -701,7 +744,7 @@ def info(image, as_json):
         
         click.echo()
         click.secho(f"Image: {image}", bold=True)
-        click.echo(f"  Dimensions:  {result.details['width']} × {result.details['height']}")
+        click.echo(f"  Dimensions:  {result.details['width']} x {result.details['height']}")
         click.echo(f"  Pixels:      {result.details['pixels']:,}")
         click.echo(f"  Mode:        {result.details['mode']}")
         click.echo(f"  Format:      {result.details['format']}")
@@ -710,9 +753,12 @@ def info(image, as_json):
         click.secho("  Capacity:", bold=True)
         click.echo(f"    LSB mode:  ~{comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
         
-        dct_status = "✓" if comparison['dct']['available'] else "✗ (scipy not installed)"
+        dct_status = "[OK]" if comparison['dct']['available'] else "[X] (scipy not installed)"
         click.echo(f"    DCT mode:  ~{comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB) {dct_status}")
         click.echo(f"    DCT ratio: {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB")
+        
+        if comparison['dct']['available']:
+            click.secho("    DCT options: grayscale/color, png/jpeg", dim=True)
         
         if date_str:
             click.echo()
@@ -725,7 +771,7 @@ def info(image, as_json):
 
 
 # ============================================================================
-# COMPARE COMMAND (NEW in v3.0)
+# COMPARE COMMAND
 # ============================================================================
 
 @cli.command()
@@ -767,7 +813,8 @@ def compare(image, payload_size, as_json):
                         "capacity_bytes": comparison['dct']['capacity_bytes'],
                         "capacity_kb": round(comparison['dct']['capacity_kb'], 1),
                         "available": comparison['dct']['available'],
-                        "output_format": comparison['dct']['output'],
+                        "output_formats": ["png", "jpeg"],
+                        "color_modes": ["grayscale", "color"],
                         "ratio_vs_lsb_percent": round(comparison['dct']['ratio_vs_lsb'], 1),
                     },
                 },
@@ -784,60 +831,63 @@ def compare(image, payload_size, as_json):
             return
         
         click.echo()
-        click.secho(f"═══ Mode Comparison: {image} ═══", fg='cyan', bold=True)
-        click.echo(f"  Dimensions: {comparison['width']} × {comparison['height']}")
+        click.secho(f"=== Mode Comparison: {image} ===", fg='cyan', bold=True)
+        click.echo(f"  Dimensions: {comparison['width']} x {comparison['height']}")
         click.echo()
         
         # LSB mode
-        click.secho("  ┌─── LSB Mode ───", fg='green')
-        click.echo(f"  │ Capacity:  {comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
-        click.echo(f"  │ Output:    {comparison['lsb']['output']}")
-        click.echo(f"  │ Status:    ✓ Available")
-        click.echo("  │")
+        click.secho("  +--- LSB Mode ---", fg='green')
+        click.echo(f"  | Capacity:  {comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
+        click.echo(f"  | Output:    {comparison['lsb']['output']}")
+        click.echo(f"  | Status:    [OK] Available")
+        click.echo("  |")
         
         # DCT mode
-        click.secho("  ├─── DCT Mode ───", fg='blue')
-        click.echo(f"  │ Capacity:  {comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB)")
-        click.echo(f"  │ Output:    {comparison['dct']['output']}")
-        click.echo(f"  │ Ratio:     {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB capacity")
+        click.secho("  +--- DCT Mode ---", fg='blue')
+        click.echo(f"  | Capacity:  {comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB)")
+        click.echo(f"  | Ratio:     {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB capacity")
         if comparison['dct']['available']:
-            click.echo(f"  │ Status:    ✓ Available")
+            click.echo(f"  | Status:    [OK] Available")
+            click.echo(f"  | Formats:   PNG (lossless), JPEG (smaller)")
+            click.echo(f"  | Colors:    Grayscale (default), Color (v3.0.1)")
         else:
-            click.secho(f"  │ Status:    ✗ Requires scipy (pip install scipy)", fg='yellow')
-        click.echo("  │")
+            click.secho(f"  | Status:    [X] Requires scipy (pip install scipy)", fg='yellow')
+        click.echo("  |")
         
         # Payload check
         if payload_size:
-            click.secho("  ├─── Payload Check ───", fg='magenta')
-            click.echo(f"  │ Size:      {payload_size:,} bytes")
+            click.secho("  +--- Payload Check ---", fg='magenta')
+            click.echo(f"  | Size:      {payload_size:,} bytes")
             
             fits_lsb = payload_size <= comparison['lsb']['capacity_bytes']
             fits_dct = payload_size <= comparison['dct']['capacity_bytes']
             
-            lsb_icon = "✓" if fits_lsb else "✗"
-            dct_icon = "✓" if fits_dct else "✗"
+            lsb_icon = "[OK]" if fits_lsb else "[X]"
+            dct_icon = "[OK]" if fits_dct else "[X]"
             lsb_color = 'green' if fits_lsb else 'red'
             dct_color = 'green' if fits_dct else 'red'
             
-            click.echo(f"  │ LSB mode:  ", nl=False)
+            click.echo(f"  | LSB mode:  ", nl=False)
             click.secho(f"{lsb_icon} {'Fits' if fits_lsb else 'Too large'}", fg=lsb_color)
-            click.echo(f"  │ DCT mode:  ", nl=False)
+            click.echo(f"  | DCT mode:  ", nl=False)
             click.secho(f"{dct_icon} {'Fits' if fits_dct else 'Too large'}", fg=dct_color)
-            click.echo("  │")
+            click.echo("  |")
         
         # Recommendation
-        click.secho("  └─── Recommendation ───", fg='yellow')
+        click.secho("  +--- Recommendation ---", fg='yellow')
         if not comparison['dct']['available']:
             click.echo("  Use LSB mode (DCT unavailable)")
         elif payload_size:
             if fits_dct:
                 click.echo("  DCT mode for better stealth (payload fits both modes)")
+                click.echo("  Use --dct-color color to preserve original colors")
             elif fits_lsb:
                 click.echo("  LSB mode (payload too large for DCT)")
             else:
-                click.secho("  ✗ Payload too large for both modes!", fg='red')
+                click.secho("  [X] Payload too large for both modes!", fg='red')
         else:
             click.echo("  LSB for larger payloads, DCT for better stealth")
+            click.echo("  DCT supports color output with --dct-color color")
         
         click.echo()
         
@@ -881,7 +931,7 @@ def strip_metadata_cmd(image, output, output_format, quiet):
         out_path.write_bytes(clean_data)
         
         if not quiet:
-            click.secho("✓ Metadata stripped", fg='green')
+            click.secho("[OK] Metadata stripped", fg='green')
             click.echo(f"  Input:  {image} ({original_size:,} bytes)")
             click.echo(f"  Output: {out_path} ({len(clean_data):,} bytes)")
         
@@ -890,7 +940,7 @@ def strip_metadata_cmd(image, output, output_format, quiet):
 
 
 # ============================================================================
-# MODES COMMAND (NEW in v3.0)
+# MODES COMMAND
 # ============================================================================
 
 @cli.command()
@@ -901,12 +951,12 @@ def modes():
     Displays which modes are available and their characteristics.
     """
     click.echo()
-    click.secho("═══ Stegasoo Embedding Modes ═══", fg='cyan', bold=True)
+    click.secho("=== Stegasoo Embedding Modes ===", fg='cyan', bold=True)
     click.echo()
     
     # LSB Mode
     click.secho("  LSB Mode (Spatial LSB)", fg='green', bold=True)
-    click.echo("    Status:      ✓ Always available")
+    click.echo("    Status:      [OK] Always available")
     click.echo("    Output:      PNG/BMP (full color)")
     click.echo("    Capacity:    ~375 KB per megapixel")
     click.echo("    Use case:    Larger payloads, color preservation")
@@ -916,18 +966,36 @@ def modes():
     # DCT Mode
     click.secho("  DCT Mode (Frequency Domain)", fg='blue', bold=True)
     if has_dct_support():
-        click.echo("    Status:      ✓ Available")
+        click.echo("    Status:      [OK] Available")
     else:
-        click.secho("    Status:      ✗ Requires scipy", fg='yellow')
+        click.secho("    Status:      [X] Requires scipy", fg='yellow')
         click.echo("    Install:     pip install scipy")
-    click.echo("    Output:      PNG (grayscale only)")
     click.echo("    Capacity:    ~75 KB per megapixel (~20% of LSB)")
-    click.echo("    Use case:    Better stealth, smaller messages")
+    click.echo("    Use case:    Better stealth, frequency domain hiding")
     click.echo("    CLI flag:    --mode dct")
     click.echo()
     
-    click.secho("  Tip:", dim=True)
-    click.echo("    Use 'stegasoo compare <image>' to see capacity for both modes")
+    # DCT Options (v3.0.1)
+    click.secho("  DCT Options (v3.0.1)", fg='magenta', bold=True)
+    click.echo("    Output format:")
+    click.echo("      --dct-format png     Lossless, larger file (default)")
+    click.echo("      --dct-format jpeg    Lossy, smaller, more natural")
+    click.echo()
+    click.echo("    Color mode:")
+    click.echo("      --dct-color grayscale   Traditional DCT (default)")
+    click.echo("      --dct-color color       Preserves original colors")
+    click.echo()
+    
+    # Examples
+    click.secho("  Examples:", dim=True)
+    click.echo("    # Traditional DCT (grayscale PNG)")
+    click.echo("    stegasoo encode ... --mode dct")
+    click.echo()
+    click.echo("    # Color-preserving DCT with JPEG output")
+    click.echo("    stegasoo encode ... --mode dct --dct-color color --dct-format jpeg")
+    click.echo()
+    click.echo("    # Compare modes for an image")
+    click.echo("    stegasoo compare carrier.png")
     click.echo()
 
 

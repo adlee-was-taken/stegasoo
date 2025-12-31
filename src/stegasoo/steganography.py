@@ -11,6 +11,7 @@ New in v3.0:
 
 New in v3.0.1:
 - dct_output_format parameter for DCT mode ('png' or 'jpeg')
+- dct_color_mode parameter for DCT mode ('grayscale' or 'color')
 """
 
 import io
@@ -58,6 +59,10 @@ ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX
 # DCT output format options (v3.0.1)
 DCT_OUTPUT_PNG = 'png'
 DCT_OUTPUT_JPEG = 'jpeg'
+
+# DCT color mode options (v3.0.1)
+DCT_COLOR_GRAYSCALE = 'grayscale'
+DCT_COLOR_COLOR = 'color'
 
 
 # =============================================================================
@@ -477,6 +482,7 @@ def embed_in_image(
     output_format: Optional[str] = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = DCT_OUTPUT_PNG,  # NEW in v3.0.1
+    dct_color_mode: str = 'grayscale',  # NEW in v3.0.1: 'grayscale' or 'color'
 ) -> Tuple[bytes, Union[EmbedStats, 'DCTEmbedStats'], str]:
     """
     Embed data into an image using specified mode.
@@ -489,6 +495,7 @@ def embed_in_image(
         output_format: Force output format (LSB mode only)
         embed_mode: 'lsb' (default) or 'dct'
         dct_output_format: For DCT mode - 'png' (lossless) or 'jpeg' (smaller)
+        dct_color_mode: For DCT mode - 'grayscale' (default) or 'color' (preserves colors)
         
     Returns:
         Tuple of (stego image bytes, stats, file extension)
@@ -515,14 +522,20 @@ def embed_in_image(
             debug.print(f"Invalid dct_output_format '{dct_output_format}', defaulting to PNG")
             dct_output_format = DCT_OUTPUT_PNG
         
+        # Validate DCT color mode (v3.0.1)
+        if dct_color_mode not in ('grayscale', 'color'):
+            debug.print(f"Invalid dct_color_mode '{dct_color_mode}', defaulting to grayscale")
+            dct_color_mode = 'grayscale'
+        
         dct_mod = _get_dct_module()
         
-        # Pass output_format to DCT module (v3.0.1)
+        # Pass output_format and color_mode to DCT module (v3.0.1)
         stego_bytes, dct_stats = dct_mod.embed_in_dct(
             data, 
             image_data, 
             pixel_key,
             output_format=dct_output_format,
+            color_mode=dct_color_mode,  # NEW in v3.0.1
         )
         
         # Determine extension based on output format
@@ -531,7 +544,8 @@ def embed_in_image(
         else:
             ext = 'png'
         
-        debug.print(f"DCT embedding complete: {dct_output_format.upper()} output, ext={ext}")
+        debug.print(f"DCT embedding complete: {dct_output_format.upper()} output, "
+                    f"color_mode={dct_color_mode}, ext={ext}")
         return stego_bytes, dct_stats, ext
     
     # LSB MODE

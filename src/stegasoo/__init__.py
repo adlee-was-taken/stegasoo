@@ -315,6 +315,7 @@ def encode(
     output_format = None,  # Optional[str]
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",  # NEW in v3.0.1: 'png' or 'jpeg'
+    dct_color_mode: str = "grayscale",  # NEW in v3.0.1: 'grayscale' or 'color'
 ) -> EncodeResult:
     """
     Encode a secret message or file into an image.
@@ -334,6 +335,7 @@ def encode(
         output_format: Force output format ('PNG', 'BMP') - LSB mode only
         embed_mode: Embedding mode - 'lsb' (default) or 'dct' (v3.0+)
         dct_output_format: For DCT mode - 'png' (lossless) or 'jpeg' (smaller)
+        dct_color_mode: For DCT mode - 'grayscale' (default) or 'color' (preserves colors)
         
     Returns:
         EncodeResult with stego image and metadata
@@ -349,16 +351,18 @@ def encode(
         # Default LSB mode
         >>> result = encode(message="Secret", ...)
         
-        # DCT mode with PNG output (lossless)
+        # DCT mode with grayscale PNG output (default)
         >>> result = encode(message="Secret", ..., embed_mode='dct')
         
-        # DCT mode with JPEG output (smaller, natural)
-        >>> result = encode(message="Secret", ..., embed_mode='dct', dct_output_format='jpeg')
+        # DCT mode with color JPEG output
+        >>> result = encode(message="Secret", ..., embed_mode='dct', 
+        ...                 dct_output_format='jpeg', dct_color_mode='color')
     """
     # Debug logging
     debug.print(f"encode called: message type={type(message).__name__}, "
                 f"day_phrase='{day_phrase[:20]}...', pin_length={len(pin)}, "
-                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}")
+                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}, "
+                f"dct_color_mode={dct_color_mode}")
     
     # Validate embed_mode
     if embed_mode not in (EMBED_MODE_LSB, EMBED_MODE_DCT):
@@ -374,6 +378,11 @@ def encode(
     if dct_output_format not in ('png', 'jpeg'):
         debug.print(f"Invalid dct_output_format '{dct_output_format}', defaulting to 'png'")
         dct_output_format = 'png'
+    
+    # Validate dct_color_mode (v3.0.1)
+    if dct_color_mode not in ('grayscale', 'color'):
+        debug.print(f"Invalid dct_color_mode '{dct_color_mode}', defaulting to 'grayscale'")
+        dct_color_mode = 'grayscale'
     
     # Validate inputs
     require_valid_payload(message)
@@ -407,7 +416,7 @@ def encode(
     debug.data(pixel_key, "Pixel key")
     
     # Embed in image (returns extension too)
-    # CRITICAL: Pass dct_output_format to embed_in_image
+    # CRITICAL: Pass dct_output_format and dct_color_mode to embed_in_image
     stego_data, stats, extension = embed_in_image(
         encrypted,
         carrier_image,
@@ -415,6 +424,7 @@ def encode(
         output_format=output_format,
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,  # NEW in v3.0.1
+        dct_color_mode=dct_color_mode,  # NEW in v3.0.1
     )
     
     # Generate filename with correct extension
@@ -468,6 +478,7 @@ def encode_file(
     filename_override: Optional[str] = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",  # NEW in v3.0.1
+    dct_color_mode: str = "grayscale",  # NEW in v3.0.1
 ) -> EncodeResult:
     """
     Encode a file into an image.
@@ -487,12 +498,13 @@ def encode_file(
         filename_override: Override the stored filename
         embed_mode: 'lsb' (default) or 'dct' (v3.0+)
         dct_output_format: For DCT mode - 'png' or 'jpeg' (v3.0.1+)
+        dct_color_mode: For DCT mode - 'grayscale' or 'color' (v3.0.1+)
         
     Returns:
         EncodeResult with stego image and metadata
     """
     debug.print(f"encode_file called: filepath={filepath}, embed_mode={embed_mode}, "
-                f"dct_output_format={dct_output_format}")
+                f"dct_output_format={dct_output_format}, dct_color_mode={dct_color_mode}")
     payload = FilePayload.from_file(str(filepath), filename_override)
     
     return encode(
@@ -507,6 +519,7 @@ def encode_file(
         output_format=output_format,
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,  # NEW in v3.0.1
+        dct_color_mode=dct_color_mode,  # NEW in v3.0.1
     )
 
 
@@ -528,6 +541,7 @@ def encode_bytes(
     mime_type: Optional[str] = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",  # NEW in v3.0.1
+    dct_color_mode: str = "grayscale",  # NEW in v3.0.1
 ) -> EncodeResult:
     """
     Encode raw bytes with a filename into an image.
@@ -548,12 +562,14 @@ def encode_bytes(
         mime_type: MIME type of the data
         embed_mode: 'lsb' (default) or 'dct' (v3.0+)
         dct_output_format: For DCT mode - 'png' or 'jpeg' (v3.0.1+)
+        dct_color_mode: For DCT mode - 'grayscale' or 'color' (v3.0.1+)
         
     Returns:
         EncodeResult with stego image and metadata
     """
     debug.print(f"encode_bytes called: filename={filename}, data_size={len(data)}, "
-                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}")
+                f"embed_mode={embed_mode}, dct_output_format={dct_output_format}, "
+                f"dct_color_mode={dct_color_mode}")
     payload = FilePayload(data=data, filename=filename, mime_type=mime_type)
     
     return encode(
@@ -568,6 +584,7 @@ def encode_bytes(
         output_format=output_format,
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,  # NEW in v3.0.1
+        dct_color_mode=dct_color_mode,  # NEW in v3.0.1
     )
 
 

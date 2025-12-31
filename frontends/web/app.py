@@ -5,7 +5,7 @@ Stegasoo Web Frontend (v3.0.1)
 Flask-based web UI for steganography operations.
 Supports both text messages and file embedding.
 NEW in v3.0: LSB and DCT embedding modes with advanced options.
-NEW in v3.0.1: DCT output format selection (PNG or JPEG).
+NEW in v3.0.1: DCT output format selection (PNG or JPEG) and color mode (grayscale or color).
 """
 
 import io
@@ -532,6 +532,11 @@ def encode_page():
             if dct_output_format not in ('png', 'jpeg'):
                 dct_output_format = 'png'
             
+            # NEW in v3.0.1 - DCT color mode (default to 'color')
+            dct_color_mode = request.form.get('dct_color_mode', 'color')
+            if dct_color_mode not in ('grayscale', 'color'):
+                dct_color_mode = 'color'
+            
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
@@ -624,7 +629,7 @@ def encode_page():
             else:
                 date_str = datetime.now().strftime('%Y-%m-%d')
             
-            # Encode with selected mode and output format
+            # Encode with selected mode, output format, and color mode
             encode_result = encode(
                 message=payload,
                 reference_photo=ref_data,
@@ -634,8 +639,9 @@ def encode_page():
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
                 date_str=date_str,
-                embed_mode=embed_mode,  # NEW in v3.0
-                dct_output_format=dct_output_format if embed_mode == 'dct' else None,  # NEW in v3.0.1
+                embed_mode=embed_mode,
+                dct_output_format=dct_output_format if embed_mode == 'dct' else None,
+                dct_color_mode=dct_color_mode if embed_mode == 'dct' else None,
             )
             
             # Determine actual output format for filename and storage
@@ -660,6 +666,7 @@ def encode_page():
                 'timestamp': time.time(),
                 'embed_mode': embed_mode,
                 'output_format': dct_output_format if embed_mode == 'dct' else 'png',
+                'color_mode': dct_color_mode if embed_mode == 'dct' else None,
                 'mime_type': output_mime,
             }
             
@@ -699,7 +706,8 @@ def encode_result(file_id):
         filename=file_info['filename'],
         thumbnail_url=url_for('encode_thumbnail', thumb_id=thumbnail_id) if thumbnail_id else None,
         embed_mode=file_info.get('embed_mode', 'lsb'),
-        output_format=file_info.get('output_format', 'png'),  # NEW in v3.0.1
+        output_format=file_info.get('output_format', 'png'),
+        color_mode=file_info.get('color_mode'),  # NEW in v3.0.1
     )
 
 
@@ -856,7 +864,7 @@ def decode_page():
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
                 date_str=stego_date if stego_date else None,
-                embed_mode=embed_mode,  # NEW in v3.0
+                embed_mode=embed_mode,
             )
             
             if decode_result.is_file:

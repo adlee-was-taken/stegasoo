@@ -34,31 +34,60 @@
                     <code class="fs-5">{{ filename }}</code>
                 </div>
                 
-                <!-- Mode and format badges (v3.0) -->
+                <!-- Mode and format badges (v3.0 / v3.0.1) -->
                 <div class="mb-4">
                     {% if embed_mode == 'dct' %}
                         <span class="badge bg-info fs-6">
                             <i class="bi bi-soundwave me-1"></i>DCT Mode
                         </span>
+                        
+                        <!-- Color mode badge (v3.0.1) -->
+                        {% if color_mode == 'color' %}
+                        <span class="badge bg-success fs-6 ms-1">
+                            <i class="bi bi-palette-fill me-1"></i>Color
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary fs-6 ms-1">
+                            <i class="bi bi-circle-half me-1"></i>Grayscale
+                        </span>
+                        {% endif %}
+                        
+                        <!-- Output format badge -->
                         {% if output_format == 'jpeg' %}
                         <span class="badge bg-warning text-dark fs-6 ms-1">
                             <i class="bi bi-file-earmark-richtext me-1"></i>JPEG
                         </span>
-                        <div class="small text-muted mt-1">Grayscale JPEG, frequency domain embedding (Q=95)</div>
+                        <div class="small text-muted mt-2">
+                            {% if color_mode == 'color' %}
+                            Color JPEG, frequency domain embedding (Q=95)
+                            {% else %}
+                            Grayscale JPEG, frequency domain embedding (Q=95)
+                            {% endif %}
+                        </div>
                         {% else %}
-                        <span class="badge bg-success fs-6 ms-1">
+                        <span class="badge bg-primary fs-6 ms-1">
                             <i class="bi bi-file-earmark-image me-1"></i>PNG
                         </span>
-                        <div class="small text-muted mt-1">Grayscale PNG, frequency domain embedding (lossless)</div>
+                        <div class="small text-muted mt-2">
+                            {% if color_mode == 'color' %}
+                            Color PNG, frequency domain embedding (lossless)
+                            {% else %}
+                            Grayscale PNG, frequency domain embedding (lossless)
+                            {% endif %}
+                        </div>
                         {% endif %}
+                        
                     {% else %}
                         <span class="badge bg-primary fs-6">
                             <i class="bi bi-grid-3x3-gap me-1"></i>LSB Mode
                         </span>
                         <span class="badge bg-success fs-6 ms-1">
+                            <i class="bi bi-palette-fill me-1"></i>Full Color
+                        </span>
+                        <span class="badge bg-primary fs-6 ms-1">
                             <i class="bi bi-file-earmark-image me-1"></i>PNG
                         </span>
-                        <div class="small text-muted mt-1">Full color PNG, spatial LSB embedding</div>
+                        <div class="small text-muted mt-2">Full color PNG, spatial LSB embedding</div>
                     {% endif %}
                 </div>
                 
@@ -88,6 +117,9 @@
                         {% endif %}
                         {% if embed_mode == 'dct' %}
                         <li>Recipient needs <strong>DCT mode</strong> or <strong>Auto</strong> detection to decode</li>
+                        {% if color_mode == 'color' %}
+                        <li><span class="badge bg-success">v3.0.1</span> Color preserved - extraction works on both color and grayscale</li>
+                        {% endif %}
                         {% endif %}
                     </ul>
                 </div>

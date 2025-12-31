@@ -16,6 +16,7 @@ Complete REST API reference for Stegasoo steganography operations.
   - [POST /decode](#post-decode-json)
   - [POST /decode/multipart](#post-decodemultipart)
   - [POST /image/info](#post-imageinfo)
+- [Embedding Modes](#embedding-modes)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
 - [Code Examples](#code-examples)
@@ -29,11 +30,18 @@ Complete REST API reference for Stegasoo steganography operations.
 The Stegasoo REST API provides programmatic access to all steganography operations:
 
 - **Generate** credentials (phrases, PINs, RSA keys)
-- **Encode** messages into images
-- **Decode** messages from images
+- **Encode** messages into images (LSB or DCT mode)
+- **Decode** messages from images (auto-detects mode)
 - **Analyze** image capacity
 
 The API supports both JSON (base64-encoded images) and multipart form data (direct file uploads).
+
+### What's New in v3.0.2
+
+- **DCT Steganography Mode** - JPEG-resilient embedding
+- **Output Format Selection** - PNG or JPEG output
+- **Color Mode Selection** - Color or grayscale processing
+- **jpegio Integration** - Proper JPEG coefficient manipulation
 
 ---
 
@@ -44,6 +52,8 @@ The API supports both JSON (base64-encoded images) and multipart form data (dire
 ```bash
 pip install stegasoo[api]
 ```
+
+This automatically installs DCT dependencies (scipy, jpegio) for full functionality.
 
 ### From Source
 
@@ -107,8 +117,10 @@ Host: localhost:8000
 
 ```json
 {
-  "version": "2.0.1",
+  "version": "3.0.2",
   "has_argon2": true,
+  "has_dct": true,
+  "has_jpegio": true,
   "day_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 }
 ```
@@ -119,6 +131,8 @@ Host: localhost:8000
 |-------|------|-------------|
 | `version` | string | Stegasoo library version |
 | `has_argon2` | boolean | Whether Argon2id is available |
+| `has_dct` | boolean | Whether DCT mode is available (scipy) |
+| `has_jpegio` | boolean | Whether native JPEG DCT is available |
 | `day_names` | array | Day names for phrase mapping |
 
 #### cURL Example
@@ -245,22 +259,28 @@ Content-Type: application/json
   "pin": "123456",
   "rsa_key_base64": null,
   "rsa_password": null,
-  "date_str": null
+  "date_str": null,
+  "embedding_mode": "lsb",
+  "output_format": "png",
+  "color_mode": "color"
 }
 ```
 
 #### Request Body
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `message` | string | ✓ | Message to encode |
-| `reference_photo_base64` | string | ✓ | Base64-encoded reference photo |
-| `carrier_image_base64` | string | ✓ | Base64-encoded carrier image |
-| `day_phrase` | string | ✓ | Today's passphrase |
-| `pin` | string | * | Static PIN (6-9 digits) |
-| `rsa_key_base64` | string | * | Base64-encoded RSA key PEM |
-| `rsa_password` | string | | Password for RSA key |
-| `date_str` | string | | Date override (YYYY-MM-DD) |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `message` | string | ✓ | | Message to encode |
+| `reference_photo_base64` | string | ✓ | | Base64-encoded reference photo |
+| `carrier_image_base64` | string | ✓ | | Base64-encoded carrier image |
+| `day_phrase` | string | ✓ | | Today's passphrase |
+| `pin` | string | * | | Static PIN (6-9 digits) |
+| `rsa_key_base64` | string | * | | Base64-encoded RSA key PEM |
+| `rsa_password` | string | | | Password for RSA key |
+| `date_str` | string | | | Date override (YYYY-MM-DD) |
+| `embedding_mode` | string | | `"lsb"` | `"lsb"` or `"dct"` |
+| `output_format` | string | | `"png"` | `"png"` or `"jpeg"` (DCT only) |
+| `color_mode` | string | | `"color"` | `"color"` or `"grayscale"` (DCT only) |
 
 \* At least one of `pin` or `rsa_key_base64` required.
 
@@ -272,7 +292,10 @@ Content-Type: application/json
   "filename": "a1b2c3d4_20251227.png",
   "capacity_used_percent": 12.4,
   "date_used": "2025-12-27",
-  "day_of_week": "Saturday"
+  "day_of_week": "Saturday",
+  "embedding_mode": "lsb",
+  "output_format": "png",
+  "color_mode": null
 }
 ```
 
@@ -280,13 +303,16 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `stego_image_base64` | string | Base64-encoded stego PNG |
+| `stego_image_base64` | string | Base64-encoded stego image |
 | `filename` | string | Suggested filename |
 | `capacity_used_percent` | float | Percentage of capacity used |
 | `date_used` | string | Date embedded in image (YYYY-MM-DD) |
 | `day_of_week` | string | Day name for passphrase rotation |
+| `embedding_mode` | string | Mode used: `"lsb"` or `"dct"` |
+| `output_format` | string | Output format: `"png"` or `"jpeg"` |
+| `color_mode` | string\|null | Color mode (DCT only): `"color"` or `"grayscale"` |
 
-#### cURL Example
+#### cURL Example (LSB Mode - Default)
 
 ```bash
 # Prepare base64-encoded images
@@ -302,6 +328,23 @@ curl -X POST http://localhost:8000/encode \
     \"day_phrase\": \"apple forest thunder\",
     \"pin\": \"123456\"
   }" | jq -r '.stego_image_base64' | base64 -d > stego.png
+```
+
+#### cURL Example (DCT Mode with JPEG Output)
+
+```bash
+curl -X POST http://localhost:8000/encode \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"message\": \"Secret message\",
+    \"reference_photo_base64\": \"$REF_B64\",
+    \"carrier_image_base64\": \"$CARRIER_B64\",
+    \"day_phrase\": \"apple forest thunder\",
+    \"pin\": \"123456\",
+    \"embedding_mode\": \"dct\",
+    \"output_format\": \"jpeg\",
+    \"color_mode\": \"color\"
+  }" | jq -r '.stego_image_base64' | base64 -d > stego.jpg
 ```
 
 ---
@@ -330,6 +373,18 @@ Content-Disposition: form-data; name="pin"
 
 123456
 ------FormBoundary
+Content-Disposition: form-data; name="embedding_mode"
+
+dct
+------FormBoundary
+Content-Disposition: form-data; name="output_format"
+
+jpeg
+------FormBoundary
+Content-Disposition: form-data; name="color_mode"
+
+color
+------FormBoundary
 Content-Disposition: form-data; name="reference_photo"; filename="ref.jpg"
 Content-Type: image/jpeg
 
@@ -344,83 +399,72 @@ Content-Type: image/png
 
 #### Form Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `message` | string | ✓ | Message to encode |
-| `reference_photo` | file | ✓ | Reference photo file |
-| `carrier` | file | ✓ | Carrier image file |
-| `day_phrase` | string | ✓ | Today's passphrase |
-| `pin` | string | * | Static PIN |
-| `rsa_key` | file | * | RSA key file (.pem) |
-| `rsa_password` | string | | Password for RSA key |
-| `date_str` | string | | Date override (YYYY-MM-DD) |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `message` | string | ✓ | | Message to encode |
+| `reference_photo` | file | ✓ | | Reference photo file |
+| `carrier` | file | ✓ | | Carrier image file |
+| `day_phrase` | string | ✓ | | Today's passphrase |
+| `pin` | string | * | | Static PIN |
+| `rsa_key` | file | * | | RSA key file (.pem) |
+| `rsa_password` | string | | | Password for RSA key |
+| `date_str` | string | | | Date override (YYYY-MM-DD) |
+| `embedding_mode` | string | | `"lsb"` | `"lsb"` or `"dct"` |
+| `output_format` | string | | `"png"` | `"png"` or `"jpeg"` (DCT only) |
+| `color_mode` | string | | `"color"` | `"color"` or `"grayscale"` (DCT only) |
 
 \* At least one of `pin` or `rsa_key` required.
 
 #### Response
 
-Returns the PNG image directly with headers:
-- `Content-Type: image/png`
-- `Content-Disposition: attachment; filename=<generated_filename>.png`
-- `X-Stegasoo-Date: 2025-12-27` (date used for encoding)
-- `X-Stegasoo-Day: Saturday` (day of week for passphrase rotation)
-- `X-Stegasoo-Capacity-Percent: 12.4` (capacity used)
+Returns the image directly with headers:
 
-#### cURL Examples
+```http
+HTTP/1.1 200 OK
+Content-Type: image/png
+Content-Disposition: attachment; filename="a1b2c3d4_20251227.png"
+X-Stegasoo-Date: 2025-12-27
+X-Stegasoo-Day: Saturday
+X-Stegasoo-Capacity-Used: 12.4
+X-Stegasoo-Embedding-Mode: lsb
+X-Stegasoo-Output-Format: png
 
-**With PIN:**
-```bash
-curl -X POST http://localhost:8000/encode/multipart \
-  -F "message=Secret message" \
-  -F "day_phrase=apple forest thunder" \
-  -F "pin=123456" \
-  -F "reference_photo=@reference.jpg" \
-  -F "carrier=@carrier.png" \
-  --output stego.png
+<binary image data>
 ```
 
-**With RSA key:**
-```bash
-curl -X POST http://localhost:8000/encode/multipart \
-  -F "message=Secret message" \
-  -F "day_phrase=apple forest thunder" \
-  -F "rsa_key=@mykey.pem" \
-  -F "rsa_password=keypassword" \
-  -F "reference_photo=@reference.jpg" \
-  -F "carrier=@carrier.png" \
-  --output stego.png
-```
+#### Response Headers
 
-**With both PIN and RSA:**
+| Header | Description |
+|--------|-------------|
+| `Content-Type` | `image/png` or `image/jpeg` |
+| `Content-Disposition` | Suggested filename |
+| `X-Stegasoo-Date` | Encoding date |
+| `X-Stegasoo-Day` | Day of week |
+| `X-Stegasoo-Capacity-Used` | Capacity percentage |
+| `X-Stegasoo-Embedding-Mode` | `lsb` or `dct` |
+| `X-Stegasoo-Output-Format` | `png` or `jpeg` |
+| `X-Stegasoo-Color-Mode` | `color` or `grayscale` (DCT only) |
+
+#### cURL Example (DCT + JPEG)
+
 ```bash
 curl -X POST http://localhost:8000/encode/multipart \
-  -F "message=Maximum security message" \
+  -F "message=Secret message for social media" \
   -F "day_phrase=apple forest thunder" \
   -F "pin=123456" \
-  -F "rsa_key=@mykey.pem" \
-  -F "rsa_password=keypassword" \
+  -F "embedding_mode=dct" \
+  -F "output_format=jpeg" \
+  -F "color_mode=color" \
   -F "reference_photo=@reference.jpg" \
   -F "carrier=@carrier.png" \
-  --output stego.png
-```
-
-**With custom date:**
-```bash
-curl -X POST http://localhost:8000/encode/multipart \
-  -F "message=Backdated message" \
-  -F "day_phrase=monday phrase here" \
-  -F "pin=123456" \
-  -F "date_str=2025-12-29" \
-  -F "reference_photo=@reference.jpg" \
-  -F "carrier=@carrier.png" \
-  --output stego.png
+  --output stego.jpg
 ```
 
 ---
 
 ### POST /decode (JSON)
 
-Decode a message using base64-encoded images.
+Decode a message using base64-encoded images. Auto-detects embedding mode.
 
 #### Request
 
@@ -450,20 +494,27 @@ Content-Type: application/json
 | `rsa_key_base64` | string | * | Base64-encoded RSA key |
 | `rsa_password` | string | | Password for RSA key |
 
-\* Must match the security factors used during encoding.
+\* Must match security factors used during encoding.
 
 #### Response
 
 ```json
 {
-  "message": "Secret message here"
+  "message": "Secret message here",
+  "embedding_mode_detected": "dct"
 }
 ```
+
+#### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Decoded message |
+| `embedding_mode_detected` | string | Detected mode: `"lsb"` or `"dct"` |
 
 #### cURL Example
 
 ```bash
-# Prepare base64-encoded images
 STEGO_B64=$(base64 -w0 stego.png)
 REF_B64=$(base64 -w0 reference.jpg)
 
@@ -481,15 +532,7 @@ curl -X POST http://localhost:8000/decode \
 
 ### POST /decode/multipart
 
-Decode a message using direct file uploads.
-
-#### Request
-
-```http
-POST /decode/multipart HTTP/1.1
-Host: localhost:8000
-Content-Type: multipart/form-data
-```
+Decode using direct file uploads. Auto-detects embedding mode.
 
 #### Form Fields
 
@@ -499,20 +542,20 @@ Content-Type: multipart/form-data
 | `reference_photo` | file | ✓ | Reference photo file |
 | `day_phrase` | string | ✓ | Passphrase for encoding day |
 | `pin` | string | * | Static PIN |
-| `rsa_key` | file | * | RSA key file |
+| `rsa_key` | file | * | RSA key file (.pem) |
 | `rsa_password` | string | | Password for RSA key |
 
 #### Response
 
 ```json
 {
-  "message": "Secret message here"
+  "message": "Secret message here",
+  "embedding_mode_detected": "lsb"
 }
 ```
 
-#### cURL Examples
+#### cURL Example
 
-**With PIN:**
 ```bash
 curl -X POST http://localhost:8000/decode/multipart \
   -F "day_phrase=apple forest thunder" \
@@ -521,35 +564,30 @@ curl -X POST http://localhost:8000/decode/multipart \
   -F "stego_image=@stego.png"
 ```
 
-**With RSA key:**
-```bash
-curl -X POST http://localhost:8000/decode/multipart \
-  -F "day_phrase=apple forest thunder" \
-  -F "rsa_key=@mykey.pem" \
-  -F "rsa_password=keypassword" \
-  -F "reference_photo=@reference.jpg" \
-  -F "stego_image=@stego.png"
-```
-
 ---
 
 ### POST /image/info
 
-Get information about an image's capacity.
+Get image information and capacity for both LSB and DCT modes.
 
-#### Request
+#### Request (JSON)
 
 ```http
 POST /image/info HTTP/1.1
 Host: localhost:8000
-Content-Type: multipart/form-data
+Content-Type: application/json
+
+{
+  "image_base64": "iVBORw0KGgo..."
+}
 ```
 
-#### Form Fields
+#### Request (Multipart)
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `image` | file | ✓ | Image file to analyze |
+```bash
+curl -X POST http://localhost:8000/image/info \
+  -F "image=@carrier.png"
+```
 
 #### Response
 
@@ -558,8 +596,19 @@ Content-Type: multipart/form-data
   "width": 1920,
   "height": 1080,
   "pixels": 2073600,
-  "capacity_bytes": 776970,
-  "capacity_kb": 758
+  "format": "PNG",
+  "mode": "RGB",
+  "capacity": {
+    "lsb": {
+      "bytes": 776970,
+      "kb": 758
+    },
+    "dct": {
+      "bytes": 64800,
+      "kb": 63,
+      "note": "Approximate - actual capacity depends on image content"
+    }
+  }
 }
 ```
 
@@ -570,15 +619,58 @@ Content-Type: multipart/form-data
 | `width` | integer | Image width in pixels |
 | `height` | integer | Image height in pixels |
 | `pixels` | integer | Total pixel count |
-| `capacity_bytes` | integer | Maximum message capacity (bytes) |
-| `capacity_kb` | integer | Maximum message capacity (KB) |
+| `format` | string | Image format (PNG, JPEG, etc.) |
+| `mode` | string | Color mode (RGB, L, etc.) |
+| `capacity.lsb.bytes` | integer | LSB capacity in bytes |
+| `capacity.lsb.kb` | integer | LSB capacity in KB |
+| `capacity.dct.bytes` | integer | Estimated DCT capacity in bytes |
+| `capacity.dct.kb` | integer | Estimated DCT capacity in KB |
+| `capacity.dct.note` | string | Capacity estimation note |
 
-#### cURL Example
+---
 
-```bash
-curl -X POST http://localhost:8000/image/info \
-  -F "image=@myimage.png"
-```
+## Embedding Modes
+
+### LSB Mode (Default)
+
+**Least Significant Bit** embedding modifies pixel values directly.
+
+| Aspect | Details |
+|--------|---------|
+| **Parameter** | `"embedding_mode": "lsb"` |
+| **Capacity** | ~3 bits/pixel (~770 KB for 1920×1080) |
+| **Output** | PNG only (lossless required) |
+| **Resilience** | ❌ Destroyed by JPEG compression |
+| **Best For** | Maximum capacity, controlled channels |
+
+### DCT Mode (Experimental)
+
+**Discrete Cosine Transform** embedding hides data in frequency coefficients.
+
+| Aspect | Details |
+|--------|---------|
+| **Parameter** | `"embedding_mode": "dct"` |
+| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080) |
+| **Output** | PNG or JPEG |
+| **Resilience** | ✅ Survives JPEG compression |
+| **Best For** | Social media, messaging apps |
+
+> ⚠️ **Experimental**: DCT mode may have edge cases. Test with your workflow.
+
+### DCT Options
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `output_format` | `"png"`, `"jpeg"` | `"png"` | Output image format |
+| `color_mode` | `"color"`, `"grayscale"` | `"color"` | Color processing mode |
+
+### Capacity Comparison
+
+| Mode | 1920×1080 Capacity |
+|------|-------------------|
+| LSB (PNG) | ~770 KB |
+| DCT (PNG) | ~65 KB |
+| DCT (JPEG) | ~30-50 KB |
 
 ---
 
@@ -618,7 +710,10 @@ curl -X POST http://localhost:8000/image/info \
   "pin": "string",
   "rsa_key_base64": "string",
   "rsa_password": "string",
-  "date_str": "YYYY-MM-DD"
+  "date_str": "YYYY-MM-DD",
+  "embedding_mode": "lsb",
+  "output_format": "png",
+  "color_mode": "color"
 }
 ```
 
@@ -630,7 +725,10 @@ curl -X POST http://localhost:8000/image/info \
   "filename": "string",
   "capacity_used_percent": 12.4,
   "date_used": "YYYY-MM-DD",
-  "day_of_week": "Saturday"
+  "day_of_week": "Saturday",
+  "embedding_mode": "lsb",
+  "output_format": "png",
+  "color_mode": null
 }
 ```
 
@@ -651,7 +749,8 @@ curl -X POST http://localhost:8000/image/info \
 
 ```json
 {
-  "message": "string"
+  "message": "string",
+  "embedding_mode_detected": "lsb"
 }
 ```
 
@@ -662,8 +761,12 @@ curl -X POST http://localhost:8000/image/info \
   "width": 1920,
   "height": 1080,
   "pixels": 2073600,
-  "capacity_bytes": 776970,
-  "capacity_kb": 758
+  "format": "PNG",
+  "mode": "RGB",
+  "capacity": {
+    "lsb": {"bytes": 776970, "kb": 758},
+    "dct": {"bytes": 64800, "kb": 63, "note": "..."}
+  }
 }
 ```
 
@@ -705,8 +808,11 @@ curl -X POST http://localhost:8000/image/info \
 | 400 | "rsa_bits must be one of [2048, 3072, 4096]" | Use valid RSA key size |
 | 400 | "Carrier image too small" | Use larger carrier image |
 | 400 | "PIN must be 6-9 digits" | Fix PIN format |
+| 400 | "Invalid embedding_mode" | Use `"lsb"` or `"dct"` |
+| 400 | "output_format 'jpeg' requires embedding_mode 'dct'" | Use DCT mode for JPEG |
+| 400 | "Message too long for DCT capacity" | Reduce message or use LSB |
 | 401 | "Decryption failed. Check credentials." | Verify phrase, PIN, ref photo |
-| 400 | "Message too long" | Reduce message size or use larger carrier |
+| 401 | "Invalid or missing Stegasoo header" | Wrong mode or corrupted image |
 
 ---
 
@@ -730,7 +836,7 @@ creds = response.json()
 print(f"PIN: {creds['pin']}")
 print(f"Monday phrase: {creds['phrases']['Monday']}")
 
-# Encode using multipart
+# Encode using multipart (LSB mode - default)
 with open("reference.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
     response = requests.post(f"{BASE_URL}/encode/multipart", files={
         "reference_photo": ref,
@@ -744,7 +850,24 @@ with open("reference.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
     with open("stego.png", "wb") as f:
         f.write(response.content)
 
-# Decode using multipart
+# Encode using DCT mode for social media
+with open("reference.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
+    response = requests.post(f"{BASE_URL}/encode/multipart", files={
+        "reference_photo": ref,
+        "carrier": carrier,
+    }, data={
+        "message": "Secret message for Instagram",
+        "day_phrase": "apple forest thunder",
+        "pin": "123456",
+        "embedding_mode": "dct",
+        "output_format": "jpeg",
+        "color_mode": "color"
+    })
+    
+    with open("stego_social.jpg", "wb") as f:
+        f.write(response.content)
+
+# Decode using multipart (auto-detects mode)
 with open("reference.jpg", "rb") as ref, open("stego.png", "rb") as stego:
     response = requests.post(f"{BASE_URL}/decode/multipart", files={
         "reference_photo": ref,
@@ -754,7 +877,9 @@ with open("reference.jpg", "rb") as ref, open("stego.png", "rb") as stego:
         "pin": "123456"
     })
     
-    print(f"Decoded: {response.json()['message']}")
+    result = response.json()
+    print(f"Decoded: {result['message']}")
+    print(f"Mode detected: {result['embedding_mode_detected']}")
 ```
 
 ### JavaScript/Node.js
@@ -766,11 +891,14 @@ const axios = require('axios');
 
 const BASE_URL = 'http://localhost:8000';
 
-async function encode() {
+async function encodeDCT() {
     const form = new FormData();
-    form.append('message', 'Secret message');
+    form.append('message', 'Secret message for social media');
     form.append('day_phrase', 'apple forest thunder');
     form.append('pin', '123456');
+    form.append('embedding_mode', 'dct');
+    form.append('output_format', 'jpeg');
+    form.append('color_mode', 'color');
     form.append('reference_photo', fs.createReadStream('reference.jpg'));
     form.append('carrier', fs.createReadStream('carrier.png'));
 
@@ -779,8 +907,9 @@ async function encode() {
         responseType: 'arraybuffer'
     });
 
-    fs.writeFileSync('stego.png', response.data);
-    console.log('Encoded successfully');
+    fs.writeFileSync('stego.jpg', response.data);
+    console.log('Encoded with DCT mode');
+    console.log('Embedding mode:', response.headers['x-stegasoo-embedding-mode']);
 }
 
 async function decode() {
@@ -788,16 +917,17 @@ async function decode() {
     form.append('day_phrase', 'apple forest thunder');
     form.append('pin', '123456');
     form.append('reference_photo', fs.createReadStream('reference.jpg'));
-    form.append('stego_image', fs.createReadStream('stego.png'));
+    form.append('stego_image', fs.createReadStream('stego.jpg'));
 
     const response = await axios.post(`${BASE_URL}/decode/multipart`, form, {
         headers: form.getHeaders()
     });
 
     console.log('Decoded:', response.data.message);
+    console.log('Mode detected:', response.data.embedding_mode_detected);
 }
 
-encode().then(decode);
+encodeDCT().then(decode);
 ```
 
 ### Go
@@ -816,13 +946,16 @@ import (
 )
 
 func main() {
-    // Encode
+    // Encode with DCT mode
     body := &bytes.Buffer{}
     writer := multipart.NewWriter(body)
 
     writer.WriteField("message", "Secret message")
     writer.WriteField("day_phrase", "apple forest thunder")
     writer.WriteField("pin", "123456")
+    writer.WriteField("embedding_mode", "dct")
+    writer.WriteField("output_format", "jpeg")
+    writer.WriteField("color_mode", "color")
 
     ref, _ := os.Open("reference.jpg")
     refPart, _ := writer.CreateFormFile("reference_photo", "reference.jpg")
@@ -842,12 +975,15 @@ func main() {
         body,
     )
 
-    stego, _ := os.Create("stego.png")
+    // Check embedding mode from header
+    fmt.Println("Embedding mode:", resp.Header.Get("X-Stegasoo-Embedding-Mode"))
+
+    stego, _ := os.Create("stego.jpg")
     io.Copy(stego, resp.Body)
     stego.Close()
     resp.Body.Close()
 
-    fmt.Println("Encoded successfully")
+    fmt.Println("Encoded successfully with DCT mode")
 }
 ```
 
@@ -863,27 +999,43 @@ PHRASE="apple forest thunder"
 PIN="123456"
 MESSAGE="Secret message"
 
-# Encode
-echo "Encoding..."
+# Encode with LSB (default)
+echo "Encoding with LSB mode..."
 curl -s -X POST "$BASE_URL/encode/multipart" \
   -F "message=$MESSAGE" \
   -F "day_phrase=$PHRASE" \
   -F "pin=$PIN" \
   -F "reference_photo=@$REF_PHOTO" \
   -F "carrier=@$CARRIER" \
-  --output stego.png
+  --output stego_lsb.png
 
-echo "Encoded to stego.png"
+echo "Encoded to stego_lsb.png"
 
-# Decode
+# Encode with DCT for social media
+echo "Encoding with DCT mode..."
+curl -s -X POST "$BASE_URL/encode/multipart" \
+  -F "message=$MESSAGE" \
+  -F "day_phrase=$PHRASE" \
+  -F "pin=$PIN" \
+  -F "embedding_mode=dct" \
+  -F "output_format=jpeg" \
+  -F "color_mode=color" \
+  -F "reference_photo=@$REF_PHOTO" \
+  -F "carrier=@$CARRIER" \
+  --output stego_dct.jpg
+
+echo "Encoded to stego_dct.jpg"
+
+# Decode (auto-detects mode)
 echo "Decoding..."
-DECODED=$(curl -s -X POST "$BASE_URL/decode/multipart" \
+RESULT=$(curl -s -X POST "$BASE_URL/decode/multipart" \
   -F "day_phrase=$PHRASE" \
   -F "pin=$PIN" \
   -F "reference_photo=@$REF_PHOTO" \
-  -F "stego_image=@stego.png" | jq -r '.message')
+  -F "stego_image=@stego_dct.jpg")
 
-echo "Decoded message: $DECODED"
+echo "Decoded message: $(echo $RESULT | jq -r '.message')"
+echo "Mode detected: $(echo $RESULT | jq -r '.embedding_mode_detected')"
 ```
 
 ---
@@ -917,8 +1069,14 @@ location /api/ {
 ### Memory Usage
 
 - Argon2id requires 256MB RAM per operation
+- DCT mode adds ~100MB for scipy operations
 - Concurrent requests can exhaust memory
 - Limit workers based on available RAM
+
+**Worker calculation:**
+```
+workers = (available_RAM - 512MB) / 350MB
+```
 
 ### Input Validation
 
@@ -927,12 +1085,23 @@ The API validates:
 - Message size (max 50KB)
 - Image size (max 5MB file, ~4MP dimensions)
 - RSA key validity
+- Embedding mode values
+- Output format compatibility
 
 ### Credential Handling
 
 - Credentials are never logged
 - No persistent storage of secrets
 - Memory cleared after operations
+
+### Embedding Mode Security
+
+| Mode | Consideration |
+|------|--------------|
+| LSB | Maximum capacity but fragile |
+| DCT | Lower capacity but survives recompression |
+
+Both modes use identical encryption (AES-256-GCM with Argon2id).
 
 ---
 

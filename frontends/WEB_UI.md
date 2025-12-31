@@ -12,6 +12,9 @@ Complete guide for the Stegasoo web-based steganography interface.
   - [Encode Message](#encode-message)
   - [Decode Message](#decode-message)
   - [About Page](#about-page)
+- [Embedding Modes](#embedding-modes)
+  - [LSB Mode (Default)](#lsb-mode-default)
+  - [DCT Mode (Experimental)](#dct-mode-experimental)
 - [User Interface Guide](#user-interface-guide)
 - [Workflow Examples](#workflow-examples)
 - [Security Features](#security-features)
@@ -42,6 +45,8 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 - ✅ Password-protected RSA key downloads
 - ✅ Real-time entropy calculations
 - ✅ Automatic file cleanup
+- ✅ **DCT steganography mode** (v3.0+) - JPEG-resilient embedding
+- ✅ **Color mode selection** (v3.0.1+) - Preserve carrier colors
 
 ---
 
@@ -52,6 +57,8 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 ```bash
 pip install stegasoo[web]
 ```
+
+This automatically installs DCT dependencies (scipy, jpegio) for full functionality.
 
 ### From Source
 
@@ -210,6 +217,18 @@ Hide a secret message inside an image.
 
 \* At least one security factor (PIN or RSA Key) required.
 
+#### Advanced Options (v3.0+)
+
+Expand "Advanced Options" to access embedding mode settings:
+
+| Option | Values | Default | Description |
+|--------|--------|---------|-------------|
+| Embedding Mode | LSB / DCT | LSB | Steganography algorithm |
+| Output Format | PNG / JPEG | PNG | Output image format (DCT only) |
+| Color Mode | Color / Grayscale | Color | Carrier color handling (DCT only) |
+
+See [Embedding Modes](#embedding-modes) for detailed explanations.
+
 #### Drag-and-Drop Upload
 
 Both image upload zones support:
@@ -237,9 +256,10 @@ Saturday's Phrase: [                    ]
 #### Encoding Process
 
 1. Fill in all required fields
-2. Click "Encode Message"
-3. Wait for processing (shows spinner)
-4. Redirected to result page
+2. (Optional) Expand "Advanced Options" for DCT mode
+3. Click "Encode Message"
+4. Wait for processing (shows spinner)
+5. Redirected to result page
 
 #### Result Page
 
@@ -254,6 +274,9 @@ After successful encoding:
 │     📄 a1b2c3d4_20251227.png          │
 │     Your secret message is hidden      │
 │     in this image                      │
+│                                        │
+│     Mode: DCT (Color, JPEG)            │  ← v3.0+ shows mode info
+│     Capacity used: 45.2%               │
 │                                        │
 │     [    Download Image    ]           │
 │     [      Share Image     ]           │
@@ -299,6 +322,10 @@ Extract a hidden message from a stego image.
 
 \* Must match security factors used during encoding.
 
+#### Automatic Mode Detection (v3.0+)
+
+The decoder automatically detects whether a stego image uses LSB or DCT mode. You don't need to specify the mode manually—it just works!
+
 #### Date Detection from Filename
 
 When you upload a stego image with a date in the filename (e.g., `stego_20251227.png`), the UI:
@@ -333,13 +360,11 @@ This helps you use the correct daily phrase.
 
 #### Troubleshooting Tips
 
-The page includes built-in troubleshooting guidance:
-
-- ✓ Use the **exact same reference photo** file
-- ✓ Use the phrase for the **encoding day**, not today
-- ✓ Provide the **same security factors** used during encoding
-- ✓ Ensure the stego image hasn't been **resized or recompressed**
-- ✓ If using RSA key, verify the **password is correct**
+If decryption fails:
+1. **Check the date** - Use phrase for encoding day, not today
+2. **Same reference photo** - Must be identical file
+3. **Correct PIN/RSA** - Match what was used for encoding
+4. **Image integrity** - Ensure no resizing/recompression
 
 ---
 
@@ -347,62 +372,130 @@ The page includes built-in troubleshooting guidance:
 
 **URL:** `/about`
 
-Learn about Stegasoo's security model and best practices.
+Information about the Stegasoo project, security model, and credits.
 
-#### Sections
+---
 
-**System Status:**
-- Argon2id availability (vs PBKDF2 fallback)
-- AES-256-GCM encryption status
+## Embedding Modes
 
-**Security Model Table:**
+Stegasoo v3.0+ offers two steganography algorithms, each with different trade-offs.
 
-| Component | Entropy | Purpose |
-|-----------|---------|---------|
-| Reference Photo | ~80-256 bits | Something you have |
-| 3-Word Phrase | ~33 bits | Something you know (daily) |
-| 6-Digit PIN | ~20 bits | Something you know (static) |
-| Date | N/A | Automatic key rotation |
-| **Combined** | **133+ bits** | **Beyond brute force** |
+### LSB Mode (Default)
 
-**Attack Resistance:**
+**Least Significant Bit** embedding modifies the least significant bits of pixel values.
 
-What attackers can't do:
-- Brute force (2^133 combinations)
-- Use rainbow tables (random salt)
-- Detect hidden data (random pixels)
-- Use GPU farms (256MB RAM per attempt)
+| Aspect | Details |
+|--------|---------|
+| **Capacity** | ~3 bits/pixel (~770 KB for 1920×1080) |
+| **Output Format** | PNG only (lossless required) |
+| **Resilience** | ❌ Destroyed by JPEG compression |
+| **Best For** | Maximum capacity, controlled sharing |
 
-Real threats:
-- Social engineering
-- Physical device access
-- Malware/keyloggers
-- Shoulder surfing
+**When to use LSB:**
+- Sharing via lossless channels (email attachment, file transfer)
+- Maximum message capacity needed
+- Recipient won't modify the image
 
-**Best Practices:**
+### DCT Mode (Experimental)
 
-Do:
-- Memorize phrases and PIN
-- Use reference photo both parties have
-- Use different carrier images each time
-- Share stego images through normal channels
+**Discrete Cosine Transform** embedding hides data in frequency domain coefficients.
 
-Don't:
-- Transmit the reference photo
-- Reuse carrier images
-- Store credentials digitally
-- Resize/recompress stego images
+| Aspect | Details |
+|--------|---------|
+| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080 PNG, ~30-50 KB JPEG) |
+| **Output Formats** | PNG or JPEG |
+| **Resilience** | ✅ Survives JPEG compression |
+| **Best For** | Social media, messaging apps, web sharing |
+
+> ⚠️ **Experimental Feature**: DCT mode is marked experimental and may have edge cases. Test with your specific workflow before relying on it for critical messages.
+
+**When to use DCT:**
+- Posting to social media (which recompresses images)
+- Sharing via messaging apps (WhatsApp, Telegram, etc.)
+- When channel may apply JPEG compression
+- Smaller messages that fit in reduced capacity
+
+#### DCT Output Formats
+
+| Format | Pros | Cons |
+|--------|------|------|
+| **PNG** | Lossless, predictable | Larger file, obvious if channel expects JPEG |
+| **JPEG** | Native format, natural | Slightly lower capacity |
+
+#### DCT Color Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Color** | Embeds in luminance (Y), preserves chrominance | Most images, photos |
+| **Grayscale** | Converts to grayscale before embedding | Black & white images |
+
+### Capacity Comparison
+
+For a 1920×1080 image:
+
+| Mode | Approximate Capacity |
+|------|---------------------|
+| LSB (PNG) | ~770 KB |
+| DCT (PNG, Color) | ~65 KB |
+| DCT (JPEG) | ~30-50 KB |
+
+### Choosing the Right Mode
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Mode Selection Guide                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Will the image be recompressed (social media, chat apps)?  │
+│                          │                                  │
+│              ┌───────────┴───────────┐                      │
+│              ▼                       ▼                      │
+│             YES                     NO                      │
+│              │                       │                      │
+│              ▼                       ▼                      │
+│         Use DCT Mode            Use LSB Mode                │
+│              │                       │                      │
+│              ▼                       ▼                      │
+│    Output: JPEG (natural)     Output: PNG (automatic)       │
+│    Color: Color (usually)     Capacity: ~770 KB             │
+│    Capacity: ~30-50 KB                                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## User Interface Guide
 
-### Navigation
-
-The navbar provides quick access to all pages:
+### Layout Structure
 
 ```
-[Logo] Stegasoo    Home | Encode | Decode | Generate | About
+┌──────────────────────────────────────────────────────────────┐
+│  🦕 Stegasoo                    [Encode] [Decode] [Generate] │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌────────────────────────────────────────────────────┐     │
+│   │                    Page Content                     │     │
+│   │                                                    │     │
+│   │   ┌──────────────┐    ┌──────────────┐            │     │
+│   │   │  Upload Zone  │    │  Upload Zone  │            │     │
+│   │   │  (Reference)  │    │  (Carrier)    │            │     │
+│   │   └──────────────┘    └──────────────┘            │     │
+│   │                                                    │     │
+│   │   [Advanced Options ▼]                             │     │
+│   │   ┌────────────────────────────────────────────┐  │     │
+│   │   │ Embedding Mode: [LSB ▼]                    │  │     │
+│   │   │ Output Format:  [PNG ▼]  (DCT only)        │  │     │
+│   │   │ Color Mode:     [Color ▼] (DCT only)       │  │     │
+│   │   └────────────────────────────────────────────┘  │     │
+│   │                                                    │     │
+│   │   [        Encode Message        ]                │     │
+│   │                                                    │     │
+│   └────────────────────────────────────────────────────┘     │
+│                                                              │
+├──────────────────────────────────────────────────────────────┤
+│                         Footer                               │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Color Scheme
@@ -415,6 +508,7 @@ The navbar provides quick access to all pages:
 | Success | Green | Positive actions |
 | Warning | Yellow | Caution messages |
 | Error | Red | Error states |
+| Experimental | Orange badge | DCT mode indicator |
 
 ### Form Validation
 
@@ -462,7 +556,7 @@ Types:
 - The PIN
 - The reference photo file (if not already shared)
 
-### Sending a Secret Message
+### Sending a Secret Message (LSB - Default)
 
 1. Go to `/encode`
 2. Upload your shared reference photo
@@ -472,7 +566,22 @@ Types:
 6. Enter your PIN
 7. Click "Encode Message"
 8. Download or share the resulting image
-9. Send via any channel (email, social media, chat)
+9. Send via any channel (email, file transfer)
+
+### Sending via Social Media (DCT Mode)
+
+1. Go to `/encode`
+2. Upload your shared reference photo
+3. Upload carrier image
+4. Type your secret message
+5. Enter today's phrase and PIN
+6. **Expand "Advanced Options"**
+7. **Select "DCT" embedding mode**
+8. **Select "JPEG" output format**
+9. Click "Encode Message"
+10. Download and post to social media
+
+The recipient can decode even after the platform recompresses the image!
 
 ### Receiving a Secret Message
 
@@ -485,6 +594,8 @@ Types:
 7. Enter the PIN
 8. Click "Decode Message"
 9. Read the secret message
+
+> 💡 Decoding automatically detects LSB vs DCT mode—no configuration needed!
 
 ### Changing Credentials
 
@@ -527,6 +638,15 @@ To rotate to new credentials:
 | Access control | Random 16-byte file ID |
 | Cleanup | Automatic + manual |
 
+### Embedding Mode Security
+
+| Mode | Security Consideration |
+|------|----------------------|
+| LSB | Full capacity, but fragile to modification |
+| DCT | Lower capacity, but survives recompression |
+
+Both modes use the same strong encryption (AES-256-GCM with Argon2id key derivation).
+
 ---
 
 ## Configuration
@@ -561,8 +681,8 @@ gunicorn \
 ```
 
 **Worker Calculation:**
-- Each encode/decode uses ~256MB RAM (Argon2)
-- Formula: `workers = (available_RAM - 512MB) / 256MB`
+- Each encode/decode uses ~256MB RAM (Argon2) + ~100MB for scipy (DCT mode)
+- Formula: `workers = (available_RAM - 512MB) / 350MB`
 
 **With Nginx (reverse proxy):**
 ```nginx
@@ -594,9 +714,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M   # Increased for scipy/DCT
         reservations:
-          memory: 256M
+          memory: 384M
 ```
 
 ---
@@ -617,7 +737,19 @@ services:
 1. Check the date in the stego filename
 2. Use the phrase for that specific day
 3. Verify you're using the original reference photo
-4. Ensure the stego image wasn't resized/recompressed
+4. Ensure the stego image wasn't resized/recompressed (LSB mode)
+
+#### "Invalid or missing Stegasoo header" (DCT Mode)
+
+**Causes:**
+- Image was heavily recompressed
+- Wrong credentials
+- Corrupted during transfer
+
+**Solutions:**
+1. If sharing via lossy channel, ensure DCT mode was used for encoding
+2. Verify credentials match
+3. Try obtaining original file
 
 #### "Carrier image too small"
 
@@ -626,7 +758,8 @@ services:
 **Solutions:**
 1. Use a larger carrier image (more pixels)
 2. Shorten the message
-3. Check capacity with `/info` command (CLI)
+3. Use LSB mode for more capacity (if channel supports it)
+4. Check capacity with `/info` command (CLI)
 
 #### "You must provide at least a PIN or RSA Key"
 
@@ -658,6 +791,17 @@ services:
 2. If key is unencrypted, leave password blank
 3. Re-download or regenerate the key
 
+#### DCT mode shows "jpegio not available"
+
+**Cause:** jpegio library not installed (required for JPEG output)
+
+**Solution:** 
+```bash
+pip install jpegio
+# Or rebuild Docker image
+docker-compose build --no-cache
+```
+
 ### Browser Compatibility
 
 | Browser | Status | Notes |
@@ -672,10 +816,12 @@ services:
 
 **Slow encoding/decoding:**
 - Normal: Argon2 is intentionally slow (security feature)
-- Expected time: 2-5 seconds per operation
+- DCT mode adds ~1-2 seconds for transform operations
+- Expected time: 3-7 seconds per operation
 
 **High memory usage:**
 - Normal: Argon2 requires 256MB RAM
+- DCT mode adds scipy memory overhead (~100MB)
 - Configure worker count based on available RAM
 
 ---
@@ -689,6 +835,7 @@ The UI adapts to mobile screens:
 - Touch-friendly buttons (48px minimum)
 - Readable text without zooming
 - Scrollable tables
+- Collapsible "Advanced Options" for cleaner mobile view
 
 ### Mobile-Specific Features
 
