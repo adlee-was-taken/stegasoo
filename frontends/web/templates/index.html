@@ -25,9 +25,9 @@
                     <i class="bi bi-lock-fill fs-1 embossed-icon"></i>
                 </div>
                 <div class="card-body text-center">
-                    <h5 class="card-title">Encode Message</h5>
+                    <h5 class="card-title">Encode</h5>
                     <p class="card-text text-muted">
-                        Hide and enrypt secret data in an image like a photo or meme.
+                        Hide encrypted messages or files inside images
                     </p>
                 </div>
             </div>
@@ -42,9 +42,9 @@
                     <i class="bi bi-unlock-fill fs-1 embossed-icon"></i>
                 </div>
                 <div class="card-body text-center">
-                    <h5 class="card-title">Decode Message</h5>
+                    <h5 class="card-title">Decode</h5>
                     <p class="card-text text-muted">
-                        Extract and decrypt data from Stegasoo-encoded images
+                        Extract and decrypt hidden data from stego images
                     </p>
                 </div>
             </div>
@@ -59,9 +59,9 @@
                     <i class="bi bi-key-fill fs-1 embossed-icon"></i>
                 </div>
                 <div class="card-body text-center">
-                    <h5 class="card-title">Generate Keys</h5>
+                    <h5 class="card-title">Generate</h5>
                     <p class="card-text text-muted">
-                        Create weekly phrase card with PIN and/or RSA key. 
+                        Create weekly phrase cards, PINs, and RSA keys
                     </p>
                 </div>
             </div>
@@ -69,51 +69,77 @@
     </div>
 </div>
 
-<div class="card">
+<!-- Embedding Modes - New in v3.0 -->
+<div class="card mb-4">
     <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Embedding Modes</h5>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <div class="p-3 bg-dark rounded h-100">
+                    <i class="bi bi-grid-3x3-gap text-primary fs-2 d-block mb-2"></i>
+                    <strong>LSB Mode</strong>
+                    <span class="badge bg-success ms-1">Default</span>
+                    <div class="small text-muted mt-2">
+                        Higher capacity (~375 KB/MP)<br>
+                        Best for email &amp; file transfer
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 bg-dark rounded h-100">
+                    <i class="bi bi-soundwave text-warning fs-2 d-block mb-2"></i>
+                    <strong>DCT Mode</strong>
+                    <span class="badge bg-warning text-dark ms-1">v3.0</span>
+                    <div class="small text-muted mt-2">
+                        Survives JPEG recompression<br>
+                        Best for social media
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>How It Works</h5>
+        <a href="/about" class="btn btn-sm btn-outline-secondary">Learn More</a>
     </div>
     <div class="card-body">
         <div class="row">
             <div class="col-md-6">
-                <h6 class="text-primary"><i class="bi bi-1-circle me-2"></i>Key Components</h6>
-                <ul class="list-unstyled">
-                    <li class="mb-2">
+                <h6 class="text-primary"><i class="bi bi-key me-2"></i>You Provide</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-1">
                         <i class="bi bi-image text-info me-2"></i>
-                        <strong>Reference Photo:</strong> Any photo you and recipient both have
+                        <strong>Reference Photo</strong> – shared secret image
                     </li>
-                    <li class="mb-2">
+                    <li class="mb-1">
                         <i class="bi bi-chat-quote text-info me-2"></i>
-                        <strong>Day Phrase:</strong> 3 to 12 words, one for each day of the week
+                        <strong>Day Phrase</strong> – 3-12 words, rotates daily
                     </li>
-                    <li class="mb-2">
-                        <i class="bi bi-key text-info me-2"></i>
-                        <strong>RSA Key:</strong> 2048, 3072, or 4096 bit PEM or printable QR code
-                    </li>
-                    <li class="mb-2">
+                    <li class="mb-1">
                         <i class="bi bi-123 text-info me-2"></i>
-                        <strong>Static PIN:</strong> 6-9 digits, same every day
+                        <strong>PIN</strong> – 6-9 digits (and/or RSA key)
                     </li>
                 </ul>
             </div>
             <div class="col-md-6">
-                <h6 class="text-primary"><i class="bi bi-2-circle me-2"></i>Security Features</h6>
-                <ul class="list-unstyled">
-                    <li class="mb-2">
-                        <i class="bi bi-shield-check text-success me-2"></i>
-                        Perfect for async communication and use on air-gapped devices
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-shield-check text-success me-2"></i>
-                        Argon2id memory-hard key derivation (256MB)
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-shuffle text-success me-2"></i>
-                        Pseudo-random pixel selection (defeats steganalysis)
-                    </li>
-                    <li class="mb-2">
+                <h6 class="text-primary"><i class="bi bi-shield-check me-2"></i>We Provide</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-1">
                         <i class="bi bi-lock text-success me-2"></i>
-                        AES-256-GCM authenticated encryption
+                        AES-256-GCM encryption
+                    </li>
+                    <li class="mb-1">
+                        <i class="bi bi-memory text-success me-2"></i>
+                        Argon2id key derivation (256MB)
+                    </li>
+                    <li class="mb-1">
+                        <i class="bi bi-shuffle text-success me-2"></i>
+                        Pseudo-random embedding
                     </li>
                 </ul>
             </div>
