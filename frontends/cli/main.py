@@ -6,6 +6,7 @@ Usage:
     stegasoo generate [OPTIONS]
     stegasoo encode [OPTIONS]
     stegasoo decode [OPTIONS]
+    stegasoo verify [OPTIONS]
     stegasoo info [OPTIONS]
 """
 
@@ -28,6 +29,9 @@ from stegasoo import (
     DAY_NAMES, __version__,
     StegasooError, DecryptionError, ExtractionError,
     FilePayload,
+    # New in 2.2.1
+    will_fit,
+    strip_image_metadata,
 )
 
 # QR Code utilities
@@ -273,6 +277,16 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
         ref_photo = Path(ref).read_bytes()
         carrier_image = Path(carrier).read_bytes()
         
+        # Pre-check capacity
+        fit_check = will_fit(payload, carrier_image)
+        if not fit_check['fits']:
+            raise click.ClickException(
+                f"Payload too large for carrier image.\n"
+                f"  Payload: {fit_check['payload_size']:,} bytes\n"
+                f"  Capacity: {fit_check['capacity']:,} bytes\n"
+                f"  Shortfall: {-fit_check['headroom']:,} bytes"
+            )
+        
         result = encode(
             message=payload,
             reference_photo=ref_photo,
@@ -302,6 +316,8 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, phrase, pin, key
         
     except StegasooError as e:
         raise click.ClickException(str(e))
+    except click.ClickException:
+        raise
     except Exception as e:
         raise click.ClickException(f"Error: {e}")
 
@@ -432,6 +448,129 @@ def decode_cmd(ref, stego, phrase, pin, key, key_qr, key_password, output, quiet
 
 
 # ============================================================================
+# VERIFY COMMAND
+# ============================================================================
+
+@cli.command()
+@click.option('--ref', '-r', required=True, type=click.Path(exists=True), help='Reference photo')
+@click.option('--stego', '-s', required=True, type=click.Path(exists=True), help='Stego image')
+@click.option('--phrase', '-p', required=True, help='Day phrase')
+@click.option('--pin', help='Static PIN')
+@click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
+@click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
+@click.option('--key-password', help='RSA key password (for encrypted .pem files)')
+@click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
+def verify(ref, stego, phrase, pin, key, key_qr, key_password, as_json):
+    """
+    Verify that a stego image can be decoded without extracting the message.
+    
+    Quick check to validate credentials are correct and data is intact.
+    Does NOT output the actual message content.
+    
+    \b
+    Examples:
+        stegasoo verify -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456
+        
+        stegasoo verify -r photo.jpg -s stego.png -p "words" -k mykey.pem --json
+    """
+    # Load key if provided
+    rsa_key_data = None
+    rsa_key_from_qr = False
+    
+    if key and key_qr:
+        raise click.UsageError("Cannot use both --key and --key-qr. Choose one.")
+    
+    if key:
+        rsa_key_data = Path(key).read_bytes()
+    elif key_qr:
+        if not HAS_QR or not has_qr_read():
+            raise click.ClickException(
+                "QR code reading not available. Install: pip install pyzbar\n"
+                "Also requires system library: sudo apt-get install libzbar0"
+            )
+        key_pem = extract_key_from_qr_file(key_qr)
+        if not key_pem:
+            raise click.ClickException(f"Could not extract RSA key from QR code: {key_qr}")
+        rsa_key_data = key_pem.encode('utf-8')
+        rsa_key_from_qr = True
+    
+    effective_key_password = None if rsa_key_from_qr else key_password
+    
+    if not pin and not rsa_key_data:
+        raise click.UsageError("Must provide --pin or --key/--key-qr (or both)")
+    
+    try:
+        ref_photo = Path(ref).read_bytes()
+        stego_image = Path(stego).read_bytes()
+        
+        # Attempt to decode
+        result = decode(
+            stego_image=stego_image,
+            reference_photo=ref_photo,
+            day_phrase=phrase,
+            pin=pin or "",
+            rsa_key_data=rsa_key_data,
+            rsa_password=effective_key_password,
+        )
+        
+        # Calculate payload size
+        if result.is_file:
+            payload_size = len(result.file_data) if result.file_data else 0
+            payload_type = "file"
+            payload_desc = result.filename or "unnamed file"
+            if result.mime_type:
+                payload_desc += f" ({result.mime_type})"
+        else:
+            payload_size = len(result.message.encode('utf-8')) if result.message else 0
+            payload_type = "text"
+            payload_desc = f"{payload_size} bytes"
+        
+        # Get date info
+        date_encoded = result.date_encoded
+        day_name = get_day_from_date(date_encoded) if date_encoded else None
+        
+        if as_json:
+            import json
+            output = {
+                "valid": True,
+                "stego_file": stego,
+                "payload_type": payload_type,
+                "payload_size": payload_size,
+                "date_encoded": date_encoded,
+                "day_encoded": day_name,
+            }
+            if result.is_file:
+                output["filename"] = result.filename
+                output["mime_type"] = result.mime_type
+            click.echo(json.dumps(output, indent=2))
+        else:
+            click.secho("✓ Valid stego image", fg='green', bold=True)
+            click.echo(f"  Payload:  {payload_type} ({payload_desc})")
+            click.echo(f"  Size:     {payload_size:,} bytes")
+            if date_encoded:
+                click.echo(f"  Encoded:  {date_encoded} ({day_name})")
+        
+    except (DecryptionError, ExtractionError) as e:
+        if as_json:
+            import json
+            output = {
+                "valid": False,
+                "stego_file": stego,
+                "error": str(e),
+            }
+            click.echo(json.dumps(output, indent=2))
+            sys.exit(1)
+        else:
+            click.secho("✗ Verification failed", fg='red', bold=True)
+            click.echo(f"  Error: {e}")
+            sys.exit(1)
+    except StegasooError as e:
+        raise click.ClickException(str(e))
+    except Exception as e:
+        raise click.ClickException(f"Error: {e}")
+
+
+# ============================================================================
 # INFO COMMAND
 # ============================================================================
 
@@ -468,6 +607,50 @@ def info(image):
             click.echo(f"  Embed date:  {date_str} ({day_name})")
         
         click.echo()
+        
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+
+# ============================================================================
+# STRIP-METADATA COMMAND
+# ============================================================================
+
+@cli.command('strip-metadata')
+@click.argument('image', type=click.Path(exists=True))
+@click.option('--output', '-o', type=click.Path(), help='Output file (default: overwrites input)')
+@click.option('--format', '-f', 'output_format', type=click.Choice(['PNG', 'BMP']), default='PNG', help='Output format')
+@click.option('--quiet', '-q', is_flag=True, help='Suppress output')
+def strip_metadata_cmd(image, output, output_format, quiet):
+    """
+    Remove all metadata (EXIF, GPS, etc.) from an image.
+    
+    Creates a clean image with only pixel data - no camera info,
+    location data, timestamps, or other potentially sensitive metadata.
+    
+    \b
+    Examples:
+        stegasoo strip-metadata photo.jpg -o clean.png
+        stegasoo strip-metadata photo.jpg  # Overwrites as PNG
+    """
+    try:
+        image_data = Path(image).read_bytes()
+        original_size = len(image_data)
+        
+        clean_data = strip_image_metadata(image_data, output_format)
+        
+        if output:
+            out_path = Path(output)
+        else:
+            # Replace extension with output format
+            out_path = Path(image).with_suffix(f'.{output_format.lower()}')
+        
+        out_path.write_bytes(clean_data)
+        
+        if not quiet:
+            click.secho("✓ Metadata stripped", fg='green')
+            click.echo(f"  Input:  {image} ({original_size:,} bytes)")
+            click.echo(f"  Output: {out_path} ({len(clean_data):,} bytes)")
         
     except Exception as e:
         raise click.ClickException(str(e))

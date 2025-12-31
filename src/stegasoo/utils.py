@@ -4,6 +4,7 @@ Stegasoo Utilities
 Secure deletion, filename generation, and other helpers.
 """
 
+import io
 import os
 import random
 import secrets
@@ -12,8 +13,48 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional, Union
 
+from PIL import Image
+
 from .constants import DAY_NAMES
 from .debug import debug
+
+
+def strip_image_metadata(image_data: bytes, output_format: str = 'PNG') -> bytes:
+    """
+    Remove all metadata (EXIF, ICC profiles, etc.) from an image.
+    
+    Creates a fresh image with only pixel data - no EXIF, GPS coordinates,
+    camera info, timestamps, or other potentially sensitive metadata.
+    
+    Args:
+        image_data: Raw image bytes
+        output_format: Output format ('PNG', 'BMP', 'TIFF')
+        
+    Returns:
+        Clean image bytes with no metadata
+        
+    Example:
+        >>> clean = strip_image_metadata(photo_bytes)
+        >>> # EXIF data is now removed
+    """
+    debug.print(f"Stripping metadata, output format: {output_format}")
+    
+    img = Image.open(io.BytesIO(image_data))
+    
+    # Convert to RGB if needed (handles RGBA, P, L, etc.)
+    if img.mode not in ('RGB', 'RGBA'):
+        img = img.convert('RGB')
+    
+    # Create fresh image - this discards all metadata
+    clean = Image.new(img.mode, img.size)
+    clean.putdata(list(img.getdata()))
+    
+    output = io.BytesIO()
+    clean.save(output, output_format.upper())
+    output.seek(0)
+    
+    debug.print(f"Metadata stripped: {len(image_data)} -> {len(output.getvalue())} bytes")
+    return output.getvalue()
 
 
 def generate_filename(

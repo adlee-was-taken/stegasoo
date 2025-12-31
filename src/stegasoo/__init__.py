@@ -58,6 +58,16 @@ File Embedding:
     else:
         print(decoded.message)
 
+Capacity Pre-check (v2.2.1):
+    from stegasoo import will_fit
+    
+    # Check if payload will fit before encoding
+    result = will_fit("My secret message", carrier_image)
+    if result['fits']:
+        print(f"Will use {result['usage_percent']:.1f}% capacity")
+    else:
+        print(f"Need {-result['headroom']} more bytes")
+
 Debugging:
     from stegasoo.debug import debug
     debug.enable(True)  # Enable debug output
@@ -142,6 +152,8 @@ from .steganography import (
     get_image_format,
     is_lossless_format,
     LOSSLESS_FORMATS,
+    # NEW in v2.2.1
+    will_fit,
 )
 from .utils import (
     generate_filename,
@@ -152,6 +164,8 @@ from .utils import (
     secure_delete,
     SecureDeleter,
     format_file_size,
+    # NEW in v2.2.1
+    strip_image_metadata,
 )
 from .debug import debug  # Import debug utilities
 
@@ -177,6 +191,8 @@ from .batch import (
     BatchItem,
     BatchStatus,
     batch_capacity_check,
+    # NEW in v2.2.1
+    BatchCredentials,
 )
 
 # QR Code utilities (optional, depends on qrcode and pyzbar)
@@ -630,6 +646,7 @@ __all__ = [
     'get_image_dimensions',
     'get_image_format',
     'is_lossless_format',
+    'will_fit',  # NEW in v2.2.1
     
     # Utilities
     'generate_filename',
@@ -640,6 +657,7 @@ __all__ = [
     'secure_delete',
     'SecureDeleter',
     'format_file_size',
+    'strip_image_metadata',  # NEW in v2.2.1
     
     # Debugging
     'debug',
@@ -659,4 +677,5 @@ __all__ = [
     'BatchItem',
     'BatchStatus',
     'batch_capacity_check',
+    'BatchCredentials',  # NEW in v2.2.1
 ]

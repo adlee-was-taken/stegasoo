@@ -1,11 +1,15 @@
 # Stegasoo Docker Image
 # Multi-stage build for smaller image size
 
-FROM python:3.11-slim as base
+# Pin the base image digest for reproducibility
+# To update: docker manifest inspect python:3.11-slim -v | jq -r '.[0].Descriptor.digest'
+FROM python:3.11-slim@sha256:5501a4fe605abe24de87c2f3d6cf9fd760354416a0cad0296cf284fddcdca9e2 as base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# Suppress pip "running as root" warnings during build
+ENV PIP_ROOT_USER_ACTION=ignore
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

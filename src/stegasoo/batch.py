@@ -62,6 +62,41 @@ class BatchItem:
 
 
 @dataclass
+class BatchCredentials:
+    """
+    Credentials for batch encode/decode operations.
+    
+    Provides a structured way to pass authentication factors
+    for batch processing instead of using plain dicts.
+    
+    Example:
+        creds = BatchCredentials(
+            reference_photo=ref_bytes,
+            day_phrase="apple forest thunder",
+            pin="123456"
+        )
+        result = processor.batch_encode(images, creds, message="secret")
+    """
+    reference_photo: bytes
+    day_phrase: str
+    pin: str = ""
+    rsa_key_data: Optional[bytes] = None
+    rsa_password: Optional[str] = None
+    date_str: Optional[str] = None  # YYYY-MM-DD, defaults to today
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for legacy API compatibility."""
+        return {
+            "reference_photo": self.reference_photo,
+            "day_phrase": self.day_phrase,
+            "pin": self.pin,
+            "rsa_key_data": self.rsa_key_data,
+            "rsa_password": self.rsa_password,
+            "date_str": self.date_str,
+        }
+
+
+@dataclass
 class BatchResult:
     """Summary of a batch operation."""
     operation: str
