@@ -27,7 +27,7 @@
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Multi-Factor Security</strong>
-                                <br><small class="text-muted">Combines photo + phrase + PIN/RSA key</small>
+                                <br><small class="text-muted">Combines photo + passphrase + PIN/RSA key</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
@@ -36,8 +36,9 @@
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
-                                <strong>Daily Rotating Phrases</strong>
-                                <br><small class="text-muted">Different passphrase each day of the week</small>
+                                <strong>Single Passphrase</strong>
+                                <span class="badge bg-success ms-1">v3.2.0</span>
+                                <br><small class="text-muted">Stronger default security</small>
                             </li>
                         </ul>
                     </div>
@@ -70,7 +71,7 @@
             </div>
         </div>
         
-        <!-- Embedding Modes - NEW SECTION -->
+        <!-- Embedding Modes -->
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Embedding Modes</h5>
@@ -213,9 +214,10 @@
                     <div class="col-md-3 mb-3">
                         <div class="p-3 bg-dark rounded">
                             <i class="bi bi-chat-quote text-warning fs-2 d-block mb-2"></i>
-                            <strong>Daily Phrase</strong>
-                            <div class="small text-muted mt-1">Something you know (rotates)</div>
-                            <div class="small text-success">~33 bits (3 words)</div>
+                            <strong>Passphrase</strong>
+                            <span class="badge bg-success ms-1">v3.2.0</span>
+                            <div class="small text-muted mt-1">Something you know</div>
+                            <div class="small text-success">~44 bits (4 words)</div>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -238,7 +240,7 @@
                 
                 <div class="alert alert-secondary">
                     <i class="bi bi-calculator me-2"></i>
-                    <strong>Combined entropy:</strong> 130-400+ bits depending on configuration.
+                    <strong>Combined entropy:</strong> 144-424+ bits depending on configuration.
                     For reference, 128 bits is considered computationally infeasible to brute force.
                 </div>
                 
@@ -348,10 +350,10 @@
                 <h6 class="mt-4"><i class="bi bi-code-slash me-2"></i>Example: DCT Encode</h6>
                 <pre class="bg-dark p-3 rounded small"><code># Encode with DCT mode for social media
 curl -X POST "http://localhost:8000/encode/multipart" \
-  -F "day_phrase=apple forest thunder" \
+  -F "passphrase=apple forest thunder mountain" \
   -F "pin=123456" \
-  -F "embedding_mode=dct" \
-  -F "output_format=jpeg" \
+  -F "embed_mode=dct" \
+  -F "dct_output_format=jpeg" \
   -F "reference_photo=@photo.jpg" \
   -F "carrier=@meme.png" \
   -F "message=secret message" \
@@ -359,17 +361,19 @@ curl -X POST "http://localhost:8000/encode/multipart" \
                 
                 <h6 class="mt-4"><i class="bi bi-terminal me-2"></i>Command Line</h6>
                 <pre class="bg-dark p-3 rounded small"><code># Generate credentials
-stegasoo generate --pin --words 3
+stegasoo generate --pin --words 4
 
 # Encode with LSB (default)
-stegasoo encode -r photo.jpg -c meme.png -p "phrase" --pin 123456 -m "secret"
+stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder mountain" \
+  --pin 123456 -m "secret"
 
 # Encode with DCT for social media
-stegasoo encode -r photo.jpg -c meme.png -p "phrase" --pin 123456 -m "secret" \
-  --mode dct --format jpeg
+stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder mountain" \
+  --pin 123456 -m "secret" --mode dct --dct-format jpeg
 
 # Decode (auto-detects mode)
-stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456</code></pre>
+stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" \
+  --pin 123456</code></pre>
                 
                 <p class="small text-muted mt-3 mb-0">
                     <span class="badge bg-{% if has_argon2 %}success{% else %}warning{% endif %} me-1">
@@ -403,7 +407,7 @@ stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456</code></pre>
                                 <ol>
                                     <li>Both parties agree on a <strong>reference photo</strong> (shared secretly, never transmitted)</li>
                                     <li>Go to <a href="/generate">Generate</a> and create credentials</li>
-                                    <li><strong>Memorize</strong> the 7 daily phrases and PIN</li>
+                                    <li><strong>Memorize</strong> the passphrase and PIN</li>
                                     <li>If using RSA, download and securely store the key file</li>
                                     <li>Share credentials with your contact through a secure channel</li>
                                 </ol>
@@ -430,7 +434,7 @@ stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456</code></pre>
                                     </li>
                                     <li>Upload your <strong>reference photo</strong> and <strong>carrier image</strong></li>
                                     <li>Enter your message or select a file to embed</li>
-                                    <li>Enter <strong>today's phrase</strong> and your PIN/key</li>
+                                    <li>Enter your <strong>passphrase</strong> and PIN/key</li>
                                     <li>Download the resulting stego image</li>
                                     <li>Send through any channel!</li>
                                 </ol>
@@ -451,14 +455,13 @@ stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456</code></pre>
                                     <li>Go to <a href="/decode">Decode</a></li>
                                     <li>Upload your <strong>reference photo</strong> (same one used for encoding)</li>
                                     <li>Upload the <strong>stego image</strong> you received</li>
-                                    <li>Enter the phrase for <strong>the day it was encoded</strong></li>
+                                    <li>Enter your <strong>passphrase</strong></li>
                                     <li>Enter your PIN and/or RSA key</li>
                                     <li>View the decoded message or download the extracted file</li>
                                 </ol>
                                 <div class="alert alert-info small mt-3 mb-0">
                                     <i class="bi bi-magic me-2"></i>
                                     <strong>Auto-detection:</strong> Stegasoo automatically detects LSB vs DCT mode.
-                                    The filename contains the encoding date (e.g., <code>abc123_20251231.png</code>).
                                 </div>
                             </div>
                         </div>
@@ -511,8 +514,10 @@ stegasoo decode -r photo.jpg -s stego.png -p "phrase" --pin 123456</code></pre>
                             <td><strong>2048, 3072, 4096 bits</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-chat-quote me-2"></i>Phrase length</td>
-                            <td><strong>3-12 words</strong> (BIP-39)</td>
+                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase length
+                                <span class="badge bg-success ms-1">v3.2.0</span>
+                            </td>
+                            <td><strong>3-12 words</strong> (BIP-39, recommended: 4+ words)</td>
                         </tr>
                     </tbody>
                 </table>

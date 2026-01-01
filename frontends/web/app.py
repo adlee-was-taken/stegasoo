@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-Stegasoo Web Frontend (v3.0.1)
+Stegasoo Web Frontend (v3.2.0)
 
 Flask-based web UI for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v3.2.0:
+- Removed date dependency from all operations
+- Renamed day_phrase → passphrase
+- No date selection or tracking needed
+- Simplified user experience for asynchronous communications
+
 NEW in v3.0: LSB and DCT embedding modes with advanced options.
 NEW in v3.0.1: DCT output format selection (PNG or JPEG) and color mode (grayscale or color).
 """
@@ -31,13 +38,12 @@ from stegasoo import (
     export_rsa_key_pem, load_rsa_key,
     validate_pin, validate_message, validate_image,
     validate_rsa_key, validate_security_factors,
-    validate_file_payload,
-    get_today_day, generate_filename,
-    DAY_NAMES,
+    validate_file_payload, validate_passphrase,
+    generate_filename,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
     FilePayload,
-    # NEW in v3.0 - Embedding modes
+    # Embedding modes
     EMBED_MODE_LSB,
     EMBED_MODE_DCT,
     EMBED_MODE_AUTO,
@@ -49,6 +55,8 @@ from stegasoo.constants import (
     __version__,
     MAX_MESSAGE_SIZE, MAX_MESSAGE_CHARS,
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
+    MIN_PASSPHRASE_WORDS, RECOMMENDED_PASSPHRASE_WORDS,
+    DEFAULT_PASSPHRASE_WORDS,
     VALID_RSA_SIZES, MAX_FILE_SIZE,
     MAX_FILE_PAYLOAD_SIZE, MAX_UPLOAD_SIZE,
     TEMP_FILE_EXPIRY, TEMP_FILE_EXPIRY_MINUTES,
@@ -111,26 +119,28 @@ def inject_globals():
         'temp_file_expiry_minutes': TEMP_FILE_EXPIRY_MINUTES,
         'min_pin_length': MIN_PIN_LENGTH,
         'max_pin_length': MAX_PIN_LENGTH,
+        # NEW in v3.2.0
+        'min_passphrase_words': MIN_PASSPHRASE_WORDS,
+        'recommended_passphrase_words': RECOMMENDED_PASSPHRASE_WORDS,
+        'default_passphrase_words': DEFAULT_PASSPHRASE_WORDS,
         # NEW in v3.0
         'has_dct': has_dct_support(),
     }
 
 
 # ============================================================================
-# CONFIGURATION (for override attempts - currently using constants.py values)
+# CONFIGURATION
 # ============================================================================
 
-# Try to import and override stegasoo constants if possible
 try:
-    # Check current limits
-    print(f"Current MAX_FILE_SIZE from constants: {MAX_FILE_SIZE}")
+    print(f"Stegasoo v{__version__} - Web Frontend")
+    print(f"Current MAX_FILE_SIZE: {MAX_FILE_SIZE}")
     print(f"Current MAX_FILE_PAYLOAD_SIZE: {MAX_FILE_PAYLOAD_SIZE}")
-    print(f"DCT support available: {has_dct_support()}")
+    print(f"DCT support: {has_dct_support()}")
+    print(f"QR code support: write={HAS_QRCODE}, read={HAS_QRCODE_READ}")
     
     DESIRED_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB
     
-    # Note: You might need to patch the stegasoo module
-    # if MAX_FILE_PAYLOAD_SIZE is used internally
     if hasattr(stegasoo, 'MAX_FILE_PAYLOAD_SIZE'):
         print(f"Overriding MAX_FILE_PAYLOAD_SIZE to {DESIRED_PAYLOAD_SIZE}")
         stegasoo.MAX_FILE_PAYLOAD_SIZE = DESIRED_PAYLOAD_SIZE
@@ -165,7 +175,6 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
             img.save(buffer, format='JPEG', quality=THUMBNAIL_QUALITY, optimize=True)
             return buffer.getvalue()
     except Exception as e:
-        # Log error but don't crash
         print(f"Thumbnail generation error: {e}")
         return None
 
@@ -212,7 +221,8 @@ def index():
 @app.route('/generate', methods=['GET', 'POST'])
 def generate():
     if request.method == 'POST':
-        words_per_phrase = int(request.form.get('words_per_phrase', 3))
+        # v3.2.0: Changed from words_per_phrase to words_per_passphrase, default increased to 4
+        words_per_passphrase = int(request.form.get('words_per_passphrase', DEFAULT_PASSPHRASE_WORDS))
         use_pin = request.form.get('use_pin') == 'on'
         use_rsa = request.form.get('use_rsa') == 'on'
         
@@ -224,7 +234,7 @@ def generate():
         rsa_bits = int(request.form.get('rsa_bits', 2048))
         
         # Clamp values
-        words_per_phrase = max(3, min(12, words_per_phrase))
+        words_per_passphrase = max(MIN_PASSPHRASE_WORDS, min(12, words_per_passphrase))
         pin_length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, pin_length))
         if rsa_bits not in VALID_RSA_SIZES:
             rsa_bits = 2048
@@ -235,7 +245,7 @@ def generate():
                 use_rsa=use_rsa,
                 pin_length=pin_length,
                 rsa_bits=rsa_bits,
-                words_per_phrase=words_per_phrase
+                words_per_passphrase=words_per_passphrase
             )
             
             # Store RSA key temporarily for QR generation
@@ -261,18 +271,18 @@ def generate():
                         'compress': qr_needs_compression
                     }
             
+            # v3.2.0: Single passphrase instead of daily phrases
             return render_template('generate.html',
-                phrases=creds.phrases,
+                passphrase=creds.passphrase,  # v3.2.0: Single passphrase
                 pin=creds.pin,
-                days=DAY_NAMES,
                 generated=True,
-                words_per_phrase=words_per_phrase,
+                words_per_passphrase=words_per_passphrase,
                 pin_length=pin_length if use_pin else None,
                 use_pin=use_pin,
                 use_rsa=use_rsa,
                 rsa_bits=rsa_bits,
                 rsa_key_pem=creds.rsa_key_pem,
-                phrase_entropy=creds.phrase_entropy,
+                passphrase_entropy=creds.passphrase_entropy,
                 pin_entropy=creds.pin_entropy,
                 rsa_entropy=creds.rsa_entropy,
                 total_entropy=creds.total_entropy,
@@ -497,8 +507,6 @@ def api_check_fit():
 
 @app.route('/encode', methods=['GET', 'POST'])
 def encode_page():
-    day_of_week = get_today_day()
-    
     if request.method == 'POST':
         try:
             # Get files
@@ -509,15 +517,15 @@ def encode_page():
             
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             if not allowed_image(ref_photo.filename) or not allowed_image(carrier.filename):
                 flash('Invalid file type. Use PNG, JPG, or BMP', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Get form data
+            # Get form data - v3.2.0: renamed from day_phrase to passphrase
             message = request.form.get('message', '')
-            day_phrase = request.form.get('day_phrase', '')
+            passphrase = request.form.get('passphrase', '')  # v3.2.0: Renamed
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
             payload_type = request.form.get('payload_type', 'text')
@@ -532,7 +540,7 @@ def encode_page():
             if dct_output_format not in ('png', 'jpeg'):
                 dct_output_format = 'png'
             
-            # NEW in v3.0.1 - DCT color mode (default to 'color')
+            # NEW in v3.0.1 - DCT color mode
             dct_color_mode = request.form.get('dct_color_mode', 'color')
             if dct_color_mode not in ('grayscale', 'color'):
                 dct_color_mode = 'color'
@@ -540,7 +548,7 @@ def encode_page():
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Determine payload
             if payload_type == 'file' and payload_file and payload_file.filename:
@@ -550,7 +558,7 @@ def encode_page():
                 result = validate_file_payload(file_data, payload_file.filename)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
                 
                 mime_type, _ = mimetypes.guess_type(payload_file.filename)
                 payload = FilePayload(
@@ -563,12 +571,23 @@ def encode_page():
                 result = validate_message(message)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
                 payload = message
             
-            if not day_phrase:
-                flash('Day phrase is required', 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            # v3.2.0: Renamed from day_phrase
+            if not passphrase:
+                flash('Passphrase is required', 'error')
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
+            
+            # v3.2.0: Validate passphrase
+            result = validate_passphrase(passphrase)
+            if not result.is_valid:
+                flash(result.error_message, 'error')
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
+            
+            # Show warning if passphrase is short
+            if result.warning:
+                flash(result.warning, 'warning')
             
             # Read files
             ref_data = ref_photo.read()
@@ -577,36 +596,34 @@ def encode_page():
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get('rsa_key_qr')
-            rsa_key_from_qr = False  # Track source for password handling
+            rsa_key_from_qr = False
             
             if rsa_key_file and rsa_key_file.filename:
-                # RSA key from .pem file
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
-                # RSA key from QR code image
                 qr_image_data = rsa_key_qr.read()
                 key_pem = extract_key_from_qr(qr_image_data)
                 if key_pem:
                     rsa_key_data = key_pem.encode('utf-8')
-                    rsa_key_from_qr = True  # QR keys are never password-protected
+                    rsa_key_from_qr = True
                 else:
-                    flash('Could not extract RSA key from QR code image. Make sure the image contains a valid QR code.', 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    flash('Could not extract RSA key from QR code image.', 'error')
+                    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate security factors
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Determine key password - QR code keys are never password-protected
+            # Determine key password
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
             
             # Validate RSA key if provided
@@ -614,31 +631,24 @@ def encode_page():
                 result = validate_rsa_key(rsa_key_data, key_password)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
-                    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate carrier image
             result = validate_image(carrier_data, "Carrier image")
             if not result.is_valid:
                 flash(result.error_message, 'error')
-                return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+                return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Get date
-            client_date = request.form.get('client_date', '').strip()
-            if client_date and len(client_date) == 10 and client_date[4] == '-' and client_date[7] == '-':
-                date_str = client_date
-            else:
-                date_str = datetime.now().strftime('%Y-%m-%d')
-            
-            # Encode with selected mode, output format, and color mode
+            # v3.2.0: No date parameter needed
             encode_result = encode(
                 message=payload,
                 reference_photo=ref_data,
                 carrier_image=carrier_data,
-                day_phrase=day_phrase,
+                passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
                 pin=pin,
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
-                date_str=date_str,
+                # date_str removed in v3.2.0
                 embed_mode=embed_mode,
                 dct_output_format=dct_output_format if embed_mode == 'dct' else None,
                 dct_color_mode=dct_color_mode if embed_mode == 'dct' else None,
@@ -648,7 +658,6 @@ def encode_page():
             if embed_mode == 'dct' and dct_output_format == 'jpeg':
                 output_ext = '.jpg'
                 output_mime = 'image/jpeg'
-                # Modify filename extension if needed
                 filename = encode_result.filename
                 if filename.endswith('.png'):
                     filename = filename[:-4] + '.jpg'
@@ -674,15 +683,15 @@ def encode_page():
             
         except CapacityError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
         except StegasooError as e:
             flash(str(e), 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
         except Exception as e:
             flash(f'Error: {e}', 'error')
-            return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+            return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
     
-    return render_template('encode.html', day_of_week=day_of_week, has_qrcode_read=HAS_QRCODE_READ)
+    return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
 
 
 @app.route('/encode/result/<file_id>')
@@ -707,7 +716,7 @@ def encode_result(file_id):
         thumbnail_url=url_for('encode_thumbnail', thumb_id=thumbnail_id) if thumbnail_id else None,
         embed_mode=file_info.get('embed_mode', 'lsb'),
         output_format=file_info.get('output_format', 'png'),
-        color_mode=file_info.get('color_mode'),  # NEW in v3.0.1
+        color_mode=file_info.get('color_mode'),
     )
 
 
@@ -787,8 +796,8 @@ def decode_page():
                 flash('Both reference photo and stego image are required', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Get form data
-            day_phrase = request.form.get('day_phrase', '')
+            # Get form data - v3.2.0: renamed from day_phrase to passphrase
+            passphrase = request.form.get('passphrase', '')  # v3.2.0: Renamed
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
             
@@ -802,11 +811,11 @@ def decode_page():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Get encoding date from form (detected from filename in JS)
-            stego_date = request.form.get('stego_date', '').strip()
+            # v3.2.0: Removed date handling (no stego_date needed)
             
-            if not day_phrase:
-                flash('Day phrase is required', 'error')
+            # v3.2.0: Renamed from day_phrase
+            if not passphrase:
+                flash('Passphrase is required', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Read files
@@ -816,20 +825,18 @@ def decode_page():
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get('rsa_key_qr')
-            rsa_key_from_qr = False  # Track source for password handling
+            rsa_key_from_qr = False
             
             if rsa_key_file and rsa_key_file.filename:
-                # RSA key from .pem file
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
-                # RSA key from QR code image
                 qr_image_data = rsa_key_qr.read()
                 key_pem = extract_key_from_qr(qr_image_data)
                 if key_pem:
                     rsa_key_data = key_pem.encode('utf-8')
-                    rsa_key_from_qr = True  # QR keys are never password-protected
+                    rsa_key_from_qr = True
                 else:
-                    flash('Could not extract RSA key from QR code image. Make sure the image contains a valid QR code.', 'error')
+                    flash('Could not extract RSA key from QR code image.', 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # Validate security factors
@@ -845,7 +852,7 @@ def decode_page():
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Determine key password - QR code keys are never password-protected
+            # Determine key password
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
             
             # Validate RSA key if provided
@@ -855,15 +862,15 @@ def decode_page():
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # Decode with selected mode
+            # v3.2.0: No date_str parameter needed
             decode_result = decode(
                 stego_image=stego_data,
                 reference_photo=ref_data,
-                day_phrase=day_phrase,
+                passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
                 pin=pin,
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
-                date_str=stego_date if stego_date else None,
+                # date_str removed in v3.2.0
                 embed_mode=embed_mode,
             )
             
@@ -892,7 +899,7 @@ def decode_page():
                 return render_template('decode.html', decoded_message=decode_result.message)
             
         except DecryptionError:
-            flash('Decryption failed. Check your phrase, PIN, RSA key, and reference photo.', 'error')
+            flash('Decryption failed. Check your passphrase, PIN, RSA key, and reference photo.', 'error')
             return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
         except StegasooError as e:
             flash(str(e), 'error')

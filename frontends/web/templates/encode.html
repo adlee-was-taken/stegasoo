@@ -11,9 +11,9 @@
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
-                    <input type="hidden" name="client_date" id="clientDate" value="">
+                    <!-- v3.2.0: Removed client_date hidden field -->
                     
-                    <!-- Embedding Mode Selection - NOW AT THE TOP -->
+                    <!-- Embedding Mode Selection -->
                     <div class="mb-4">
                         <label class="form-label">
                             <i class="bi bi-cpu me-1"></i> Embedding Mode
@@ -182,14 +182,21 @@
                         </div>
                     </div>
                     
+                    <!-- v3.2.0: Renamed from day_phrase to passphrase, removed date selection -->
                     <div class="mb-3">
-                        <label class="form-label" id="dayPhraseLabel">
-                            <i class="bi bi-chat-quote me-1"></i> Day's Phrase
+                        <label class="form-label" id="passphraseLabel">
+                            <i class="bi bi-chat-quote me-1"></i> Passphrase
+                            <span class="badge bg-success ms-2">v3.2.0</span>
                         </label>
-                        <input type="text" name="day_phrase" class="form-control" 
-                               placeholder="e.g., correct horse battery" required>
+                        <input type="text" name="passphrase" class="form-control" 
+                               placeholder="e.g., apple forest thunder mountain" required
+                               id="passphraseInput">
                         <div class="form-text">
-                            Your phrase for <strong>today</strong> (based on your local timezone)
+                            Your passphrase for this message
+                        </div>
+                        <div class="form-text mt-1" id="passphraseWarning" style="display: none;">
+                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                            Passphrase should have at least {{ recommended_passphrase_words }} words for good security
                         </div>
                     </div>
                     
@@ -232,19 +239,18 @@
                             
                             <!-- .pem File Input -->
                             <div id="rsaFileSection">
-                                <input type="file" name="rsa_key_file" class="form-control form-control-sm" accept=".pem">
+                                <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
                             </div>
                             
                             <!-- QR Code Input -->
                             <div id="rsaQrSection" class="d-none">
                                 <div class="drop-zone p-3" id="qrDropZone">
-                                    <input type="file" name="rsa_qr_image" accept="image/*" id="rsaQrInput">
+                                    <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
                                     <div class="drop-zone-label text-center">
                                         <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
                                         <span class="text-muted small">Drop QR image or click to browse</span>
                                     </div>
                                 </div>
-                                <input type="hidden" name="rsa_key_pem_from_qr" id="rsaKeyFromQr">
                             </div>
                             
                             <!-- Key Password (always visible) -->
@@ -373,25 +379,7 @@
 
 {% block scripts %}
 <script>
-// Detect client's local date and day
-const now = new Date();
-const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const localDay = dayNames[now.getDay()];
-const localDate = now.getFullYear() + '-' + 
-    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(now.getDate()).padStart(2, '0');
-
-// Update day label to client's local day
-const dayLabel = document.getElementById('dayPhraseLabel');
-if (dayLabel) {
-    dayLabel.innerHTML = `<i class="bi bi-chat-quote me-1"></i>Secure with <span class="day-of-week-highlight">${localDay}</span>'s Phrase`;
-}
-
-// Set hidden field with client's local date for server
-const dateInput = document.getElementById('clientDate');
-if (dateInput) {
-    dateInput.value = localDate;
-}
+// v3.2.0: Removed date detection - no longer needed!
 
 // Payload type switching
 const payloadTextRadio = document.getElementById('payloadText');
@@ -417,6 +405,23 @@ function updatePayloadSection() {
 
 payloadTextRadio.addEventListener('change', updatePayloadSection);
 payloadFileRadio.addEventListener('change', updatePayloadSection);
+
+// Passphrase validation (v3.2.0)
+const passphraseInput = document.getElementById('passphraseInput');
+const passphraseWarning = document.getElementById('passphraseWarning');
+
+if (passphraseInput) {
+    passphraseInput.addEventListener('input', function() {
+        const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+        const recommendedWords = {{ recommended_passphrase_words }};
+        
+        if (words.length > 0 && words.length < recommendedWords) {
+            passphraseWarning.style.display = 'block';
+        } else {
+            passphraseWarning.style.display = 'none';
+        }
+    });
+}
 
 // Payload file info display
 payloadFileInput.addEventListener('change', function() {
@@ -471,9 +476,9 @@ carrierInput.addEventListener('change', function() {
 
 function fetchCapacityComparison(file) {
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('carrier', file);
     
-    fetch('/api/capacity', {
+    fetch('/api/compare-capacity', {
         method: 'POST',
         body: formData
     })
@@ -485,11 +490,11 @@ function fetchCapacityComparison(file) {
         }
         
         document.getElementById('carrierDimensions').textContent = 
-            `${data.width} × ${data.height} (${(data.pixels / 1000000).toFixed(1)} MP)`;
+            `${data.width} × ${data.height} (${(data.width * data.height / 1000000).toFixed(1)} MP)`;
         document.getElementById('lsbCapacityBadge').textContent = 
-            `LSB: ${data.lsb_capacity_kb} KB`;
+            `LSB: ${data.lsb.capacity_kb} KB`;
         document.getElementById('dctCapacityBadge').textContent = 
-            `DCT: ${data.dct_capacity_kb} KB`;
+            `DCT: ${data.dct.capacity_kb} KB`;
         
         capacityPanel.classList.remove('d-none');
     })
@@ -729,17 +734,17 @@ if (rsaQrInput) {
             const formData = new FormData();
             formData.append('qr_image', this.files[0]);
             
-            fetch('/api/decode-qr', {
+            fetch('/extract-key-from-qr', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
+                if (!data.success) {
                     alert('QR decode failed: ' + data.error);
                     return;
                 }
-                document.getElementById('rsaKeyFromQr').value = data.pem_data;
+                // Visual feedback
                 document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
                     '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded from QR';
             })

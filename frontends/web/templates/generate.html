@@ -14,13 +14,17 @@
                 <!-- Generation Form -->
                 <form method="POST">
                     <div class="mb-4">
-                        <label class="form-label">Words per Phrase</label>
-                        <input type="range" class="form-range" name="words_per_phrase" 
-                               min="3" max="12" value="3" id="wordsRange">
+                        <label class="form-label">Words per Passphrase</label>
+                        <input type="range" class="form-range" name="words_per_passphrase" 
+                               min="{{ min_passphrase_words }}" max="12" value="{{ default_passphrase_words }}" id="wordsRange">
                         <div class="d-flex justify-content-between small text-muted">
-                            <span>3 (33 bits)</span>
-                            <span id="wordsValue" class="text-primary fw-bold">3 words (~33 bits)</span>
+                            <span>{{ min_passphrase_words }} (~33 bits)</span>
+                            <span id="wordsValue" class="text-primary fw-bold">{{ default_passphrase_words }} words (~44 bits)</span>
                             <span>12 (132 bits)</span>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-shield-check me-1"></i>
+                            Recommended: <strong>{{ recommended_passphrase_words }}+ words</strong> for good security
                         </div>
                     </div>
                     
@@ -106,25 +110,58 @@
                 {% endif %}
                 
                 <div class="mb-4">
-                    <h6 class="text-muted"><i class="bi bi-chat-quote me-2"></i>DAILY PHRASES</h6>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped mb-0">
-                            <tbody>
-                                {% for day in days %}
-                                <tr>
-                                    <td class="text-muted" style="width: 100px;">{{ day }}</td>
-                                    <td>
-                                        <span class="font-monospace phrase-display" id="phrase{{ loop.index }}">{{ phrases[day] }}</span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <h6 class="text-muted">
+                        <i class="bi bi-chat-quote me-2"></i>PASSPHRASE
+                        <span class="badge bg-success ms-2">v3.2.0</span>
+                    </h6>
+                    
+                    <div class="passphrase-container">
+                        <div class="passphrase-display" id="passphraseDisplay">
+                            <code class="passphrase-text">{{ passphrase }}</code>
+                        </div>
+                        
+                        <div class="passphrase-buttons mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="togglePassphraseVisibility()">
+                                <i class="bi bi-eye-slash" id="passphraseToggleIcon"></i>
+                                <span id="passphraseToggleText">Hide</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="copyPassphrase()">
+                                <i class="bi bi-clipboard" id="passphraseCopyIcon"></i>
+                                <span id="passphraseCopyText">Copy</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleMemoryAid()">
+                                <i class="bi bi-lightbulb" id="memoryAidIcon"></i>
+                                <span id="memoryAidText">Memory Aid</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="text-end mt-2">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllPhrases()">
-                            <i class="bi bi-eye-slash me-1"></i>Toggle Visibility
-                        </button>
+                    
+                    <!-- Memory Aid Story -->
+                    <div class="memory-aid-container mt-3 d-none" id="memoryAidContainer">
+                        <div class="card bg-dark border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-book me-2"></i>Memory Story
+                            </div>
+                            <div class="card-body">
+                                <p class="memory-story mb-3" id="memoryStory">
+                                    <!-- Story will be generated by JavaScript -->
+                                </p>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    This story is generated from your passphrase to help you remember it.
+                                    The words appear in order within the narrative.
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-light mt-2" onclick="regenerateStory()">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Generate Different Story
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small class="text-muted">
+                            ({{ words_per_passphrase }} words = ~{{ passphrase_entropy }} bits entropy)
+                        </small>
                     </div>
                 </div>
                 
@@ -229,8 +266,9 @@
                     <div class="row text-center">
                         <div class="col">
                             <div class="p-2 bg-dark rounded">
-                                <div class="small text-muted">Phrase</div>
-                                <div class="fs-5 text-info">{{ phrase_entropy }} bits</div>
+                                <div class="small text-muted">Passphrase</div>
+                                <div class="fs-5 text-info">{{ passphrase_entropy }} bits</div>
+                                <div class="small text-muted">{{ words_per_passphrase }} words</div>
                             </div>
                         </div>
                         {% if pin_entropy %}
@@ -279,7 +317,7 @@
                 <h6 class="text-muted mb-3"><i class="bi bi-info-circle me-2"></i>About Credentials</h6>
                 <ul class="small text-muted mb-0">
                     <li class="mb-2">
-                        <strong>Daily phrases</strong> rotate each day of the week for forward secrecy
+                        <strong>Passphrase</strong> is a single phrase you use each time
                     </li>
                     <li class="mb-2">
                         <strong>PIN</strong> is static and adds another factor both parties must know
@@ -343,9 +381,69 @@
     min-width: 80px;
 }
 
+/* Passphrase Container */
+.passphrase-container {
+    background: linear-gradient(145deg, #1e1e2e 0%, #2d2d44 100%);
+    border: 1px solid #0dcaf0;
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(13, 202, 240, 0.1);
+}
+
+.passphrase-display {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(13, 202, 240, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: filter 0.3s ease;
+}
+
+.passphrase-display.blurred {
+    filter: blur(8px);
+    user-select: none;
+}
+
+.passphrase-text {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #0dcaf0;
+    text-shadow: 0 0 10px rgba(13, 202, 240, 0.5);
+    word-wrap: break-word;
+    display: block;
+    line-height: 1.6;
+}
+
+.passphrase-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.passphrase-buttons .btn {
+    min-width: 100px;
+}
+
+/* Memory Aid */
+.memory-story {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #e9ecef;
+}
+
+.memory-story .passphrase-word {
+    font-weight: bold;
+    color: #0dcaf0;
+    text-decoration: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: rgba(13, 202, 240, 0.5);
+}
+
 /* Responsive */
 @media (max-width: 576px) {
-    .pin-container {
+    .pin-container, .passphrase-container {
         padding: 1rem 1.25rem;
     }
     
@@ -357,6 +455,14 @@
     
     .pin-digits-row {
         gap: 0.35rem;
+    }
+    
+    .passphrase-text {
+        font-size: 1.2rem;
+    }
+    
+    .memory-story {
+        font-size: 1rem;
     }
 }
 </style>
@@ -429,13 +535,113 @@ function copyPin() {
     });
 }
 
-// Toggle all phrases visibility
-let phrasesHidden = false;
-function toggleAllPhrases() {
-    phrasesHidden = !phrasesHidden;
-    document.querySelectorAll('.phrase-display').forEach(el => {
-        el.style.filter = phrasesHidden ? 'blur(8px)' : 'none';
+// Passphrase visibility toggle
+let passphraseHidden = false;
+function togglePassphraseVisibility() {
+    const display = document.getElementById('passphraseDisplay');
+    const icon = document.getElementById('passphraseToggleIcon');
+    const text = document.getElementById('passphraseToggleText');
+    
+    passphraseHidden = !passphraseHidden;
+    
+    if (passphraseHidden) {
+        display.classList.add('blurred');
+        icon.className = 'bi bi-eye';
+        text.textContent = 'Show';
+    } else {
+        display.classList.remove('blurred');
+        icon.className = 'bi bi-eye-slash';
+        text.textContent = 'Hide';
+    }
+}
+
+// Copy passphrase
+function copyPassphrase() {
+    const passphrase = '{{ passphrase|default("", true) }}';
+    const icon = document.getElementById('passphraseCopyIcon');
+    const text = document.getElementById('passphraseCopyText');
+    
+    navigator.clipboard.writeText(passphrase).then(() => {
+        icon.className = 'bi bi-check';
+        text.textContent = 'Copied!';
+        setTimeout(() => {
+            icon.className = 'bi bi-clipboard';
+            text.textContent = 'Copy';
+        }, 2000);
     });
+}
+
+// Memory Aid Story Generation
+const passphrase = '{{ passphrase|default("", true) }}';
+const passphraseWords = passphrase.split(' ').filter(w => w.length > 0);
+let currentStoryTemplate = 0;
+
+// Story templates - words are inserted in order
+const storyTemplates = [
+    // Adventure template
+    words => `Once upon a time, a brave explorer named ${highlight(words[0])} set out on a quest. Along the way, they discovered a mysterious ${highlight(words[1])} hidden in an ancient ${highlight(words[2])}${words[3] ? `. With the help of a magical ${highlight(words[3])}` : ''}${words[4] ? `, they unlocked the secrets of the ${highlight(words[4])}` : ''}${words[5] ? ` and found the legendary ${highlight(words[5])}` : ''}. And they all lived happily ever after.`,
+    
+    // Detective template
+    words => `Detective ${highlight(words[0])} was investigating a curious case involving a stolen ${highlight(words[1])}. The only clue was a ${highlight(words[2])} found at the scene${words[3] ? `. Suddenly, a witness mentioned seeing a suspicious ${highlight(words[3])}` : ''}${words[4] ? ` near the old ${highlight(words[4])}` : ''}${words[5] ? `. The case was solved when they discovered the ${highlight(words[5])} contained the answer` : ''}.`,
+    
+    // Science fiction template
+    words => `In the year 2150, Captain ${highlight(words[0])} commanded the starship ${highlight(words[1])}. Their mission: to explore the ${highlight(words[2])} sector of space${words[3] ? ` where ancient ${highlight(words[3])} technology was rumored to exist` : ''}${words[4] ? `. The crew discovered a portal to the ${highlight(words[4])} dimension` : ''}${words[5] ? `, containing the mythical ${highlight(words[5])}` : ''}.`,
+    
+    // Restaurant template
+    words => `Chef ${highlight(words[0])} opened a new restaurant called "The ${highlight(words[1])}." The signature dish featured ${highlight(words[2])} as the main ingredient${words[3] ? `, garnished with fresh ${highlight(words[3])}` : ''}${words[4] ? `. Customers loved the special ${highlight(words[4])} sauce` : ''}${words[5] ? ` served in a ${highlight(words[5])}-shaped bowl` : ''}.`,
+    
+    // Journey template
+    words => `The journey began at ${highlight(words[0])} Mountain, where travelers would gather their ${highlight(words[1])} supplies. The path led through the ${highlight(words[2])} valley${words[3] ? `, past the ancient ${highlight(words[3])} ruins` : ''}${words[4] ? `, until reaching the sacred ${highlight(words[4])} temple` : ''}${words[5] ? ` where the golden ${highlight(words[5])} awaited` : ''}.`,
+    
+    // Music template  
+    words => `${highlight(words[0])} was a talented musician who played the ${highlight(words[1])} in the city square. Their music sounded like ${highlight(words[2])}${words[3] ? ` mixed with ${highlight(words[3])}` : ''}${words[4] ? `. People said it reminded them of ${highlight(words[4])}` : ''}${words[5] ? ` during a beautiful ${highlight(words[5])} sunset` : ''}.`,
+    
+    // Inventor template
+    words => `Professor ${highlight(words[0])} invented a revolutionary device powered by ${highlight(words[1])} energy. It could transform ordinary ${highlight(words[2])}${words[3] ? ` into magnificent ${highlight(words[3])}` : ''}${words[4] ? `. The invention won the prestigious ${highlight(words[4])} Prize` : ''}${words[5] ? ` and was displayed at the ${highlight(words[5])} Museum` : ''}.`,
+    
+    // Garden template
+    words => `In the enchanted garden, ${highlight(words[0])} flowers bloomed beside a ${highlight(words[1])} fountain. The garden keeper planted ${highlight(words[2])} seeds${words[3] ? ` near the ${highlight(words[3])} hedge` : ''}${words[4] ? `, creating a path to the ${highlight(words[4])} arbor` : ''}${words[5] ? ` where butterflies gathered on ${highlight(words[5])} petals` : ''}.`
+];
+
+function highlight(word) {
+    return `<span class="passphrase-word">${word}</span>`;
+}
+
+function generateStory(templateIndex = null) {
+    if (passphraseWords.length === 0) return '';
+    
+    if (templateIndex === null) {
+        templateIndex = currentStoryTemplate;
+    }
+    
+    const template = storyTemplates[templateIndex % storyTemplates.length];
+    return template(passphraseWords);
+}
+
+function toggleMemoryAid() {
+    const container = document.getElementById('memoryAidContainer');
+    const icon = document.getElementById('memoryAidIcon');
+    const text = document.getElementById('memoryAidText');
+    
+    if (container.classList.contains('d-none')) {
+        // Show memory aid
+        container.classList.remove('d-none');
+        icon.className = 'bi bi-lightbulb-fill';
+        text.textContent = 'Hide Aid';
+        
+        // Generate initial story
+        document.getElementById('memoryStory').innerHTML = generateStory();
+    } else {
+        // Hide memory aid
+        container.classList.add('d-none');
+        icon.className = 'bi bi-lightbulb';
+        text.textContent = 'Memory Aid';
+    }
+}
+
+function regenerateStory() {
+    currentStoryTemplate = (currentStoryTemplate + 1) % storyTemplates.length;
+    document.getElementById('memoryStory').innerHTML = generateStory(currentStoryTemplate);
 }
 
 // Print QR code

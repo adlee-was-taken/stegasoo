@@ -9,7 +9,10 @@
         <div class="d-flex align-items-end justify-content-center gap-4">
             <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="155">
             <div style="margin-bottom: 40px;">
-                <h1 class="display-4 fw-bold mb-2">Stegasoo</h1>
+                <h1 class="display-4 fw-bold mb-2">
+                    Stegasoo
+                    <span class="badge bg-success fs-6 ms-2">v3.2.0</span>
+                </h1>
                 <p class="lead text-muted mb-0">Hide encrypted data in plain sight.</p>
             </div>
         </div>
@@ -61,7 +64,7 @@
                 <div class="card-body text-center">
                     <h5 class="card-title">Generate</h5>
                     <p class="card-text text-muted">
-                        Create weekly phrase cards, PINs, and RSA keys
+                        Create passphrases, PINs, and RSA keys
                     </p>
                 </div>
             </div>
@@ -69,7 +72,7 @@
     </div>
 </div>
 
-<!-- Embedding Modes - New in v3.0 -->
+<!-- Embedding Modes -->
 <div class="card mb-4">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Embedding Modes</h5>
@@ -118,7 +121,8 @@
                     </li>
                     <li class="mb-1">
                         <i class="bi bi-chat-quote text-info me-2"></i>
-                        <strong>Day Phrase</strong> – 3-12 words, rotates daily
+                        <strong>Passphrase</strong> – 4+ words
+                        <span class="badge bg-success ms-1">v3.2.0</span>
                     </li>
                     <li class="mb-1">
                         <i class="bi bi-123 text-info me-2"></i>
