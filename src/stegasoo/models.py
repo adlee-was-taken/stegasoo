@@ -1,27 +1,41 @@
 """
-Stegasoo Data Models
+Stegasoo Data Models (v3.2.0)
 
 Dataclasses for structured data exchange between modules and frontends.
+
+Changes in v3.2.0:
+- Renamed day_phrase → passphrase
+- Credentials now uses single passphrase instead of day mapping
+- Removed date_str from EncodeInput (date no longer used in crypto)
+- Made date_used optional in EncodeResult (cosmetic only)
+- Added ImageInfo, CapacityComparison, GenerateResult
 """
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 
 @dataclass
 class Credentials:
-    """Generated credentials for encoding/decoding."""
-    phrases: dict[str, str]  # Day -> phrase mapping
+    """
+    Generated credentials for encoding/decoding.
+    
+    v3.2.0: Simplified to use single passphrase instead of daily rotation.
+    """
+    passphrase: str  # Single passphrase (no daily rotation)
     pin: Optional[str] = None
     rsa_key_pem: Optional[str] = None
     rsa_bits: Optional[int] = None
-    words_per_phrase: int = 3
+    words_per_passphrase: int = 4  # Increased from 3 in v3.1.0
+    
+    # Optional: backup passphrases for multi-factor or rotation
+    backup_passphrases: Optional[list[str]] = None
     
     @property
-    def phrase_entropy(self) -> int:
-        """Entropy in bits from phrases (~11 bits per BIP-39 word)."""
-        return self.words_per_phrase * 11
+    def passphrase_entropy(self) -> int:
+        """Entropy in bits from passphrase (~11 bits per BIP-39 word)."""
+        return self.words_per_passphrase * 11
     
     @property
     def pin_entropy(self) -> int:
@@ -40,7 +54,13 @@ class Credentials:
     @property
     def total_entropy(self) -> int:
         """Total entropy in bits (excluding reference photo)."""
-        return self.phrase_entropy + self.pin_entropy + self.rsa_entropy
+        return self.passphrase_entropy + self.pin_entropy + self.rsa_entropy
+    
+    # Legacy property for compatibility
+    @property
+    def phrase_entropy(self) -> int:
+        """Alias for passphrase_entropy (backward compatibility)."""
+        return self.passphrase_entropy
 
 
 @dataclass
@@ -70,30 +90,33 @@ class FilePayload:
 
 @dataclass
 class EncodeInput:
-    """Input parameters for encoding a message."""
+    """
+    Input parameters for encoding a message.
+    
+    v3.2.0: Removed date_str (date no longer used in crypto).
+    """
     message: Union[str, bytes, FilePayload]  # Text, raw bytes, or file
     reference_photo: bytes
     carrier_image: bytes
-    day_phrase: str
+    passphrase: str  # Renamed from day_phrase
     pin: str = ""
     rsa_key_data: Optional[bytes] = None
     rsa_password: Optional[str] = None
-    date_str: Optional[str] = None  # YYYY-MM-DD, defaults to today
-    
-    def __post_init__(self):
-        if self.date_str is None:
-            self.date_str = date.today().isoformat()
 
 
 @dataclass
 class EncodeResult:
-    """Result of encoding operation."""
+    """
+    Result of encoding operation.
+    
+    v3.2.0: date_used is now optional/cosmetic (not used in crypto).
+    """
     stego_image: bytes
     filename: str
     pixels_modified: int
     total_pixels: int
     capacity_used: float  # 0.0 - 1.0
-    date_used: str
+    date_used: Optional[str] = None  # Cosmetic only (for filename organization)
     
     @property
     def capacity_percent(self) -> float:
@@ -103,10 +126,14 @@ class EncodeResult:
 
 @dataclass
 class DecodeInput:
-    """Input parameters for decoding a message."""
+    """
+    Input parameters for decoding a message.
+    
+    v3.2.0: Renamed day_phrase → passphrase, no date needed.
+    """
     stego_image: bytes
     reference_photo: bytes
-    day_phrase: str
+    passphrase: str  # Renamed from day_phrase
     pin: str = ""
     rsa_key_data: Optional[bytes] = None
     rsa_password: Optional[str] = None
@@ -114,13 +141,17 @@ class DecodeInput:
 
 @dataclass
 class DecodeResult:
-    """Result of decoding operation."""
+    """
+    Result of decoding operation.
+    
+    v3.2.0: date_encoded is always None (date removed from crypto).
+    """
     payload_type: str  # 'text' or 'file'
     message: Optional[str] = None  # For text payloads
     file_data: Optional[bytes] = None  # For file payloads
     filename: Optional[str] = None  # Original filename for file payloads
     mime_type: Optional[str] = None  # MIME type hint
-    date_encoded: Optional[str] = None
+    date_encoded: Optional[str] = None  # Always None in v3.2.0 (kept for compatibility)
     
     @property
     def is_file(self) -> bool:
@@ -165,13 +196,77 @@ class ValidationResult:
     is_valid: bool
     error_message: str = ""
     details: dict = field(default_factory=dict)
+    warning: Optional[str] = None  # v3.2.0: Added for passphrase length warnings
     
     @classmethod
-    def ok(cls, **details) -> 'ValidationResult':
+    def ok(cls, warning: Optional[str] = None, **details) -> 'ValidationResult':
         """Create a successful validation result."""
-        return cls(is_valid=True, details=details)
+        result = cls(is_valid=True, details=details)
+        if warning:
+            result.warning = warning
+        return result
     
     @classmethod
     def error(cls, message: str, **details) -> 'ValidationResult':
         """Create a failed validation result."""
         return cls(is_valid=False, error_message=message, details=details)
+
+
+# =============================================================================
+# NEW MODELS FOR V3.2.0 PUBLIC API
+# =============================================================================
+
+@dataclass
+class ImageInfo:
+    """Information about an image for steganography."""
+    width: int
+    height: int
+    pixels: int
+    format: str
+    mode: str
+    file_size: int
+    lsb_capacity_bytes: int
+    lsb_capacity_kb: float
+    dct_capacity_bytes: Optional[int] = None
+    dct_capacity_kb: Optional[float] = None
+
+
+@dataclass
+class CapacityComparison:
+    """Comparison of embedding capacity between modes."""
+    image_width: int
+    image_height: int
+    lsb_available: bool
+    lsb_bytes: int
+    lsb_kb: float
+    lsb_output_format: str
+    dct_available: bool
+    dct_bytes: Optional[int] = None
+    dct_kb: Optional[float] = None
+    dct_output_formats: Optional[List[str]] = None
+    dct_ratio_vs_lsb: Optional[float] = None
+
+
+@dataclass
+class GenerateResult:
+    """Result of credential generation."""
+    passphrase: str
+    pin: Optional[str] = None
+    rsa_key_pem: Optional[str] = None
+    passphrase_words: int = 4
+    passphrase_entropy: int = 0
+    pin_entropy: int = 0
+    rsa_entropy: int = 0
+    total_entropy: int = 0
+    
+    def __str__(self) -> str:
+        lines = [
+            "Generated Credentials:",
+            f"  Passphrase: {self.passphrase}",
+        ]
+        if self.pin:
+            lines.append(f"  PIN: {self.pin}")
+        if self.rsa_key_pem:
+            lines.append(f"  RSA Key: {len(self.rsa_key_pem)} bytes PEM")
+        lines.append(f"  Total Entropy: {self.total_entropy} bits")
+        return "\n".join(lines)

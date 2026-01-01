@@ -1,8 +1,14 @@
 """
-Stegasoo Constants and Configuration
+Stegasoo Constants and Configuration (v3.2.0 - Date Independent)
 
 Central location for all magic numbers, limits, and crypto parameters.
 All version numbers, limits, and configuration values should be defined here.
+
+BREAKING CHANGES in v3.2.0:
+- Removed date dependency from cryptographic operations
+- Renamed day_phrase → passphrase throughout codebase
+- FORMAT_VERSION bumped to 4 to indicate incompatibility
+- Increased default passphrase length to compensate for removed date entropy
 """
 
 import os
@@ -12,14 +18,18 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 
 # ============================================================================
 # FILE FORMAT
 # ============================================================================
 
 MAGIC_HEADER = b'\x89ST3'
-FORMAT_VERSION = 3
+
+# FORMAT VERSION HISTORY:
+# Version 1-3: Date-dependent encryption (v3.0.x - v3.1.x)
+# Version 4: Date-independent encryption (v3.2.0+) - BREAKING CHANGE
+FORMAT_VERSION = 4
 
 # Payload type markers
 PAYLOAD_TEXT = 0x01
@@ -46,8 +56,14 @@ PBKDF2_ITERATIONS = 600000
 # ============================================================================
 
 MAX_IMAGE_PIXELS = 24_000_000     # ~24 megapixels
+MIN_IMAGE_PIXELS = 256 * 256      # Minimum viable image size
+
 MAX_MESSAGE_SIZE = 250_000        # 250 KB (text messages)
 MAX_MESSAGE_CHARS = 250_000       # Alias for clarity in templates
+MIN_MESSAGE_LENGTH = 1            # Minimum message length
+MAX_MESSAGE_LENGTH = MAX_MESSAGE_SIZE  # Alias for consistency
+
+MAX_PAYLOAD_SIZE = MAX_MESSAGE_SIZE  # Maximum payload size (alias)
 MAX_FILENAME_LENGTH = 255         # Max filename length to store
 
 # File size limits
@@ -60,10 +76,17 @@ MIN_PIN_LENGTH = 6
 MAX_PIN_LENGTH = 9
 DEFAULT_PIN_LENGTH = 6
 
-# Phrase configuration
-MIN_PHRASE_WORDS = 3
-MAX_PHRASE_WORDS = 12
-DEFAULT_PHRASE_WORDS = 3
+# Passphrase configuration (v3.2.0: renamed from PHRASE to PASSPHRASE)
+# Increased defaults to compensate for removed date entropy (~33 bits)
+MIN_PASSPHRASE_WORDS = 3
+MAX_PASSPHRASE_WORDS = 12
+DEFAULT_PASSPHRASE_WORDS = 4  # Increased from 3 (was DEFAULT_PHRASE_WORDS)
+RECOMMENDED_PASSPHRASE_WORDS = 4  # Best practice guideline
+
+# Legacy aliases for backward compatibility during transition
+MIN_PHRASE_WORDS = MIN_PASSPHRASE_WORDS
+MAX_PHRASE_WORDS = MAX_PASSPHRASE_WORDS  
+DEFAULT_PHRASE_WORDS = DEFAULT_PASSPHRASE_WORDS
 
 # RSA configuration
 MIN_RSA_BITS = 2048
@@ -97,8 +120,11 @@ ALLOWED_KEY_EXTENSIONS = {'pem', 'key'}
 # Lossless image formats (safe for steganography)
 LOSSLESS_FORMATS = {'PNG', 'BMP', 'TIFF'}
 
+# Supported image formats for steganography
+SUPPORTED_IMAGE_FORMATS = LOSSLESS_FORMATS
+
 # ============================================================================
-# DAYS
+# DAYS (kept for organizational/UI purposes, not crypto)
 # ============================================================================
 
 DAY_NAMES = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
@@ -184,7 +210,7 @@ def get_wordlist() -> list[str]:
 
 
 # =============================================================================
-# DCT STEGANOGRAPHY (v3.0)
+# DCT STEGANOGRAPHY (v3.0+)
 # =============================================================================
 
 # Embedding modes
@@ -199,6 +225,10 @@ DCT_STEP_SIZE = 8              # QIM quantization step
 
 # Valid embedding modes
 VALID_EMBED_MODES = {EMBED_MODE_LSB, EMBED_MODE_DCT}
+
+# Capacity estimation constants
+LSB_BYTES_PER_PIXEL = 3 / 8  # 3 bits per pixel (RGB, 1 bit per channel) / 8 bits per byte
+DCT_BYTES_PER_PIXEL = 0.125  # Approximate for DCT mode (varies by implementation)
 
 
 def detect_stego_mode(encrypted_data: bytes) -> str:

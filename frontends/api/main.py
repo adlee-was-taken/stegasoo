@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API (v3.0.1)
+Stegasoo REST API (v3.2.0)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v3.2.0:
+- Removed date dependency from all operations
+- Renamed day_phrase → passphrase
+- No date_str parameters needed
+- Simplified API for asynchronous communications
+
 NEW in v3.0: LSB and DCT embedding modes.
 NEW in v3.0.1: DCT color mode and JPEG output format.
 """
@@ -26,13 +33,12 @@ import stegasoo
 from stegasoo import (
     encode, decode, generate_credentials,
     validate_image, calculate_capacity,
-    get_day_from_date,
-    DAY_NAMES, __version__,
+    __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
     FilePayload,
     MAX_FILE_PAYLOAD_SIZE,
-    # NEW in v3.0 - Embedding modes
+    # Embedding modes
     EMBED_MODE_LSB,
     EMBED_MODE_DCT,
     EMBED_MODE_AUTO,
@@ -43,7 +49,8 @@ from stegasoo import (
 )
 from stegasoo.constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
-    MIN_PHRASE_WORDS, MAX_PHRASE_WORDS,
+    MIN_PASSPHRASE_WORDS, MAX_PASSPHRASE_WORDS,
+    DEFAULT_PASSPHRASE_WORDS,
     VALID_RSA_SIZES,
 )
 
@@ -67,6 +74,12 @@ app = FastAPI(
     title="Stegasoo API",
     description="""
 Secure steganography with hybrid authentication. Supports text messages and file embedding.
+
+## Version 3.2.0 Changes
+
+- **No date parameters needed** - Encode and decode anytime without tracking dates
+- **Single passphrase** - No daily rotation, just use your passphrase
+- **True asynchronous communications** - Perfect for dead drops and delayed delivery
 
 ## Embedding Modes (v3.0)
 
@@ -105,25 +118,35 @@ class GenerateRequest(BaseModel):
     use_rsa: bool = False
     pin_length: int = Field(default=6, ge=MIN_PIN_LENGTH, le=MAX_PIN_LENGTH)
     rsa_bits: int = Field(default=2048)
-    words_per_phrase: int = Field(default=3, ge=MIN_PHRASE_WORDS, le=MAX_PHRASE_WORDS)
+    words_per_passphrase: int = Field(
+        default=DEFAULT_PASSPHRASE_WORDS,
+        ge=MIN_PASSPHRASE_WORDS,
+        le=MAX_PASSPHRASE_WORDS,
+        description="Words per passphrase (v3.2.0: default increased to 4)"
+    )
 
 
 class GenerateResponse(BaseModel):
-    phrases: dict[str, str]
+    passphrase: str = Field(description="Single passphrase (v3.2.0: no daily rotation)")
     pin: Optional[str] = None
     rsa_key_pem: Optional[str] = None
     entropy: dict[str, int]
+    # Legacy field for compatibility
+    phrases: Optional[dict[str, str]] = Field(
+        default=None,
+        description="Deprecated: Use 'passphrase' instead"
+    )
 
 
 class EncodeRequest(BaseModel):
     message: str
     reference_photo_base64: str
     carrier_image_base64: str
-    day_phrase: str
+    passphrase: str = Field(description="Passphrase (v3.2.0: renamed from day_phrase)")
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
-    date_str: Optional[str] = None
+    # date_str removed in v3.2.0
     embed_mode: EmbedModeType = Field(
         default="lsb",
         description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
@@ -146,11 +169,11 @@ class EncodeFileRequest(BaseModel):
     mime_type: Optional[str] = None
     reference_photo_base64: str
     carrier_image_base64: str
-    day_phrase: str
+    passphrase: str = Field(description="Passphrase (v3.2.0: renamed from day_phrase)")
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
-    date_str: Optional[str] = None
+    # date_str removed in v3.2.0
     embed_mode: EmbedModeType = Field(
         default="lsb",
         description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
@@ -170,8 +193,6 @@ class EncodeResponse(BaseModel):
     stego_image_base64: str
     filename: str
     capacity_used_percent: float
-    date_used: str
-    day_of_week: str
     embed_mode: str = Field(description="Embedding mode used: 'lsb' or 'dct'")
     # NEW in v3.0.1
     output_format: str = Field(
@@ -182,12 +203,21 @@ class EncodeResponse(BaseModel):
         default="color",
         description="Color mode: 'color' (LSB/DCT color) or 'grayscale' (DCT grayscale)"
     )
+    # Legacy fields (v3.2.0: no longer used in crypto)
+    date_used: Optional[str] = Field(
+        default=None,
+        description="Deprecated: Date no longer used in v3.2.0"
+    )
+    day_of_week: Optional[str] = Field(
+        default=None,
+        description="Deprecated: Date no longer used in v3.2.0"
+    )
 
 
 class DecodeRequest(BaseModel):
     stego_image_base64: str
     reference_photo_base64: str
-    day_phrase: str
+    passphrase: str = Field(description="Passphrase (v3.2.0: renamed from day_phrase)")
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
@@ -268,13 +298,16 @@ class StatusResponse(BaseModel):
     has_argon2: bool
     has_qrcode_read: bool
     has_dct: bool
-    day_names: list[str]
     max_payload_kb: int
     available_modes: list[str]
     # NEW in v3.0.1
     dct_features: Optional[dict] = Field(
         default=None,
         description="DCT mode features (v3.0.1+)"
+    )
+    # NEW in v3.2.0
+    breaking_changes: dict = Field(
+        description="v3.2.0 breaking changes"
     )
 
 
@@ -330,10 +363,15 @@ async def root():
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QR_READ,
         has_dct=has_dct_support(),
-        day_names=list(DAY_NAMES),
         max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
         available_modes=available_modes,
         dct_features=dct_features,
+        breaking_changes={
+            "date_removed": "No date_str parameter needed - encode/decode anytime",
+            "passphrase_renamed": "day_phrase → passphrase (single passphrase, no daily rotation)",
+            "format_version": 4,
+            "backward_compatible": False,
+        }
     )
 
 
@@ -496,6 +534,9 @@ async def api_generate(request: GenerateRequest):
     Generate credentials for encoding/decoding.
     
     At least one of use_pin or use_rsa must be True.
+    
+    v3.2.0: Generates single passphrase (no daily rotation).
+    Default increased to 4 words for better security.
     """
     if not request.use_pin and not request.use_rsa:
         raise HTTPException(400, "Must enable at least one of use_pin or use_rsa")
@@ -509,19 +550,20 @@ async def api_generate(request: GenerateRequest):
             use_rsa=request.use_rsa,
             pin_length=request.pin_length,
             rsa_bits=request.rsa_bits,
-            words_per_phrase=request.words_per_phrase
+            words_per_passphrase=request.words_per_passphrase
         )
         
         return GenerateResponse(
-            phrases=creds.phrases,
+            passphrase=creds.passphrase,  # v3.2.0: Single passphrase
             pin=creds.pin,
             rsa_key_pem=creds.rsa_key_pem,
             entropy={
-                "phrase": creds.phrase_entropy,
+                "passphrase": creds.passphrase_entropy,
                 "pin": creds.pin_entropy,
                 "rsa": creds.rsa_entropy,
                 "total": creds.total_entropy
-            }
+            },
+            phrases=None  # Legacy field removed
         )
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -573,6 +615,8 @@ async def api_encode(request: EncodeRequest):
     
     Images must be base64-encoded. Returns base64-encoded stego image.
     
+    v3.2.0: No date_str parameter needed - encode anytime!
+    
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
     """
@@ -592,21 +636,21 @@ async def api_encode(request: EncodeRequest):
             request.dct_color_mode
         )
         
+        # v3.2.0: No date_str parameter
         result = encode(
             message=request.message,
             reference_photo=ref_photo,
             carrier_image=carrier,
-            day_phrase=request.day_phrase,
+            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            date_str=request.date_str,
+            # date_str removed in v3.2.0
             embed_mode=request.embed_mode,
-            **dct_params,  # NEW in v3.0.1
+            **dct_params,
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
-        day_of_week = get_day_from_date(result.date_used)
         
         output_format, color_mode, _ = _get_output_info(
             request.embed_mode,
@@ -618,11 +662,11 @@ async def api_encode(request: EncodeRequest):
             stego_image_base64=stego_b64,
             filename=result.filename,
             capacity_used_percent=result.capacity_percent,
-            date_used=result.date_used,
-            day_of_week=day_of_week,
             embed_mode=request.embed_mode,
             output_format=output_format,
             color_mode=color_mode,
+            date_used=None,  # v3.2.0: No longer used
+            day_of_week=None,  # v3.2.0: No longer used
         )
         
     except CapacityError as e:
@@ -639,6 +683,8 @@ async def api_encode_file(request: EncodeFileRequest):
     Encode a file into an image (JSON with base64).
     
     File data must be base64-encoded.
+    
+    v3.2.0: No date_str parameter needed - encode anytime!
     
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     NEW in v3.0.1: Supports dct_output_format and dct_color_mode.
@@ -666,21 +712,21 @@ async def api_encode_file(request: EncodeFileRequest):
             request.dct_color_mode
         )
         
+        # v3.2.0: No date_str parameter
         result = encode(
             message=payload,
             reference_photo=ref_photo,
             carrier_image=carrier,
-            day_phrase=request.day_phrase,
+            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            date_str=request.date_str,
+            # date_str removed in v3.2.0
             embed_mode=request.embed_mode,
-            **dct_params,  # NEW in v3.0.1
+            **dct_params,
         )
         
         stego_b64 = base64.b64encode(result.stego_image).decode('utf-8')
-        day_of_week = get_day_from_date(result.date_used)
         
         output_format, color_mode, _ = _get_output_info(
             request.embed_mode,
@@ -692,11 +738,11 @@ async def api_encode_file(request: EncodeFileRequest):
             stego_image_base64=stego_b64,
             filename=result.filename,
             capacity_used_percent=result.capacity_percent,
-            date_used=result.date_used,
-            day_of_week=day_of_week,
             embed_mode=request.embed_mode,
             output_format=output_format,
             color_mode=color_mode,
+            date_used=None,  # v3.2.0: No longer used
+            day_of_week=None,  # v3.2.0: No longer used
         )
         
     except CapacityError as e:
@@ -718,6 +764,8 @@ async def api_decode(request: DecodeRequest):
     
     Returns payload_type to indicate if result is text or file.
     
+    v3.2.0: No date_str parameter needed - decode anytime!
+    
     NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
     With 'auto' (default), tries LSB first then DCT.
     
@@ -733,10 +781,11 @@ async def api_decode(request: DecodeRequest):
         ref_photo = base64.b64decode(request.reference_photo_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
         
+        # v3.2.0: No date_str parameter
         result = decode(
             stego_image=stego,
             reference_photo=ref_photo,
-            day_phrase=request.day_phrase,
+            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
@@ -770,7 +819,7 @@ async def api_decode(request: DecodeRequest):
 
 @app.post("/encode/multipart")
 async def api_encode_multipart(
-    day_phrase: str = Form(...),
+    passphrase: str = Form(..., description="Passphrase (v3.2.0: renamed from day_phrase)"),
     reference_photo: UploadFile = File(...),
     carrier: UploadFile = File(...),
     message: str = Form(""),
@@ -779,7 +828,7 @@ async def api_encode_multipart(
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
-    date_str: str = Form(""),
+    # date_str removed in v3.2.0
     embed_mode: str = Form("lsb"),
     # NEW in v3.0.1
     dct_output_format: str = Form("png"),
@@ -791,6 +840,8 @@ async def api_encode_multipart(
     Provide either 'message' (text) or 'payload_file' (binary file).
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns the stego image directly with metadata headers.
+    
+    v3.2.0: No date_str parameter needed - encode anytime!
     
     NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
     NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
@@ -849,20 +900,20 @@ async def api_encode_multipart(
         # Get DCT parameters
         dct_params = _get_dct_params(embed_mode, dct_output_format, dct_color_mode)
         
+        # v3.2.0: No date_str parameter
         result = encode(
             message=payload,
             reference_photo=ref_data,
             carrier_image=carrier_data,
-            day_phrase=day_phrase,
+            passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
-            date_str=date_str if date_str else None,
+            # date_str removed in v3.2.0
             embed_mode=embed_mode,
-            **dct_params,  # NEW in v3.0.1
+            **dct_params,
         )
         
-        day_of_week = get_day_from_date(result.date_used)
         output_format, color_mode, mime_type = _get_output_info(
             embed_mode, dct_output_format, dct_color_mode
         )
@@ -872,12 +923,11 @@ async def api_encode_multipart(
             media_type=mime_type,
             headers={
                 "Content-Disposition": f"attachment; filename={result.filename}",
-                "X-Stegasoo-Date": result.date_used,
-                "X-Stegasoo-Day": day_of_week,
                 "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}",
                 "X-Stegasoo-Embed-Mode": embed_mode,
-                "X-Stegasoo-Output-Format": output_format,  # NEW in v3.0.1
-                "X-Stegasoo-Color-Mode": color_mode,  # NEW in v3.0.1
+                "X-Stegasoo-Output-Format": output_format,
+                "X-Stegasoo-Color-Mode": color_mode,
+                "X-Stegasoo-Version": __version__,
             }
         )
         
@@ -893,7 +943,7 @@ async def api_encode_multipart(
 
 @app.post("/decode/multipart", response_model=DecodeResponse)
 async def api_decode_multipart(
-    day_phrase: str = Form(...),
+    passphrase: str = Form(..., description="Passphrase (v3.2.0: renamed from day_phrase)"),
     reference_photo: UploadFile = File(...),
     stego_image: UploadFile = File(...),
     pin: str = Form(""),
@@ -907,6 +957,8 @@ async def api_decode_multipart(
     
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns JSON with payload_type indicating text or file.
+    
+    v3.2.0: No date_str parameter needed - decode anytime!
     
     NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
     
@@ -944,10 +996,11 @@ async def api_decode_multipart(
         # QR code keys are never password-protected
         effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
         
+        # v3.2.0: No date_str parameter
         result = decode(
             stego_image=stego_data,
             reference_photo=ref_data,
-            day_phrase=day_phrase,
+            passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
@@ -1022,7 +1075,7 @@ async def api_image_info(
                     capacity_bytes=comparison['dct']['capacity_bytes'],
                     capacity_kb=round(comparison['dct']['capacity_kb'], 1),
                     available=comparison['dct']['available'],
-                    output_format="PNG/JPEG (grayscale or color)",  # Updated for v3.0.1
+                    output_format="PNG/JPEG (grayscale or color)",
                 ),
             }
         

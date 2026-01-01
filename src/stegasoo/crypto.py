@@ -1,8 +1,15 @@
 """
-Stegasoo Cryptographic Functions
+Stegasoo Cryptographic Functions (v3.2.0 - Date Independent)
 
 Key derivation, encryption, and decryption using AES-256-GCM.
 Supports both text messages and binary file payloads.
+
+BREAKING CHANGES in v3.2.0:
+- Removed date dependency from key derivation
+- Renamed day_phrase → passphrase (no daily rotation needed)
+- Messages can now be decoded without knowing encoding date
+- Enables true asynchronous communication
+- NOT backward compatible with v3.1.0 and earlier
 """
 
 import io
@@ -63,8 +70,7 @@ def hash_photo(image_data: bytes) -> bytes:
 
 def derive_hybrid_key(
     photo_data: bytes,
-    day_phrase: str,
-    date_str: str,
+    passphrase: str,
     salt: bytes,
     pin: str = "",
     rsa_key_data: Optional[bytes] = None
@@ -74,18 +80,19 @@ def derive_hybrid_key(
     
     Combines:
     - Photo hash (something you have)
-    - Day phrase (something you know, rotates daily)
+    - Passphrase (something you know)
     - PIN (something you know, static)
     - RSA key (something you have)
-    - Date (automatic rotation)
     - Salt (random per message)
     
     Uses Argon2id if available, falls back to PBKDF2.
     
+    NOTE: v3.2.0 removed date dependency and daily rotation.
+    Use a strong static passphrase instead (recommend 4+ words).
+    
     Args:
         photo_data: Reference photo bytes
-        day_phrase: The day's phrase
-        date_str: Date string (YYYY-MM-DD)
+        passphrase: Shared passphrase (recommend 4+ words)
         salt: Random salt for this message
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
@@ -101,9 +108,8 @@ def derive_hybrid_key(
         
         key_material = (
             photo_hash +
-            day_phrase.lower().encode() +
+            passphrase.lower().encode() +
             pin.encode() +
-            date_str.encode() +
             salt
         )
         
@@ -139,8 +145,7 @@ def derive_hybrid_key(
 
 def derive_pixel_key(
     photo_data: bytes,
-    day_phrase: str,
-    date_str: str,
+    passphrase: str,
     pin: str = "",
     rsa_key_data: Optional[bytes] = None
 ) -> bytes:
@@ -150,10 +155,11 @@ def derive_pixel_key(
     This key determines which pixels are used for embedding,
     making the message location unpredictable without the correct inputs.
     
+    NOTE: v3.2.0 removed date dependency.
+    
     Args:
         photo_data: Reference photo bytes
-        day_phrase: The day's phrase
-        date_str: Date string (YYYY-MM-DD)
+        passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
         
@@ -164,9 +170,8 @@ def derive_pixel_key(
     
     material = (
         photo_hash +
-        day_phrase.lower().encode() +
-        pin.encode() +
-        date_str.encode()
+        passphrase.lower().encode() +
+        pin.encode()
     )
     
     if rsa_key_data:
@@ -282,19 +287,16 @@ def _unpack_payload(data: bytes) -> DecodeResult:
 def encrypt_message(
     message: Union[str, bytes, FilePayload],
     photo_data: bytes,
-    day_phrase: str,
-    date_str: str,
+    passphrase: str,
     pin: str = "",
     rsa_key_data: Optional[bytes] = None
 ) -> bytes:
     """
     Encrypt message or file using AES-256-GCM with hybrid key derivation.
     
-    Message format:
+    Message format (v3.2.0 - no date):
     - Magic header (4 bytes)
-    - Version (1 byte)
-    - Date length (1 byte)
-    - Date string (variable)
+    - Version (1 byte) = 4
     - Salt (32 bytes)
     - IV (12 bytes)
     - Auth tag (16 bytes)
@@ -303,8 +305,7 @@ def encrypt_message(
     Args:
         message: Message string, raw bytes, or FilePayload to encrypt
         photo_data: Reference photo bytes
-        day_phrase: The day's phrase
-        date_str: Date string (YYYY-MM-DD)
+        passphrase: Shared passphrase (recommend 4+ words for good entropy)
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
         
@@ -316,7 +317,7 @@ def encrypt_message(
     """
     try:
         salt = secrets.token_bytes(SALT_SIZE)
-        key = derive_hybrid_key(photo_data, day_phrase, date_str, salt, pin, rsa_key_data)
+        key = derive_hybrid_key(photo_data, passphrase, salt, pin, rsa_key_data)
         iv = secrets.token_bytes(IV_SIZE)
         
         # Pack payload with type marker
@@ -335,13 +336,10 @@ def encrypt_message(
         encryptor.authenticate_additional_data(MAGIC_HEADER + bytes([FORMAT_VERSION]))
         ciphertext = encryptor.update(padded_message) + encryptor.finalize()
         
-        date_bytes = date_str.encode()
-        
+        # v3.2.0: Simplified header without date
         return (
             MAGIC_HEADER +
             bytes([FORMAT_VERSION]) +
-            bytes([len(date_bytes)]) +
-            date_bytes +
             salt +
             iv +
             encryptor.tag +
@@ -356,13 +354,16 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
     """
     Parse the header from encrypted data.
     
+    v3.2.0: No date field in header.
+    
     Args:
         encrypted_data: Raw encrypted bytes
         
     Returns:
-        Dict with date, salt, iv, tag, ciphertext or None if invalid
+        Dict with salt, iv, tag, ciphertext or None if invalid
     """
-    if len(encrypted_data) < 10 or encrypted_data[:4] != MAGIC_HEADER:
+    # Min size: Magic(4) + Version(1) + Salt(32) + IV(12) + Tag(16) = 65 bytes
+    if len(encrypted_data) < 65 or encrypted_data[:4] != MAGIC_HEADER:
         return None
     
     try:
@@ -370,10 +371,7 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
         if version != FORMAT_VERSION:
             return None
         
-        date_len = encrypted_data[5]
-        date_str = encrypted_data[6:6 + date_len].decode()
-        
-        offset = 6 + date_len
+        offset = 5
         salt = encrypted_data[offset:offset + SALT_SIZE]
         offset += SALT_SIZE
         iv = encrypted_data[offset:offset + IV_SIZE]
@@ -383,7 +381,6 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
         ciphertext = encrypted_data[offset:]
         
         return {
-            'date': date_str,
             'salt': salt,
             'iv': iv,
             'tag': tag,
@@ -396,17 +393,17 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
 def decrypt_message(
     encrypted_data: bytes,
     photo_data: bytes,
-    day_phrase: str,
+    passphrase: str,
     pin: str = "",
     rsa_key_data: Optional[bytes] = None
 ) -> DecodeResult:
     """
-    Decrypt message using the embedded date from the header.
+    Decrypt message (v3.2.0 - no date needed).
     
     Args:
         encrypted_data: Encrypted message bytes
         photo_data: Reference photo bytes
-        day_phrase: The day's phrase (must match encoding day)
+        passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
         
@@ -423,7 +420,7 @@ def decrypt_message(
     
     try:
         key = derive_hybrid_key(
-            photo_data, day_phrase, header['date'], header['salt'], pin, rsa_key_data
+            photo_data, passphrase, header['salt'], pin, rsa_key_data
         )
         
         cipher = Cipher(
@@ -439,20 +436,21 @@ def decrypt_message(
         
         payload_data = padded_plaintext[:original_length]
         result = _unpack_payload(payload_data)
-        result.date_encoded = header['date']
+        
+        # Note: No date_encoded field in v3.2.0
         
         return result
         
     except Exception as e:
         raise DecryptionError(
-            "Decryption failed. Check your phrase, PIN, RSA key, and reference photo."
+            "Decryption failed. Check your passphrase, PIN, RSA key, and reference photo."
         ) from e
 
 
 def decrypt_message_text(
     encrypted_data: bytes,
     photo_data: bytes,
-    day_phrase: str,
+    passphrase: str,
     pin: str = "",
     rsa_key_data: Optional[bytes] = None
 ) -> str:
@@ -464,7 +462,7 @@ def decrypt_message_text(
     Args:
         encrypted_data: Encrypted message bytes
         photo_data: Reference photo bytes
-        day_phrase: The day's phrase
+        passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
         
@@ -474,7 +472,7 @@ def decrypt_message_text(
     Raises:
         DecryptionError: If decryption fails or content is a file
     """
-    result = decrypt_message(encrypted_data, photo_data, day_phrase, pin, rsa_key_data)
+    result = decrypt_message(encrypted_data, photo_data, passphrase, pin, rsa_key_data)
     
     if result.is_file:
         if result.file_data:
@@ -488,22 +486,6 @@ def decrypt_message_text(
         return ""
     
     return result.message or ""
-
-
-def get_date_from_encrypted(encrypted_data: bytes) -> Optional[str]:
-    """
-    Extract the date string from encrypted data without decrypting.
-    
-    Useful for determining which day's phrase to use.
-    
-    Args:
-        encrypted_data: Encrypted message bytes
-        
-    Returns:
-        Date string (YYYY-MM-DD) or None if invalid
-    """
-    header = parse_header(encrypted_data)
-    return header['date'] if header else None
 
 
 def has_argon2() -> bool:

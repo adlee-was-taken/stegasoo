@@ -1,7 +1,12 @@
 """
-Stegasoo Input Validation
+Stegasoo Input Validation (v3.2.0)
 
 Validators for all user inputs with clear error messages.
+
+Changes in v3.2.0:
+- Renamed validate_phrase() → validate_passphrase()
+- Added word count validation with warnings for passphrases
+- Added validators for embed modes and DCT parameters
 """
 
 import io
@@ -14,6 +19,8 @@ from .constants import (
     MAX_MESSAGE_SIZE, MAX_FILE_PAYLOAD_SIZE, MAX_IMAGE_PIXELS, MAX_FILE_SIZE,
     MIN_RSA_BITS, MIN_KEY_PASSWORD_LENGTH,
     ALLOWED_IMAGE_EXTENSIONS, ALLOWED_KEY_EXTENSIONS,
+    MIN_PASSPHRASE_WORDS, RECOMMENDED_PASSPHRASE_WORDS,
+    EMBED_MODE_LSB, EMBED_MODE_DCT, EMBED_MODE_AUTO,
 )
 from .models import ValidationResult, FilePayload
 from .exceptions import (
@@ -325,55 +332,110 @@ def validate_key_password(password: str) -> ValidationResult:
     return ValidationResult.ok(length=len(password))
 
 
-def validate_phrase(phrase: str) -> ValidationResult:
+def validate_passphrase(passphrase: str) -> ValidationResult:
     """
-    Validate day phrase.
+    Validate passphrase.
+    
+    v3.2.0: Recommend 4+ words for good entropy (since date is no longer used).
     
     Args:
-        phrase: Phrase string
+        passphrase: Passphrase string
         
     Returns:
-        ValidationResult with word_count
+        ValidationResult with word_count and optional warning
     """
-    if not phrase or not phrase.strip():
-        return ValidationResult.error("Day phrase is required")
+    if not passphrase or not passphrase.strip():
+        return ValidationResult.error("Passphrase is required")
     
-    words = phrase.strip().split()
+    words = passphrase.strip().split()
+    
+    if len(words) < MIN_PASSPHRASE_WORDS:
+        return ValidationResult.error(
+            f"Passphrase should have at least {MIN_PASSPHRASE_WORDS} words"
+        )
+    
+    # Provide warning if below recommended length
+    if len(words) < RECOMMENDED_PASSPHRASE_WORDS:
+        return ValidationResult.ok(
+            word_count=len(words),
+            warning=f"Recommend {RECOMMENDED_PASSPHRASE_WORDS}+ words for better security"
+        )
     
     return ValidationResult.ok(word_count=len(words))
 
 
-def validate_date_string(date_str: str) -> ValidationResult:
+# =============================================================================
+# NEW VALIDATORS FOR V3.2.0
+# =============================================================================
+
+def validate_reference_photo(photo_data: bytes) -> ValidationResult:
+    """Validate reference photo. Alias for validate_image."""
+    return validate_image(photo_data, "Reference photo")
+
+
+def validate_carrier(carrier_data: bytes) -> ValidationResult:
+    """Validate carrier image. Alias for validate_image."""
+    return validate_image(carrier_data, "Carrier image")
+
+
+def validate_embed_mode(mode: str) -> ValidationResult:
     """
-    Validate date string format (YYYY-MM-DD).
+    Validate embedding mode.
     
     Args:
-        date_str: Date string
+        mode: Embedding mode string
         
     Returns:
         ValidationResult
     """
-    if not date_str:
-        return ValidationResult.error("Date is required")
+    valid_modes = {EMBED_MODE_LSB, EMBED_MODE_DCT, EMBED_MODE_AUTO}
     
-    if len(date_str) != 10:
-        return ValidationResult.error("Date must be in YYYY-MM-DD format")
+    if mode not in valid_modes:
+        return ValidationResult.error(
+            f"Invalid embed_mode: '{mode}'. Valid options: {', '.join(sorted(valid_modes))}"
+        )
     
-    if date_str[4] != '-' or date_str[7] != '-':
-        return ValidationResult.error("Date must be in YYYY-MM-DD format")
+    return ValidationResult.ok(mode=mode)
+
+
+def validate_dct_output_format(format_str: str) -> ValidationResult:
+    """
+    Validate DCT output format.
     
-    try:
-        year = int(date_str[0:4])
-        month = int(date_str[5:7])
-        day = int(date_str[8:10])
+    Args:
+        format_str: Output format ('png' or 'jpeg')
         
-        if not (1 <= month <= 12 and 1 <= day <= 31 and 2000 <= year <= 2100):
-            return ValidationResult.error("Invalid date values")
+    Returns:
+        ValidationResult
+    """
+    valid_formats = {'png', 'jpeg'}
+    
+    if format_str.lower() not in valid_formats:
+        return ValidationResult.error(
+            f"Invalid DCT output format: '{format_str}'. Valid options: {', '.join(sorted(valid_formats))}"
+        )
+    
+    return ValidationResult.ok(format=format_str.lower())
+
+
+def validate_dct_color_mode(mode: str) -> ValidationResult:
+    """
+    Validate DCT color mode.
+    
+    Args:
+        mode: Color mode ('grayscale' or 'color')
         
-        return ValidationResult.ok(year=year, month=month, day=day)
-        
-    except ValueError:
-        return ValidationResult.error("Date must contain valid numbers")
+    Returns:
+        ValidationResult
+    """
+    valid_modes = {'grayscale', 'color'}
+    
+    if mode.lower() not in valid_modes:
+        return ValidationResult.error(
+            f"Invalid DCT color mode: '{mode}'. Valid options: {', '.join(sorted(valid_modes))}"
+        )
+    
+    return ValidationResult.ok(mode=mode.lower())
 
 
 # ============================================================================
