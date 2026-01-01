@@ -240,12 +240,13 @@ def generate():
             rsa_bits = 2048
         
         try:
+            # v3.2.0 FIX: Use correct parameter name 'passphrase_words'
             creds = generate_credentials(
                 use_pin=use_pin,
                 use_rsa=use_rsa,
                 pin_length=pin_length,
                 rsa_bits=rsa_bits,
-                words_per_passphrase=words_per_passphrase
+                passphrase_words=words_per_passphrase,  # FIX: was words_per_passphrase=
             )
             
             # Store RSA key temporarily for QR generation
@@ -892,11 +893,15 @@ def decode_page():
                     file_id=file_id,
                     filename=filename,
                     file_size=format_size(len(decode_result.file_data)),
-                    mime_type=decode_result.mime_type
+                    mime_type=decode_result.mime_type,
+                    has_qrcode_read=HAS_QRCODE_READ
                 )
             else:
                 # Text content
-                return render_template('decode.html', decoded_message=decode_result.message)
+                return render_template('decode.html', 
+                    decoded_message=decode_result.message,
+                    has_qrcode_read=HAS_QRCODE_READ
+                )
             
         except DecryptionError:
             flash('Decryption failed. Check your passphrase, PIN, RSA key, and reference photo.', 'error')

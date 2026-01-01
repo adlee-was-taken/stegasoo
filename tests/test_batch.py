@@ -1,5 +1,10 @@
 """
-Tests for Stegasoo batch processing module.
+Tests for Stegasoo batch processing module (v3.2.0).
+
+Updated for v3.2.0:
+- Uses 'passphrase' instead of 'phrase' in credentials dict
+- No date_str parameter
+- BatchCredentials.passphrase is a single string
 """
 
 import pytest
@@ -13,6 +18,7 @@ from stegasoo.batch import (
     BatchResult,
     BatchItem,
     BatchStatus,
+    BatchCredentials,
     batch_capacity_check,
     print_batch_result,
 )
@@ -39,6 +45,15 @@ def sample_images(temp_dir):
         images.append(img_path)
     
     return images
+
+
+@pytest.fixture
+def sample_credentials():
+    """Create sample v3.2.0 credentials dict."""
+    return {
+        "passphrase": "test phrase four words",  # v3.2.0: single passphrase
+        "pin": "123456"
+    }
 
 
 class TestBatchItem:
@@ -88,6 +103,50 @@ class TestBatchResult:
         result.start_time = 100.0
         result.end_time = 110.0
         assert result.duration == 10.0
+
+
+class TestBatchCredentials:
+    """Tests for BatchCredentials dataclass (v3.2.0)."""
+    
+    def test_from_dict_new_format(self):
+        """Should parse v3.2.0 format with 'passphrase' key."""
+        data = {
+            "passphrase": "test phrase four words",
+            "pin": "123456"
+        }
+        creds = BatchCredentials.from_dict(data)
+        assert creds.passphrase == "test phrase four words"
+        assert creds.pin == "123456"
+    
+    def test_from_dict_legacy_format(self):
+        """Should parse legacy format with 'day_phrase' key for migration."""
+        data = {
+            "day_phrase": "legacy phrase here",  # Old key name
+            "pin": "123456"
+        }
+        creds = BatchCredentials.from_dict(data)
+        # Should accept old key and map to passphrase
+        assert creds.passphrase == "legacy phrase here"
+        assert creds.pin == "123456"
+    
+    def test_to_dict(self):
+        """Should serialize to v3.2.0 format."""
+        creds = BatchCredentials(
+            passphrase="test phrase four words",
+            pin="123456"
+        )
+        result = creds.to_dict()
+        assert result['passphrase'] == "test phrase four words"
+        assert result['pin'] == "123456"
+        assert 'day_phrase' not in result  # Old key should not be present
+    
+    def test_passphrase_is_string(self):
+        """Passphrase should be a string, not a dict."""
+        creds = BatchCredentials(
+            passphrase="test phrase four words",
+            pin="123456"
+        )
+        assert isinstance(creds.passphrase, str)
 
 
 class TestBatchProcessor:
@@ -145,13 +204,13 @@ class TestBatchProcessor:
         results = list(processor.find_images([temp_dir], recursive=True))
         assert any(p.name == "nested.png" for p in results)
     
-    def test_batch_encode_requires_message_or_file(self, sample_images):
+    def test_batch_encode_requires_message_or_file(self, sample_images, sample_credentials):
         """Should raise if neither message nor file provided."""
         processor = BatchProcessor()
         with pytest.raises(ValueError, match="message or file_payload"):
             processor.batch_encode(
                 images=sample_images,
-                credentials={"phrase": "test", "pin": "123456"},
+                credentials=sample_credentials,
             )
     
     def test_batch_encode_requires_credentials(self, sample_images):
@@ -163,14 +222,28 @@ class TestBatchProcessor:
                 message="test",
             )
     
-    def test_batch_encode_creates_result(self, sample_images, temp_dir):
+    def test_batch_encode_accepts_passphrase_credentials(self, sample_images, temp_dir, sample_credentials):
+        """Should accept v3.2.0 format credentials with passphrase."""
+        processor = BatchProcessor()
+        result = processor.batch_encode(
+            images=sample_images,
+            message="Test message",
+            output_dir=temp_dir / "output",
+            credentials=sample_credentials,  # Uses 'passphrase' key
+        )
+        
+        assert isinstance(result, BatchResult)
+        assert result.operation == "encode"
+        assert result.total == 3
+    
+    def test_batch_encode_creates_result(self, sample_images, temp_dir, sample_credentials):
         """Should return BatchResult with correct structure."""
         processor = BatchProcessor()
         result = processor.batch_encode(
             images=sample_images,
             message="Test message",
             output_dir=temp_dir / "output",
-            credentials={"phrase": "test phrase", "pin": "123456"},
+            credentials=sample_credentials,
         )
         
         assert isinstance(result, BatchResult)
@@ -184,19 +257,31 @@ class TestBatchProcessor:
         with pytest.raises(ValueError, match="Credentials"):
             processor.batch_decode(images=sample_images)
     
-    def test_batch_decode_creates_result(self, sample_images):
-        """Should return BatchResult with correct structure."""
+    def test_batch_decode_accepts_passphrase_credentials(self, sample_images, sample_credentials):
+        """Should accept v3.2.0 format credentials with passphrase."""
         processor = BatchProcessor()
         result = processor.batch_decode(
             images=sample_images,
-            credentials={"phrase": "test phrase", "pin": "123456"},
+            credentials=sample_credentials,  # Uses 'passphrase' key
         )
         
         assert isinstance(result, BatchResult)
         assert result.operation == "decode"
         assert result.total == 3
     
-    def test_progress_callback_called(self, sample_images):
+    def test_batch_decode_creates_result(self, sample_images, sample_credentials):
+        """Should return BatchResult with correct structure."""
+        processor = BatchProcessor()
+        result = processor.batch_decode(
+            images=sample_images,
+            credentials=sample_credentials,
+        )
+        
+        assert isinstance(result, BatchResult)
+        assert result.operation == "decode"
+        assert result.total == 3
+    
+    def test_progress_callback_called(self, sample_images, sample_credentials):
         """Progress callback should be called for each item."""
         processor = BatchProcessor()
         callback = Mock()
@@ -204,13 +289,13 @@ class TestBatchProcessor:
         processor.batch_encode(
             images=sample_images,
             message="Test",
-            credentials={"phrase": "test", "pin": "123456"},
+            credentials=sample_credentials,
             progress_callback=callback,
         )
         
         assert callback.call_count == 3
     
-    def test_custom_encode_func(self, sample_images, temp_dir):
+    def test_custom_encode_func(self, sample_images, temp_dir, sample_credentials):
         """Should use custom encode function if provided."""
         processor = BatchProcessor()
         encode_mock = Mock()
@@ -219,7 +304,7 @@ class TestBatchProcessor:
             images=sample_images,
             message="Test",
             output_dir=temp_dir / "output",
-            credentials={"phrase": "test", "pin": "123456"},
+            credentials=sample_credentials,
             encode_func=encode_mock,
         )
         
@@ -289,3 +374,36 @@ class TestPrintBatchResult:
         
         captured = capsys.readouterr()
         assert "test.png" in captured.out
+
+
+class TestCredentialsMigration:
+    """Tests for v3.1.x to v3.2.0 credentials migration."""
+    
+    def test_old_phrase_key_accepted(self):
+        """Old 'phrase' key should be accepted for migration."""
+        old_format = {
+            "phrase": "old style phrase",
+            "pin": "123456"
+        }
+        # Should not raise
+        creds = BatchCredentials.from_dict(old_format)
+        assert creds.passphrase == "old style phrase"
+    
+    def test_old_day_phrase_key_accepted(self):
+        """Old 'day_phrase' key should be accepted for migration."""
+        old_format = {
+            "day_phrase": "old day phrase",
+            "pin": "123456"
+        }
+        creds = BatchCredentials.from_dict(old_format)
+        assert creds.passphrase == "old day phrase"
+    
+    def test_new_passphrase_key_preferred(self):
+        """New 'passphrase' key should take precedence if both present."""
+        mixed_format = {
+            "passphrase": "new style passphrase",
+            "day_phrase": "old day phrase",
+            "pin": "123456"
+        }
+        creds = BatchCredentials.from_dict(mixed_format)
+        assert creds.passphrase == "new style passphrase"

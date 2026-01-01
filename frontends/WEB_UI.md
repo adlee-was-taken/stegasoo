@@ -1,10 +1,11 @@
-# Stegasoo Web UI Documentation
+# Stegasoo Web UI Documentation (v3.2.0)
 
 Complete guide for the Stegasoo web-based steganography interface.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [What's New in v3.2.0](#whats-new-in-v320)
 - [Installation & Setup](#installation--setup)
 - [Pages & Features](#pages--features)
   - [Home Page](#home-page)
@@ -14,7 +15,7 @@ Complete guide for the Stegasoo web-based steganography interface.
   - [About Page](#about-page)
 - [Embedding Modes](#embedding-modes)
   - [LSB Mode (Default)](#lsb-mode-default)
-  - [DCT Mode (Experimental)](#dct-mode-experimental)
+  - [DCT Mode](#dct-mode)
 - [User Interface Guide](#user-interface-guide)
 - [Workflow Examples](#workflow-examples)
 - [Security Features](#security-features)
@@ -28,9 +29,9 @@ Complete guide for the Stegasoo web-based steganography interface.
 
 The Stegasoo Web UI provides a user-friendly browser-based interface for:
 
-- **Generating** secure credentials (phrases, PINs, RSA keys)
-- **Encoding** secret messages into images
-- **Decoding** hidden messages from images
+- **Generating** secure credentials (passphrase, PINs, RSA keys)
+- **Encoding** secret messages or files into images
+- **Decoding** hidden messages or files from images
 - **Learning** about the security model
 
 Built with Flask, Bootstrap 5, and a modern dark theme.
@@ -39,14 +40,37 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 
 - ✅ Drag-and-drop file uploads
 - ✅ Image previews
-- ✅ Client-side date detection
 - ✅ Native sharing (Web Share API)
 - ✅ Responsive design (mobile-friendly)
 - ✅ Password-protected RSA key downloads
 - ✅ Real-time entropy calculations
 - ✅ Automatic file cleanup
-- ✅ **DCT steganography mode** (v3.0+) - JPEG-resilient embedding
-- ✅ **Color mode selection** (v3.0.1+) - Preserve carrier colors
+- ✅ **DCT steganography mode** - Frequency domain embedding
+- ✅ **Color mode selection** - Preserve carrier colors
+- ✅ **File embedding** - Hide files, not just text
+- ✅ **v3.2.0: No date tracking** - Simplified workflow
+
+---
+
+## What's New in v3.2.0
+
+Version 3.2.0 simplifies the user experience significantly:
+
+| Change | Before (v3.1) | After (v3.2.0) |
+|--------|---------------|----------------|
+| Credentials | 7 daily phrases | Single passphrase |
+| Encode form | Date selection required | No date field |
+| Decode form | Date detection/input | No date needed |
+| Default words | 3 words | 4 words |
+| Field label | "Day Phrase" | "Passphrase" |
+
+**Key benefits:**
+- ✅ No need to remember which day a message was encoded
+- ✅ Simpler forms with fewer fields
+- ✅ True asynchronous communication
+- ✅ Stronger default security (4 words = ~44 bits entropy)
+
+**Breaking Change:** v3.2.0 cannot decode images created with v3.1.x.
 
 ---
 
@@ -58,7 +82,7 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 pip install stegasoo[web]
 ```
 
-This automatically installs DCT dependencies (scipy, jpegio) for full functionality.
+This automatically installs DCT dependencies (scipy) for full functionality.
 
 ### From Source
 
@@ -92,7 +116,7 @@ docker-compose up web
 
 1. Navigate to http://localhost:5000
 2. Click "Generate" to create your credentials
-3. **Memorize** your phrases and PIN
+3. **Memorize** your passphrase and PIN
 4. Share credentials securely with your communication partner
 
 ---
@@ -117,7 +141,7 @@ The landing page introduces Stegasoo and provides quick access to all features.
 
 Explains the three key components:
 1. **Reference Photo** - Shared secret image
-2. **Day Phrase** - Changes daily
+2. **Passphrase** - Your secret phrase (v3.2.0: same every time!)
 3. **Static PIN** - Same every day
 
 ---
@@ -132,7 +156,7 @@ Create a new set of credentials for steganography operations.
 
 | Option | Range | Default | Description |
 |--------|-------|---------|-------------|
-| Words per phrase | 3-12 | 3 | BIP-39 words per daily phrase |
+| Words per passphrase | 3-12 | 4 | BIP-39 words in passphrase |
 | Use PIN | on/off | on | Generate a numeric PIN |
 | PIN length | 6-9 | 6 | Digits in the PIN |
 | Use RSA Key | on/off | off | Generate an RSA key pair |
@@ -143,12 +167,12 @@ Create a new set of credentials for steganography operations.
 The UI displays real-time entropy calculations:
 
 ```
-Estimated entropy: ~53 bits
-[==========>                    ] Good for most use cases
+Estimated entropy: ~63 bits
+[=============>                 ] Good for most use cases
 • Reference photo adds ~80-256 bits more
 ```
 
-#### Generated Output
+#### Generated Output (v3.2.0)
 
 After clicking "Generate Credentials":
 
@@ -157,34 +181,32 @@ After clicking "Generate Credentials":
 ┌─────────────────────┐
 │      8 4 7 2 9 3    │
 └─────────────────────┘
-Use this 6-digit PIN every day
+Use this 6-digit PIN every time
 ```
 
-**Daily Phrases:**
+**Passphrase** (v3.2.0: single passphrase, no daily rotation):
 ```
-Day         │ Phrase
-─────────────────────────────────────────
-Monday      │ abandon ability able
-Tuesday     │ actor actress actual
-Wednesday   │ advice aerobic affair
-Thursday    │ afraid again age
-Friday      │ agree ahead aim
-Saturday    │ airport aisle alarm
-Sunday      │ album alcohol alert
+┌─────────────────────────────────────────┐
+│  abandon ability able about             │
+│                                         │
+│  Use this passphrase to encode and      │
+│  decode messages - no date needed!      │
+└─────────────────────────────────────────┘
 ```
 
 **RSA Key** (if enabled):
 - Copy to clipboard button
 - Download as password-protected .pem file
+- Download as QR code image
 
 **Security Summary:**
 ```
-Phrase entropy: 33 bits/phrase
-PIN entropy:    19 bits/PIN
-RSA entropy:    128 bits/RSA
+Passphrase entropy: 44 bits (4 words)
+PIN entropy:        19 bits
+RSA entropy:        128 bits
 ─────────────────────────────
-Total:          180 bits
-+ reference photo (~80-256 bits) = 260+ bits combined
+Total:              191 bits
++ reference photo (~80-256 bits) = 271+ bits combined
 ```
 
 #### RSA Key Download
@@ -195,13 +217,20 @@ Total:          180 bits
 4. Save the file securely
 5. Share with your communication partner through a secure channel
 
+#### RSA Key QR Code
+
+For easier sharing, you can also:
+1. Click "Download QR Code"
+2. Save the QR code image
+3. Your partner can scan it to import the key
+
 ---
 
 ### Encode Message
 
 **URL:** `/encode`
 
-Hide a secret message inside an image.
+Hide a secret message or file inside an image.
 
 #### Input Fields
 
@@ -209,15 +238,19 @@ Hide a secret message inside an image.
 |-------|------|----------|-------------|
 | Reference Photo | Image file | ✓ | Your shared secret photo |
 | Carrier Image | Image file | ✓ | Image to hide message in |
-| Secret Message | Text | ✓ | Message to hide (max 50KB) |
-| Day Phrase | Text | ✓ | Today's passphrase |
-| PIN | Number | * | Your static PIN |
-| RSA Key | .pem file | * | Your shared RSA key |
+| Payload Type | Toggle | ✓ | Text message or file |
+| Secret Message | Text | * | Message to hide (max 50KB) |
+| File to Embed | File | * | File to hide (max 2MB) |
+| Passphrase | Text | ✓ | Your passphrase (v3.2.0) |
+| PIN | Number | ** | Your static PIN |
+| RSA Key | .pem file | ** | Your shared RSA key |
+| RSA Key QR | Image file | ** | QR code containing RSA key |
 | RSA Key Password | Password | | Password for encrypted key |
 
-\* At least one security factor (PIN or RSA Key) required.
+\* One of message or file required.
+\*\* At least one security factor (PIN or RSA Key) required.
 
-#### Advanced Options (v3.0+)
+#### Advanced Options
 
 Expand "Advanced Options" to access embedding mode settings:
 
@@ -246,13 +279,6 @@ Message: [                                              ]
 
 Shows warning at 80% capacity.
 
-#### Day Detection
-
-The page automatically detects your local day of week and updates the label:
-```
-Saturday's Phrase: [                    ]
-```
-
 #### Encoding Process
 
 1. Fill in all required fields
@@ -271,11 +297,11 @@ After successful encoding:
 ┌────────────────────────────────────────┐
 │  ✓ Message Encoded Successfully!       │
 │                                        │
-│     📄 a1b2c3d4_20251227.png          │
-│     Your secret message is hidden      │
+│     📄 a1b2c3d4.png                    │
+│     Your secret is hidden              │
 │     in this image                      │
 │                                        │
-│     Mode: DCT (Color, JPEG)            │  ← v3.0+ shows mode info
+│     Mode: DCT (Color, JPEG)            │
 │     Capacity used: 45.2%               │
 │                                        │
 │     [    Download Image    ]           │
@@ -307,7 +333,7 @@ After successful encoding:
 
 **URL:** `/decode`
 
-Extract a hidden message from a stego image.
+Extract a hidden message or file from a stego image.
 
 #### Input Fields
 
@@ -315,34 +341,28 @@ Extract a hidden message from a stego image.
 |-------|------|----------|-------------|
 | Reference Photo | Image file | ✓ | Same photo used for encoding |
 | Stego Image | Image file | ✓ | Image containing hidden message |
-| Day Phrase | Text | ✓ | Phrase for the **encoding** day |
+| Passphrase | Text | ✓ | Same passphrase used for encoding |
 | PIN | Number | * | Same PIN used for encoding |
 | RSA Key | .pem file | * | Same RSA key used for encoding |
+| RSA Key QR | Image file | * | QR code containing RSA key |
 | RSA Key Password | Password | | Password for encrypted key |
 
 \* Must match security factors used during encoding.
 
-#### Automatic Mode Detection (v3.0+)
+#### Automatic Mode Detection
 
 The decoder automatically detects whether a stego image uses LSB or DCT mode. You don't need to specify the mode manually—it just works!
 
-#### Date Detection from Filename
+#### Decoding Process (v3.2.0 Simplified)
 
-When you upload a stego image with a date in the filename (e.g., `stego_20251227.png`), the UI:
-1. Extracts the date
-2. Determines the day of week
-3. Updates the phrase label: "Saturday's Phrase"
+1. Upload the same reference photo
+2. Upload the received stego image
+3. Enter your passphrase (no date needed!)
+4. Enter your PIN and/or RSA key
+5. Click "Decode Message"
+6. View decoded message or download decoded file
 
-This helps you use the correct daily phrase.
-
-#### Decoding Process
-
-1. Fill in all required fields
-2. Click "Decode Message"
-3. Wait for processing
-4. View decoded message on same page
-
-#### Successful Decode
+#### Successful Decode (Text)
 
 ```
 ┌────────────────────────────────────────┐
@@ -358,13 +378,31 @@ This helps you use the correct daily phrase.
 └────────────────────────────────────────┘
 ```
 
+#### Successful Decode (File)
+
+```
+┌────────────────────────────────────────┐
+│  ✓ File Extracted Successfully!        │
+│                                        │
+│     📄 secret_document.pdf             │
+│     Size: 245 KB                       │
+│     Type: application/pdf              │
+│                                        │
+│     [    Download File    ]            │
+│                                        │
+│  ⚠️ File expires in 5 minutes.         │
+│                                        │
+│     [ Decode Another Message ]         │
+└────────────────────────────────────────┘
+```
+
 #### Troubleshooting Tips
 
 If decryption fails:
-1. **Check the date** - Use phrase for encoding day, not today
+1. **Check passphrase** - Must be exact match (case-sensitive)
 2. **Same reference photo** - Must be identical file
 3. **Correct PIN/RSA** - Match what was used for encoding
-4. **Image integrity** - Ensure no resizing/recompression
+4. **Image integrity** - Ensure no resizing/recompression (LSB mode)
 
 ---
 
@@ -374,11 +412,17 @@ If decryption fails:
 
 Information about the Stegasoo project, security model, and credits.
 
+Includes:
+- Version information (v3.2.0)
+- v3.2.0 changes explanation
+- Security model overview
+- Dependency status (Argon2, QR code support)
+
 ---
 
 ## Embedding Modes
 
-Stegasoo v3.0+ offers two steganography algorithms, each with different trade-offs.
+Stegasoo offers two steganography algorithms, each with different trade-offs.
 
 ### LSB Mode (Default)
 
@@ -386,7 +430,7 @@ Stegasoo v3.0+ offers two steganography algorithms, each with different trade-of
 
 | Aspect | Details |
 |--------|---------|
-| **Capacity** | ~3 bits/pixel (~770 KB for 1920×1080) |
+| **Capacity** | ~3 bits/pixel (~375 KB for 1920×1080) |
 | **Output Format** | PNG only (lossless required) |
 | **Resilience** | ❌ Destroyed by JPEG compression |
 | **Best For** | Maximum capacity, controlled sharing |
@@ -396,31 +440,28 @@ Stegasoo v3.0+ offers two steganography algorithms, each with different trade-of
 - Maximum message capacity needed
 - Recipient won't modify the image
 
-### DCT Mode (Experimental)
+### DCT Mode
 
 **Discrete Cosine Transform** embedding hides data in frequency domain coefficients.
 
 | Aspect | Details |
 |--------|---------|
-| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080 PNG, ~30-50 KB JPEG) |
+| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080 PNG, ~50 KB JPEG) |
 | **Output Formats** | PNG or JPEG |
-| **Resilience** | ✅ Survives JPEG compression |
-| **Best For** | Social media, messaging apps, web sharing |
-
-> ⚠️ **Experimental Feature**: DCT mode is marked experimental and may have edge cases. Test with your specific workflow before relying on it for critical messages.
+| **Resilience** | ✅ Better resistance to analysis |
+| **Best For** | Stealth requirements, frequency domain hiding |
 
 **When to use DCT:**
-- Posting to social media (which recompresses images)
-- Sharing via messaging apps (WhatsApp, Telegram, etc.)
-- When channel may apply JPEG compression
+- When stealth is important
 - Smaller messages that fit in reduced capacity
+- When you want JPEG output for natural appearance
 
 #### DCT Output Formats
 
 | Format | Pros | Cons |
 |--------|------|------|
-| **PNG** | Lossless, predictable | Larger file, obvious if channel expects JPEG |
-| **JPEG** | Native format, natural | Slightly lower capacity |
+| **PNG** | Lossless, predictable | Larger file |
+| **JPEG** | Native format, natural, smaller | Slightly lower capacity |
 
 #### DCT Color Modes
 
@@ -435,9 +476,9 @@ For a 1920×1080 image:
 
 | Mode | Approximate Capacity |
 |------|---------------------|
-| LSB (PNG) | ~770 KB |
+| LSB (PNG) | ~375 KB |
 | DCT (PNG, Color) | ~65 KB |
-| DCT (JPEG) | ~30-50 KB |
+| DCT (JPEG) | ~50 KB |
 
 ### Choosing the Right Mode
 
@@ -446,19 +487,21 @@ For a 1920×1080 image:
 │                    Mode Selection Guide                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Will the image be recompressed (social media, chat apps)?  │
-│                          │                                  │
-│              ┌───────────┴───────────┐                      │
-│              ▼                       ▼                      │
-│             YES                     NO                      │
-│              │                       │                      │
-│              ▼                       ▼                      │
-│         Use DCT Mode            Use LSB Mode                │
-│              │                       │                      │
-│              ▼                       ▼                      │
-│    Output: JPEG (natural)     Output: PNG (automatic)       │
-│    Color: Color (usually)     Capacity: ~770 KB             │
-│    Capacity: ~30-50 KB                                      │
+│  Need maximum capacity?                                     │
+│              │                                              │
+│      ┌───────┴───────┐                                      │
+│      ▼               ▼                                      │
+│     YES             NO                                      │
+│      │               │                                      │
+│      ▼               ▼                                      │
+│  Use LSB        Need stealth?                               │
+│  (default)           │                                      │
+│              ┌───────┴───────┐                              │
+│              ▼               ▼                              │
+│             YES             NO                              │
+│              │               │                              │
+│              ▼               ▼                              │
+│          Use DCT        Use LSB                             │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -481,6 +524,9 @@ For a 1920×1080 image:
 │   │   │  Upload Zone  │    │  Upload Zone  │            │     │
 │   │   │  (Reference)  │    │  (Carrier)    │            │     │
 │   │   └──────────────┘    └──────────────┘            │     │
+│   │                                                    │     │
+│   │   Passphrase: [________________________]           │     │
+│   │   PIN:        [____________]                       │     │
 │   │                                                    │     │
 │   │   [Advanced Options ▼]                             │     │
 │   │   ┌────────────────────────────────────────────┐  │     │
@@ -508,7 +554,6 @@ For a 1920×1080 image:
 | Success | Green | Positive actions |
 | Warning | Yellow | Caution messages |
 | Error | Red | Error states |
-| Experimental | Orange badge | DCT mode indicator |
 
 ### Form Validation
 
@@ -516,6 +561,7 @@ For a 1920×1080 image:
 - Clear error messages in alerts
 - Required field indicators
 - Input constraints (max length, format)
+- Passphrase word count validation (v3.2.0)
 
 ### Loading States
 
@@ -535,7 +581,7 @@ During long operations:
 Types:
 - Success (green) - Operation completed
 - Error (red) - Operation failed
-- Warning (yellow) - Caution needed
+- Warning (yellow) - Caution needed (e.g., short passphrase)
 
 ---
 
@@ -545,14 +591,14 @@ Types:
 
 **Party A:**
 1. Go to `/generate`
-2. Configure: PIN ✓, 3 words, 6 digits
+2. Configure: PIN ✓, 4 words, 6 digits
 3. Click "Generate Credentials"
-4. **Write down** phrases and PIN on paper
+4. **Write down** passphrase and PIN on paper
 5. **Memorize** over the next few days
 6. Destroy the paper
 
 **Share with Party B (in person or secure channel):**
-- The 7 daily phrases
+- The passphrase (just one phrase now!)
 - The PIN
 - The reference photo file (if not already shared)
 
@@ -562,40 +608,53 @@ Types:
 2. Upload your shared reference photo
 3. Upload any carrier image (meme, vacation photo, etc.)
 4. Type your secret message
-5. Enter today's phrase (check your memory!)
+5. Enter your passphrase
 6. Enter your PIN
 7. Click "Encode Message"
 8. Download or share the resulting image
 9. Send via any channel (email, file transfer)
 
-### Sending via Social Media (DCT Mode)
+### Sending with DCT Mode
 
 1. Go to `/encode`
 2. Upload your shared reference photo
 3. Upload carrier image
 4. Type your secret message
-5. Enter today's phrase and PIN
+5. Enter your passphrase and PIN
 6. **Expand "Advanced Options"**
 7. **Select "DCT" embedding mode**
-8. **Select "JPEG" output format**
+8. **Select "JPEG" output format** (optional)
 9. Click "Encode Message"
-10. Download and post to social media
+10. Download and share
 
-The recipient can decode even after the platform recompresses the image!
-
-### Receiving a Secret Message
+### Receiving a Secret Message (v3.2.0 Simplified)
 
 1. Receive the stego image through any channel
 2. Go to `/decode`
 3. Upload the same reference photo
 4. Upload the received stego image
-5. Note the date in the filename (e.g., `_20251227`)
-6. Enter the phrase for **that day** (not today!)
-7. Enter the PIN
-8. Click "Decode Message"
-9. Read the secret message
+5. Enter your passphrase (no date needed!)
+6. Enter your PIN
+7. Click "Decode Message"
+8. Read the secret message or download the file
 
-> 💡 Decoding automatically detects LSB vs DCT mode—no configuration needed!
+### Embedding a File
+
+1. Go to `/encode`
+2. Upload reference photo and carrier image
+3. Select "File" as payload type
+4. Upload the file to embed (max 2MB)
+5. Enter passphrase and PIN
+6. Click "Encode Message"
+7. Download the stego image
+
+### Extracting a File
+
+1. Go to `/decode`
+2. Upload reference photo and stego image
+3. Enter passphrase and PIN
+4. Click "Decode Message"
+5. Click "Download File" to save the extracted file
 
 ### Changing Credentials
 
@@ -613,7 +672,6 @@ To rotate to new credentials:
 
 | Feature | Implementation |
 |---------|----------------|
-| Local date detection | JavaScript `Date()` object |
 | No credential storage | Nothing saved in browser |
 | Automatic cleanup | Files deleted after 5 minutes |
 | HTTPS support | Configure at server level |
@@ -643,7 +701,7 @@ To rotate to new credentials:
 | Mode | Security Consideration |
 |------|----------------------|
 | LSB | Full capacity, but fragile to modification |
-| DCT | Lower capacity, but survives recompression |
+| DCT | Lower capacity, frequency domain hiding |
 
 Both modes use the same strong encryption (AES-256-GCM with Argon2id key derivation).
 
@@ -666,7 +724,9 @@ Both modes use the same strong encryption (AES-256-GCM with Argon2id key derivat
 | File expiry | 5 minutes | `TEMP_FILE_EXPIRY` |
 | Max image pixels | 4 MP | `stegasoo.constants` |
 | Max message size | 50 KB | `stegasoo.constants` |
+| Max file payload | 2 MB | `stegasoo.constants` |
 | PIN length | 6-9 digits | `stegasoo.constants` |
+| Passphrase words | 3-12 | `stegasoo.constants` |
 
 ### Production Deployment
 
@@ -714,7 +774,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M   # Increased for scipy/DCT
+          memory: 768M
         reservations:
           memory: 384M
 ```
@@ -728,18 +788,17 @@ services:
 #### "Decryption failed"
 
 **Causes:**
-- Wrong day phrase
+- Wrong passphrase
 - Wrong PIN
 - Different reference photo
 - Stego image was modified
 
 **Solutions:**
-1. Check the date in the stego filename
-2. Use the phrase for that specific day
-3. Verify you're using the original reference photo
-4. Ensure the stego image wasn't resized/recompressed (LSB mode)
+1. Verify exact passphrase (case-sensitive)
+2. Verify you're using the original reference photo
+3. Ensure the stego image wasn't resized/recompressed (LSB mode)
 
-#### "Invalid or missing Stegasoo header" (DCT Mode)
+#### "Invalid or missing Stegasoo header"
 
 **Causes:**
 - Image was heavily recompressed
@@ -747,9 +806,9 @@ services:
 - Corrupted during transfer
 
 **Solutions:**
-1. If sharing via lossy channel, ensure DCT mode was used for encoding
-2. Verify credentials match
-3. Try obtaining original file
+1. Verify credentials match
+2. Try obtaining original file
+3. If using DCT mode, some modification is expected to work
 
 #### "Carrier image too small"
 
@@ -758,8 +817,15 @@ services:
 **Solutions:**
 1. Use a larger carrier image (more pixels)
 2. Shorten the message
-3. Use LSB mode for more capacity (if channel supports it)
-4. Check capacity with `/info` command (CLI)
+3. Use LSB mode for more capacity
+
+#### "Passphrase should have at least 4 words"
+
+**Cause:** Passphrase too short (v3.2.0 warning)
+
+**Solutions:**
+1. Use a longer passphrase for better security
+2. Can still proceed with shorter passphrase (warning only)
 
 #### "You must provide at least a PIN or RSA Key"
 
@@ -791,13 +857,13 @@ services:
 2. If key is unencrypted, leave password blank
 3. Re-download or regenerate the key
 
-#### DCT mode shows "jpegio not available"
+#### DCT mode shows "requires scipy"
 
-**Cause:** jpegio library not installed (required for JPEG output)
+**Cause:** scipy library not installed
 
 **Solution:** 
 ```bash
-pip install jpegio
+pip install scipy
 # Or rebuild Docker image
 docker-compose build --no-cache
 ```
@@ -883,4 +949,5 @@ The web app can be added to home screen on mobile devices for quick access.
 
 - [CLI Documentation](CLI.md) - Command-line interface
 - [API Documentation](API.md) - REST API reference
-- [README](README.md) - Project overview
+- [Web Frontend Update Summary](web/WEB_FRONTEND_UPDATE_SUMMARY_V3.2.0.md) - Migration details
+- [README](../README.md) - Project overview

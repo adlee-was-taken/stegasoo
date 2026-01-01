@@ -545,12 +545,13 @@ async def api_generate(request: GenerateRequest):
         raise HTTPException(400, f"rsa_bits must be one of {VALID_RSA_SIZES}")
     
     try:
+        # v3.2.0: Call with passphrase_words parameter
         creds = generate_credentials(
             use_pin=request.use_pin,
             use_rsa=request.use_rsa,
             pin_length=request.pin_length,
             rsa_bits=request.rsa_bits,
-            words_per_passphrase=request.words_per_passphrase
+            passphrase_words=request.words_per_passphrase,  # Map API field to library parameter
         )
         
         return GenerateResponse(
