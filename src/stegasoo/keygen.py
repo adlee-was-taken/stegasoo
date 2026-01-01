@@ -1,7 +1,12 @@
 """
-Stegasoo Key Generation
+Stegasoo Key Generation (v3.2.0)
 
 Generate PINs, passphrases, and RSA keys.
+
+Changes in v3.2.0:
+- generate_credentials() now returns Credentials with single passphrase
+- Removed generate_day_phrases() from main API (kept for legacy compatibility)
+- Updated to use PASSPHRASE constants
 """
 
 import secrets
@@ -16,7 +21,7 @@ from cryptography.hazmat.backends import default_backend
 from .constants import (
     DAY_NAMES,
     MIN_PIN_LENGTH, MAX_PIN_LENGTH, DEFAULT_PIN_LENGTH,
-    MIN_PHRASE_WORDS, MAX_PHRASE_WORDS, DEFAULT_PHRASE_WORDS,
+    MIN_PASSPHRASE_WORDS, MAX_PASSPHRASE_WORDS, DEFAULT_PASSPHRASE_WORDS,
     MIN_RSA_BITS, VALID_RSA_SIZES, DEFAULT_RSA_BITS,
     get_wordlist,
 )
@@ -57,7 +62,7 @@ def generate_pin(length: int = DEFAULT_PIN_LENGTH) -> str:
     return pin
 
 
-def generate_phrase(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> str:
+def generate_phrase(words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS) -> str:
     """
     Generate a random passphrase from BIP-39 wordlist.
     
@@ -68,13 +73,13 @@ def generate_phrase(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> str:
         Space-separated phrase
         
     Example:
-        >>> generate_phrase(3)
-        "apple forest thunder"
+        >>> generate_phrase(4)
+        "apple forest thunder mountain"
     """
-    debug.validate(MIN_PHRASE_WORDS <= words_per_phrase <= MAX_PHRASE_WORDS,
-                f"Words per phrase must be between {MIN_PHRASE_WORDS} and {MAX_PHRASE_WORDS}")
+    debug.validate(MIN_PASSPHRASE_WORDS <= words_per_phrase <= MAX_PASSPHRASE_WORDS,
+                f"Words per phrase must be between {MIN_PASSPHRASE_WORDS} and {MAX_PASSPHRASE_WORDS}")
     
-    words_per_phrase = max(MIN_PHRASE_WORDS, min(MAX_PHRASE_WORDS, words_per_phrase))
+    words_per_phrase = max(MIN_PASSPHRASE_WORDS, min(MAX_PASSPHRASE_WORDS, words_per_phrase))
     wordlist = get_wordlist()
     
     words = [secrets.choice(wordlist) for _ in range(words_per_phrase)]
@@ -83,9 +88,16 @@ def generate_phrase(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> str:
     return phrase
 
 
-def generate_day_phrases(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> Dict[str, str]:
+# Alias for backward compatibility and public API consistency
+generate_passphrase = generate_phrase
+
+
+def generate_day_phrases(words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS) -> Dict[str, str]:
     """
     Generate phrases for all days of the week.
+    
+    DEPRECATED in v3.2.0: Use generate_phrase() for single passphrase.
+    Kept for legacy compatibility and organizational use cases.
     
     Args:
         words_per_phrase: Number of words per phrase (3-12)
@@ -97,6 +109,14 @@ def generate_day_phrases(words_per_phrase: int = DEFAULT_PHRASE_WORDS) -> Dict[s
         >>> generate_day_phrases(3)
         {'Monday': 'apple forest thunder', 'Tuesday': 'banana river lightning', ...}
     """
+    import warnings
+    warnings.warn(
+        "generate_day_phrases() is deprecated in v3.2.0. "
+        "Use generate_phrase() for single passphrase.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
     phrases = {day: generate_phrase(words_per_phrase) for day in DAY_NAMES}
     debug.print(f"Generated phrases for {len(phrases)} days")
     return phrases
@@ -272,12 +292,88 @@ def generate_credentials(
     use_rsa: bool = False,
     pin_length: int = DEFAULT_PIN_LENGTH,
     rsa_bits: int = DEFAULT_RSA_BITS,
-    words_per_phrase: int = DEFAULT_PHRASE_WORDS
+    passphrase_words: int = DEFAULT_PASSPHRASE_WORDS,
+    rsa_password: Optional[str] = None,
 ) -> Credentials:
     """
     Generate a complete set of credentials.
     
+    v3.2.0: Now generates a single passphrase instead of daily phrases.
     At least one of use_pin or use_rsa must be True.
+    
+    Args:
+        use_pin: Whether to generate a PIN
+        use_rsa: Whether to generate an RSA key
+        pin_length: PIN length if generating (default 6)
+        rsa_bits: RSA key size if generating (default 2048)
+        passphrase_words: Words in passphrase (default 4)
+        rsa_password: Optional password for RSA key encryption
+        
+    Returns:
+        Credentials object with passphrase, PIN, and/or RSA key
+        
+    Raises:
+        ValueError: If neither PIN nor RSA is selected
+        
+    Example:
+        >>> creds = generate_credentials(use_pin=True, use_rsa=False)
+        >>> creds.passphrase
+        "apple forest thunder mountain"
+        >>> creds.pin
+        "812345"
+    """
+    debug.validate(use_pin or use_rsa,
+                "Must select at least one security factor (PIN or RSA key)")
+    
+    if not use_pin and not use_rsa:
+        raise ValueError("Must select at least one security factor (PIN or RSA key)")
+    
+    debug.print(f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
+                f"passphrase_words={passphrase_words}")
+    
+    # Generate single passphrase (v3.2.0 - no daily rotation)
+    passphrase = generate_phrase(passphrase_words)
+    
+    # Generate PIN if requested
+    pin = generate_pin(pin_length) if use_pin else None
+    
+    # Generate RSA key if requested
+    rsa_key_pem = None
+    if use_rsa:
+        rsa_key_obj = generate_rsa_key(rsa_bits)
+        rsa_key_pem = export_rsa_key_pem(rsa_key_obj, rsa_password).decode('utf-8')
+    
+    # Create Credentials object (v3.2.0 format with single passphrase)
+    creds = Credentials(
+        passphrase=passphrase,
+        pin=pin,
+        rsa_key_pem=rsa_key_pem,
+        rsa_bits=rsa_bits if use_rsa else None,
+        words_per_passphrase=passphrase_words,
+    )
+    
+    debug.print(f"Credentials generated: {creds.total_entropy} bits total entropy")
+    return creds
+
+
+# =============================================================================
+# LEGACY COMPATIBILITY
+# =============================================================================
+
+def generate_credentials_legacy(
+    use_pin: bool = True,
+    use_rsa: bool = False,
+    pin_length: int = DEFAULT_PIN_LENGTH,
+    rsa_bits: int = DEFAULT_RSA_BITS,
+    words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS
+) -> dict:
+    """
+    Generate credentials in legacy format (v3.1.0 style with daily phrases).
+    
+    DEPRECATED: Use generate_credentials() for v3.2.0 format.
+    
+    This function exists only for migration tools that need to work with
+    old-format credentials.
     
     Args:
         use_pin: Whether to generate a PIN
@@ -287,44 +383,33 @@ def generate_credentials(
         words_per_phrase: Words per daily phrase
         
     Returns:
-        Credentials object
-        
-    Raises:
-        ValueError: If neither PIN nor RSA is selected
-        
-    Example:
-        >>> creds = generate_credentials(use_pin=True, use_rsa=False)
-        >>> creds.pin
-        "812345"
-        >>> creds.phrases['Monday']
-        "apple forest thunder"
+        Dict with 'phrases' (dict), 'pin', 'rsa_key_pem', etc.
     """
-    debug.validate(use_pin or use_rsa,
-                "Must select at least one security factor (PIN or RSA key)")
+    import warnings
+    warnings.warn(
+        "generate_credentials_legacy() returns v3.1.0 format. "
+        "Use generate_credentials() for v3.2.0 format.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     
     if not use_pin and not use_rsa:
         raise ValueError("Must select at least one security factor (PIN or RSA key)")
     
-    debug.print(f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
-                f"words={words_per_phrase}")
-    
-    phrases = generate_day_phrases(words_per_phrase)
+    # Generate daily phrases (old format)
+    phrases = {day: generate_phrase(words_per_phrase) for day in DAY_NAMES}
     
     pin = generate_pin(pin_length) if use_pin else None
     
     rsa_key_pem = None
-    rsa_key_obj = None
     if use_rsa:
         rsa_key_obj = generate_rsa_key(rsa_bits)
         rsa_key_pem = export_rsa_key_pem(rsa_key_obj).decode('utf-8')
     
-    creds = Credentials(
-        phrases=phrases,
-        pin=pin,
-        rsa_key_pem=rsa_key_pem,
-        rsa_bits=rsa_bits if use_rsa else None,
-        words_per_phrase=words_per_phrase
-    )
-    
-    debug.print(f"Credentials generated: {creds.total_entropy} bits total entropy")
-    return creds
+    return {
+        'phrases': phrases,
+        'pin': pin,
+        'rsa_key_pem': rsa_key_pem,
+        'rsa_bits': rsa_bits if use_rsa else None,
+        'words_per_phrase': words_per_phrase,
+    }

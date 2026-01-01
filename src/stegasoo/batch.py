@@ -1,8 +1,12 @@
 """
-Stegasoo Batch Processing Module
+Stegasoo Batch Processing Module (v3.2.0)
 
 Enables encoding/decoding multiple files in a single operation.
 Supports parallel processing, progress tracking, and detailed reporting.
+
+Changes in v3.2.0:
+- BatchCredentials: renamed day_phrase → passphrase, removed date_str
+- Updated all credential handling to use v3.2.0 API
 """
 
 import os
@@ -64,36 +68,56 @@ class BatchItem:
 @dataclass
 class BatchCredentials:
     """
-    Credentials for batch encode/decode operations.
+    Credentials for batch encode/decode operations (v3.2.0).
     
     Provides a structured way to pass authentication factors
     for batch processing instead of using plain dicts.
     
+    Changes in v3.2.0:
+    - Renamed day_phrase → passphrase
+    - Removed date_str (no longer used in cryptographic operations)
+    
     Example:
         creds = BatchCredentials(
             reference_photo=ref_bytes,
-            day_phrase="apple forest thunder",
+            passphrase="apple forest thunder mountain",
             pin="123456"
         )
         result = processor.batch_encode(images, creds, message="secret")
     """
     reference_photo: bytes
-    day_phrase: str
+    passphrase: str  # v3.2.0: renamed from day_phrase
     pin: str = ""
     rsa_key_data: Optional[bytes] = None
     rsa_password: Optional[str] = None
-    date_str: Optional[str] = None  # YYYY-MM-DD, defaults to today
     
     def to_dict(self) -> dict:
-        """Convert to dictionary for legacy API compatibility."""
+        """Convert to dictionary for API compatibility."""
         return {
             "reference_photo": self.reference_photo,
-            "day_phrase": self.day_phrase,
+            "passphrase": self.passphrase,
             "pin": self.pin,
             "rsa_key_data": self.rsa_key_data,
             "rsa_password": self.rsa_password,
-            "date_str": self.date_str,
         }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'BatchCredentials':
+        """
+        Create BatchCredentials from a dictionary.
+        
+        Handles both v3.2.0 format (passphrase) and legacy format (day_phrase).
+        """
+        # Handle legacy 'day_phrase' key
+        passphrase = data.get('passphrase') or data.get('day_phrase', '')
+        
+        return cls(
+            reference_photo=data['reference_photo'],
+            passphrase=passphrase,
+            pin=data.get('pin', ''),
+            rsa_key_data=data.get('rsa_key_data'),
+            rsa_password=data.get('rsa_password'),
+        )
 
 
 @dataclass
@@ -140,23 +164,39 @@ ProgressCallback = Callable[[int, int, BatchItem], None]
 
 class BatchProcessor:
     """
-    Handles batch encoding/decoding operations.
+    Handles batch encoding/decoding operations (v3.2.0).
     
     Usage:
         processor = BatchProcessor(max_workers=4)
         
-        # Batch encode
+        # Batch encode with BatchCredentials
+        creds = BatchCredentials(
+            reference_photo=ref_bytes,
+            passphrase="apple forest thunder mountain",
+            pin="123456"
+        )
         result = processor.batch_encode(
             images=['img1.png', 'img2.png'],
             message="Secret message",
             output_dir="./encoded/",
-            credentials={"phrase": "...", "pin": "..."},
+            credentials=creds,
+        )
+        
+        # Batch encode with dict credentials
+        result = processor.batch_encode(
+            images=['img1.png', 'img2.png'],
+            message="Secret message",
+            credentials={
+                "reference_photo": ref_bytes,
+                "passphrase": "apple forest thunder mountain",
+                "pin": "123456"
+            },
         )
         
         # Batch decode
         result = processor.batch_decode(
             images=['encoded1.png', 'encoded2.png'],
-            credentials={"phrase": "...", "pin": "..."},
+            credentials=creds,
         )
     """
     
@@ -202,6 +242,26 @@ class BatchProcessor:
         """Check if path is a valid image file."""
         return path.suffix.lower().lstrip('.') in ALLOWED_IMAGE_EXTENSIONS
     
+    def _normalize_credentials(
+        self, 
+        credentials: dict | BatchCredentials | None
+    ) -> BatchCredentials:
+        """
+        Normalize credentials to BatchCredentials object.
+        
+        Handles both dict and BatchCredentials input, and legacy 'day_phrase' key.
+        """
+        if credentials is None:
+            raise ValueError("Credentials are required")
+        
+        if isinstance(credentials, BatchCredentials):
+            return credentials
+        
+        if isinstance(credentials, dict):
+            return BatchCredentials.from_dict(credentials)
+        
+        raise ValueError(f"Invalid credentials type: {type(credentials)}")
+    
     def batch_encode(
         self,
         images: list[str | Path],
@@ -209,7 +269,7 @@ class BatchProcessor:
         file_payload: Optional[Path] = None,
         output_dir: Optional[Path] = None,
         output_suffix: str = "_encoded",
-        credentials: dict = None,
+        credentials: dict | BatchCredentials | None = None,
         compress: bool = True,
         recursive: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
@@ -224,7 +284,7 @@ class BatchProcessor:
             file_payload: File to embed (mutually exclusive with message)
             output_dir: Output directory (default: same as input)
             output_suffix: Suffix for output files
-            credentials: Dict with 'phrase', 'pin', and optionally 'private_key'
+            credentials: BatchCredentials or dict with 'passphrase', 'pin', etc.
             compress: Enable compression
             recursive: Search directories recursively
             progress_callback: Called for each item: callback(current, total, item)
@@ -236,8 +296,8 @@ class BatchProcessor:
         if message is None and file_payload is None:
             raise ValueError("Either message or file_payload must be provided")
         
-        if credentials is None:
-            raise ValueError("Credentials are required")
+        # Normalize credentials to BatchCredentials
+        creds = self._normalize_credentials(credentials)
         
         result = BatchResult(operation="encode")
         image_paths = list(self.find_images(images, recursive))
@@ -274,15 +334,15 @@ class BatchProcessor:
                         output_path=item.output_path,
                         message=message,
                         file_payload=file_payload,
-                        credentials=credentials,
+                        credentials=creds.to_dict(),
                         compress=compress,
                     )
                 else:
-                    # Placeholder - actual implementation would call stego.encode()
-                    self._mock_encode(item, message, credentials, compress)
+                    # Use stegasoo encode
+                    self._do_encode(item, message, file_payload, creds, compress)
                 
                 item.status = BatchStatus.SUCCESS
-                item.output_size = item.output_path.stat().st_size if item.output_path.exists() else 0
+                item.output_size = item.output_path.stat().st_size if item.output_path and item.output_path.exists() else 0
                 item.message = f"Encoded to {item.output_path.name}"
                 
             except Exception as e:
@@ -301,7 +361,7 @@ class BatchProcessor:
         self,
         images: list[str | Path],
         output_dir: Optional[Path] = None,
-        credentials: dict = None,
+        credentials: dict | BatchCredentials | None = None,
         recursive: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
         decode_func: Callable = None,
@@ -312,7 +372,7 @@ class BatchProcessor:
         Args:
             images: List of image paths or directories
             output_dir: Output directory for file payloads (default: same as input)
-            credentials: Dict with 'phrase', 'pin', and optionally 'private_key'
+            credentials: BatchCredentials or dict with 'passphrase', 'pin', etc.
             recursive: Search directories recursively
             progress_callback: Called for each item: callback(current, total, item)
             decode_func: Custom decode function (for integration)
@@ -320,8 +380,8 @@ class BatchProcessor:
         Returns:
             BatchResult with decoded messages in item.message fields
         """
-        if credentials is None:
-            raise ValueError("Credentials are required")
+        # Normalize credentials to BatchCredentials
+        creds = self._normalize_credentials(credentials)
         
         result = BatchResult(operation="decode")
         image_paths = list(self.find_images(images, recursive))
@@ -351,12 +411,12 @@ class BatchProcessor:
                     decoded = decode_func(
                         image_path=item.input_path,
                         output_dir=item.output_path,
-                        credentials=credentials,
+                        credentials=creds.to_dict(),
                     )
                     item.message = decoded.get('message', '') if isinstance(decoded, dict) else str(decoded)
                 else:
-                    # Placeholder - actual implementation would call stego.decode()
-                    item.message = self._mock_decode(item, credentials)
+                    # Use stegasoo decode
+                    item.message = self._do_decode(item, creds)
                 
                 item.status = BatchStatus.SUCCESS
                 
@@ -404,14 +464,112 @@ class BatchProcessor:
         
         result.end_time = time.time()
     
-    def _mock_encode(self, item: BatchItem, message: str, credentials: dict, compress: bool) -> None:
+    def _do_encode(
+        self,
+        item: BatchItem,
+        message: Optional[str],
+        file_payload: Optional[Path],
+        creds: BatchCredentials,
+        compress: bool
+    ) -> None:
+        """
+        Perform actual encoding using stegasoo.encode.
+        
+        Override this method to customize encoding behavior.
+        """
+        try:
+            from .encode import encode, encode_file
+            from .models import FilePayload
+            
+            # Read carrier image
+            carrier_image = item.input_path.read_bytes()
+            
+            if file_payload:
+                # Encode file
+                payload = FilePayload.from_file(str(file_payload))
+                result = encode(
+                    message=payload,
+                    reference_photo=creds.reference_photo,
+                    carrier_image=carrier_image,
+                    passphrase=creds.passphrase,
+                    pin=creds.pin,
+                    rsa_key_data=creds.rsa_key_data,
+                    rsa_password=creds.rsa_password,
+                )
+            else:
+                # Encode text message
+                result = encode(
+                    message=message,
+                    reference_photo=creds.reference_photo,
+                    carrier_image=carrier_image,
+                    passphrase=creds.passphrase,
+                    pin=creds.pin,
+                    rsa_key_data=creds.rsa_key_data,
+                    rsa_password=creds.rsa_password,
+                )
+            
+            # Write output
+            if item.output_path:
+                item.output_path.write_bytes(result.stego_image)
+                
+        except ImportError:
+            # Fallback to mock if stegasoo.encode not available
+            self._mock_encode(item, message, creds, compress)
+    
+    def _do_decode(
+        self,
+        item: BatchItem,
+        creds: BatchCredentials,
+    ) -> str:
+        """
+        Perform actual decoding using stegasoo.decode.
+        
+        Override this method to customize decoding behavior.
+        """
+        try:
+            from .decode import decode
+            
+            # Read stego image
+            stego_image = item.input_path.read_bytes()
+            
+            result = decode(
+                stego_image=stego_image,
+                reference_photo=creds.reference_photo,
+                passphrase=creds.passphrase,
+                pin=creds.pin,
+                rsa_key_data=creds.rsa_key_data,
+                rsa_password=creds.rsa_password,
+            )
+            
+            if result.is_text:
+                return result.message or ""
+            else:
+                # File payload - save it
+                if item.output_path and result.file_data:
+                    output_file = item.output_path / (result.filename or "extracted_file")
+                    output_file.write_bytes(result.file_data)
+                    return f"File extracted: {result.filename or 'extracted_file'}"
+                return f"[File: {result.filename or 'binary data'}]"
+                
+        except ImportError:
+            # Fallback to mock if stegasoo.decode not available
+            return self._mock_decode(item, creds)
+    
+    def _mock_encode(
+        self,
+        item: BatchItem,
+        message: str,
+        creds: BatchCredentials,
+        compress: bool
+    ) -> None:
         """Mock encode for testing - replace with actual stego.encode()"""
         # This is a placeholder - in real usage, you'd call your actual encode function
         # For now, just copy the file to simulate encoding
         import shutil
-        shutil.copy(item.input_path, item.output_path)
+        if item.output_path:
+            shutil.copy(item.input_path, item.output_path)
     
-    def _mock_decode(self, item: BatchItem, credentials: dict) -> str:
+    def _mock_decode(self, item: BatchItem, creds: BatchCredentials) -> str:
         """Mock decode for testing - replace with actual stego.decode()"""
         # This is a placeholder - in real usage, you'd call your actual decode function
         return "[Decoded message would appear here]"

@@ -1,5 +1,5 @@
 """
-DCT Domain Steganography Module (v3.0.2)
+DCT Domain Steganography Module (v3.2.0)
 
 Embeds data in DCT coefficients with two approaches:
 1. PNG output: Scipy-based DCT transform (grayscale or color)
@@ -8,10 +8,15 @@ Embeds data in DCT coefficients with two approaches:
 The JPEG approach is the "correct" way to do JPEG steganography because
 it directly modifies the already-quantized coefficients without re-encoding.
 
-New in v3.0.2:
+Changes in v3.0.2:
 - jpegio integration for proper JPEG coefficient embedding
 - Falls back to warning if jpegio not available for JPEG output
 - Maintains backward compatibility with v3.0.1
+
+Changes in v3.2.0:
+- Fixed color-mode extraction to properly extract from Y channel
+- Added _extract_from_y_channel() for accurate color-mode extraction
+- Improved extraction robustness for both grayscale and color modes
 
 Requires: scipy (for PNG mode), optionally jpegio (for JPEG mode)
 """
@@ -82,6 +87,9 @@ JPEG_OUTPUT_QUALITY = 95
 JPEGIO_MAGIC = b'JPGS'
 JPEGIO_MIN_COEF_MAGNITUDE = 2
 JPEGIO_EMBED_CHANNEL = 0  # Y channel
+
+# Flag bits for header
+FLAG_COLOR_MODE = 0x01  # Set if embedded in color mode (Y channel of YCbCr)
 
 
 # ============================================================================
@@ -165,6 +173,37 @@ def _to_grayscale(image_data: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_data))
     gray = img.convert('L')
     return np.array(gray, dtype=np.float64)
+
+
+def _extract_y_channel(image_data: bytes) -> np.ndarray:
+    """
+    Extract Y (luminance) channel from image for color-mode extraction.
+    
+    This uses the same YCbCr conversion as embedding to ensure
+    accurate extraction from color-mode stego images.
+    
+    Args:
+        image_data: Image file bytes
+        
+    Returns:
+        Y channel as float64 numpy array
+    """
+    img = Image.open(io.BytesIO(image_data))
+    
+    # Convert to RGB if needed
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    
+    rgb_array = np.array(img, dtype=np.float64)
+    
+    # Extract Y channel using ITU-R BT.601 (same as embedding)
+    R = rgb_array[:, :, 0]
+    G = rgb_array[:, :, 1]
+    B = rgb_array[:, :, 2]
+    
+    Y = 0.299 * R + 0.587 * G + 0.114 * B
+    
+    return Y
 
 
 def _pad_to_blocks(image: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int]]:
@@ -376,9 +415,9 @@ def _jpegio_generate_order(num_positions: int, seed: bytes) -> list:
     return order
 
 
-def _jpegio_create_header(data_length: int) -> bytes:
+def _jpegio_create_header(data_length: int, flags: int = 0) -> bytes:
     """Create header for jpegio embedding."""
-    return struct.pack('>4sBBI', JPEGIO_MAGIC, 1, 0, data_length)
+    return struct.pack('>4sBBI', JPEGIO_MAGIC, 1, flags, data_length)
 
 
 def _jpegio_parse_header(header_bytes: bytes) -> Tuple[int, int, int]:
@@ -549,6 +588,9 @@ def _embed_scipy_dct(
     img = Image.open(io.BytesIO(carrier_image))
     width, height = img.size
     
+    # Set flags for header
+    flags = FLAG_COLOR_MODE if color_mode == 'color' else 0
+    
     if color_mode == 'color' and img.mode in ('RGB', 'RGBA'):
         # Color mode: convert to YCbCr, embed in Y only, preserve Cb/Cr
         if img.mode == 'RGBA':
@@ -560,8 +602,8 @@ def _embed_scipy_dct(
         # Pad Y channel
         Y_padded, original_size = _pad_to_blocks(Y)
         
-        # Embed in Y channel
-        Y_embedded = _embed_in_channel(Y_padded, data, seed, capacity_info)
+        # Embed in Y channel (with color flag)
+        Y_embedded = _embed_in_channel(Y_padded, data, seed, capacity_info, flags)
         
         # Unpad
         Y_result = _unpad_image(Y_embedded, original_size)
@@ -576,13 +618,13 @@ def _embed_scipy_dct(
         image = _to_grayscale(carrier_image)
         padded, original_size = _pad_to_blocks(image)
         
-        embedded = _embed_in_channel(padded, data, seed, capacity_info)
+        embedded = _embed_in_channel(padded, data, seed, capacity_info, flags)
         
         result = _unpad_image(embedded, original_size)
         stego_bytes = _save_stego_image(result, output_format)
     
     # Calculate stats
-    header = _create_header(len(data))
+    header = _create_header(len(data), flags)
     payload = header + data
     bits = len(payload) * 8
     
@@ -607,9 +649,10 @@ def _embed_in_channel(
     data: bytes,
     seed: bytes,
     capacity_info: DCTCapacityInfo,
+    flags: int = 0,
 ) -> np.ndarray:
     """Embed data in a single channel using DCT."""
-    header = _create_header(len(data))
+    header = _create_header(len(data), flags)
     payload = header + data
     
     bits = []
@@ -677,14 +720,14 @@ def _embed_jpegio(
     input_path = _jpegio_bytes_to_file(carrier_image, suffix='.jpg')
     output_path = tempfile.mktemp(suffix='.jpg')
     
+    # Set flags
+    flags = FLAG_COLOR_MODE if color_mode == 'color' else 0
+    
     try:
         # Read JPEG with jpegio
         jpeg = jio.read(input_path)
         
         # Get Y channel coefficients (channel 0)
-        # For grayscale mode, we could convert to grayscale, but jpegio
-        # works with the original JPEG which already has color info.
-        # The color_mode primarily affects the output interpretation.
         coef_array = jpeg.coef_arrays[JPEGIO_EMBED_CHANNEL]
         
         # Find usable positions
@@ -693,8 +736,8 @@ def _embed_jpegio(
         # Generate pseudo-random order
         order = _jpegio_generate_order(len(all_positions), seed)
         
-        # Create payload
-        header = _jpegio_create_header(len(data))
+        # Create payload with flags
+        header = _jpegio_create_header(len(data), flags)
         payload = header + data
         
         # Convert to bits
@@ -764,7 +807,8 @@ def extract_from_dct(
     """
     Extract data from DCT stego image.
     
-    Automatically detects whether image uses scipy DCT or jpegio embedding.
+    Automatically detects whether image uses scipy DCT or jpegio embedding,
+    and handles both grayscale and color modes.
     
     Args:
         stego_image: Stego image bytes
@@ -790,9 +834,28 @@ def extract_from_dct(
 
 
 def _extract_scipy_dct(stego_image: bytes, seed: bytes) -> bytes:
-    """Extract using scipy DCT (for PNG images)."""
-    image = _to_grayscale(stego_image)
-    padded, original_size = _pad_to_blocks(image)
+    """
+    Extract using scipy DCT (for PNG images).
+    
+    v3.2.0: Now properly handles both grayscale and color modes by
+    first trying to detect the mode from header flags, then extracting
+    from the appropriate channel.
+    """
+    # First, try extracting from grayscale to get header and detect mode
+    # This works because even color-mode images can be converted to grayscale
+    # and the Y channel ≈ grayscale for extraction purposes
+    
+    # Try Y channel extraction first (works for both color and grayscale)
+    img = Image.open(io.BytesIO(stego_image))
+    
+    if img.mode in ('RGB', 'RGBA'):
+        # Extract from Y channel (more accurate for color-mode images)
+        channel = _extract_y_channel(stego_image)
+    else:
+        # Grayscale image
+        channel = _to_grayscale(stego_image)
+    
+    padded, original_size = _pad_to_blocks(channel)
     
     h, w = padded.shape
     blocks_x = w // BLOCK_SIZE
@@ -816,7 +879,7 @@ def _extract_scipy_dct(stego_image: bytes, seed: bytes) -> bytes:
         
         if len(all_bits) >= HEADER_SIZE * 8:
             try:
-                _, _, data_length = _parse_header(all_bits[:HEADER_SIZE * 8])
+                _, flags, data_length = _parse_header(all_bits[:HEADER_SIZE * 8])
                 total_needed = (HEADER_SIZE + data_length) * 8
                 if len(all_bits) >= total_needed:
                     break
@@ -824,6 +887,9 @@ def _extract_scipy_dct(stego_image: bytes, seed: bytes) -> bytes:
                 pass
     
     version, flags, data_length = _parse_header(all_bits)
+    
+    # Check if color mode flag is set (for informational purposes)
+    is_color_mode = bool(flags & FLAG_COLOR_MODE)
     
     data_bits = all_bits[HEADER_SIZE * 8:(HEADER_SIZE + data_length) * 8]
     

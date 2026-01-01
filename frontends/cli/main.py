@@ -6,6 +6,7 @@ CHANGES in v3.2.0:
 - Removed date dependency from all operations
 - Renamed day_phrase → passphrase
 - No longer need to specify or remember encoding dates
+- Default passphrase length increased to 4 words
 
 Usage:
     stegasoo generate [OPTIONS]
@@ -28,25 +29,56 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 import stegasoo
 from stegasoo import (
-    encode, encode_file, decode,
+    # Core operations
+    encode, decode,
+    
+    # Credential generation
     generate_credentials,
-    export_rsa_key_pem, load_rsa_key,
-    validate_image, calculate_capacity,
-    parse_date_from_filename,  # Keep for filename parsing only
-    __version__,
-    StegasooError, DecryptionError, ExtractionError,
-    FilePayload,
-    will_fit,
-    strip_image_metadata,
-    # Embedding modes
-    EMBED_MODE_LSB,
-    EMBED_MODE_DCT,
-    EMBED_MODE_AUTO,
+    generate_passphrase,
+    generate_pin,
+    export_rsa_key_pem, 
+    load_rsa_key,
+    
+    # Validation
+    validate_image,
+    
+    # Image utilities
+    get_image_info,
+    compare_capacity,
+    
+    # Steganography functions
     has_dct_support,
     compare_modes,
     will_fit_by_mode,
-    calculate_capacity_by_mode,
+    
+    # Utilities  
+    generate_filename,
+    
+    # Version
+    __version__,
+    
+    # Exceptions
+    StegasooError, 
+    DecryptionError, 
+    ExtractionError,
+    
+    # Models
+    FilePayload,
+    
+    # Constants
+    EMBED_MODE_LSB,
+    EMBED_MODE_DCT,
+    EMBED_MODE_AUTO,
+    DEFAULT_PASSPHRASE_WORDS,
+    DEFAULT_PIN_LENGTH,
 )
+
+# Optional: strip_image_metadata from utils
+try:
+    from stegasoo.utils import strip_image_metadata
+    HAS_STRIP_METADATA = True
+except ImportError:
+    HAS_STRIP_METADATA = False
 
 # QR Code utilities
 try:
@@ -87,6 +119,7 @@ def cli():
     Version 3.2.0 Changes:
     - No more date parameters - encode/decode anytime!
     - Simplified passphrase (no daily rotation)
+    - Default passphrase increased to 4 words
     - True asynchronous communications
     
     \b
@@ -109,9 +142,12 @@ def cli():
 @cli.command()
 @click.option('--pin/--no-pin', default=True, help='Generate a PIN (default: yes)')
 @click.option('--rsa/--no-rsa', default=False, help='Generate an RSA key')
-@click.option('--pin-length', type=click.IntRange(6, 9), default=6, help='PIN length (6-9)')
-@click.option('--rsa-bits', type=click.Choice(['2048', '3072', '4096']), default='2048', help='RSA key size')
-@click.option('--words', type=click.IntRange(3, 12), default=4, help='Words per passphrase (default: 4, was 3 in v3.1)')
+@click.option('--pin-length', type=click.IntRange(6, 9), default=DEFAULT_PIN_LENGTH, 
+              help=f'PIN length (6-9, default: {DEFAULT_PIN_LENGTH})')
+@click.option('--rsa-bits', type=click.Choice(['2048', '3072', '4096']), default='2048', 
+              help='RSA key size')
+@click.option('--words', type=click.IntRange(3, 12), default=DEFAULT_PASSPHRASE_WORDS, 
+              help=f'Words per passphrase (default: {DEFAULT_PASSPHRASE_WORDS})')
 @click.option('--output', '-o', type=click.Path(), help='Save RSA key to file (requires password)')
 @click.option('--password', '-p', help='Password for RSA key file')
 @click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
@@ -122,8 +158,8 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
     Creates a passphrase and optionally a PIN and/or RSA key.
     At least one of --pin or --rsa must be enabled.
     
-    v3.2.0: No more daily passphrases - use one strong passphrase!
-    Default increased to 4 words (from 3) for better security.
+    v3.2.0: Single passphrase (no more daily rotation!)
+    Default increased to 4 words for better security.
     
     \b
     Examples:
@@ -148,7 +184,8 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
             use_rsa=rsa,
             pin_length=pin_length,
             rsa_bits=int(rsa_bits),
-            words_per_passphrase=words
+            passphrase_words=words,  # v3.2.0: renamed parameter
+            rsa_password=password if output else None,
         )
         
         if as_json:
@@ -174,21 +211,21 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         click.secho("=" * 60, fg='cyan')
         click.echo()
         
-        click.secho("  MEMORIZE THESE AND CLOSE THIS WINDOW", fg='yellow', bold=True)
+        click.secho("⚠️  MEMORIZE THESE AND CLOSE THIS WINDOW", fg='yellow', bold=True)
         click.secho("    Do not screenshot or save to file!", fg='yellow')
         click.echo()
         
         if creds.pin:
-            click.secho("--- STATIC PIN ---", fg='green')
+            click.secho("─── STATIC PIN ───", fg='green')
             click.secho(f"    {creds.pin}", fg='bright_yellow', bold=True)
             click.echo()
         
-        click.secho("--- PASSPHRASE ---", fg='green')
+        click.secho("─── PASSPHRASE ───", fg='green')
         click.secho(f"    {creds.passphrase}", fg='bright_white', bold=True)
         click.echo()
         
         if creds.rsa_key_pem:
-            click.secho("--- RSA KEY ---", fg='green')
+            click.secho("─── RSA KEY ───", fg='green')
             if output:
                 # Save to file
                 private_key = load_rsa_key(creds.rsa_key_pem.encode())
@@ -200,7 +237,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
                 click.echo(creds.rsa_key_pem)
             click.echo()
         
-        click.secho("--- SECURITY ---", fg='green')
+        click.secho("─── SECURITY ───", fg='green')
         click.echo(f"    Passphrase entropy: {creds.passphrase_entropy} bits ({words} words)")
         if creds.pin:
             click.echo(f"    PIN entropy:        {creds.pin_entropy} bits")
@@ -210,7 +247,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         click.secho(f"    + photo entropy:    80-256 bits", dim=True)
         click.echo()
         
-        click.secho("NOTE: v3.2.0 removed date dependency - use this passphrase anytime!", fg='cyan')
+        click.secho("✓ v3.2.0: Use this passphrase anytime - no date needed!", fg='cyan')
         click.echo()
         
     except Exception as e:
@@ -227,7 +264,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
 @click.option('--message', '-m', help='Text message to encode')
 @click.option('--message-file', '-f', type=click.Path(exists=True), help='Read text message from file')
 @click.option('--embed-file', '-e', type=click.Path(exists=True), help='Embed a file (binary)')
-@click.option('--passphrase', '-p', required=True, help='Passphrase (v3.2.0: no date needed!)')
+@click.option('--passphrase', '-p', required=True, help='Passphrase')
 @click.option('--pin', help='Static PIN')
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
@@ -282,7 +319,7 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
         stegasoo encode -r photo.jpg -c meme.png -p "secure words here now" --pin 123456 -m "secret" --mode dct
         
         # DCT mode - color JPEG
-        stegasoo encode -r photo.jpg -c meme.png -p "my strong passphrase" --pin 123456 -m "secret" \
+        stegasoo encode -r photo.jpg -c meme.png -p "my strong passphrase" --pin 123456 -m "secret" \\
             --mode dct --dct-color color --dct-format jpeg
     """
     # Check DCT mode availability
@@ -378,7 +415,7 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
             message=payload,
             reference_photo=ref_photo,
             carrier_image=carrier_image,
-            passphrase=passphrase,  # Renamed from day_phrase
+            passphrase=passphrase,
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
@@ -405,7 +442,6 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
                 color_note = "color preserved" if dct_color_mode == 'color' else "grayscale"
                 format_note = dct_output_format.upper()
                 click.secho(f"  DCT output: {format_note} ({color_note})", dim=True)
-            click.secho("  (v3.2.0: No date needed to decode!)", fg='cyan', dim=True)
         
     except StegasooError as e:
         raise click.ClickException(str(e))
@@ -509,7 +545,7 @@ def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, output, e
         result = decode(
             stego_image=stego_image,
             reference_photo=ref_photo,
-            passphrase=passphrase,  # Renamed from day_phrase
+            passphrase=passphrase,
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
@@ -631,7 +667,7 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, embed_mode, a
         result = decode(
             stego_image=stego_image,
             reference_photo=ref_photo,
-            passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=passphrase,
             pin=pin or "",
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
@@ -652,16 +688,16 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, embed_mode, a
         
         if as_json:
             import json
-            output = {
+            output_data = {
                 "valid": True,
                 "stego_file": stego,
                 "payload_type": payload_type,
                 "payload_size": payload_size,
             }
             if result.is_file:
-                output["filename"] = result.filename
-                output["mime_type"] = result.mime_type
-            click.echo(json.dumps(output, indent=2))
+                output_data["filename"] = result.filename
+                output_data["mime_type"] = result.mime_type
+            click.echo(json.dumps(output_data, indent=2))
         else:
             click.secho("✓ Valid stego image", fg='green', bold=True)
             click.echo(f"  Payload:  {payload_type} ({payload_desc})")
@@ -670,12 +706,12 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, embed_mode, a
     except (DecryptionError, ExtractionError) as e:
         if as_json:
             import json
-            output = {
+            output_data = {
                 "valid": False,
                 "stego_file": stego,
                 "error": str(e),
             }
-            click.echo(json.dumps(output, indent=2))
+            click.echo(json.dumps(output_data, indent=2))
             sys.exit(1)
         else:
             click.secho("✗ Verification failed", fg='red', bold=True)
@@ -712,7 +748,7 @@ def info(image, as_json):
         
         if as_json:
             import json
-            output = {
+            output_data = {
                 "file": image,
                 "width": result.details['width'],
                 "height": result.details['height'],
@@ -734,12 +770,12 @@ def info(image, as_json):
                     },
                 },
             }
-            click.echo(json.dumps(output, indent=2))
+            click.echo(json.dumps(output_data, indent=2))
             return
         
         click.echo()
         click.secho(f"Image: {image}", bold=True)
-        click.echo(f"  Dimensions:  {result.details['width']} x {result.details['height']}")
+        click.echo(f"  Dimensions:  {result.details['width']} × {result.details['height']}")
         click.echo(f"  Pixels:      {result.details['pixels']:,}")
         click.echo(f"  Mode:        {result.details['mode']}")
         click.echo(f"  Format:      {result.details['format']}")
@@ -789,7 +825,7 @@ def compare(image, payload_size, as_json):
         
         if as_json:
             import json
-            output = {
+            output_data = {
                 "file": image,
                 "width": comparison['width'],
                 "height": comparison['height'],
@@ -812,43 +848,43 @@ def compare(image, payload_size, as_json):
             }
             
             if payload_size:
-                output["payload_check"] = {
+                output_data["payload_check"] = {
                     "size_bytes": payload_size,
                     "fits_lsb": payload_size <= comparison['lsb']['capacity_bytes'],
                     "fits_dct": payload_size <= comparison['dct']['capacity_bytes'],
                 }
             
-            click.echo(json.dumps(output, indent=2))
+            click.echo(json.dumps(output_data, indent=2))
             return
         
         click.echo()
         click.secho(f"=== Mode Comparison: {image} ===", fg='cyan', bold=True)
-        click.echo(f"  Dimensions: {comparison['width']} x {comparison['height']}")
+        click.echo(f"  Dimensions: {comparison['width']} × {comparison['height']}")
         click.echo()
         
         # LSB mode
-        click.secho("  +--- LSB Mode ---", fg='green')
-        click.echo(f"  | Capacity:  {comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
-        click.echo(f"  | Output:    {comparison['lsb']['output']}")
-        click.echo(f"  | Status:    ✓ Available")
-        click.echo("  |")
+        click.secho("  ┌─── LSB Mode ───", fg='green')
+        click.echo(f"  │ Capacity:  {comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
+        click.echo(f"  │ Output:    {comparison['lsb']['output']}")
+        click.echo(f"  │ Status:    ✓ Available")
+        click.echo("  │")
         
         # DCT mode
-        click.secho("  +--- DCT Mode ---", fg='blue')
-        click.echo(f"  | Capacity:  {comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB)")
-        click.echo(f"  | Ratio:     {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB capacity")
+        click.secho("  ├─── DCT Mode ───", fg='blue')
+        click.echo(f"  │ Capacity:  {comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB)")
+        click.echo(f"  │ Ratio:     {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB capacity")
         if comparison['dct']['available']:
-            click.echo(f"  | Status:    ✓ Available")
-            click.echo(f"  | Formats:   PNG (lossless), JPEG (smaller)")
-            click.echo(f"  | Colors:    Grayscale (default), Color (v3.0.1)")
+            click.echo(f"  │ Status:    ✓ Available")
+            click.echo(f"  │ Formats:   PNG (lossless), JPEG (smaller)")
+            click.echo(f"  │ Colors:    Grayscale (default), Color")
         else:
-            click.secho(f"  | Status:    ✗ Requires scipy (pip install scipy)", fg='yellow')
-        click.echo("  |")
+            click.secho(f"  │ Status:    ✗ Requires scipy (pip install scipy)", fg='yellow')
+        click.echo("  │")
         
         # Payload check
         if payload_size:
-            click.secho("  +--- Payload Check ---", fg='magenta')
-            click.echo(f"  | Size:      {payload_size:,} bytes")
+            click.secho("  ├─── Payload Check ───", fg='magenta')
+            click.echo(f"  │ Size:      {payload_size:,} bytes")
             
             fits_lsb = payload_size <= comparison['lsb']['capacity_bytes']
             fits_dct = payload_size <= comparison['dct']['capacity_bytes']
@@ -858,27 +894,27 @@ def compare(image, payload_size, as_json):
             lsb_color = 'green' if fits_lsb else 'red'
             dct_color = 'green' if fits_dct else 'red'
             
-            click.echo(f"  | LSB mode:  ", nl=False)
+            click.echo(f"  │ LSB mode:  ", nl=False)
             click.secho(f"{lsb_icon} {'Fits' if fits_lsb else 'Too large'}", fg=lsb_color)
-            click.echo(f"  | DCT mode:  ", nl=False)
+            click.echo(f"  │ DCT mode:  ", nl=False)
             click.secho(f"{dct_icon} {'Fits' if fits_dct else 'Too large'}", fg=dct_color)
-            click.echo("  |")
+            click.echo("  │")
         
         # Recommendation
-        click.secho("  +--- Recommendation ---", fg='yellow')
+        click.secho("  └─── Recommendation ───", fg='yellow')
         if not comparison['dct']['available']:
-            click.echo("  Use LSB mode (DCT unavailable)")
+            click.echo("    Use LSB mode (DCT unavailable)")
         elif payload_size:
             if fits_dct:
-                click.echo("  DCT mode for better stealth (payload fits both modes)")
-                click.echo("  Use --dct-color color to preserve original colors")
+                click.echo("    DCT mode for better stealth (payload fits both modes)")
+                click.echo("    Use --dct-color color to preserve original colors")
             elif fits_lsb:
-                click.echo("  LSB mode (payload too large for DCT)")
+                click.echo("    LSB mode (payload too large for DCT)")
             else:
-                click.secho("  ✗ Payload too large for both modes!", fg='red')
+                click.secho("    ✗ Payload too large for both modes!", fg='red')
         else:
-            click.echo("  LSB for larger payloads, DCT for better stealth")
-            click.echo("  DCT supports color output with --dct-color color")
+            click.echo("    LSB for larger payloads, DCT for better stealth")
+            click.echo("    DCT supports color output with --dct-color color")
         
         click.echo()
         
@@ -893,7 +929,8 @@ def compare(image, payload_size, as_json):
 @cli.command('strip-metadata')
 @click.argument('image', type=click.Path(exists=True))
 @click.option('--output', '-o', type=click.Path(), help='Output file (default: overwrites input)')
-@click.option('--format', '-f', 'output_format', type=click.Choice(['PNG', 'BMP']), default='PNG', help='Output format')
+@click.option('--format', '-f', 'output_format', type=click.Choice(['PNG', 'BMP']), default='PNG', 
+              help='Output format')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress output')
 def strip_metadata_cmd(image, output, output_format, quiet):
     """
@@ -907,6 +944,9 @@ def strip_metadata_cmd(image, output, output_format, quiet):
         stegasoo strip-metadata photo.jpg -o clean.png
         stegasoo strip-metadata photo.jpg  # Overwrites as PNG
     """
+    if not HAS_STRIP_METADATA:
+        raise click.ClickException("strip_image_metadata not available")
+    
     try:
         image_data = Path(image).read_bytes()
         original_size = len(image_data)
@@ -967,7 +1007,7 @@ def modes():
     click.echo()
     
     # DCT Options
-    click.secho("  DCT Options (v3.0.1)", fg='magenta', bold=True)
+    click.secho("  DCT Options", fg='magenta', bold=True)
     click.echo("    Output format:")
     click.echo("      --dct-format png     Lossless, larger file (default)")
     click.echo("      --dct-format jpeg    Lossy, smaller, more natural")
@@ -981,6 +1021,7 @@ def modes():
     click.secho("  v3.2.0 Changes:", fg='cyan', bold=True)
     click.echo("    ✓ No date parameters needed")
     click.echo("    ✓ Single passphrase (no daily rotation)")
+    click.echo("    ✓ Default passphrase increased to 4 words")
     click.echo("    ✓ True asynchronous communications")
     click.echo()
     

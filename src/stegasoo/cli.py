@@ -1,7 +1,11 @@
 """
-Stegasoo CLI Module
+Stegasoo CLI Module (v3.2.0)
 
 Command-line interface with batch processing and compression support.
+
+Changes in v3.2.0:
+- Updated to use DEFAULT_PASSPHRASE_WORDS (consistency with v3.2.0 naming)
+- Updated help text to use 'passphrase' terminology
 """
 
 import sys
@@ -16,7 +20,7 @@ from .constants import (
     MAX_MESSAGE_SIZE,
     MAX_FILE_PAYLOAD_SIZE,
     DEFAULT_PIN_LENGTH,
-    DEFAULT_PHRASE_WORDS,
+    DEFAULT_PASSPHRASE_WORDS,  # v3.2.0: renamed from DEFAULT_PHRASE_WORDS
 )
 from .compression import (
     CompressionAlgorithm,
@@ -60,8 +64,8 @@ def cli(ctx, json_output):
 @click.option('-f', '--file', 'file_payload', type=click.Path(exists=True), 
               help='File to embed instead of message')
 @click.option('-o', '--output', type=click.Path(), help='Output image path')
-@click.option('--phrase', prompt=True, hide_input=True, 
-              confirmation_prompt=True, help='Passphrase')
+@click.option('--passphrase', prompt=True, hide_input=True, 
+              confirmation_prompt=True, help='Passphrase (recommend 4+ words)')
 @click.option('--pin', prompt=True, hide_input=True,
               confirmation_prompt=True, help='PIN code')
 @click.option('--compress/--no-compress', default=True, 
@@ -70,14 +74,14 @@ def cli(ctx, json_output):
               default='zlib', help='Compression algorithm')
 @click.option('--dry-run', is_flag=True, help='Show capacity usage without encoding')
 @click.pass_context
-def encode(ctx, image, message, file_payload, output, phrase, pin, 
+def encode(ctx, image, message, file_payload, output, passphrase, pin, 
            compress, algorithm, dry_run):
     """
     Encode a message or file into an image.
     
     Examples:
     
-        stegasoo encode photo.png -m "Secret message" --phrase --pin
+        stegasoo encode photo.png -m "Secret message" --passphrase --pin
         
         stegasoo encode photo.png -f secret.pdf -o encoded.png
     """
@@ -109,7 +113,7 @@ def encode(ctx, image, message, file_payload, output, phrase, pin,
     # Get image capacity
     with Image.open(image) as img:
         width, height = img.size
-        capacity_bytes = (width * height * 3 // 8) - 100
+        capacity_bytes = (width * height * 3 // 8) - 69  # v3.2.0: corrected overhead
     
     if dry_run:
         result = {
@@ -153,18 +157,18 @@ def encode(ctx, image, message, file_payload, output, phrase, pin,
 
 @cli.command()
 @click.argument('image', type=click.Path(exists=True))
-@click.option('--phrase', prompt=True, hide_input=True, help='Passphrase')
+@click.option('--passphrase', prompt=True, hide_input=True, help='Passphrase')
 @click.option('--pin', prompt=True, hide_input=True, help='PIN code')
 @click.option('-o', '--output', type=click.Path(), 
               help='Output path for file payloads')
 @click.pass_context
-def decode(ctx, image, phrase, pin, output):
+def decode(ctx, image, passphrase, pin, output):
     """
     Decode a message or file from an image.
     
     Examples:
     
-        stegasoo decode encoded.png --phrase --pin
+        stegasoo decode encoded.png --passphrase --pin
         
         stegasoo decode encoded.png -o ./extracted/
     """
@@ -201,8 +205,8 @@ def batch():
 @click.option('-o', '--output-dir', type=click.Path(),
               help='Output directory (default: same as input)')
 @click.option('--suffix', default='_encoded', help='Output filename suffix')
-@click.option('--phrase', prompt=True, hide_input=True,
-              confirmation_prompt=True, help='Passphrase')
+@click.option('--passphrase', prompt=True, hide_input=True,
+              confirmation_prompt=True, help='Passphrase (recommend 4+ words)')
 @click.option('--pin', prompt=True, hide_input=True,
               confirmation_prompt=True, help='PIN code')
 @click.option('--compress/--no-compress', default=True,
@@ -215,13 +219,13 @@ def batch():
 @click.option('-v', '--verbose', is_flag=True, help='Show detailed output')
 @click.pass_context
 def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
-                 phrase, pin, compress, algorithm, recursive, jobs, verbose):
+                 passphrase, pin, compress, algorithm, recursive, jobs, verbose):
     """
     Encode message into multiple images.
     
     Examples:
     
-        stegasoo batch encode *.png -m "Secret" --phrase --pin
+        stegasoo batch encode *.png -m "Secret" --passphrase --pin
         
         stegasoo batch encode ./photos/ -r -o ./encoded/
     """
@@ -236,7 +240,8 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
     
-    credentials = {"phrase": phrase, "pin": pin}
+    # v3.2.0: Use 'passphrase' key instead of 'phrase'
+    credentials = {"passphrase": passphrase, "pin": pin}
     
     result = processor.batch_encode(
         images=list(images),
@@ -260,20 +265,20 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
 @click.argument('images', nargs=-1, required=True, type=click.Path(exists=True))
 @click.option('-o', '--output-dir', type=click.Path(),
               help='Output directory for file payloads')
-@click.option('--phrase', prompt=True, hide_input=True, help='Passphrase')
+@click.option('--passphrase', prompt=True, hide_input=True, help='Passphrase')
 @click.option('--pin', prompt=True, hide_input=True, help='PIN code')
 @click.option('-r', '--recursive', is_flag=True,
               help='Search directories recursively')
 @click.option('-j', '--jobs', default=4, help='Parallel workers (default: 4)')
 @click.option('-v', '--verbose', is_flag=True, help='Show detailed output')
 @click.pass_context
-def batch_decode(ctx, images, output_dir, phrase, pin, recursive, jobs, verbose):
+def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verbose):
     """
     Decode messages from multiple images.
     
     Examples:
     
-        stegasoo batch decode encoded*.png --phrase --pin
+        stegasoo batch decode encoded*.png --passphrase --pin
         
         stegasoo batch decode ./encoded/ -r -o ./extracted/
     """
@@ -285,7 +290,8 @@ def batch_decode(ctx, images, output_dir, phrase, pin, recursive, jobs, verbose)
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
     
-    credentials = {"phrase": phrase, "pin": pin}
+    # v3.2.0: Use 'passphrase' key instead of 'phrase'
+    credentials = {"passphrase": passphrase, "pin": pin}
     
     result = processor.batch_decode(
         images=list(images),
@@ -348,14 +354,14 @@ def batch_check(ctx, images, recursive):
 # =============================================================================
 
 @cli.command()
-@click.option('--words', default=DEFAULT_PHRASE_WORDS, 
-              help=f'Number of words (default: {DEFAULT_PHRASE_WORDS})')
+@click.option('--words', default=DEFAULT_PASSPHRASE_WORDS, 
+              help=f'Number of words in passphrase (default: {DEFAULT_PASSPHRASE_WORDS})')
 @click.option('--pin-length', default=DEFAULT_PIN_LENGTH,
               help=f'PIN length (default: {DEFAULT_PIN_LENGTH})')
 @click.pass_context
 def generate(ctx, words, pin_length):
     """
-    Generate random credentials (phrase + PIN).
+    Generate random credentials (passphrase + PIN).
     
     Examples:
     
@@ -367,26 +373,36 @@ def generate(ctx, words, pin_length):
     
     # Generate PIN
     pin = ''.join(str(secrets.randbelow(10)) for _ in range(pin_length))
+    # Ensure PIN doesn't start with 0
+    if pin[0] == '0':
+        pin = str(secrets.randbelow(9) + 1) + pin[1:]
     
-    # Generate phrase (would use BIP-39 wordlist)
+    # Generate passphrase (would use BIP-39 wordlist)
     # Placeholder - actual implementation uses constants.get_wordlist()
-    sample_words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot',
-                    'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima']
-    phrase_words = [secrets.choice(sample_words) for _ in range(words)]
-    phrase = ' '.join(phrase_words)
+    try:
+        from .constants import get_wordlist
+        wordlist = get_wordlist()
+        phrase_words = [secrets.choice(wordlist) for _ in range(words)]
+    except (ImportError, FileNotFoundError):
+        # Fallback for testing
+        sample_words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot',
+                        'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima']
+        phrase_words = [secrets.choice(sample_words) for _ in range(words)]
+    
+    passphrase = ' '.join(phrase_words)
     
     result = {
-        "phrase": phrase,
+        "passphrase": passphrase,
         "pin": pin,
-        "phrase_words": words,
+        "passphrase_words": words,
         "pin_length": pin_length,
     }
     
     if ctx.obj.get('json'):
         click.echo(json.dumps(result, indent=2))
     else:
-        click.echo(f"Phrase: {phrase}")
-        click.echo(f"PIN:    {pin}")
+        click.echo(f"Passphrase: {passphrase}")
+        click.echo(f"PIN:        {pin}")
         click.echo("\n⚠️  Save these credentials securely - they cannot be recovered!")
 
 

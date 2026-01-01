@@ -1,17 +1,21 @@
 """
-Stegasoo Steganography Functions (v3.0.1)
+Stegasoo Steganography Functions (v3.2.0)
 
 LSB and DCT embedding modes with pseudo-random pixel/coefficient selection.
 
-New in v3.0:
+Changes in v3.0:
 - DCT domain embedding mode (requires scipy)
 - embed_mode parameter for encode/decode
 - Auto-detection of embedding mode
 - Comparison utilities
 
-New in v3.0.1:
+Changes in v3.0.1:
 - dct_output_format parameter for DCT mode ('png' or 'jpeg')
 - dct_color_mode parameter for DCT mode ('grayscale' or 'color')
+
+Changes in v3.2.0:
+- Fixed HEADER_OVERHEAD constant (65 bytes, not 104 - date field removed)
+- Updated ENCRYPTION_OVERHEAD calculation
 """
 
 import io
@@ -51,10 +55,24 @@ EXT_TO_FORMAT = {
     'tif': 'TIFF',
 }
 
-# Overhead constants for capacity estimation
-HEADER_OVERHEAD = 104  # Magic + version + date + salt + iv + tag
-LENGTH_PREFIX = 4      # 4 bytes for payload length
-ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX
+# =============================================================================
+# OVERHEAD CONSTANTS (v3.2.0 - Updated for date-independent format)
+# =============================================================================
+# v3.2.0 Header format (no date field):
+#   Magic:   4 bytes  (\x89ST3)
+#   Version: 1 byte   (4 for v3.2.0)
+#   Salt:    32 bytes
+#   IV:      12 bytes
+#   Tag:     16 bytes
+#   -----------------
+#   Total:   65 bytes
+#
+# Previous v3.1.0 had date field (10 bytes + 1 byte length) = 76 bytes header
+# The old value of 104 was incorrect even for v3.1.0
+
+HEADER_OVERHEAD = 65       # v3.2.0: Magic + version + salt + iv + tag
+LENGTH_PREFIX = 4          # 4 bytes for payload length in LSB embedding
+ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX  # 69 bytes total
 
 # DCT output format options (v3.0.1)
 DCT_OUTPUT_PNG = 'png'
@@ -167,6 +185,9 @@ def will_fit(
     
     capacity = calculate_capacity(carrier_image, bits_per_channel)
     
+    # Estimate encrypted size with padding
+    # Padding adds 64-319 bytes, rounded up to 256-byte boundary
+    # Average case: ~190 bytes padding
     estimated_padding = 190
     estimated_encrypted_size = payload_size + estimated_padding + ENCRYPTION_OVERHEAD
     
@@ -175,7 +196,7 @@ def will_fit(
         try:
             import zlib
             compressed = zlib.compress(payload_data, level=6)
-            compressed_size = len(compressed) + 9
+            compressed_size = len(compressed) + 9  # Compression header
             if compressed_size < payload_size:
                 compressed_estimate = compressed_size
                 estimated_encrypted_size = compressed_size + estimated_padding + ENCRYPTION_OVERHEAD
@@ -301,7 +322,7 @@ def will_fit_by_mode(
         else:
             payload_size = len(payload)
         
-        estimated_size = payload_size + ENCRYPTION_OVERHEAD + 190
+        estimated_size = payload_size + ENCRYPTION_OVERHEAD + 190  # padding estimate
         
         dct_mod = _get_dct_module()
         fits = dct_mod.will_fit_dct(estimated_size, carrier_image)
@@ -481,8 +502,8 @@ def embed_in_image(
     bits_per_channel: int = 1,
     output_format: Optional[str] = None,
     embed_mode: str = EMBED_MODE_LSB,
-    dct_output_format: str = DCT_OUTPUT_PNG,  # NEW in v3.0.1
-    dct_color_mode: str = 'grayscale',  # NEW in v3.0.1: 'grayscale' or 'color'
+    dct_output_format: str = DCT_OUTPUT_PNG,
+    dct_color_mode: str = 'grayscale',
 ) -> Tuple[bytes, Union[EmbedStats, 'DCTEmbedStats'], str]:
     """
     Embed data into an image using specified mode.
@@ -535,7 +556,7 @@ def embed_in_image(
             image_data, 
             pixel_key,
             output_format=dct_output_format,
-            color_mode=dct_color_mode,  # NEW in v3.0.1
+            color_mode=dct_color_mode,
         )
         
         # Determine extension based on output format
