@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stegasoo"
-version = "3.0.2"
+version = "3.2.0"
 description = "Secure steganography with hybrid photo + passphrase + PIN authentication"
 readme = "README.md"
 license = "MIT"

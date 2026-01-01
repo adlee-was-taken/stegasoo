@@ -95,24 +95,15 @@
                         </div>
                     </div>
                     
-                    <!-- Hidden field for encoding date (auto-detected from filename) -->
-                    <input type="hidden" name="stego_date" id="stegoDate" value="">
-                    
                     <div class="mb-3">
-                        <label class="form-label" id="dayPhraseLabel">
-                            <i class="bi bi-chat-quote me-1"></i> Day Phrase
+                        <label class="form-label">
+                            <i class="bi bi-chat-quote me-1"></i> Passphrase
                         </label>
-                        <input type="text" name="day_phrase" class="form-control" 
-                               placeholder="e.g., correct horse battery" required>
+                        <input type="text" name="passphrase" class="form-control" 
+                               placeholder="e.g., correct horse battery staple" required>
                         <div class="form-text">
-                            The phrase for the day the message was encoded
+                            The passphrase used during encoding (typically 4 words)
                         </div>
-                    </div>
-                    
-                    <!-- Date detection info -->
-                    <div class="alert alert-info small d-none" id="dateDetectedAlert">
-                        <i class="bi bi-calendar-check me-1"></i>
-                        <span id="dateDetectedText">Date detected from filename</span>
                     </div>
                     
                     <hr class="my-4">
@@ -268,28 +259,32 @@
                 <h6 class="text-muted mb-3"><i class="bi bi-question-circle me-2"></i>Troubleshooting</h6>
                 <ul class="list-unstyled text-muted small mb-0">
                     <li class="mb-2">
-                        <i class="bi bi-dot"></i>
-                        Make sure you're using the <strong>exact same reference photo</strong> file
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Use the <strong>exact same reference photo</strong> file (byte-for-byte identical)
                     </li>
                     <li class="mb-2">
-                        <i class="bi bi-dot"></i>
-                        Use the phrase for the <strong>day the message was encoded</strong>, not today
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                        Enter the <strong>exact passphrase</strong> used during encoding (case-sensitive, spacing matters)
                     </li>
                     <li class="mb-2">
-                        <i class="bi bi-dot"></i>
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>
                         Provide the <strong>same security factors</strong> (PIN and/or RSA key) used during encoding
                     </li>
                     <li class="mb-2">
-                        <i class="bi bi-dot"></i>
-                        Ensure the stego image hasn't been <strong>resized or recompressed</strong>
+                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                        Ensure the stego image hasn't been <strong>resized, cropped, or recompressed</strong>
                     </li>
                     <li class="mb-2">
-                        <i class="bi bi-dot"></i>
-                        If using an RSA key, make sure the <strong>password is correct</strong>
+                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                        <strong>Format compatibility:</strong> v3.2.0 cannot decode messages from v3.1.0 (different format)
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-info-circle-fill text-info me-1"></i>
+                        If using an RSA key, verify the <strong>password is correct</strong> (if key is encrypted)
                     </li>
                     <li class="mb-0">
-                        <i class="bi bi-dot"></i>
-                        <strong>v3.0:</strong> If auto-detection fails, try specifying <strong>LSB or DCT mode</strong> in Advanced Options
+                        <i class="bi bi-info-circle-fill text-info me-1"></i>
+                        If auto-detection fails, try specifying <strong>LSB or DCT mode</strong> in Advanced Options
                     </li>
                 </ul>
             </div>
@@ -309,83 +304,21 @@ document.getElementById('decodeForm')?.addEventListener('submit', function() {
     btn.disabled = true;
 });
 
-// Show RSA password field when key is selected (only for .pem files, not QR)
+// Show RSA password field when key is selected
 const rsaKeyInput = document.getElementById('rsaKeyInput');
 const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
 const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
 
-if (rsaKeyInput) {
-    rsaKeyInput.addEventListener('change', function() {
-        // Show password field only for .pem files
-        rsaPasswordGroup.classList.toggle('d-none', !this.files.length);
-        // Clear QR input if file is selected
-        if (rsaKeyQrInput && this.files.length) {
-            rsaKeyQrInput.value = '';
-        }
-    });
-}
-
-if (rsaKeyQrInput) {
-    rsaKeyQrInput.addEventListener('change', function() {
-        // Hide password field for QR codes (they're unencrypted)
-        rsaPasswordGroup.classList.add('d-none');
-        // Clear file input if QR is selected
-        if (rsaKeyInput && this.files.length) {
-            rsaKeyInput.value = '';
-        }
-    });
-}
-
-// Day names for date detection
-const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-// Detect day AND date from filename - FIXED VERSION
-function detectDayFromFilename(filename) {
-    // Match patterns like _20251227 or _2025-12-27
-    const compactMatch = filename.match(/_(\d{4})(\d{2})(\d{2})/);
-    const dashedMatch = filename.match(/_(\d{4})-(\d{2})-(\d{2})/);
-    
-    const dateMatch = compactMatch || dashedMatch;
-    
-    if (dateMatch) {
-        const [, year, month, day] = dateMatch;
-        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        const dayName = dayNames[date.getDay()];
-        // Return ISO format date string for the server
-        const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        
-        console.log('Detected date from filename:', dateStr, 'Day:', dayName);
-        
-        return {
-            dayName: dayName,
-            dateStr: dateStr
-        };
-    }
-    return null;
-}
-
-// Update day phrase label AND set hidden date field
-function updateDayLabel(dayName, dateStr) {
-    const label = document.getElementById('dayPhraseLabel');
-    if (label && dayName) {
-        label.innerHTML = `<i class="bi bi-chat-quote me-1"></i>Provide <span class="day-of-week-highlight">${dayName}</span>'s Phrase`;
-    }
-    
-    // CRITICAL FIX: Set the hidden date field for the server
-    const dateField = document.getElementById('stegoDate');
-    if (dateField && dateStr) {
-        dateField.value = dateStr;
-        console.log('Set stego_date hidden field to:', dateStr);
-    }
-    
-    // Show info alert about detected date
-    const dateAlert = document.getElementById('dateDetectedAlert');
-    const dateText = document.getElementById('dateDetectedText');
-    if (dateAlert && dateText && dateStr) {
-        dateText.textContent = `Encoding date detected: ${dateStr} (${dayName})`;
-        dateAlert.classList.remove('d-none');
+function checkRsaKeySelected() {
+    const hasFile = (rsaKeyInput && rsaKeyInput.files.length > 0) || 
+                    (rsaKeyQrInput && rsaKeyQrInput.files.length > 0);
+    if (rsaPasswordGroup) {
+        rsaPasswordGroup.classList.toggle('d-none', !hasFile);
     }
 }
+
+rsaKeyInput?.addEventListener('change', checkRsaKeySelected);
+rsaKeyQrInput?.addEventListener('change', checkRsaKeySelected);
 
 // PIN Toggle
 document.getElementById('togglePin')?.addEventListener('click', function() {
@@ -461,7 +394,6 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
     const input = zone.querySelector('input[type="file"]');
     const label = zone.querySelector('.drop-zone-label');
     const preview = zone.querySelector('.drop-zone-preview');
-    const isStegoZone = zone.id === 'stegoDropZone';
     
     ['dragenter', 'dragover'].forEach(evt => {
         zone.addEventListener(evt, e => {
@@ -482,29 +414,12 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
             input.files = e.dataTransfer.files;
             const file = e.dataTransfer.files[0];
             showPreview(file);
-            
-            // FIXED: Extract both day name AND date string
-            if (isStegoZone) {
-                const detected = detectDayFromFilename(file.name);
-                if (detected) {
-                    updateDayLabel(detected.dayName, detected.dateStr);
-                }
-            }
         }
     });
     
     input.addEventListener('change', function() {
         if (this.files && this.files[0]) {
-            const file = this.files[0];
-            showPreview(file);
-            
-            // FIXED: Extract both day name AND date string
-            if (isStegoZone) {
-                const detected = detectDayFromFilename(file.name);
-                if (detected) {
-                    updateDayLabel(detected.dayName, detected.dateStr);
-                }
-            }
+            showPreview(this.files[0]);
         }
     });
     
