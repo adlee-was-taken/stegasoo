@@ -1,11 +1,11 @@
-# Stegasoo Web UI Documentation (v3.3.0)
+# Stegasoo Web UI Documentation (v4.0.1)
 
 Complete guide for the Stegasoo web-based steganography interface.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [What's New in v3.3.0](#whats-new-in-v330)
+- [What's New in v4.0.1](#whats-new-in-v401)
 - [Installation & Setup](#installation--setup)
 - [Pages & Features](#pages--features)
   - [Home Page](#home-page)
@@ -53,25 +53,24 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 
 ---
 
-## What's New in v3.3.0
+## What's New in v4.0.1
 
-Version 3.3.0 improves the user interface with a streamlined workflow:
+Version 4.0.1 adds channel key support and UI improvements:
 
-| Change | Before (v3.2) | After (v3.3.0) |
-|--------|---------------|----------------|
-| Default mode | LSB | DCT (when available) |
-| Mode selection | Large cards with bullet lists | Compact inline buttons with tooltips |
-| Mode position | Top of form | After image upload, before payload |
-| Mode details | Always visible | Hover tooltip on ⓘ icon |
-| Capacity badges | LSB first | DCT first |
-| Status labels | "Key Source", "Carrier", "RSA KEY" | "Hash Acquired", "Carrier Loaded"/"Stego Loaded", "KEY LOADED" |
+| Feature | Description |
+|---------|-------------|
+| Channel keys | 256-bit keys for deployment/group isolation |
+| Channel dropdown | Select channel mode (Auto/Public/Custom) |
+| LED indicators | Visual status indicators for form fields |
+| Key capsule styling | Improved RSA key display |
+| Streamlined layout | PIN + Channel key in same row |
 
 **Key benefits:**
-- ✅ DCT mode default - Better for social media sharing
-- ✅ Logical form flow: Load images → Select mode → Enter payload
-- ✅ Cleaner UI with less visual clutter
-- ✅ Mode details available on hover without expanding
-- ✅ Consistent "Loaded" status indicators
+- ✅ Channel key isolation - Different teams/deployments can't read each other's messages
+- ✅ Dropdown selection for channel mode instead of radio buttons
+- ✅ Visual LED indicators show field status
+- ✅ Cleaner form layout with improved spacing
+- ✅ Backward compatible - public mode works without channel key
 
 ---
 

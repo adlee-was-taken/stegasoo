@@ -1,4 +1,4 @@
-# Stegasoo REST API Documentation (v4.0.0)
+# Stegasoo REST API Documentation (v4.0.1)
 
 Complete REST API reference for Stegasoo steganography operations.
 
@@ -113,7 +113,7 @@ Check API status and configuration.
 
 ```json
 {
-  "version": "4.0.0",
+  "version": "4.0.1",
   "has_argon2": true,
   "has_qrcode_read": true,
   "has_dct": true,
@@ -462,7 +462,7 @@ X-Stegasoo-Capacity-Percent: 12.4
 X-Stegasoo-Embed-Mode: lsb
 X-Stegasoo-Channel-Mode: private
 X-Stegasoo-Channel-Fingerprint: ABCD-••••-...-3456
-X-Stegasoo-Version: 4.0.0
+X-Stegasoo-Version: 4.0.1
 
 <binary image data>
 ```

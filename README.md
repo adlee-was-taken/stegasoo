@@ -362,7 +362,8 @@ python -c "from stegasoo.dct_steganography import has_jpegio_support; print(f'jp
 
 | Version | Changes |
 |---------|---------|
-| **4.0.0** | Removed date dependency, renamed day_phrase→passphrase, Python 3.12 requirement, JPEG normalization fix, subprocess isolation, large image support |
+| **4.0.1** | Lint cleanup, test fixes, Web UI improvements (channel key dropdown, LED indicators) |
+| **4.0.0** | Channel key support for deployment isolation, removed date dependency, renamed day_phrase→passphrase, Python 3.12 requirement, JPEG normalization fix, subprocess isolation, large image support |
 | **3.2.x** | DCT color mode, JPEG output fixes |
 | **3.0.x** | Added DCT steganography mode |
 | **2.2.x** | QR code support, file embedding |

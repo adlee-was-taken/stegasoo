@@ -1,4 +1,4 @@
-# Stegasoo CLI Documentation (v4.0.0)
+# Stegasoo CLI Documentation (v4.0.1)
 
 Complete command-line interface reference for Stegasoo steganography operations.
 
