@@ -68,6 +68,7 @@ def debug_exception(e: Exception, context: str = "") -> None:
 
 def time_function(func: Callable) -> Callable:
     """Decorator to time function execution for performance debugging."""
+
     @wraps(func)
     def wrapper(*args, **kwargs) -> Any:
         if not (DEBUG_ENABLED and LOG_PERFORMANCE):
@@ -96,16 +97,17 @@ def memory_usage() -> dict[str, float | str]:
         import os
 
         import psutil
+
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
 
         return {
-            'rss_mb': mem_info.rss / 1024 / 1024,
-            'vms_mb': mem_info.vms / 1024 / 1024,
-            'percent': process.memory_percent(),
+            "rss_mb": mem_info.rss / 1024 / 1024,
+            "vms_mb": mem_info.vms / 1024 / 1024,
+            "percent": process.memory_percent(),
         }
     except ImportError:
-        return {'error': 'psutil not installed'}
+        return {"error": "psutil not installed"}
 
 
 def hexdump(data: bytes, offset: int = 0, length: int = 64) -> str:
@@ -117,16 +119,16 @@ def hexdump(data: bytes, offset: int = 0, length: int = 64) -> str:
     data_to_dump = data[:length]
 
     for i in range(0, len(data_to_dump), 16):
-        chunk = data_to_dump[i:i+16]
-        hex_str = ' '.join(f'{b:02x}' for b in chunk)
+        chunk = data_to_dump[i : i + 16]
+        hex_str = " ".join(f"{b:02x}" for b in chunk)
         hex_str = hex_str.ljust(47)
-        ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
+        ascii_str = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
         result.append(f"{offset + i:08x}: {hex_str}  {ascii_str}")
 
     if len(data) > length:
         result.append(f"... ({len(data) - length} more bytes)")
 
-    return '\n'.join(result)
+    return "\n".join(result)
 
 
 class Debug:

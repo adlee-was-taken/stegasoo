@@ -26,7 +26,7 @@ __version__ = "4.0.1"
 # FILE FORMAT
 # ============================================================================
 
-MAGIC_HEADER = b'\x89ST3'
+MAGIC_HEADER = b"\x89ST3"
 
 # FORMAT VERSION HISTORY:
 # Version 1-3: Date-dependent encryption (v3.0.x - v3.1.x)
@@ -58,21 +58,21 @@ PBKDF2_ITERATIONS = 600000
 # INPUT LIMITS
 # ============================================================================
 
-MAX_IMAGE_PIXELS = 24_000_000     # ~24 megapixels
-MIN_IMAGE_PIXELS = 256 * 256      # Minimum viable image size
+MAX_IMAGE_PIXELS = 24_000_000  # ~24 megapixels
+MIN_IMAGE_PIXELS = 256 * 256  # Minimum viable image size
 
-MAX_MESSAGE_SIZE = 250_000        # 250 KB (text messages)
-MAX_MESSAGE_CHARS = 250_000       # Alias for clarity in templates
-MIN_MESSAGE_LENGTH = 1            # Minimum message length
+MAX_MESSAGE_SIZE = 250_000  # 250 KB (text messages)
+MAX_MESSAGE_CHARS = 250_000  # Alias for clarity in templates
+MIN_MESSAGE_LENGTH = 1  # Minimum message length
 MAX_MESSAGE_LENGTH = MAX_MESSAGE_SIZE  # Alias for consistency
 
 MAX_PAYLOAD_SIZE = MAX_MESSAGE_SIZE  # Maximum payload size (alias)
-MAX_FILENAME_LENGTH = 255         # Max filename length to store
+MAX_FILENAME_LENGTH = 255  # Max filename length to store
 
 # File size limits
-MAX_FILE_SIZE = 30 * 1024 * 1024        # 30MB total file size
+MAX_FILE_SIZE = 30 * 1024 * 1024  # 30MB total file size
 MAX_FILE_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB payload
-MAX_UPLOAD_SIZE = 30 * 1024 * 1024       # 30MB max upload (Flask)
+MAX_UPLOAD_SIZE = 30 * 1024 * 1024  # 30MB max upload (Flask)
 
 # PIN configuration
 MIN_PIN_LENGTH = 6
@@ -119,11 +119,11 @@ QR_CROP_MIN_PADDING_PX = 10  # Minimum padding in pixels
 # FILE TYPES
 # ============================================================================
 
-ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif'}
-ALLOWED_KEY_EXTENSIONS = {'pem', 'key'}
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "bmp", "gif"}
+ALLOWED_KEY_EXTENSIONS = {"pem", "key"}
 
 # Lossless image formats (safe for steganography)
-LOSSLESS_FORMATS = {'PNG', 'BMP', 'TIFF'}
+LOSSLESS_FORMATS = {"PNG", "BMP", "TIFF"}
 
 # Supported image formats for steganography
 SUPPORTED_IMAGE_FORMATS = LOSSLESS_FORMATS
@@ -132,7 +132,7 @@ SUPPORTED_IMAGE_FORMATS = LOSSLESS_FORMATS
 # DAYS (kept for organizational/UI purposes, not crypto)
 # ============================================================================
 
-DAY_NAMES = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')
+DAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 # ============================================================================
 # COMPRESSION
@@ -145,7 +145,7 @@ MIN_COMPRESS_SIZE = 64
 ZLIB_COMPRESSION_LEVEL = 6
 
 # Compression header magic bytes
-COMPRESSION_MAGIC = b'\x00CMP'
+COMPRESSION_MAGIC = b"\x00CMP"
 
 # ============================================================================
 # BATCH PROCESSING
@@ -164,6 +164,7 @@ BATCH_OUTPUT_SUFFIX = "_encoded"
 # DATA FILES
 # ============================================================================
 
+
 def get_data_dir() -> Path:
     """Get the data directory path."""
     # Check multiple locations
@@ -172,12 +173,12 @@ def get_data_dir() -> Path:
     #   .parent.parent = src/
     #   .parent.parent.parent = project root (where data/ lives)
     candidates = [
-        Path(__file__).parent.parent.parent / 'data',          # Development: src/stegasoo -> project root
-        Path(__file__).parent / 'data',                        # Installed package
-        Path('/app/data'),                                     # Docker
-        Path.cwd() / 'data',                                   # Current directory
-        Path.cwd().parent / 'data',                            # One level up from cwd
-        Path.cwd().parent.parent / 'data',                     # Two levels up from cwd
+        Path(__file__).parent.parent.parent / "data",  # Development: src/stegasoo -> project root
+        Path(__file__).parent / "data",  # Installed package
+        Path("/app/data"),  # Docker
+        Path.cwd() / "data",  # Current directory
+        Path.cwd().parent / "data",  # One level up from cwd
+        Path.cwd().parent.parent / "data",  # Two levels up from cwd
     ]
 
     for path in candidates:
@@ -190,7 +191,7 @@ def get_data_dir() -> Path:
 
 def get_bip39_words() -> list[str]:
     """Load BIP-39 wordlist."""
-    wordlist_path = get_data_dir() / 'bip39-words.txt'
+    wordlist_path = get_data_dir() / "bip39-words.txt"
 
     if not wordlist_path.exists():
         raise FileNotFoundError(
@@ -219,14 +220,14 @@ def get_wordlist() -> list[str]:
 # =============================================================================
 
 # Embedding modes
-EMBED_MODE_LSB = 'lsb'       # Spatial LSB embedding (default, original mode)
-EMBED_MODE_DCT = 'dct'       # DCT domain embedding (new in v3.0)
-EMBED_MODE_AUTO = 'auto'     # Auto-detect on decode
+EMBED_MODE_LSB = "lsb"  # Spatial LSB embedding (default, original mode)
+EMBED_MODE_DCT = "dct"  # DCT domain embedding (new in v3.0)
+EMBED_MODE_AUTO = "auto"  # Auto-detect on decode
 
 # DCT-specific constants
-DCT_MAGIC_HEADER = b'\x89DCT'  # Magic header for DCT mode
+DCT_MAGIC_HEADER = b"\x89DCT"  # Magic header for DCT mode
 DCT_FORMAT_VERSION = 1
-DCT_STEP_SIZE = 8              # QIM quantization step
+DCT_STEP_SIZE = 8  # QIM quantization step
 
 # Valid embedding modes
 VALID_EMBED_MODES = {EMBED_MODE_LSB, EMBED_MODE_DCT}
@@ -247,13 +248,13 @@ def detect_stego_mode(encrypted_data: bytes) -> str:
         'lsb' or 'dct' or 'unknown'
     """
     if len(encrypted_data) < 4:
-        return 'unknown'
+        return "unknown"
 
     header = encrypted_data[:4]
 
-    if header == b'\x89ST3':
+    if header == b"\x89ST3":
         return EMBED_MODE_LSB
-    elif header == b'\x89DCT':
+    elif header == b"\x89DCT":
         return EMBED_MODE_DCT
     else:
-        return 'unknown'
+        return "unknown"

@@ -22,6 +22,7 @@ def main():
     """
     try:
         from stegasoo.cli import main as cli_main
+
         cli_main()
     except ImportError as e:
         # Provide helpful error if dependencies are missing
@@ -43,6 +44,7 @@ def version():
     """Print version and exit."""
     try:
         from stegasoo import __version__
+
         print(f"stegasoo {__version__}")
     except ImportError:
         print("stegasoo (version unknown)")

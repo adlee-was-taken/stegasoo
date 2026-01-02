@@ -50,8 +50,10 @@ def generate_pin(length: int = DEFAULT_PIN_LENGTH) -> str:
         >>> generate_pin(6)
         "812345"
     """
-    debug.validate(MIN_PIN_LENGTH <= length <= MAX_PIN_LENGTH,
-                f"PIN length must be between {MIN_PIN_LENGTH} and {MAX_PIN_LENGTH}")
+    debug.validate(
+        MIN_PIN_LENGTH <= length <= MAX_PIN_LENGTH,
+        f"PIN length must be between {MIN_PIN_LENGTH} and {MAX_PIN_LENGTH}",
+    )
 
     length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, length))
 
@@ -59,7 +61,7 @@ def generate_pin(length: int = DEFAULT_PIN_LENGTH) -> str:
     first_digit = str(secrets.randbelow(9) + 1)
 
     # Remaining digits: 0-9
-    rest = ''.join(str(secrets.randbelow(10)) for _ in range(length - 1))
+    rest = "".join(str(secrets.randbelow(10)) for _ in range(length - 1))
 
     pin = first_digit + rest
     debug.print(f"Generated PIN: {pin}")
@@ -80,14 +82,16 @@ def generate_phrase(words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS) -> str:
         >>> generate_phrase(4)
         "apple forest thunder mountain"
     """
-    debug.validate(MIN_PASSPHRASE_WORDS <= words_per_phrase <= MAX_PASSPHRASE_WORDS,
-                f"Words per phrase must be between {MIN_PASSPHRASE_WORDS} and {MAX_PASSPHRASE_WORDS}")
+    debug.validate(
+        MIN_PASSPHRASE_WORDS <= words_per_phrase <= MAX_PASSPHRASE_WORDS,
+        f"Words per phrase must be between {MIN_PASSPHRASE_WORDS} and {MAX_PASSPHRASE_WORDS}",
+    )
 
     words_per_phrase = max(MIN_PASSPHRASE_WORDS, min(MAX_PASSPHRASE_WORDS, words_per_phrase))
     wordlist = get_wordlist()
 
     words = [secrets.choice(wordlist) for _ in range(words_per_phrase)]
-    phrase = ' '.join(words)
+    phrase = " ".join(words)
     debug.print(f"Generated phrase: {phrase}")
     return phrase
 
@@ -114,11 +118,12 @@ def generate_day_phrases(words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS) -> di
         {'Monday': 'apple forest thunder', 'Tuesday': 'banana river lightning', ...}
     """
     import warnings
+
     warnings.warn(
         "generate_day_phrases() is deprecated in v3.2.0. "
         "Use generate_phrase() for single passphrase.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
 
     phrases = {day: generate_phrase(words_per_phrase) for day in DAY_NAMES}
@@ -144,8 +149,7 @@ def generate_rsa_key(bits: int = DEFAULT_RSA_BITS) -> rsa.RSAPrivateKey:
         >>> key.key_size
         2048
     """
-    debug.validate(bits in VALID_RSA_SIZES,
-                f"RSA key size must be one of {VALID_RSA_SIZES}")
+    debug.validate(bits in VALID_RSA_SIZES, f"RSA key size must be one of {VALID_RSA_SIZES}")
 
     if bits not in VALID_RSA_SIZES:
         bits = DEFAULT_RSA_BITS
@@ -153,9 +157,7 @@ def generate_rsa_key(bits: int = DEFAULT_RSA_BITS) -> rsa.RSAPrivateKey:
     debug.print(f"Generating {bits}-bit RSA key...")
     try:
         key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=bits,
-            backend=default_backend()
+            public_exponent=65537, key_size=bits, backend=default_backend()
         )
         debug.print(f"RSA key generated: {bits} bits")
         return key
@@ -164,10 +166,7 @@ def generate_rsa_key(bits: int = DEFAULT_RSA_BITS) -> rsa.RSAPrivateKey:
         raise KeyGenerationError(f"Failed to generate RSA key: {e}") from e
 
 
-def export_rsa_key_pem(
-    private_key: rsa.RSAPrivateKey,
-    password: str | None = None
-) -> bytes:
+def export_rsa_key_pem(private_key: rsa.RSAPrivateKey, password: str | None = None) -> bytes:
     """
     Export RSA key to PEM format.
 
@@ -198,14 +197,11 @@ def export_rsa_key_pem(
     return private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=encryption_algorithm
+        encryption_algorithm=encryption_algorithm,
     )
 
 
-def load_rsa_key(
-    key_data: bytes,
-    password: str | None = None
-) -> rsa.RSAPrivateKey:
+def load_rsa_key(key_data: bytes, password: str | None = None) -> rsa.RSAPrivateKey:
     """
     Load RSA private key from PEM data.
 
@@ -223,8 +219,7 @@ def load_rsa_key(
     Example:
         >>> key = load_rsa_key(pem_data, "my_password")
     """
-    debug.validate(key_data is not None and len(key_data) > 0,
-                "Key data cannot be empty")
+    debug.validate(key_data is not None and len(key_data) > 0, "Key data cannot be empty")
 
     try:
         pwd_bytes = password.encode() if password else None
@@ -274,15 +269,11 @@ def get_key_info(key_data: bytes, password: str | None = None) -> KeyInfo:
     """
     debug.print("Getting RSA key info")
     # Check if encrypted
-    is_encrypted = b'ENCRYPTED' in key_data
+    is_encrypted = b"ENCRYPTED" in key_data
 
     private_key = load_rsa_key(key_data, password)
 
-    info = KeyInfo(
-        key_size=private_key.key_size,
-        is_encrypted=is_encrypted,
-        pem_data=key_data
-    )
+    info = KeyInfo(key_size=private_key.key_size, is_encrypted=is_encrypted, pem_data=key_data)
 
     debug.print(f"Key info: {info.key_size} bits, encrypted: {info.is_encrypted}")
     return info
@@ -323,14 +314,15 @@ def generate_credentials(
         >>> creds.pin
         "812345"
     """
-    debug.validate(use_pin or use_rsa,
-                "Must select at least one security factor (PIN or RSA key)")
+    debug.validate(use_pin or use_rsa, "Must select at least one security factor (PIN or RSA key)")
 
     if not use_pin and not use_rsa:
         raise ValueError("Must select at least one security factor (PIN or RSA key)")
 
-    debug.print(f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
-                f"passphrase_words={passphrase_words}")
+    debug.print(
+        f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
+        f"passphrase_words={passphrase_words}"
+    )
 
     # Generate single passphrase (v3.2.0 - no daily rotation)
     passphrase = generate_phrase(passphrase_words)
@@ -342,7 +334,7 @@ def generate_credentials(
     rsa_key_pem = None
     if use_rsa:
         rsa_key_obj = generate_rsa_key(rsa_bits)
-        rsa_key_pem = export_rsa_key_pem(rsa_key_obj, rsa_password).decode('utf-8')
+        rsa_key_pem = export_rsa_key_pem(rsa_key_obj, rsa_password).decode("utf-8")
 
     # Create Credentials object (v3.2.0 format with single passphrase)
     creds = Credentials(
@@ -361,12 +353,13 @@ def generate_credentials(
 # LEGACY COMPATIBILITY
 # =============================================================================
 
+
 def generate_credentials_legacy(
     use_pin: bool = True,
     use_rsa: bool = False,
     pin_length: int = DEFAULT_PIN_LENGTH,
     rsa_bits: int = DEFAULT_RSA_BITS,
-    words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS
+    words_per_phrase: int = DEFAULT_PASSPHRASE_WORDS,
 ) -> dict:
     """
     Generate credentials in legacy format (v3.1.0 style with daily phrases).
@@ -387,11 +380,12 @@ def generate_credentials_legacy(
         Dict with 'phrases' (dict), 'pin', 'rsa_key_pem', etc.
     """
     import warnings
+
     warnings.warn(
         "generate_credentials_legacy() returns v3.1.0 format. "
         "Use generate_credentials() for v3.2.0 format.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
 
     if not use_pin and not use_rsa:
@@ -405,12 +399,12 @@ def generate_credentials_legacy(
     rsa_key_pem = None
     if use_rsa:
         rsa_key_obj = generate_rsa_key(rsa_bits)
-        rsa_key_pem = export_rsa_key_pem(rsa_key_obj).decode('utf-8')
+        rsa_key_pem = export_rsa_key_pem(rsa_key_obj).decode("utf-8")
 
     return {
-        'phrases': phrases,
-        'pin': pin,
-        'rsa_key_pem': rsa_key_pem,
-        'rsa_bits': rsa_bits if use_rsa else None,
-        'words_per_phrase': words_per_phrase,
+        "phrases": phrases,
+        "pin": pin,
+        "rsa_key_pem": rsa_key_pem,
+        "rsa_bits": rsa_bits if use_rsa else None,
+        "words_per_phrase": words_per_phrase,
     }

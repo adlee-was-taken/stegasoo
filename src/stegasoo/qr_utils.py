@@ -20,6 +20,7 @@ from PIL import Image
 try:
     import qrcode
     from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M
+
     HAS_QRCODE_WRITE = True
 except ImportError:
     HAS_QRCODE_WRITE = False
@@ -28,6 +29,7 @@ except ImportError:
 try:
     from pyzbar.pyzbar import ZBarSymbol
     from pyzbar.pyzbar import decode as pyzbar_decode
+
     HAS_QRCODE_READ = True
 except ImportError:
     HAS_QRCODE_READ = False
@@ -53,8 +55,8 @@ def compress_data(data: str) -> str:
     Returns:
         Compressed string with STEGASOO-Z: prefix
     """
-    compressed = zlib.compress(data.encode('utf-8'), level=9)
-    encoded = base64.b64encode(compressed).decode('ascii')
+    compressed = zlib.compress(data.encode("utf-8"), level=9)
+    encoded = base64.b64encode(compressed).decode("ascii")
     return COMPRESSION_PREFIX + encoded
 
 
@@ -74,9 +76,9 @@ def decompress_data(data: str) -> str:
     if not data.startswith(COMPRESSION_PREFIX):
         raise ValueError("Data is not in compressed format")
 
-    encoded = data[len(COMPRESSION_PREFIX):]
+    encoded = data[len(COMPRESSION_PREFIX) :]
     compressed = base64.b64decode(encoded)
-    return zlib.decompress(compressed).decode('utf-8')
+    return zlib.decompress(compressed).decode("utf-8")
 
 
 def normalize_pem(pem_data: str) -> str:
@@ -101,25 +103,25 @@ def normalize_pem(pem_data: str) -> str:
     import re
 
     # Step 1: Normalize ALL line endings to \n
-    pem_data = pem_data.replace('\r\n', '\n').replace('\r', '\n')
+    pem_data = pem_data.replace("\r\n", "\n").replace("\r", "\n")
 
     # Step 2: Remove leading/trailing whitespace
     pem_data = pem_data.strip()
 
     # Step 3: Remove any non-ASCII characters (QR artifacts)
-    pem_data = ''.join(char for char in pem_data if ord(char) < 128)
+    pem_data = "".join(char for char in pem_data if ord(char) < 128)
 
     # Step 4: Extract header, content, and footer with flexible regex
     # This handles variations like:
     # - "PRIVATE KEY" vs "RSA PRIVATE KEY"
     # - Extra spaces in headers
     # - Missing spaces
-    pattern = r'(-----BEGIN[^-]*-----)(.*?)(-----END[^-]*-----)'
+    pattern = r"(-----BEGIN[^-]*-----)(.*?)(-----END[^-]*-----)"
     match = re.search(pattern, pem_data, re.DOTALL | re.IGNORECASE)
 
     if not match:
         # Fallback: try even more permissive pattern
-        pattern = r'(-+BEGIN[^-]+-+)(.*?)(-+END[^-]+-+)'
+        pattern = r"(-+BEGIN[^-]+-+)(.*?)(-+END[^-]+-+)"
         match = re.search(pattern, pem_data, re.DOTALL | re.IGNORECASE)
 
         if not match:
@@ -132,38 +134,35 @@ def normalize_pem(pem_data: str) -> str:
 
     # Step 5: Normalize header and footer
     # Standardize spacing and ensure proper format
-    header = re.sub(r'\s+', ' ', header_raw)
-    footer = re.sub(r'\s+', ' ', footer_raw)
+    header = re.sub(r"\s+", " ", header_raw)
+    footer = re.sub(r"\s+", " ", footer_raw)
 
     # Ensure exactly 5 dashes on each side
-    header = re.sub(r'^-+', '-----', header)
-    header = re.sub(r'-+$', '-----', header)
-    footer = re.sub(r'^-+', '-----', footer)
-    footer = re.sub(r'-+$', '-----', footer)
+    header = re.sub(r"^-+", "-----", header)
+    header = re.sub(r"-+$", "-----", header)
+    footer = re.sub(r"^-+", "-----", footer)
+    footer = re.sub(r"-+$", "-----", footer)
 
     # Step 6: Clean the base64 content THOROUGHLY
     # Remove ALL whitespace: spaces, tabs, newlines
     # Keep only valid base64 characters: A-Z, a-z, 0-9, +, /, =
-    content_clean = ''.join(
-        char for char in content_raw
-        if char.isalnum() or char in '+/='
-    )
+    content_clean = "".join(char for char in content_raw if char.isalnum() or char in "+/=")
 
     # Double-check: remove any remaining invalid characters
-    content_clean = re.sub(r'[^A-Za-z0-9+/=]', '', content_clean)
+    content_clean = re.sub(r"[^A-Za-z0-9+/=]", "", content_clean)
 
     # Step 7: Fix base64 padding
     # Base64 strings must be divisible by 4
     remainder = len(content_clean) % 4
     if remainder:
-        content_clean += '=' * (4 - remainder)
+        content_clean += "=" * (4 - remainder)
 
     # Step 8: Split into 64-character lines (PEM standard)
-    lines = [content_clean[i:i+64] for i in range(0, len(content_clean), 64)]
+    lines = [content_clean[i : i + 64] for i in range(0, len(content_clean), 64)]
 
     # Step 9: Reconstruct with EXACT PEM formatting
     # Format: header\ncontent_line1\ncontent_line2\n...\nfooter\n
-    return header + '\n' + '\n'.join(lines) + '\n' + footer + '\n'
+    return header + "\n" + "\n".join(lines) + "\n" + footer + "\n"
 
 
 def is_compressed(data: str) -> bool:
@@ -205,7 +204,7 @@ def can_fit_in_qr(data: str, compress: bool = False) -> bool:
     if compress:
         size = get_compressed_size(data)
     else:
-        size = len(data.encode('utf-8'))
+        size = len(data.encode("utf-8"))
     return size <= QR_MAX_BINARY
 
 
@@ -214,11 +213,7 @@ def needs_compression(data: str) -> bool:
     return not can_fit_in_qr(data, compress=False) and can_fit_in_qr(data, compress=True)
 
 
-def generate_qr_code(
-    data: str,
-    compress: bool = False,
-    error_correction=None
-) -> bytes:
+def generate_qr_code(data: str, compress: bool = False, error_correction=None) -> bytes:
     """
     Generate a QR code PNG from string data.
 
@@ -244,10 +239,9 @@ def generate_qr_code(
         qr_data = compress_data(data)
 
     # Check size
-    if len(qr_data.encode('utf-8')) > QR_MAX_BINARY:
+    if len(qr_data.encode("utf-8")) > QR_MAX_BINARY:
         raise ValueError(
-            f"Data too large for QR code ({len(qr_data)} bytes). "
-            f"Maximum: {QR_MAX_BINARY} bytes"
+            f"Data too large for QR code ({len(qr_data)} bytes). " f"Maximum: {QR_MAX_BINARY} bytes"
         )
 
     # Use lower error correction for larger data
@@ -266,7 +260,7 @@ def generate_qr_code(
     img = qr.make_image(fill_color="black", back_color="white")
 
     buf = io.BytesIO()
-    img.save(buf, format='PNG')
+    img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
 
@@ -294,8 +288,8 @@ def read_qr_code(image_data: bytes) -> str | None:
         img: Image.Image = Image.open(io.BytesIO(image_data))
 
         # Convert to RGB if necessary (pyzbar works best with RGB/grayscale)
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
 
         # Decode QR codes
         decoded = pyzbar_decode(img, symbols=[ZBarSymbol.QRCODE])
@@ -304,7 +298,7 @@ def read_qr_code(image_data: bytes) -> str | None:
             return None
 
         # Return first QR code found
-        result: str = decoded[0].data.decode('utf-8')
+        result: str = decoded[0].data.decode("utf-8")
         return result
 
     except Exception:
@@ -321,7 +315,7 @@ def read_qr_code_from_file(filepath: str) -> str | None:
     Returns:
         Decoded string, or None if no QR code found
     """
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         return read_qr_code(f.read())
 
 
@@ -355,7 +349,7 @@ def extract_key_from_qr(image_data: bytes) -> str | None:
         key_pem = qr_data
 
     # Step 3: Validate it looks like a PEM key
-    if '-----BEGIN' not in key_pem or '-----END' not in key_pem:
+    if "-----BEGIN" not in key_pem or "-----END" not in key_pem:
         return None
 
     # Step 4: Aggressively normalize PEM format
@@ -367,7 +361,7 @@ def extract_key_from_qr(image_data: bytes) -> str | None:
         return None
 
     # Step 5: Final validation - ensure it still looks like PEM
-    if '-----BEGIN' in key_pem and '-----END' in key_pem:
+    if "-----BEGIN" in key_pem and "-----END" in key_pem:
         return key_pem
 
     return None
@@ -383,14 +377,14 @@ def extract_key_from_qr_file(filepath: str) -> str | None:
     Returns:
         PEM-encoded RSA key string, or None if not found/invalid
     """
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         return extract_key_from_qr(f.read())
 
 
 def detect_and_crop_qr(
     image_data: bytes,
     padding_percent: float = QR_CROP_PADDING_PERCENT,
-    min_padding_px: int = QR_CROP_MIN_PADDING_PX
+    min_padding_px: int = QR_CROP_MIN_PADDING_PX,
 ) -> bytes | None:
     """
     Detect QR code in image and crop to it, handling rotation.
@@ -420,8 +414,8 @@ def detect_and_crop_qr(
         original_mode = img.mode
 
         # Convert for pyzbar detection
-        if img.mode not in ('RGB', 'L'):
-            detect_img = img.convert('RGB')
+        if img.mode not in ("RGB", "L"):
+            detect_img = img.convert("RGB")
         else:
             detect_img = img
 
@@ -468,16 +462,17 @@ def detect_and_crop_qr(
         # Convert to PNG bytes
         buf = io.BytesIO()
         # Preserve transparency if present
-        if original_mode in ('RGBA', 'LA', 'P'):
-            cropped.save(buf, format='PNG')
+        if original_mode in ("RGBA", "LA", "P"):
+            cropped.save(buf, format="PNG")
         else:
-            cropped.save(buf, format='PNG')
+            cropped.save(buf, format="PNG")
         buf.seek(0)
         return buf.getvalue()
 
     except Exception as e:
         # Log for debugging but return None for clean API
         import sys
+
         print(f"QR crop error: {e}", file=sys.stderr)
         return None
 
@@ -485,7 +480,7 @@ def detect_and_crop_qr(
 def detect_and_crop_qr_file(
     filepath: str,
     padding_percent: float = QR_CROP_PADDING_PERCENT,
-    min_padding_px: int = QR_CROP_MIN_PADDING_PX
+    min_padding_px: int = QR_CROP_MIN_PADDING_PX,
 ) -> bytes | None:
     """
     Detect QR code in image file and crop to it.
@@ -498,7 +493,7 @@ def detect_and_crop_qr_file(
     Returns:
         Cropped PNG image bytes, or None if no QR code found
     """
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         return detect_and_crop_qr(f.read(), padding_percent, min_padding_px)
 
 

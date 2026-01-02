@@ -7,6 +7,7 @@ Custom exception classes for clear error handling across all frontends.
 
 class StegasooError(Exception):
     """Base exception for all Stegasoo errors."""
+
     pass
 
 
@@ -14,33 +15,40 @@ class StegasooError(Exception):
 # VALIDATION ERRORS
 # ============================================================================
 
+
 class ValidationError(StegasooError):
     """Base class for validation errors."""
+
     pass
 
 
 class PinValidationError(ValidationError):
     """PIN validation failed."""
+
     pass
 
 
 class MessageValidationError(ValidationError):
     """Message validation failed."""
+
     pass
 
 
 class ImageValidationError(ValidationError):
     """Image validation failed."""
+
     pass
 
 
 class KeyValidationError(ValidationError):
     """RSA key validation failed."""
+
     pass
 
 
 class SecurityFactorError(ValidationError):
     """Security factor requirements not met."""
+
     pass
 
 
@@ -48,33 +56,40 @@ class SecurityFactorError(ValidationError):
 # CRYPTO ERRORS
 # ============================================================================
 
+
 class CryptoError(StegasooError):
     """Base class for cryptographic errors."""
+
     pass
 
 
 class EncryptionError(CryptoError):
     """Encryption failed."""
+
     pass
 
 
 class DecryptionError(CryptoError):
     """Decryption failed (wrong key, corrupted data, etc.)."""
+
     pass
 
 
 class KeyDerivationError(CryptoError):
     """Key derivation failed."""
+
     pass
 
 
 class KeyGenerationError(CryptoError):
     """Key generation failed."""
+
     pass
 
 
 class KeyPasswordError(CryptoError):
     """RSA key password is incorrect or missing."""
+
     pass
 
 
@@ -82,8 +97,10 @@ class KeyPasswordError(CryptoError):
 # STEGANOGRAPHY ERRORS
 # ============================================================================
 
+
 class SteganographyError(StegasooError):
     """Base class for steganography errors."""
+
     pass
 
 
@@ -100,16 +117,19 @@ class CapacityError(SteganographyError):
 
 class ExtractionError(SteganographyError):
     """Failed to extract hidden data from image."""
+
     pass
 
 
 class EmbeddingError(SteganographyError):
     """Failed to embed data in image."""
+
     pass
 
 
 class InvalidHeaderError(SteganographyError):
     """Invalid or missing Stegasoo header in extracted data."""
+
     pass
 
 
@@ -117,13 +137,16 @@ class InvalidHeaderError(SteganographyError):
 # FILE ERRORS
 # ============================================================================
 
+
 class FileError(StegasooError):
     """Base class for file-related errors."""
+
     pass
 
 
 class FileNotFoundError(FileError):
     """Required file not found."""
+
     pass
 
 

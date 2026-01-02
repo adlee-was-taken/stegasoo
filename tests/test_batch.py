@@ -41,8 +41,8 @@ def sample_images(temp_dir):
     images = []
     for i in range(3):
         img_path = temp_dir / f"test_image_{i}.png"
-        img = Image.new('RGB', (100, 100), color=(i * 50, i * 50, i * 50))
-        img.save(img_path, 'PNG')
+        img = Image.new("RGB", (100, 100), color=(i * 50, i * 50, i * 50))
+        img.save(img_path, "PNG")
         images.append(img_path)
 
     return images
@@ -55,9 +55,9 @@ def sample_reference_photo():
 
     from PIL import Image
 
-    img = Image.new('RGB', (100, 100), color=(128, 128, 128))
+    img = Image.new("RGB", (100, 100), color=(128, 128, 128))
     buf = BytesIO()
-    img.save(buf, 'PNG')
+    img.save(buf, "PNG")
     return buf.getvalue()
 
 
@@ -67,7 +67,7 @@ def sample_credentials(sample_reference_photo):
     return {
         "reference_photo": sample_reference_photo,
         "passphrase": "test phrase four words",  # v3.2.0: single passphrase
-        "pin": "123456"
+        "pin": "123456",
     }
 
 
@@ -95,9 +95,9 @@ class TestBatchItem:
             message="Done",
         )
         result = item.to_dict()
-        assert result['input_path'] == "input.png"
-        assert result['output_path'] == "output.png"
-        assert result['status'] == "success"
+        assert result["input_path"] == "input.png"
+        assert result["output_path"] == "output.png"
+        assert result["status"] == "success"
 
 
 class TestBatchResult:
@@ -106,11 +106,12 @@ class TestBatchResult:
     def test_to_json(self):
         """Should serialize to valid JSON."""
         import json
+
         result = BatchResult(operation="encode", total=5, succeeded=4, failed=1)
         json_str = result.to_json()
         parsed = json.loads(json_str)
-        assert parsed['operation'] == "encode"
-        assert parsed['summary']['total'] == 5
+        assert parsed["operation"] == "encode"
+        assert parsed["summary"]["total"] == 5
 
     def test_duration_with_end_time(self):
         """Duration should work when end_time is set."""
@@ -128,7 +129,7 @@ class TestBatchCredentials:
         data = {
             "reference_photo": sample_reference_photo,
             "passphrase": "test phrase four words",
-            "pin": "123456"
+            "pin": "123456",
         }
         creds = BatchCredentials.from_dict(data)
         assert creds.passphrase == "test phrase four words"
@@ -139,7 +140,7 @@ class TestBatchCredentials:
         data = {
             "reference_photo": sample_reference_photo,
             "day_phrase": "legacy phrase here",  # Old key name
-            "pin": "123456"
+            "pin": "123456",
         }
         creds = BatchCredentials.from_dict(data)
         # Should accept old key and map to passphrase
@@ -151,19 +152,19 @@ class TestBatchCredentials:
         creds = BatchCredentials(
             reference_photo=sample_reference_photo,
             passphrase="test phrase four words",
-            pin="123456"
+            pin="123456",
         )
         result = creds.to_dict()
-        assert result['passphrase'] == "test phrase four words"
-        assert result['pin'] == "123456"
-        assert 'day_phrase' not in result  # Old key should not be present
+        assert result["passphrase"] == "test phrase four words"
+        assert result["pin"] == "123456"
+        assert "day_phrase" not in result  # Old key should not be present
 
     def test_passphrase_is_string(self, sample_reference_photo):
         """Passphrase should be a string, not a dict."""
         creds = BatchCredentials(
             reference_photo=sample_reference_photo,
             passphrase="test phrase four words",
-            pin="123456"
+            pin="123456",
         )
         assert isinstance(creds.passphrase, str)
 
@@ -216,7 +217,7 @@ class TestBatchProcessor:
         nested = temp_dir / "nested"
         nested.mkdir()
         img_path = nested / "nested.png"
-        img = Image.new('RGB', (50, 50))
+        img = Image.new("RGB", (50, 50))
         img.save(img_path)
 
         processor = BatchProcessor()
@@ -241,7 +242,9 @@ class TestBatchProcessor:
                 message="test",
             )
 
-    def test_batch_encode_accepts_passphrase_credentials(self, sample_images, temp_dir, sample_credentials):
+    def test_batch_encode_accepts_passphrase_credentials(
+        self, sample_images, temp_dir, sample_credentials
+    ):
         """Should accept v3.2.0 format credentials with passphrase."""
         processor = BatchProcessor()
         result = processor.batch_encode(
@@ -343,9 +346,9 @@ class TestBatchCapacityCheck:
         """Results should include capacity info."""
         results = batch_capacity_check(sample_images)
         for item in results:
-            assert 'capacity_bytes' in item
-            assert 'dimensions' in item
-            assert 'valid' in item
+            assert "capacity_bytes" in item
+            assert "dimensions" in item
+            assert "valid" in item
 
     def test_handles_invalid_files(self, temp_dir):
         """Should handle non-image files gracefully."""
@@ -354,7 +357,7 @@ class TestBatchCapacityCheck:
 
         results = batch_capacity_check([bad_file])
         assert len(results) == 1
-        assert 'error' in results[0]
+        assert "error" in results[0]
 
 
 class TestPrintBatchResult:
@@ -403,7 +406,7 @@ class TestCredentialsMigration:
         old_format = {
             "reference_photo": sample_reference_photo,
             "phrase": "old style phrase",
-            "pin": "123456"
+            "pin": "123456",
         }
         # Should not raise
         creds = BatchCredentials.from_dict(old_format)
@@ -414,7 +417,7 @@ class TestCredentialsMigration:
         old_format = {
             "reference_photo": sample_reference_photo,
             "day_phrase": "old day phrase",
-            "pin": "123456"
+            "pin": "123456",
         }
         creds = BatchCredentials.from_dict(old_format)
         assert creds.passphrase == "old day phrase"
@@ -425,7 +428,7 @@ class TestCredentialsMigration:
             "reference_photo": sample_reference_photo,
             "passphrase": "new style passphrase",
             "day_phrase": "old day phrase",
-            "pin": "123456"
+            "pin": "123456",
         }
         creds = BatchCredentials.from_dict(mixed_format)
         assert creds.passphrase == "new style passphrase"

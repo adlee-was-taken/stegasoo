@@ -18,7 +18,7 @@ from .constants import DAY_NAMES
 from .debug import debug
 
 
-def strip_image_metadata(image_data: bytes, output_format: str = 'PNG') -> bytes:
+def strip_image_metadata(image_data: bytes, output_format: str = "PNG") -> bytes:
     """
     Remove all metadata (EXIF, ICC profiles, etc.) from an image.
 
@@ -41,8 +41,8 @@ def strip_image_metadata(image_data: bytes, output_format: str = 'PNG') -> bytes
     img = Image.open(io.BytesIO(image_data))
 
     # Convert to RGB if needed (handles RGBA, P, L, etc.)
-    if img.mode not in ('RGB', 'RGBA'):
-        img = img.convert('RGB')
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
 
     # Create fresh image - this discards all metadata
     clean = Image.new(img.mode, img.size)
@@ -56,11 +56,7 @@ def strip_image_metadata(image_data: bytes, output_format: str = 'PNG') -> bytes
     return output.getvalue()
 
 
-def generate_filename(
-    date_str: str | None = None,
-    prefix: str = "",
-    extension: str = "png"
-) -> str:
+def generate_filename(date_str: str | None = None, prefix: str = "", extension: str = "png") -> str:
     """
     Generate a filename for stego images.
 
@@ -78,17 +74,19 @@ def generate_filename(
         >>> generate_filename("2023-12-25", "secret_", "png")
         "secret_a1b2c3d4_20231225.png"
     """
-    debug.validate(bool(extension) and '.' not in extension,
-                f"Extension must not contain dot, got '{extension}'")
+    debug.validate(
+        bool(extension) and "." not in extension,
+        f"Extension must not contain dot, got '{extension}'",
+    )
 
     if date_str is None:
         date_str = date.today().isoformat()
 
-    date_compact = date_str.replace('-', '')
+    date_compact = date_str.replace("-", "")
     random_hex = secrets.token_hex(4)
 
     # Ensure extension doesn't have a leading dot
-    extension = extension.lstrip('.')
+    extension = extension.lstrip(".")
 
     filename = f"{prefix}{random_hex}_{date_compact}.{extension}"
     debug.print(f"Generated filename: {filename}")
@@ -114,7 +112,7 @@ def parse_date_from_filename(filename: str) -> str | None:
     import re
 
     # Try YYYYMMDD format
-    match = re.search(r'_(\d{4})(\d{2})(\d{2})(?:\.|$)', filename)
+    match = re.search(r"_(\d{4})(\d{2})(\d{2})(?:\.|$)", filename)
     if match:
         year, month, day = match.groups()
         date_str = f"{year}-{month}-{day}"
@@ -122,7 +120,7 @@ def parse_date_from_filename(filename: str) -> str | None:
         return date_str
 
     # Try YYYY-MM-DD format
-    match = re.search(r'_(\d{4})-(\d{2})-(\d{2})(?:\.|$)', filename)
+    match = re.search(r"_(\d{4})-(\d{2})-(\d{2})(?:\.|$)", filename)
     if match:
         year, month, day = match.groups()
         date_str = f"{year}-{month}-{day}"
@@ -147,11 +145,13 @@ def get_day_from_date(date_str: str) -> str:
         >>> get_day_from_date("2023-12-25")
         "Monday"
     """
-    debug.validate(len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-',
-                f"Invalid date format: {date_str}, expected YYYY-MM-DD")
+    debug.validate(
+        len(date_str) == 10 and date_str[4] == "-" and date_str[7] == "-",
+        f"Invalid date format: {date_str}, expected YYYY-MM-DD",
+    )
 
     try:
-        year, month, day = map(int, date_str.split('-'))
+        year, month, day = map(int, date_str.split("-"))
         d = date(year, month, day)
         day_name = DAY_NAMES[d.weekday()]
         debug.print(f"Date {date_str} is {day_name}")
@@ -231,11 +231,11 @@ class SecureDeleter:
             debug.print("File is empty, nothing to overwrite")
             return
 
-        patterns = [b'\x00', b'\xFF', bytes([random.randint(0, 255)])]
+        patterns = [b"\x00", b"\xff", bytes([random.randint(0, 255)])]
 
         for pass_num in range(self.passes):
             debug.print(f"Overwrite pass {pass_num + 1}/{self.passes}")
-            with open(file_path, 'r+b') as f:
+            with open(file_path, "r+b") as f:
                 for pattern_idx, pattern in enumerate(patterns):
                     f.seek(0)
                     # Write pattern in chunks for large files
@@ -243,7 +243,7 @@ class SecureDeleter:
                     for offset in range(0, length, chunk_size):
                         chunk = min(chunk_size, length - offset)
                         f.write(pattern * (chunk // len(pattern)))
-                        f.write(pattern[:chunk % len(pattern)])
+                        f.write(pattern[: chunk % len(pattern)])
 
                 # Final pass with random data
                 f.seek(0)
@@ -271,7 +271,7 @@ class SecureDeleter:
 
         # First, securely overwrite all files
         file_count = 0
-        for file_path in self.path.rglob('*'):
+        for file_path in self.path.rglob("*"):
             if file_path.is_file():
                 self._overwrite_file(file_path)
                 file_count += 1
@@ -325,9 +325,9 @@ def format_file_size(size_bytes: int) -> str:
     debug.validate(size_bytes >= 0, f"File size cannot be negative: {size_bytes}")
 
     size: float = float(size_bytes)
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
         if size < 1024:
-            if unit == 'B':
+            if unit == "B":
                 return f"{int(size)} {unit}"
             return f"{size:.1f} {unit}"
         size /= 1024

@@ -60,6 +60,7 @@ try:
         extract_key_from_qr,
         generate_qr_code,
     )
+
     HAS_QR_UTILS = True
 except ImportError:
     HAS_QR_UTILS = False
@@ -151,13 +152,11 @@ DCT_BYTES_PER_PIXEL = 0.125
 __all__ = [
     # Version
     "__version__",
-
     # Core
     "encode",
     "decode",
     "decode_file",
     "decode_text",
-
     # Generation
     "generate_pin",
     "generate_passphrase",
@@ -165,7 +164,6 @@ __all__ = [
     "generate_credentials",
     "export_rsa_key_pem",
     "load_rsa_key",
-
     # Channel key management (v4.0.0)
     "generate_channel_key",
     "get_channel_key",
@@ -177,28 +175,22 @@ __all__ = [
     "format_channel_key",
     "get_active_channel_key",
     "get_channel_fingerprint",
-
     # Image utilities
     "get_image_info",
     "compare_capacity",
-
     # Utilities
     "generate_filename",
-
     # Crypto
     "has_argon2",
-
     # Steganography
     "has_dct_support",
     "compare_modes",
     "will_fit_by_mode",
-
     # QR utilities
     "generate_qr_code",
     "extract_key_from_qr",
     "detect_and_crop_qr",
     "HAS_QR_UTILS",
-
     # Validation
     "validate_reference_photo",
     "validate_carrier",
@@ -212,7 +204,6 @@ __all__ = [
     "validate_dct_output_format",
     "validate_dct_color_mode",
     "validate_channel_key",
-
     # Models
     "ImageInfo",
     "CapacityComparison",
@@ -222,7 +213,6 @@ __all__ = [
     "FilePayload",
     "Credentials",
     "ValidationResult",
-
     # Exceptions
     "StegasooError",
     "ValidationError",
@@ -242,7 +232,6 @@ __all__ = [
     "ExtractionError",
     "EmbeddingError",
     "InvalidHeaderError",
-
     # Constants
     "FORMAT_VERSION",
     "MIN_PASSPHRASE_WORDS",

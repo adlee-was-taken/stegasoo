@@ -82,9 +82,11 @@ def encode(
         ...     channel_key="ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
         ... )
     """
-    debug.print(f"encode: passphrase length={len(passphrase.split())} words, "
-                f"pin={'set' if pin else 'none'}, mode={embed_mode}, "
-                f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}")
+    debug.print(
+        f"encode: passphrase length={len(passphrase.split())} words, "
+        f"pin={'set' if pin else 'none'}, mode={embed_mode}, "
+        f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}"
+    )
 
     # Validate inputs
     require_valid_payload(message)
@@ -105,9 +107,7 @@ def encode(
     debug.print(f"Encrypted payload: {len(encrypted)} bytes")
 
     # Derive pixel/coefficient selection key (with channel key)
-    pixel_key = derive_pixel_key(
-        reference_photo, passphrase, pin, rsa_key_data, channel_key
-    )
+    pixel_key = derive_pixel_key(reference_photo, passphrase, pin, rsa_key_data, channel_key)
 
     # Embed in image
     stego_data, stats, extension = embed_in_image(
@@ -124,7 +124,7 @@ def encode(
     filename = generate_filename(extension=extension)
 
     # Create result
-    if hasattr(stats, 'pixels_modified'):
+    if hasattr(stats, "pixels_modified"):
         # LSB mode stats
         return EncodeResult(
             stego_image=stego_data,

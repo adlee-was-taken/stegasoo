@@ -24,7 +24,7 @@ import traceback
 from pathlib import Path
 
 # Ensure stegasoo is importable
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 
@@ -66,7 +66,7 @@ def _get_channel_info(resolved_key):
     # Auto mode - check server config
     if has_channel_key():
         status = get_channel_status()
-        return "private", status.get('fingerprint')
+        return "private", status.get("fingerprint")
 
     return "public", None
 
@@ -76,62 +76,62 @@ def encode_operation(params: dict) -> dict:
     from stegasoo import FilePayload, encode
 
     # Decode base64 inputs
-    carrier_data = base64.b64decode(params['carrier_b64'])
-    reference_data = base64.b64decode(params['reference_b64'])
+    carrier_data = base64.b64decode(params["carrier_b64"])
+    reference_data = base64.b64decode(params["reference_b64"])
 
     # Optional RSA key
     rsa_key_data = None
-    if params.get('rsa_key_b64'):
-        rsa_key_data = base64.b64decode(params['rsa_key_b64'])
+    if params.get("rsa_key_b64"):
+        rsa_key_data = base64.b64decode(params["rsa_key_b64"])
 
     # Determine payload type
-    if params.get('file_b64'):
-        file_data = base64.b64decode(params['file_b64'])
+    if params.get("file_b64"):
+        file_data = base64.b64decode(params["file_b64"])
         payload = FilePayload(
             data=file_data,
-            filename=params.get('file_name', 'file'),
-            mime_type=params.get('file_mime', 'application/octet-stream'),
+            filename=params.get("file_name", "file"),
+            mime_type=params.get("file_mime", "application/octet-stream"),
         )
     else:
-        payload = params.get('message', '')
+        payload = params.get("message", "")
 
     # Resolve channel key (v4.0.0)
-    resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
+    resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
 
     # Call encode with correct parameter names
     result = encode(
         message=payload,
         reference_photo=reference_data,
         carrier_image=carrier_data,
-        passphrase=params.get('passphrase', ''),
-        pin=params.get('pin'),
+        passphrase=params.get("passphrase", ""),
+        pin=params.get("pin"),
         rsa_key_data=rsa_key_data,
-        rsa_password=params.get('rsa_password'),
-        embed_mode=params.get('embed_mode', 'lsb'),
-        dct_output_format=params.get('dct_output_format', 'png'),
-        dct_color_mode=params.get('dct_color_mode', 'color'),
+        rsa_password=params.get("rsa_password"),
+        embed_mode=params.get("embed_mode", "lsb"),
+        dct_output_format=params.get("dct_output_format", "png"),
+        dct_color_mode=params.get("dct_color_mode", "color"),
         channel_key=resolved_channel_key,  # v4.0.0
     )
 
     # Build stats dict if available
     stats = None
-    if hasattr(result, 'stats') and result.stats:
+    if hasattr(result, "stats") and result.stats:
         stats = {
-            'pixels_modified': getattr(result.stats, 'pixels_modified', 0),
-            'capacity_used': getattr(result.stats, 'capacity_used', 0),
-            'bytes_embedded': getattr(result.stats, 'bytes_embedded', 0),
+            "pixels_modified": getattr(result.stats, "pixels_modified", 0),
+            "capacity_used": getattr(result.stats, "capacity_used", 0),
+            "bytes_embedded": getattr(result.stats, "bytes_embedded", 0),
         }
 
     # Get channel info for response (v4.0.0)
     channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
 
     return {
-        'success': True,
-        'stego_b64': base64.b64encode(result.stego_image).decode('ascii'),
-        'filename': getattr(result, 'filename', None),
-        'stats': stats,
-        'channel_mode': channel_mode,
-        'channel_fingerprint': channel_fingerprint,
+        "success": True,
+        "stego_b64": base64.b64encode(result.stego_image).decode("ascii"),
+        "filename": getattr(result, "filename", None),
+        "stats": stats,
+        "channel_mode": channel_mode,
+        "channel_fingerprint": channel_fingerprint,
     }
 
 
@@ -140,42 +140,42 @@ def decode_operation(params: dict) -> dict:
     from stegasoo import decode
 
     # Decode base64 inputs
-    stego_data = base64.b64decode(params['stego_b64'])
-    reference_data = base64.b64decode(params['reference_b64'])
+    stego_data = base64.b64decode(params["stego_b64"])
+    reference_data = base64.b64decode(params["reference_b64"])
 
     # Optional RSA key
     rsa_key_data = None
-    if params.get('rsa_key_b64'):
-        rsa_key_data = base64.b64decode(params['rsa_key_b64'])
+    if params.get("rsa_key_b64"):
+        rsa_key_data = base64.b64decode(params["rsa_key_b64"])
 
     # Resolve channel key (v4.0.0)
-    resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
+    resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
 
     # Call decode with correct parameter names
     result = decode(
         stego_image=stego_data,
         reference_photo=reference_data,
-        passphrase=params.get('passphrase', ''),
-        pin=params.get('pin'),
+        passphrase=params.get("passphrase", ""),
+        pin=params.get("pin"),
         rsa_key_data=rsa_key_data,
-        rsa_password=params.get('rsa_password'),
-        embed_mode=params.get('embed_mode', 'auto'),
+        rsa_password=params.get("rsa_password"),
+        embed_mode=params.get("embed_mode", "auto"),
         channel_key=resolved_channel_key,  # v4.0.0
     )
 
     if result.is_file:
         return {
-            'success': True,
-            'is_file': True,
-            'file_b64': base64.b64encode(result.file_data).decode('ascii'),
-            'filename': result.filename,
-            'mime_type': result.mime_type,
+            "success": True,
+            "is_file": True,
+            "file_b64": base64.b64encode(result.file_data).decode("ascii"),
+            "filename": result.filename,
+            "mime_type": result.mime_type,
         }
     else:
         return {
-            'success': True,
-            'is_file': False,
-            'message': result.message,
+            "success": True,
+            "is_file": False,
+            "message": result.message,
         }
 
 
@@ -183,12 +183,12 @@ def compare_operation(params: dict) -> dict:
     """Handle compare_modes operation."""
     from stegasoo import compare_modes
 
-    carrier_data = base64.b64decode(params['carrier_b64'])
+    carrier_data = base64.b64decode(params["carrier_b64"])
     result = compare_modes(carrier_data)
 
     return {
-        'success': True,
-        'comparison': result,
+        "success": True,
+        "comparison": result,
     }
 
 
@@ -196,17 +196,17 @@ def capacity_check_operation(params: dict) -> dict:
     """Handle will_fit_by_mode operation."""
     from stegasoo import will_fit_by_mode
 
-    carrier_data = base64.b64decode(params['carrier_b64'])
+    carrier_data = base64.b64decode(params["carrier_b64"])
 
     result = will_fit_by_mode(
-        payload=params['payload_size'],
+        payload=params["payload_size"],
         carrier_image=carrier_data,
-        embed_mode=params.get('embed_mode', 'lsb'),
+        embed_mode=params.get("embed_mode", "lsb"),
     )
 
     return {
-        'success': True,
-        'result': result,
+        "success": True,
+        "result": result,
     }
 
 
@@ -215,17 +215,17 @@ def channel_status_operation(params: dict) -> dict:
     from stegasoo import get_channel_status
 
     status = get_channel_status()
-    reveal = params.get('reveal', False)
+    reveal = params.get("reveal", False)
 
     return {
-        'success': True,
-        'status': {
-            'mode': status['mode'],
-            'configured': status['configured'],
-            'fingerprint': status.get('fingerprint'),
-            'source': status.get('source'),
-            'key': status.get('key') if reveal and status['configured'] else None,
-        }
+        "success": True,
+        "status": {
+            "mode": status["mode"],
+            "configured": status["configured"],
+            "fingerprint": status.get("fingerprint"),
+            "source": status.get("source"),
+            "key": status.get("key") if reveal and status["configured"] else None,
+        },
     }
 
 
@@ -236,37 +236,37 @@ def main():
         input_text = sys.stdin.read()
 
         if not input_text.strip():
-            output = {'success': False, 'error': 'No input provided'}
+            output = {"success": False, "error": "No input provided"}
         else:
             params = json.loads(input_text)
-            operation = params.get('operation')
+            operation = params.get("operation")
 
-            if operation == 'encode':
+            if operation == "encode":
                 output = encode_operation(params)
-            elif operation == 'decode':
+            elif operation == "decode":
                 output = decode_operation(params)
-            elif operation == 'compare':
+            elif operation == "compare":
                 output = compare_operation(params)
-            elif operation == 'capacity':
+            elif operation == "capacity":
                 output = capacity_check_operation(params)
-            elif operation == 'channel_status':
+            elif operation == "channel_status":
                 output = channel_status_operation(params)
             else:
-                output = {'success': False, 'error': f'Unknown operation: {operation}'}
+                output = {"success": False, "error": f"Unknown operation: {operation}"}
 
     except json.JSONDecodeError as e:
-        output = {'success': False, 'error': f'Invalid JSON: {e}'}
+        output = {"success": False, "error": f"Invalid JSON: {e}"}
     except Exception as e:
         output = {
-            'success': False,
-            'error': str(e),
-            'error_type': type(e).__name__,
-            'traceback': traceback.format_exc(),
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc(),
         }
 
     # Write output as JSON
     print(json.dumps(output), flush=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

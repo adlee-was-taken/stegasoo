@@ -55,12 +55,13 @@ from typing import Any
 DEFAULT_TIMEOUT = 120
 
 # Path to worker script - adjust if needed
-WORKER_SCRIPT = Path(__file__).parent / 'stego_worker.py'
+WORKER_SCRIPT = Path(__file__).parent / "stego_worker.py"
 
 
 @dataclass
 class EncodeResult:
     """Result from encode operation."""
+
     success: bool
     stego_data: bytes | None = None
     filename: str | None = None
@@ -75,6 +76,7 @@ class EncodeResult:
 @dataclass
 class DecodeResult:
     """Result from decode operation."""
+
     success: bool
     is_file: bool = False
     message: str | None = None
@@ -88,6 +90,7 @@ class DecodeResult:
 @dataclass
 class CompareResult:
     """Result from compare_modes operation."""
+
     success: bool
     width: int = 0
     height: int = 0
@@ -99,6 +102,7 @@ class CompareResult:
 @dataclass
 class CapacityResult:
     """Result from capacity check operation."""
+
     success: bool
     fits: bool = False
     payload_size: int = 0
@@ -112,6 +116,7 @@ class CapacityResult:
 @dataclass
 class ChannelStatusResult:
     """Result from channel status check (v4.0.0)."""
+
     success: bool
     mode: str = "public"
     configured: bool = False
@@ -177,37 +182,37 @@ class SubprocessStego:
             if result.returncode != 0:
                 # Worker crashed
                 return {
-                    'success': False,
-                    'error': f'Worker crashed (exit code {result.returncode})',
-                    'stderr': result.stderr,
+                    "success": False,
+                    "error": f"Worker crashed (exit code {result.returncode})",
+                    "stderr": result.stderr,
                 }
 
             if not result.stdout.strip():
                 return {
-                    'success': False,
-                    'error': 'Worker returned empty output',
-                    'stderr': result.stderr,
+                    "success": False,
+                    "error": "Worker returned empty output",
+                    "stderr": result.stderr,
                 }
 
             return json.loads(result.stdout)
 
         except subprocess.TimeoutExpired:
             return {
-                'success': False,
-                'error': f'Operation timed out after {timeout} seconds',
-                'error_type': 'TimeoutError',
+                "success": False,
+                "error": f"Operation timed out after {timeout} seconds",
+                "error_type": "TimeoutError",
             }
         except json.JSONDecodeError as e:
             return {
-                'success': False,
-                'error': f'Invalid JSON from worker: {e}',
-                'raw_output': result.stdout if 'result' in dir() else None,
+                "success": False,
+                "error": f"Invalid JSON from worker: {e}",
+                "raw_output": result.stdout if "result" in dir() else None,
             }
         except Exception as e:
             return {
-                'success': False,
-                'error': str(e),
-                'error_type': type(e).__name__,
+                "success": False,
+                "error": str(e),
+                "error_type": type(e).__name__,
             }
 
     def encode(
@@ -253,43 +258,43 @@ class SubprocessStego:
             EncodeResult with stego_data and extension on success
         """
         params = {
-            'operation': 'encode',
-            'carrier_b64': base64.b64encode(carrier_data).decode('ascii'),
-            'reference_b64': base64.b64encode(reference_data).decode('ascii'),
-            'message': message,
-            'passphrase': passphrase,
-            'pin': pin,
-            'embed_mode': embed_mode,
-            'dct_output_format': dct_output_format,
-            'dct_color_mode': dct_color_mode,
-            'channel_key': channel_key,  # v4.0.0
+            "operation": "encode",
+            "carrier_b64": base64.b64encode(carrier_data).decode("ascii"),
+            "reference_b64": base64.b64encode(reference_data).decode("ascii"),
+            "message": message,
+            "passphrase": passphrase,
+            "pin": pin,
+            "embed_mode": embed_mode,
+            "dct_output_format": dct_output_format,
+            "dct_color_mode": dct_color_mode,
+            "channel_key": channel_key,  # v4.0.0
         }
 
         if file_data:
-            params['file_b64'] = base64.b64encode(file_data).decode('ascii')
-            params['file_name'] = file_name
-            params['file_mime'] = file_mime
+            params["file_b64"] = base64.b64encode(file_data).decode("ascii")
+            params["file_name"] = file_name
+            params["file_mime"] = file_mime
 
         if rsa_key_data:
-            params['rsa_key_b64'] = base64.b64encode(rsa_key_data).decode('ascii')
-            params['rsa_password'] = rsa_password
+            params["rsa_key_b64"] = base64.b64encode(rsa_key_data).decode("ascii")
+            params["rsa_password"] = rsa_password
 
         result = self._run_worker(params, timeout)
 
-        if result.get('success'):
+        if result.get("success"):
             return EncodeResult(
                 success=True,
-                stego_data=base64.b64decode(result['stego_b64']),
-                filename=result.get('filename'),
-                stats=result.get('stats'),
-                channel_mode=result.get('channel_mode'),
-                channel_fingerprint=result.get('channel_fingerprint'),
+                stego_data=base64.b64decode(result["stego_b64"]),
+                filename=result.get("filename"),
+                stats=result.get("stats"),
+                channel_mode=result.get("channel_mode"),
+                channel_fingerprint=result.get("channel_fingerprint"),
             )
         else:
             return EncodeResult(
                 success=False,
-                error=result.get('error', 'Unknown error'),
-                error_type=result.get('error_type'),
+                error=result.get("error", "Unknown error"),
+                error_type=result.get("error_type"),
             )
 
     def decode(
@@ -323,41 +328,41 @@ class SubprocessStego:
             DecodeResult with message or file_data on success
         """
         params = {
-            'operation': 'decode',
-            'stego_b64': base64.b64encode(stego_data).decode('ascii'),
-            'reference_b64': base64.b64encode(reference_data).decode('ascii'),
-            'passphrase': passphrase,
-            'pin': pin,
-            'embed_mode': embed_mode,
-            'channel_key': channel_key,  # v4.0.0
+            "operation": "decode",
+            "stego_b64": base64.b64encode(stego_data).decode("ascii"),
+            "reference_b64": base64.b64encode(reference_data).decode("ascii"),
+            "passphrase": passphrase,
+            "pin": pin,
+            "embed_mode": embed_mode,
+            "channel_key": channel_key,  # v4.0.0
         }
 
         if rsa_key_data:
-            params['rsa_key_b64'] = base64.b64encode(rsa_key_data).decode('ascii')
-            params['rsa_password'] = rsa_password
+            params["rsa_key_b64"] = base64.b64encode(rsa_key_data).decode("ascii")
+            params["rsa_password"] = rsa_password
 
         result = self._run_worker(params, timeout)
 
-        if result.get('success'):
-            if result.get('is_file'):
+        if result.get("success"):
+            if result.get("is_file"):
                 return DecodeResult(
                     success=True,
                     is_file=True,
-                    file_data=base64.b64decode(result['file_b64']),
-                    filename=result.get('filename'),
-                    mime_type=result.get('mime_type'),
+                    file_data=base64.b64decode(result["file_b64"]),
+                    filename=result.get("filename"),
+                    mime_type=result.get("mime_type"),
                 )
             else:
                 return DecodeResult(
                     success=True,
                     is_file=False,
-                    message=result.get('message'),
+                    message=result.get("message"),
                 )
         else:
             return DecodeResult(
                 success=False,
-                error=result.get('error', 'Unknown error'),
-                error_type=result.get('error_type'),
+                error=result.get("error", "Unknown error"),
+                error_type=result.get("error_type"),
             )
 
     def compare_modes(
@@ -376,25 +381,25 @@ class SubprocessStego:
             CompareResult with capacity information
         """
         params = {
-            'operation': 'compare',
-            'carrier_b64': base64.b64encode(carrier_data).decode('ascii'),
+            "operation": "compare",
+            "carrier_b64": base64.b64encode(carrier_data).decode("ascii"),
         }
 
         result = self._run_worker(params, timeout)
 
-        if result.get('success'):
-            comparison = result.get('comparison', {})
+        if result.get("success"):
+            comparison = result.get("comparison", {})
             return CompareResult(
                 success=True,
-                width=comparison.get('width', 0),
-                height=comparison.get('height', 0),
-                lsb=comparison.get('lsb'),
-                dct=comparison.get('dct'),
+                width=comparison.get("width", 0),
+                height=comparison.get("height", 0),
+                lsb=comparison.get("lsb"),
+                dct=comparison.get("dct"),
             )
         else:
             return CompareResult(
                 success=False,
-                error=result.get('error', 'Unknown error'),
+                error=result.get("error", "Unknown error"),
             )
 
     def check_capacity(
@@ -417,29 +422,29 @@ class SubprocessStego:
             CapacityResult with fit information
         """
         params = {
-            'operation': 'capacity',
-            'carrier_b64': base64.b64encode(carrier_data).decode('ascii'),
-            'payload_size': payload_size,
-            'embed_mode': embed_mode,
+            "operation": "capacity",
+            "carrier_b64": base64.b64encode(carrier_data).decode("ascii"),
+            "payload_size": payload_size,
+            "embed_mode": embed_mode,
         }
 
         result = self._run_worker(params, timeout)
 
-        if result.get('success'):
-            r = result.get('result', {})
+        if result.get("success"):
+            r = result.get("result", {})
             return CapacityResult(
                 success=True,
-                fits=r.get('fits', False),
-                payload_size=r.get('payload_size', 0),
-                capacity=r.get('capacity', 0),
-                usage_percent=r.get('usage_percent', 0.0),
-                headroom=r.get('headroom', 0),
-                mode=r.get('mode', embed_mode),
+                fits=r.get("fits", False),
+                payload_size=r.get("payload_size", 0),
+                capacity=r.get("capacity", 0),
+                usage_percent=r.get("usage_percent", 0.0),
+                headroom=r.get("headroom", 0),
+                mode=r.get("mode", embed_mode),
             )
         else:
             return CapacityResult(
                 success=False,
-                error=result.get('error', 'Unknown error'),
+                error=result.get("error", "Unknown error"),
             )
 
     def get_channel_status(
@@ -458,26 +463,26 @@ class SubprocessStego:
             ChannelStatusResult with channel info
         """
         params = {
-            'operation': 'channel_status',
-            'reveal': reveal,
+            "operation": "channel_status",
+            "reveal": reveal,
         }
 
         result = self._run_worker(params, timeout)
 
-        if result.get('success'):
-            status = result.get('status', {})
+        if result.get("success"):
+            status = result.get("status", {})
             return ChannelStatusResult(
                 success=True,
-                mode=status.get('mode', 'public'),
-                configured=status.get('configured', False),
-                fingerprint=status.get('fingerprint'),
-                source=status.get('source'),
-                key=status.get('key') if reveal else None,
+                mode=status.get("mode", "public"),
+                configured=status.get("configured", False),
+                fingerprint=status.get("fingerprint"),
+                source=status.get("source"),
+                key=status.get("key") if reveal else None,
             )
         else:
             return ChannelStatusResult(
                 success=False,
-                error=result.get('error', 'Unknown error'),
+                error=result.get("error", "Unknown error"),
             )
 
 

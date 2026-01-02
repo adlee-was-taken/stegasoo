@@ -42,6 +42,7 @@ class TestCompress:
     def test_compress_incompressible_data(self):
         """Incompressible data should be stored uncompressed."""
         import os
+
         # Random data doesn't compress well
         data = os.urandom(500)
         result = compress(data, CompressionAlgorithm.ZLIB)
@@ -107,6 +108,7 @@ class TestDecompress:
     def test_roundtrip_large_data(self):
         """Large data should survive compress/decompress roundtrip."""
         import os
+
         original = os.urandom(50000)
         compressed = compress(original)
         result = decompress(compressed)
@@ -173,7 +175,7 @@ class TestEdgeCases:
     def test_unicode_after_encoding(self):
         """UTF-8 encoded Unicode should compress correctly."""
         text = "Hello, 世界! 🎉 " * 100
-        data = text.encode('utf-8')
+        data = text.encode("utf-8")
         compressed = compress(data)
         result = decompress(compressed)
-        assert result.decode('utf-8') == text
+        assert result.decode("utf-8") == text

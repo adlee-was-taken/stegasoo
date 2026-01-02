@@ -21,6 +21,7 @@ class Credentials:
 
     v3.2.0: Simplified to use single passphrase instead of daily rotation.
     """
+
     passphrase: str  # Single passphrase (no daily rotation)
     pin: str | None = None
     rsa_key_pem: str | None = None
@@ -64,6 +65,7 @@ class Credentials:
 @dataclass
 class FilePayload:
     """Represents a file to be embedded."""
+
     data: bytes
     filename: str
     mime_type: str | None = None
@@ -73,7 +75,7 @@ class FilePayload:
         return len(self.data)
 
     @classmethod
-    def from_file(cls, filepath: str, filename: str | None = None) -> 'FilePayload':
+    def from_file(cls, filepath: str, filename: str | None = None) -> "FilePayload":
         """Create FilePayload from a file path."""
         import mimetypes
         from pathlib import Path
@@ -93,6 +95,7 @@ class EncodeInput:
 
     v3.2.0: Removed date_str (date no longer used in crypto).
     """
+
     message: str | bytes | FilePayload  # Text, raw bytes, or file
     reference_photo: bytes
     carrier_image: bytes
@@ -109,6 +112,7 @@ class EncodeResult:
 
     v3.2.0: date_used is now optional/cosmetic (not used in crypto).
     """
+
     stego_image: bytes
     filename: str
     pixels_modified: int
@@ -129,6 +133,7 @@ class DecodeInput:
 
     v3.2.0: Renamed day_phrase → passphrase, no date needed.
     """
+
     stego_image: bytes
     reference_photo: bytes
     passphrase: str  # Renamed from day_phrase
@@ -144,6 +149,7 @@ class DecodeResult:
 
     v3.2.0: date_encoded is always None (date removed from crypto).
     """
+
     payload_type: str  # 'text' or 'file'
     message: str | None = None  # For text payloads
     file_data: bytes | None = None  # For file payloads
@@ -153,11 +159,11 @@ class DecodeResult:
 
     @property
     def is_file(self) -> bool:
-        return self.payload_type == 'file'
+        return self.payload_type == "file"
 
     @property
     def is_text(self) -> bool:
-        return self.payload_type == 'text'
+        return self.payload_type == "text"
 
     def get_content(self) -> str | bytes:
         """Get the decoded content (text or bytes)."""
@@ -169,6 +175,7 @@ class DecodeResult:
 @dataclass
 class EmbedStats:
     """Statistics from image embedding."""
+
     pixels_modified: int
     total_pixels: int
     capacity_used: float
@@ -183,6 +190,7 @@ class EmbedStats:
 @dataclass
 class KeyInfo:
     """Information about an RSA key."""
+
     key_size: int
     is_encrypted: bool
     pem_data: bytes
@@ -191,13 +199,14 @@ class KeyInfo:
 @dataclass
 class ValidationResult:
     """Result of input validation."""
+
     is_valid: bool
     error_message: str = ""
     details: dict = field(default_factory=dict)
     warning: str | None = None  # v3.2.0: Added for passphrase length warnings
 
     @classmethod
-    def ok(cls, warning: str | None = None, **details) -> 'ValidationResult':
+    def ok(cls, warning: str | None = None, **details) -> "ValidationResult":
         """Create a successful validation result."""
         result = cls(is_valid=True, details=details)
         if warning:
@@ -205,7 +214,7 @@ class ValidationResult:
         return result
 
     @classmethod
-    def error(cls, message: str, **details) -> 'ValidationResult':
+    def error(cls, message: str, **details) -> "ValidationResult":
         """Create a failed validation result."""
         return cls(is_valid=False, error_message=message, details=details)
 
@@ -214,9 +223,11 @@ class ValidationResult:
 # NEW MODELS FOR V3.2.0 PUBLIC API
 # =============================================================================
 
+
 @dataclass
 class ImageInfo:
     """Information about an image for steganography."""
+
     width: int
     height: int
     pixels: int
@@ -232,6 +243,7 @@ class ImageInfo:
 @dataclass
 class CapacityComparison:
     """Comparison of embedding capacity between modes."""
+
     image_width: int
     image_height: int
     lsb_available: bool
@@ -248,6 +260,7 @@ class CapacityComparison:
 @dataclass
 class GenerateResult:
     """Result of credential generation."""
+
     passphrase: str
     pin: str | None = None
     rsa_key_pem: str | None = None

@@ -12,6 +12,7 @@ from enum import IntEnum
 # Optional LZ4 support (faster, slightly worse ratio)
 try:
     import lz4.frame
+
     HAS_LZ4 = True
 except ImportError:
     HAS_LZ4 = False
@@ -19,13 +20,14 @@ except ImportError:
 
 class CompressionAlgorithm(IntEnum):
     """Supported compression algorithms."""
+
     NONE = 0
     ZLIB = 1
     LZ4 = 2
 
 
 # Magic bytes for compressed payloads
-COMPRESSION_MAGIC = b'\x00CMP'
+COMPRESSION_MAGIC = b"\x00CMP"
 
 # Minimum size to bother compressing (small data often expands)
 MIN_COMPRESS_SIZE = 64
@@ -36,6 +38,7 @@ ZLIB_LEVEL = 6
 
 class CompressionError(Exception):
     """Raised when compression/decompression fails."""
+
     pass
 
 
@@ -77,7 +80,7 @@ def compress(data: bytes, algorithm: CompressionAlgorithm = CompressionAlgorithm
         return _wrap_uncompressed(data)
 
     # Build header: MAGIC + algorithm + original_size + compressed_data
-    header = COMPRESSION_MAGIC + struct.pack('<BI', algorithm, len(data))
+    header = COMPRESSION_MAGIC + struct.pack("<BI", algorithm, len(data))
     return header + compressed
 
 
@@ -101,7 +104,7 @@ def decompress(data: bytes) -> bytes:
 
     # Parse header
     algorithm = CompressionAlgorithm(data[4])
-    original_size = struct.unpack('<I', data[5:9])[0]
+    original_size = struct.unpack("<I", data[5:9])[0]
     compressed_data = data[9:]
 
     if algorithm == CompressionAlgorithm.NONE:
@@ -125,16 +128,14 @@ def decompress(data: bytes) -> bytes:
 
     # Verify size
     if len(result) != original_size:
-        raise CompressionError(
-            f"Size mismatch: expected {original_size}, got {len(result)}"
-        )
+        raise CompressionError(f"Size mismatch: expected {original_size}, got {len(result)}")
 
     return result
 
 
 def _wrap_uncompressed(data: bytes) -> bytes:
     """Wrap uncompressed data with header for consistency."""
-    header = COMPRESSION_MAGIC + struct.pack('<BI', CompressionAlgorithm.NONE, len(data))
+    header = COMPRESSION_MAGIC + struct.pack("<BI", CompressionAlgorithm.NONE, len(data))
     return header + data
 
 
@@ -150,7 +151,9 @@ def get_compression_ratio(original: bytes, compressed: bytes) -> float:
     return len(compressed) / len(original)
 
 
-def estimate_compressed_size(data: bytes, algorithm: CompressionAlgorithm = CompressionAlgorithm.ZLIB) -> int:
+def estimate_compressed_size(
+    data: bytes, algorithm: CompressionAlgorithm = CompressionAlgorithm.ZLIB
+) -> int:
     """
     Estimate compressed size without full compression.
     Uses sampling for large data.

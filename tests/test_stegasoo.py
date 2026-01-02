@@ -37,12 +37,13 @@ from stegasoo.steganography import get_output_format
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def png_image():
     """Create a test PNG image."""
-    img = Image.new('RGB', (100, 100), color='red')
+    img = Image.new("RGB", (100, 100), color="red")
     buf = io.BytesIO()
-    img.save(buf, format='PNG')
+    img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
 
@@ -50,9 +51,9 @@ def png_image():
 @pytest.fixture
 def large_png_image():
     """Create a larger test PNG image for DCT mode."""
-    img = Image.new('RGB', (400, 400), color='blue')
+    img = Image.new("RGB", (400, 400), color="blue")
     buf = io.BytesIO()
-    img.save(buf, format='PNG')
+    img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
 
@@ -60,9 +61,9 @@ def large_png_image():
 @pytest.fixture
 def bmp_image():
     """Create a test BMP image."""
-    img = Image.new('RGB', (100, 100), color='blue')
+    img = Image.new("RGB", (100, 100), color="blue")
     buf = io.BytesIO()
-    img.save(buf, format='BMP')
+    img.save(buf, format="BMP")
     buf.seek(0)
     return buf.getvalue()
 
@@ -70,9 +71,9 @@ def bmp_image():
 @pytest.fixture
 def jpeg_image():
     """Create a test JPEG image."""
-    img = Image.new('RGB', (100, 100), color='green')
+    img = Image.new("RGB", (100, 100), color="green")
     buf = io.BytesIO()
-    img.save(buf, format='JPEG')
+    img.save(buf, format="JPEG")
     buf.seek(0)
     return buf.getvalue()
 
@@ -80,9 +81,9 @@ def jpeg_image():
 @pytest.fixture
 def gif_image():
     """Create a test GIF image."""
-    img = Image.new('RGB', (100, 100), color='yellow')
+    img = Image.new("RGB", (100, 100), color="yellow")
     buf = io.BytesIO()
-    img.save(buf, format='GIF')
+    img.save(buf, format="GIF")
     buf.seek(0)
     return buf.getvalue()
 
@@ -90,6 +91,7 @@ def gif_image():
 # =============================================================================
 # Key Generation Tests (v3.2.0 Updated)
 # =============================================================================
+
 
 class TestKeygen:
     """Tests for key generation functions."""
@@ -99,7 +101,7 @@ class TestKeygen:
         pin = generate_pin()
         assert len(pin) == 6
         assert pin.isdigit()
-        assert pin[0] != '0'
+        assert pin[0] != "0"
 
     def test_generate_pin_lengths(self):
         """PIN generation should work for all valid lengths."""
@@ -129,7 +131,7 @@ class TestKeygen:
         # v3.2.0: Single passphrase instead of 7 daily phrases
         assert creds.passphrase is not None
         assert isinstance(creds.passphrase, str)
-        assert ' ' in creds.passphrase  # Should have multiple words
+        assert " " in creds.passphrase  # Should have multiple words
 
     def test_generate_credentials_rsa_only(self):
         """RSA-only credentials should have single passphrase."""
@@ -179,6 +181,7 @@ class TestKeygen:
 # =============================================================================
 # Validation Tests (v3.2.0 Updated)
 # =============================================================================
+
 
 class TestValidation:
     """Tests for validation functions."""
@@ -250,49 +253,51 @@ class TestValidation:
 # Output Format Tests
 # =============================================================================
 
+
 class TestOutputFormat:
     """Tests for output format handling."""
 
     def test_png_stays_png(self):
         """PNG input should produce PNG output."""
-        fmt, ext = get_output_format('PNG')
-        assert fmt == 'PNG'
-        assert ext == 'png'
+        fmt, ext = get_output_format("PNG")
+        assert fmt == "PNG"
+        assert ext == "png"
 
     def test_bmp_stays_bmp(self):
         """BMP input should produce BMP output."""
-        fmt, ext = get_output_format('BMP')
-        assert fmt == 'BMP'
-        assert ext == 'bmp'
+        fmt, ext = get_output_format("BMP")
+        assert fmt == "BMP"
+        assert ext == "bmp"
 
     def test_jpeg_becomes_png(self):
         """JPEG input should produce PNG output (lossless)."""
-        fmt, ext = get_output_format('JPEG')
-        assert fmt == 'PNG'
-        assert ext == 'png'
+        fmt, ext = get_output_format("JPEG")
+        assert fmt == "PNG"
+        assert ext == "png"
 
     def test_gif_becomes_png(self):
         """GIF input should produce PNG output."""
-        fmt, ext = get_output_format('GIF')
-        assert fmt == 'PNG'
-        assert ext == 'png'
+        fmt, ext = get_output_format("GIF")
+        assert fmt == "PNG"
+        assert ext == "png"
 
     def test_none_becomes_png(self):
         """None format should default to PNG."""
         fmt, ext = get_output_format(None)
-        assert fmt == 'PNG'
-        assert ext == 'png'
+        assert fmt == "PNG"
+        assert ext == "png"
 
     def test_unknown_becomes_png(self):
         """Unknown format should default to PNG."""
-        fmt, ext = get_output_format('UNKNOWN')
-        assert fmt == 'PNG'
-        assert ext == 'png'
+        fmt, ext = get_output_format("UNKNOWN")
+        assert fmt == "PNG"
+        assert ext == "png"
 
 
 # =============================================================================
 # Header Overhead Test (v4.0.0)
 # =============================================================================
+
 
 class TestConstants:
     """Tests for constants and configuration."""
@@ -300,12 +305,14 @@ class TestConstants:
     def test_header_overhead_value(self):
         """Header overhead should be 66 bytes (v4.0.0: added flags byte)."""
         from stegasoo.steganography import HEADER_OVERHEAD
+
         assert HEADER_OVERHEAD == 66
 
 
 # =============================================================================
 # Encode/Decode Tests (v4.0.0 Updated)
 # =============================================================================
+
 
 class TestEncodeDecode:
     """Tests for encoding and decoding functions."""
@@ -322,19 +329,19 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert result.stego_image is not None
         assert len(result.stego_image) > 0
-        assert result.filename.endswith('.png')
+        assert result.filename.endswith(".png")
 
         # v3.2.0: Use passphrase parameter, no date_str
         decoded = decode(
             stego_image=result.stego_image,
             reference_photo=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert decoded.message == message
@@ -350,7 +357,7 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         # decode_text returns string directly
@@ -358,7 +365,7 @@ class TestEncodeDecode:
             stego_image=result.stego_image,
             reference_photo=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert decoded_text == message
@@ -370,9 +377,9 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase="test phrase here now",
-            pin="123456"
+            pin="123456",
         )
-        assert result.filename.endswith('.png')
+        assert result.filename.endswith(".png")
 
     def test_bmp_carrier_produces_bmp(self, bmp_image, png_image):
         """BMP carrier should produce BMP output."""
@@ -381,9 +388,9 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=bmp_image,
             passphrase="test phrase here now",
-            pin="123456"
+            pin="123456",
         )
-        assert result.filename.endswith('.bmp')
+        assert result.filename.endswith(".bmp")
 
     def test_jpeg_carrier_produces_png(self, jpeg_image, png_image):
         """JPEG carrier should produce PNG output (lossless)."""
@@ -392,9 +399,9 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=jpeg_image,
             passphrase="test phrase here now",
-            pin="123456"
+            pin="123456",
         )
-        assert result.filename.endswith('.png')
+        assert result.filename.endswith(".png")
 
     def test_bmp_roundtrip(self, bmp_image, png_image):
         """Full encode/decode cycle with BMP should work."""
@@ -407,15 +414,15 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=bmp_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
-        assert result.filename.endswith('.bmp')
+        assert result.filename.endswith(".bmp")
 
         decoded = decode(
             stego_image=result.stego_image,
             reference_photo=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert decoded.message == message
@@ -427,7 +434,7 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase="test phrase here now",
-            pin="123456"
+            pin="123456",
         )
 
         with pytest.raises((stegasoo.DecryptionError, stegasoo.ExtractionError)):
@@ -435,7 +442,7 @@ class TestEncodeDecode:
                 stego_image=result.stego_image,
                 reference_photo=png_image,
                 passphrase="test phrase here now",
-                pin="654321"  # Wrong PIN
+                pin="654321",  # Wrong PIN
             )
 
     def test_wrong_passphrase_fails(self, png_image):
@@ -445,7 +452,7 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase="correct phrase here now",
-            pin="123456"
+            pin="123456",
         )
 
         with pytest.raises((stegasoo.DecryptionError, stegasoo.ExtractionError)):
@@ -453,7 +460,7 @@ class TestEncodeDecode:
                 stego_image=result.stego_image,
                 reference_photo=png_image,
                 passphrase="wrong phrase here now",  # Wrong passphrase
-                pin="123456"
+                pin="123456",
             )
 
     def test_unicode_message(self, png_image):
@@ -467,14 +474,14 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         decoded = decode(
             stego_image=result.stego_image,
             reference_photo=png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert decoded.message == message
@@ -486,17 +493,19 @@ class TestEncodeDecode:
             reference_photo=png_image,
             carrier_image=png_image,
             passphrase="test phrase here now",
-            pin="123456"
+            pin="123456",
         )
         # Filename format: {random_hex}_{YYYYMMDD}.{ext}
         # e.g., "a1b2c3d4_20251227.png"
         import re
-        assert re.search(r'^[a-f0-9]{8}_\d{8}\.png$', result.filename)
+
+        assert re.search(r"^[a-f0-9]{8}_\d{8}\.png$", result.filename)
 
 
 # =============================================================================
 # DCT Mode Tests (v3.2.0)
 # =============================================================================
+
 
 class TestDCTMode:
     """Tests for DCT steganography mode."""
@@ -519,7 +528,7 @@ class TestDCTMode:
             carrier_image=large_png_image,
             passphrase=passphrase,
             pin=pin,
-            embed_mode='dct'
+            embed_mode="dct",
         )
 
         assert result.stego_image is not None
@@ -528,7 +537,7 @@ class TestDCTMode:
             stego_image=result.stego_image,
             reference_photo=large_png_image,
             passphrase=passphrase,
-            pin=pin
+            pin=pin,
         )
 
         assert decoded.message == message
@@ -545,7 +554,7 @@ class TestDCTMode:
             carrier_image=large_png_image,
             passphrase=passphrase,
             pin=pin,
-            embed_mode='dct'
+            embed_mode="dct",
         )
 
         # Decode with auto mode (default)
@@ -554,7 +563,7 @@ class TestDCTMode:
             reference_photo=large_png_image,
             passphrase=passphrase,
             pin=pin,
-            embed_mode='auto'
+            embed_mode="auto",
         )
 
         assert decoded.message == message
@@ -564,19 +573,20 @@ class TestDCTMode:
 # Version Tests
 # =============================================================================
 
+
 class TestVersion:
     """Tests for version information."""
 
     def test_version_exists(self):
         """Version string should exist and be valid."""
-        assert hasattr(stegasoo, '__version__')
-        parts = stegasoo.__version__.split('.')
+        assert hasattr(stegasoo, "__version__")
+        parts = stegasoo.__version__.split(".")
         assert len(parts) >= 2
         assert all(p.isdigit() for p in parts[:2])
 
     def test_version_is_4_0_0(self):
         """Version should be 4.0.0 or higher."""
-        parts = stegasoo.__version__.split('.')
+        parts = stegasoo.__version__.split(".")
         major = int(parts[0])
         assert major >= 4
 
@@ -584,6 +594,7 @@ class TestVersion:
 # =============================================================================
 # Backward Compatibility Tests
 # =============================================================================
+
 
 class TestBackwardCompatibility:
     """Tests for backward compatibility handling."""
@@ -596,7 +607,7 @@ class TestBackwardCompatibility:
                 reference_photo=png_image,
                 carrier_image=png_image,
                 day_phrase="old style phrase",  # Old parameter name
-                pin="123456"
+                pin="123456",
             )
 
     def test_old_date_str_parameter_raises(self, png_image):
@@ -608,13 +619,14 @@ class TestBackwardCompatibility:
                 carrier_image=png_image,
                 passphrase="test phrase here now",
                 pin="123456",
-                date_str="2025-01-01"  # Removed parameter
+                date_str="2025-01-01",  # Removed parameter
             )
 
 
 # =============================================================================
 # Channel Key Tests (v4.0.0)
 # =============================================================================
+
 
 class TestChannelKey:
     """Tests for channel key functionality (v4.0.0)."""
@@ -624,7 +636,7 @@ class TestChannelKey:
         key = generate_channel_key()
         # Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (8 groups of 4)
         assert len(key) == 39
-        parts = key.split('-')
+        parts = key.split("-")
         assert len(parts) == 8
         for part in parts:
             assert len(part) == 4
@@ -665,7 +677,7 @@ class TestChannelKey:
             carrier_image=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=channel_key
+            channel_key=channel_key,
         )
 
         assert result.stego_image is not None
@@ -676,7 +688,7 @@ class TestChannelKey:
             reference_photo=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=channel_key
+            channel_key=channel_key,
         )
 
         assert decoded.message == message
@@ -696,7 +708,7 @@ class TestChannelKey:
             carrier_image=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=channel_key1
+            channel_key=channel_key1,
         )
 
         # Decode with different channel key should fail
@@ -706,7 +718,7 @@ class TestChannelKey:
                 reference_photo=png_image,
                 passphrase=passphrase,
                 pin=pin,
-                channel_key=channel_key2
+                channel_key=channel_key2,
             )
 
     def test_encode_decode_public_mode(self, png_image):
@@ -722,7 +734,7 @@ class TestChannelKey:
             carrier_image=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=""  # Explicit public mode
+            channel_key="",  # Explicit public mode
         )
 
         # Decode without channel key
@@ -731,7 +743,7 @@ class TestChannelKey:
             reference_photo=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=""  # Explicit public mode
+            channel_key="",  # Explicit public mode
         )
 
         assert decoded.message == message
@@ -749,7 +761,7 @@ class TestChannelKey:
             carrier_image=png_image,
             passphrase=passphrase,
             pin=pin,
-            channel_key=""  # Public mode
+            channel_key="",  # Public mode
         )
 
         # Decode with channel key should fail
@@ -760,5 +772,5 @@ class TestChannelKey:
                 reference_photo=png_image,
                 passphrase=passphrase,
                 pin=pin,
-                channel_key=channel_key
+                channel_key=channel_key,
             )

@@ -75,9 +75,11 @@ def decode(
         ...     channel_key="ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
         ... )
     """
-    debug.print(f"decode: passphrase length={len(passphrase.split())} words, "
-                f"mode={embed_mode}, "
-                f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}")
+    debug.print(
+        f"decode: passphrase length={len(passphrase.split())} words, "
+        f"mode={embed_mode}, "
+        f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}"
+    )
 
     # Validate inputs
     require_valid_image(stego_image, "Stego image")
@@ -91,9 +93,8 @@ def decode(
 
     # Derive pixel/coefficient selection key (with channel key)
     from .crypto import derive_pixel_key
-    pixel_key = derive_pixel_key(
-        reference_photo, passphrase, pin, rsa_key_data, channel_key
-    )
+
+    pixel_key = derive_pixel_key(reference_photo, passphrase, pin, rsa_key_data, channel_key)
 
     # Extract encrypted data
     encrypted = extract_from_image(
@@ -109,9 +110,7 @@ def decode(
     debug.print(f"Extracted {len(encrypted)} bytes from image")
 
     # Decrypt (with channel key)
-    result = decrypt_message(
-        encrypted, reference_photo, passphrase, pin, rsa_key_data, channel_key
-    )
+    result = decrypt_message(encrypted, reference_photo, passphrase, pin, rsa_key_data, channel_key)
 
     debug.print(f"Decryption successful: {result.payload_type}")
     return result
@@ -222,7 +221,7 @@ def decode_text(
         # Try to decode as text
         if result.file_data:
             try:
-                return result.file_data.decode('utf-8')
+                return result.file_data.decode("utf-8")
             except UnicodeDecodeError:
                 raise DecryptionError(
                     f"Payload is a binary file ({result.filename or 'unnamed'}), not text"

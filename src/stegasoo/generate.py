@@ -4,7 +4,6 @@ Stegasoo Generate Module (v3.2.0)
 Public API for generating credentials (PINs, passphrases, RSA keys).
 """
 
-
 from .constants import (
     DEFAULT_PASSPHRASE_WORDS,
     DEFAULT_PIN_LENGTH,
@@ -26,12 +25,12 @@ from .models import Credentials
 
 # Re-export from keygen for convenience
 __all__ = [
-    'generate_pin',
-    'generate_passphrase',
-    'generate_rsa_key',
-    'generate_credentials',
-    'export_rsa_key_pem',
-    'load_rsa_key',
+    "generate_pin",
+    "generate_passphrase",
+    "generate_rsa_key",
+    "generate_credentials",
+    "export_rsa_key_pem",
+    "load_rsa_key",
 ]
 
 
@@ -78,10 +77,7 @@ def generate_passphrase(words: int = DEFAULT_PASSPHRASE_WORDS) -> str:
     return generate_phrase(words)
 
 
-def generate_rsa_key(
-    bits: int = DEFAULT_RSA_BITS,
-    password: str | None = None
-) -> str:
+def generate_rsa_key(bits: int = DEFAULT_RSA_BITS, password: str | None = None) -> str:
     """
     Generate an RSA private key in PEM format.
 
@@ -99,7 +95,7 @@ def generate_rsa_key(
     """
     key_obj = _generate_rsa_key(bits)
     pem_bytes = export_rsa_key_pem(key_obj, password)
-    return pem_bytes.decode('utf-8')
+    return pem_bytes.decode("utf-8")
 
 
 def generate_credentials(
@@ -140,8 +136,10 @@ def generate_credentials(
     if not use_pin and not use_rsa:
         raise ValueError("Must select at least one security factor (PIN or RSA key)")
 
-    debug.print(f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
-                f"passphrase_words={passphrase_words}")
+    debug.print(
+        f"Generating credentials: PIN={use_pin}, RSA={use_rsa}, "
+        f"passphrase_words={passphrase_words}"
+    )
 
     # Generate passphrase (single, not daily)
     passphrase = generate_phrase(passphrase_words)
@@ -154,7 +152,7 @@ def generate_credentials(
     if use_rsa:
         rsa_key_obj = _generate_rsa_key(rsa_bits)
         rsa_key_bytes = export_rsa_key_pem(rsa_key_obj, rsa_password)
-        rsa_key_pem = rsa_key_bytes.decode('utf-8')
+        rsa_key_pem = rsa_key_bytes.decode("utf-8")
 
     # Create Credentials object (v3.2.0 format)
     creds = Credentials(

@@ -28,10 +28,12 @@ from PIL import Image
 # Prefer scipy.fft (newer, more stable) over scipy.fftpack
 try:
     from scipy.fft import dct, idct
+
     HAS_SCIPY = True
 except ImportError:
     try:
         from scipy.fftpack import dct, idct
+
         HAS_SCIPY = True
     except ImportError:
         HAS_SCIPY = False
@@ -41,6 +43,7 @@ except ImportError:
 # Check for jpegio availability (for proper JPEG mode)
 try:
     import jpegio as jio
+
     HAS_JPEGIO = True
 except ImportError:
     HAS_JPEGIO = False
@@ -53,19 +56,49 @@ except ImportError:
 
 BLOCK_SIZE = 8
 EMBED_POSITIONS = [
-    (0, 1), (1, 0), (2, 0), (1, 1), (0, 2), (0, 3), (1, 2), (2, 1), (3, 0),
-    (4, 0), (3, 1), (2, 2), (1, 3), (0, 4), (0, 5), (1, 4), (2, 3), (3, 2),
-    (4, 1), (5, 0), (5, 1), (4, 2), (3, 3), (2, 4), (1, 5), (0, 6), (0, 7),
-    (1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 1), (7, 0),
+    (0, 1),
+    (1, 0),
+    (2, 0),
+    (1, 1),
+    (0, 2),
+    (0, 3),
+    (1, 2),
+    (2, 1),
+    (3, 0),
+    (4, 0),
+    (3, 1),
+    (2, 2),
+    (1, 3),
+    (0, 4),
+    (0, 5),
+    (1, 4),
+    (2, 3),
+    (3, 2),
+    (4, 1),
+    (5, 0),
+    (5, 1),
+    (4, 2),
+    (3, 3),
+    (2, 4),
+    (1, 5),
+    (0, 6),
+    (0, 7),
+    (1, 6),
+    (2, 5),
+    (3, 4),
+    (4, 3),
+    (5, 2),
+    (6, 1),
+    (7, 0),
 ]
 DEFAULT_EMBED_POSITIONS = EMBED_POSITIONS[4:20]
 QUANT_STEP = 25
-DCT_MAGIC = b'DCTS'
+DCT_MAGIC = b"DCTS"
 HEADER_SIZE = 10
-OUTPUT_FORMAT_PNG = 'png'
-OUTPUT_FORMAT_JPEG = 'jpeg'
+OUTPUT_FORMAT_PNG = "png"
+OUTPUT_FORMAT_JPEG = "jpeg"
 JPEG_OUTPUT_QUALITY = 95
-JPEGIO_MAGIC = b'JPGS'
+JPEGIO_MAGIC = b"JPGS"
 JPEGIO_MIN_COEF_MAGNITUDE = 2
 JPEGIO_EMBED_CHANNEL = 0
 FLAG_COLOR_MODE = 0x01
@@ -83,9 +116,10 @@ JPEGIO_MAX_QUANT_VALUE_THRESHOLD = 1  # If all quant values <= this, normalize
 # DATA CLASSES
 # ============================================================================
 
+
 class DCTOutputFormat(Enum):
-    PNG = 'png'
-    JPEG = 'jpeg'
+    PNG = "png"
+    JPEG = "jpeg"
 
 
 @dataclass
@@ -99,7 +133,7 @@ class DCTEmbedStats:
     image_height: int
     output_format: str
     jpeg_native: bool = False
-    color_mode: str = 'grayscale'
+    color_mode: str = "grayscale"
 
 
 @dataclass
@@ -119,11 +153,10 @@ class DCTCapacityInfo:
 # AVAILABILITY CHECKS
 # ============================================================================
 
+
 def _check_scipy():
     if not HAS_SCIPY:
-        raise ImportError(
-            "DCT steganography requires scipy. Install with: pip install scipy"
-        )
+        raise ImportError("DCT steganography requires scipy. Install with: pip install scipy")
 
 
 def has_dct_support() -> bool:
@@ -139,25 +172,26 @@ def has_jpegio_support() -> bool:
 # These create fresh arrays to avoid scipy memory corruption issues
 # ============================================================================
 
+
 def _safe_dct2(block: np.ndarray) -> np.ndarray:
     """
     Apply 2D DCT with memory isolation.
     Creates a completely fresh array to avoid heap corruption.
     """
     # Create a brand new array (not a view)
-    safe_block = np.array(block, dtype=np.float64, copy=True, order='C')
+    safe_block = np.array(block, dtype=np.float64, copy=True, order="C")
 
     # First DCT on columns (transpose -> DCT rows -> transpose back)
-    temp = np.zeros_like(safe_block, dtype=np.float64, order='C')
+    temp = np.zeros_like(safe_block, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         col = np.array(safe_block[:, i], dtype=np.float64, copy=True)
-        temp[:, i] = dct(col, norm='ortho')
+        temp[:, i] = dct(col, norm="ortho")
 
     # Second DCT on rows
-    result = np.zeros_like(temp, dtype=np.float64, order='C')
+    result = np.zeros_like(temp, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         row = np.array(temp[i, :], dtype=np.float64, copy=True)
-        result[i, :] = dct(row, norm='ortho')
+        result[i, :] = dct(row, norm="ortho")
 
     return result
 
@@ -168,19 +202,19 @@ def _safe_idct2(block: np.ndarray) -> np.ndarray:
     Creates a completely fresh array to avoid heap corruption.
     """
     # Create a brand new array (not a view)
-    safe_block = np.array(block, dtype=np.float64, copy=True, order='C')
+    safe_block = np.array(block, dtype=np.float64, copy=True, order="C")
 
     # First IDCT on rows
-    temp = np.zeros_like(safe_block, dtype=np.float64, order='C')
+    temp = np.zeros_like(safe_block, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         row = np.array(safe_block[i, :], dtype=np.float64, copy=True)
-        temp[i, :] = idct(row, norm='ortho')
+        temp[i, :] = idct(row, norm="ortho")
 
     # Second IDCT on columns
-    result = np.zeros_like(temp, dtype=np.float64, order='C')
+    result = np.zeros_like(temp, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         col = np.array(temp[:, i], dtype=np.float64, copy=True)
-        result[:, i] = idct(col, norm='ortho')
+        result[:, i] = idct(col, norm="ortho")
 
     return result
 
@@ -189,20 +223,21 @@ def _safe_idct2(block: np.ndarray) -> np.ndarray:
 # IMAGE PROCESSING HELPERS
 # ============================================================================
 
+
 def _to_grayscale(image_data: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_data))
-    gray = img.convert('L')
-    return np.array(gray, dtype=np.float64, copy=True, order='C')
+    gray = img.convert("L")
+    return np.array(gray, dtype=np.float64, copy=True, order="C")
 
 
 def _extract_y_channel(image_data: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_data))
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
+    if img.mode != "RGB":
+        img = img.convert("RGB")
 
-    rgb = np.array(img, dtype=np.float64, copy=True, order='C')
+    rgb = np.array(img, dtype=np.float64, copy=True, order="C")
     Y = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
-    return np.array(Y, dtype=np.float64, copy=True, order='C')
+    return np.array(Y, dtype=np.float64, copy=True, order="C")
 
 
 def _pad_to_blocks(image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
@@ -211,27 +246,27 @@ def _pad_to_blocks(image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
     new_w = ((w + BLOCK_SIZE - 1) // BLOCK_SIZE) * BLOCK_SIZE
 
     if new_h == h and new_w == w:
-        return np.array(image, dtype=np.float64, copy=True, order='C'), (h, w)
+        return np.array(image, dtype=np.float64, copy=True, order="C"), (h, w)
 
-    padded = np.zeros((new_h, new_w), dtype=np.float64, order='C')
+    padded = np.zeros((new_h, new_w), dtype=np.float64, order="C")
     padded[:h, :w] = image
 
     # Simple edge replication for padding
     if new_h > h:
         for i in range(h, new_h):
-            padded[i, :w] = padded[h-1, :w]
+            padded[i, :w] = padded[h - 1, :w]
     if new_w > w:
         for j in range(w, new_w):
-            padded[:h, j] = padded[:h, w-1]
+            padded[:h, j] = padded[:h, w - 1]
     if new_h > h and new_w > w:
-        padded[h:, w:] = padded[h-1, w-1]
+        padded[h:, w:] = padded[h - 1, w - 1]
 
     return padded, (h, w)
 
 
 def _unpad_image(image: np.ndarray, original_size: tuple[int, int]) -> np.ndarray:
     h, w = original_size
-    return np.array(image[:h, :w], dtype=np.float64, copy=True, order='C')
+    return np.array(image[:h, :w], dtype=np.float64, copy=True, order="C")
 
 
 def _embed_bit_in_coeff(coef: float, bit: int, quant_step: int = QUANT_STEP) -> float:
@@ -251,7 +286,7 @@ def _extract_bit_from_coeff(coef: float, quant_step: int = QUANT_STEP) -> int:
 
 def _generate_block_order(num_blocks: int, seed: bytes) -> list:
     hash_bytes = hashlib.sha256(seed).digest()
-    rng = np.random.RandomState(int.from_bytes(hash_bytes[:4], 'big'))
+    rng = np.random.RandomState(int.from_bytes(hash_bytes[:4], "big"))
     order = list(range(num_blocks))
     rng.shuffle(order)
     return order
@@ -259,25 +294,23 @@ def _generate_block_order(num_blocks: int, seed: bytes) -> list:
 
 def _save_stego_image(image: np.ndarray, output_format: str = OUTPUT_FORMAT_PNG) -> bytes:
     clipped = np.clip(image, 0, 255).astype(np.uint8)
-    img = Image.fromarray(clipped, mode='L')
+    img = Image.fromarray(clipped, mode="L")
     buffer = io.BytesIO()
     if output_format == OUTPUT_FORMAT_JPEG:
-        img.save(buffer, format='JPEG', quality=JPEG_OUTPUT_QUALITY,
-                 subsampling=0, optimize=True)
+        img.save(buffer, format="JPEG", quality=JPEG_OUTPUT_QUALITY, subsampling=0, optimize=True)
     else:
-        img.save(buffer, format='PNG', optimize=True)
+        img.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
 
 
 def _save_color_image(rgb_array: np.ndarray, output_format: str = OUTPUT_FORMAT_PNG) -> bytes:
     clipped = np.clip(rgb_array, 0, 255).astype(np.uint8)
-    img = Image.fromarray(clipped, mode='RGB')
+    img = Image.fromarray(clipped, mode="RGB")
     buffer = io.BytesIO()
     if output_format == OUTPUT_FORMAT_JPEG:
-        img.save(buffer, format='JPEG', quality=JPEG_OUTPUT_QUALITY,
-                 subsampling=0, optimize=True)
+        img.save(buffer, format="JPEG", quality=JPEG_OUTPUT_QUALITY, subsampling=0, optimize=True)
     else:
-        img.save(buffer, format='PNG', optimize=True)
+        img.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
 
 
@@ -286,9 +319,13 @@ def _rgb_to_ycbcr(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     G = rgb[:, :, 1].astype(np.float64)
     B = rgb[:, :, 2].astype(np.float64)
 
-    Y = np.array(0.299 * R + 0.587 * G + 0.114 * B, dtype=np.float64, copy=True, order='C')
-    Cb = np.array(128 - 0.168736 * R - 0.331264 * G + 0.5 * B, dtype=np.float64, copy=True, order='C')
-    Cr = np.array(128 + 0.5 * R - 0.418688 * G - 0.081312 * B, dtype=np.float64, copy=True, order='C')
+    Y = np.array(0.299 * R + 0.587 * G + 0.114 * B, dtype=np.float64, copy=True, order="C")
+    Cb = np.array(
+        128 - 0.168736 * R - 0.331264 * G + 0.5 * B, dtype=np.float64, copy=True, order="C"
+    )
+    Cr = np.array(
+        128 + 0.5 * R - 0.418688 * G - 0.081312 * B, dtype=np.float64, copy=True, order="C"
+    )
 
     return Y, Cb, Cr
 
@@ -298,7 +335,7 @@ def _ycbcr_to_rgb(Y: np.ndarray, Cb: np.ndarray, Cr: np.ndarray) -> np.ndarray:
     G = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128)
     B = Y + 1.772 * (Cb - 128)
 
-    rgb = np.zeros((Y.shape[0], Y.shape[1], 3), dtype=np.float64, order='C')
+    rgb = np.zeros((Y.shape[0], Y.shape[1], 3), dtype=np.float64, order="C")
     rgb[:, :, 0] = R
     rgb[:, :, 1] = G
     rgb[:, :, 2] = B
@@ -306,19 +343,21 @@ def _ycbcr_to_rgb(Y: np.ndarray, Cb: np.ndarray, Cr: np.ndarray) -> np.ndarray:
 
 
 def _create_header(data_length: int, flags: int = 0) -> bytes:
-    return struct.pack('>4sBBI', DCT_MAGIC, 1, flags, data_length)
+    return struct.pack(">4sBBI", DCT_MAGIC, 1, flags, data_length)
 
 
 def _parse_header(header_bits: list) -> tuple[int, int, int]:
     if len(header_bits) < HEADER_SIZE * 8:
         raise ValueError("Insufficient header data")
 
-    header_bytes = bytes([
-        sum(header_bits[i*8:(i+1)*8][j] << (7-j) for j in range(8))
-        for i in range(HEADER_SIZE)
-    ])
+    header_bytes = bytes(
+        [
+            sum(header_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+            for i in range(HEADER_SIZE)
+        ]
+    )
 
-    magic, version, flags, length = struct.unpack('>4sBBI', header_bytes)
+    magic, version, flags, length = struct.unpack(">4sBBI", header_bytes)
 
     if magic != DCT_MAGIC:
         raise ValueError("Invalid DCT stego magic bytes")
@@ -330,9 +369,11 @@ def _parse_header(header_bits: list) -> tuple[int, int, int]:
 # JPEGIO HELPERS
 # ============================================================================
 
-def _jpegio_bytes_to_file(data: bytes, suffix: str = '.jpg') -> str:
+
+def _jpegio_bytes_to_file(data: bytes, suffix: str = ".jpg") -> str:
     import os
     import tempfile
+
     fd, path = tempfile.mkstemp(suffix=suffix)
     try:
         os.write(fd, data)
@@ -355,20 +396,20 @@ def _jpegio_get_usable_positions(coef_array: np.ndarray) -> list:
 
 def _jpegio_generate_order(num_positions: int, seed: bytes) -> list:
     hash_bytes = hashlib.sha256(seed + b"jpeg_coef_order").digest()
-    rng = np.random.RandomState(int.from_bytes(hash_bytes[:4], 'big'))
+    rng = np.random.RandomState(int.from_bytes(hash_bytes[:4], "big"))
     order = list(range(num_positions))
     rng.shuffle(order)
     return order
 
 
 def _jpegio_create_header(data_length: int, flags: int = 0) -> bytes:
-    return struct.pack('>4sBBI', JPEGIO_MAGIC, 1, flags, data_length)
+    return struct.pack(">4sBBI", JPEGIO_MAGIC, 1, flags, data_length)
 
 
 def _jpegio_parse_header(header_bytes: bytes) -> tuple[int, int, int]:
     if len(header_bytes) < HEADER_SIZE:
         raise ValueError("Insufficient header data")
-    magic, version, flags, length = struct.unpack('>4sBBI', header_bytes[:HEADER_SIZE])
+    magic, version, flags, length = struct.unpack(">4sBBI", header_bytes[:HEADER_SIZE])
     if magic != JPEGIO_MAGIC:
         raise ValueError(f"Invalid JPEG stego magic: {magic}")
     return version, flags, length
@@ -377,6 +418,7 @@ def _jpegio_parse_header(header_bytes: bytes) -> tuple[int, int, int]:
 # ============================================================================
 # PUBLIC API
 # ============================================================================
+
 
 def calculate_dct_capacity(image_data: bytes) -> DCTCapacityInfo:
     """Calculate DCT embedding capacity of an image."""
@@ -405,7 +447,7 @@ def calculate_dct_capacity(image_data: bytes) -> DCTCapacityInfo:
         bits_per_block=bits_per_block,
         total_capacity_bits=total_bits,
         total_capacity_bytes=total_bytes,
-        usable_capacity_bytes=usable_bytes
+        usable_capacity_bytes=usable_bytes,
     )
 
 
@@ -427,24 +469,24 @@ def estimate_capacity_comparison(image_data: bytes) -> dict:
     dct_bytes = (blocks * 16) // 8 - HEADER_SIZE
 
     return {
-        'width': width,
-        'height': height,
-        'lsb': {
-            'capacity_bytes': lsb_bytes,
-            'capacity_kb': lsb_bytes / 1024,
-            'output': 'PNG/BMP (color)',
+        "width": width,
+        "height": height,
+        "lsb": {
+            "capacity_bytes": lsb_bytes,
+            "capacity_kb": lsb_bytes / 1024,
+            "output": "PNG/BMP (color)",
         },
-        'dct': {
-            'capacity_bytes': dct_bytes,
-            'capacity_kb': dct_bytes / 1024,
-            'output': 'PNG or JPEG (grayscale)',
-            'ratio_vs_lsb': (dct_bytes / lsb_bytes * 100) if lsb_bytes > 0 else 0,
-            'available': HAS_SCIPY,
+        "dct": {
+            "capacity_bytes": dct_bytes,
+            "capacity_kb": dct_bytes / 1024,
+            "output": "PNG or JPEG (grayscale)",
+            "ratio_vs_lsb": (dct_bytes / lsb_bytes * 100) if lsb_bytes > 0 else 0,
+            "available": HAS_SCIPY,
         },
-        'jpeg_native': {
-            'available': HAS_JPEGIO,
-            'note': 'Uses jpegio for proper JPEG coefficient embedding',
-        }
+        "jpeg_native": {
+            "available": HAS_JPEGIO,
+            "note": "Uses jpegio for proper JPEG coefficient embedding",
+        },
     }
 
 
@@ -453,14 +495,14 @@ def embed_in_dct(
     carrier_image: bytes,
     seed: bytes,
     output_format: str = OUTPUT_FORMAT_PNG,
-    color_mode: str = 'color',
+    color_mode: str = "color",
 ) -> tuple[bytes, DCTEmbedStats]:
     """Embed data using DCT coefficient modification."""
     if output_format not in (OUTPUT_FORMAT_PNG, OUTPUT_FORMAT_JPEG):
         raise ValueError(f"Invalid output format: {output_format}")
 
-    if color_mode not in ('color', 'grayscale'):
-        color_mode = 'color'
+    if color_mode not in ("color", "grayscale"):
+        color_mode = "color"
 
     if output_format == OUTPUT_FORMAT_JPEG and HAS_JPEGIO:
         return _embed_jpegio(data, carrier_image, seed, color_mode)
@@ -474,7 +516,7 @@ def _embed_scipy_dct_safe(
     carrier_image: bytes,
     seed: bytes,
     output_format: str,
-    color_mode: str = 'color',
+    color_mode: str = "color",
 ) -> tuple[bytes, DCTEmbedStats]:
     """
     Embed using scipy DCT with safe memory handling.
@@ -494,7 +536,7 @@ def _embed_scipy_dct_safe(
     img = Image.open(io.BytesIO(carrier_image))
     width, height = img.size
 
-    flags = FLAG_COLOR_MODE if color_mode == 'color' else 0
+    flags = FLAG_COLOR_MODE if color_mode == "color" else 0
 
     # Prepare payload bits
     header = _create_header(len(data), flags)
@@ -509,12 +551,12 @@ def _embed_scipy_dct_safe(
     block_order = _generate_block_order(num_blocks, seed)
     blocks_x = width // BLOCK_SIZE
 
-    if color_mode == 'color' and img.mode in ('RGB', 'RGBA'):
-        if img.mode == 'RGBA':
-            img = img.convert('RGB')
+    if color_mode == "color" and img.mode in ("RGB", "RGBA"):
+        if img.mode == "RGBA":
+            img = img.convert("RGB")
 
         # Process color image
-        rgb = np.array(img, dtype=np.float64, copy=True, order='C')
+        rgb = np.array(img, dtype=np.float64, copy=True, order="C")
         img.close()
 
         Y, Cb, Cr = _rgb_to_ycbcr(rgb)
@@ -592,7 +634,7 @@ def _embed_in_channel_safe(
     h, w = channel.shape
 
     # Create result with explicit new memory
-    result = np.array(channel, dtype=np.float64, copy=True, order='C')
+    result = np.array(channel, dtype=np.float64, copy=True, order="C")
 
     bit_idx = 0
 
@@ -605,8 +647,10 @@ def _embed_in_channel_safe(
 
         # Extract block - create brand new array
         block = np.array(
-            result[by:by+BLOCK_SIZE, bx:bx+BLOCK_SIZE],
-            dtype=np.float64, copy=True, order='C'
+            result[by : by + BLOCK_SIZE, bx : bx + BLOCK_SIZE],
+            dtype=np.float64,
+            copy=True,
+            order="C",
         )
 
         # Apply safe DCT (row-by-row)
@@ -617,8 +661,7 @@ def _embed_in_channel_safe(
             if bit_idx >= len(bits):
                 break
             dct_block[pos[0], pos[1]] = _embed_bit_in_coeff(
-                float(dct_block[pos[0], pos[1]]),
-                bits[bit_idx]
+                float(dct_block[pos[0], pos[1]]), bits[bit_idx]
             )
             bit_idx += 1
 
@@ -626,7 +669,7 @@ def _embed_in_channel_safe(
         modified_block = _safe_idct2(dct_block)
 
         # Copy back
-        result[by:by+BLOCK_SIZE, bx:bx+BLOCK_SIZE] = modified_block
+        result[by : by + BLOCK_SIZE, bx : bx + BLOCK_SIZE] = modified_block
 
         # Clean up this iteration
         del block, dct_block, modified_block
@@ -654,13 +697,13 @@ def _normalize_jpeg_for_jpegio(image_data: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_data))
 
     # Only process JPEGs
-    if img.format != 'JPEG':
+    if img.format != "JPEG":
         img.close()
         return image_data
 
     # Check quantization tables
     needs_normalization = False
-    if hasattr(img, 'quantization') and img.quantization:
+    if hasattr(img, "quantization") and img.quantization:
         for table_id, table in img.quantization.items():
             # If all values in any table are <= threshold, normalize
             if max(table) <= JPEGIO_MAX_QUANT_VALUE_THRESHOLD:
@@ -672,11 +715,11 @@ def _normalize_jpeg_for_jpegio(image_data: bytes) -> bytes:
         return image_data
 
     # Re-save at safe quality level
-    if img.mode != 'RGB':
-        img = img.convert('RGB')
+    if img.mode != "RGB":
+        img = img.convert("RGB")
 
     buffer = io.BytesIO()
-    img.save(buffer, format='JPEG', quality=JPEGIO_NORMALIZE_QUALITY, subsampling=0)
+    img.save(buffer, format="JPEG", quality=JPEGIO_NORMALIZE_QUALITY, subsampling=0)
     img.close()
 
     return buffer.getvalue()
@@ -686,7 +729,7 @@ def _embed_jpegio(
     data: bytes,
     carrier_image: bytes,
     seed: bytes,
-    color_mode: str = 'color',
+    color_mode: str = "color",
 ) -> tuple[bytes, DCTEmbedStats]:
     """Embed using jpegio for proper JPEG coefficient modification."""
     import os
@@ -698,18 +741,18 @@ def _embed_jpegio(
     img = Image.open(io.BytesIO(carrier_image))
     width, height = img.size
 
-    if img.format != 'JPEG':
+    if img.format != "JPEG":
         buffer = io.BytesIO()
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        img.save(buffer, format='JPEG', quality=95, subsampling=0)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        img.save(buffer, format="JPEG", quality=95, subsampling=0)
         carrier_image = buffer.getvalue()
     img.close()
 
-    input_path = _jpegio_bytes_to_file(carrier_image, suffix='.jpg')
-    output_path = tempfile.mktemp(suffix='.jpg')
+    input_path = _jpegio_bytes_to_file(carrier_image, suffix=".jpg")
+    output_path = tempfile.mktemp(suffix=".jpg")
 
-    flags = FLAG_COLOR_MODE if color_mode == 'color' else 0
+    flags = FLAG_COLOR_MODE if color_mode == "color" else 0
 
     try:
         jpeg = jio.read(input_path)
@@ -750,7 +793,7 @@ def _embed_jpegio(
 
         jio.write(jpeg, output_path)
 
-        with open(output_path, 'rb') as f:
+        with open(output_path, "rb") as f:
             stego_bytes = f.read()
 
         stats = DCTEmbedStats(
@@ -782,7 +825,7 @@ def extract_from_dct(stego_image: bytes, seed: bytes) -> bytes:
     fmt = img.format
     img.close()
 
-    if fmt == 'JPEG' and HAS_JPEGIO:
+    if fmt == "JPEG" and HAS_JPEGIO:
         try:
             return _extract_jpegio(stego_image, seed)
         except ValueError:
@@ -798,7 +841,7 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
     width, height = img.size
     mode = img.mode
 
-    if mode in ('RGB', 'RGBA'):
+    if mode in ("RGB", "RGBA"):
         channel = _extract_y_channel(stego_image)
     else:
         channel = _to_grayscale(stego_image)
@@ -821,8 +864,10 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
         bx = (block_num % blocks_x) * BLOCK_SIZE
 
         block = np.array(
-            padded[by:by+BLOCK_SIZE, bx:bx+BLOCK_SIZE],
-            dtype=np.float64, copy=True, order='C'
+            padded[by : by + BLOCK_SIZE, bx : bx + BLOCK_SIZE],
+            dtype=np.float64,
+            copy=True,
+            order="C",
         )
         dct_block = _safe_dct2(block)
 
@@ -834,7 +879,7 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
 
         if len(all_bits) >= HEADER_SIZE * 8:
             try:
-                _, flags, data_length = _parse_header(all_bits[:HEADER_SIZE * 8])
+                _, flags, data_length = _parse_header(all_bits[: HEADER_SIZE * 8])
                 total_needed = (HEADER_SIZE + data_length) * 8
                 if len(all_bits) >= total_needed:
                     break
@@ -845,12 +890,14 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
     gc.collect()
 
     _, flags, data_length = _parse_header(all_bits)
-    data_bits = all_bits[HEADER_SIZE * 8:(HEADER_SIZE + data_length) * 8]
+    data_bits = all_bits[HEADER_SIZE * 8 : (HEADER_SIZE + data_length) * 8]
 
-    data = bytes([
-        sum(data_bits[i*8:(i+1)*8][j] << (7-j) for j in range(8))
-        for i in range(data_length)
-    ])
+    data = bytes(
+        [
+            sum(data_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+            for i in range(data_length)
+        ]
+    )
 
     return data
 
@@ -863,7 +910,7 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
     # (shouldn't happen with stego images, but be defensive)
     stego_image = _normalize_jpeg_for_jpegio(stego_image)
 
-    temp_path = _jpegio_bytes_to_file(stego_image, suffix='.jpg')
+    temp_path = _jpegio_bytes_to_file(stego_image, suffix=".jpg")
 
     try:
         jpeg = jio.read(temp_path)
@@ -873,15 +920,17 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
         order = _jpegio_generate_order(len(all_positions), seed)
 
         header_bits = []
-        for pos_idx in order[:HEADER_SIZE * 8]:
+        for pos_idx in order[: HEADER_SIZE * 8]:
             row, col = all_positions[pos_idx]
             coef = coef_array[row, col]
             header_bits.append(coef & 1)
 
-        header_bytes = bytes([
-            sum(header_bits[i*8:(i+1)*8][j] << (7-j) for j in range(8))
-            for i in range(HEADER_SIZE)
-        ])
+        header_bytes = bytes(
+            [
+                sum(header_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                for i in range(HEADER_SIZE)
+            ]
+        )
 
         _, flags, data_length = _jpegio_parse_header(header_bytes)
 
@@ -895,12 +944,14 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
             coef = coef_array[row, col]
             all_bits.append(coef & 1)
 
-        data_bits = all_bits[HEADER_SIZE * 8:]
+        data_bits = all_bits[HEADER_SIZE * 8 :]
 
-        data = bytes([
-            sum(data_bits[i*8:(i+1)*8][j] << (7-j) for j in range(8))
-            for i in range(data_length)
-        ])
+        data = bytes(
+            [
+                sum(data_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                for i in range(data_length)
+            ]
+        )
 
         return data
 
@@ -915,13 +966,14 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
+
 def get_output_extension(output_format: str) -> str:
     if output_format == OUTPUT_FORMAT_JPEG:
-        return '.jpg'
-    return '.png'
+        return ".jpg"
+    return ".png"
 
 
 def get_output_mimetype(output_format: str) -> str:
     if output_format == OUTPUT_FORMAT_JPEG:
-        return 'image/jpeg'
-    return 'image/png'
+        return "image/jpeg"
+    return "image/png"

@@ -43,6 +43,7 @@ def get_image_info(image_data: bytes) -> ImageInfo:
     if has_dct_support():
         try:
             from .dct_steganography import calculate_dct_capacity
+
             dct_info = calculate_dct_capacity(image_data)
             dct_capacity = dct_info.usable_capacity_bytes
         except Exception as e:
@@ -61,8 +62,10 @@ def get_image_info(image_data: bytes) -> ImageInfo:
         dct_capacity_kb=dct_capacity / 1024 if dct_capacity else None,
     )
 
-    debug.print(f"Image info: {width}x{height}, LSB={lsb_capacity} bytes, "
-                f"DCT={dct_capacity or 'N/A'} bytes")
+    debug.print(
+        f"Image info: {width}x{height}, LSB={lsb_capacity} bytes, "
+        f"DCT={dct_capacity or 'N/A'} bytes"
+    )
 
     return info
 
@@ -101,6 +104,7 @@ def compare_capacity(
     if dct_available:
         try:
             from .dct_steganography import calculate_dct_capacity
+
             dct_info = calculate_dct_capacity(carrier_image)
             dct_bytes = dct_info.usable_capacity_bytes
             dct_kb = dct_bytes / 1024
@@ -146,7 +150,7 @@ def validate_carrier_capacity(
     from .steganography import calculate_capacity_by_mode
 
     capacity_info = calculate_capacity_by_mode(carrier_image, embed_mode)
-    capacity = capacity_info['capacity_bytes']
+    capacity = capacity_info["capacity_bytes"]
 
     # Add encryption overhead estimate
     estimated_size = payload_size + 200  # Approximate overhead
@@ -156,11 +160,11 @@ def validate_carrier_capacity(
     headroom = capacity - estimated_size
 
     return {
-        'fits': fits,
-        'capacity': capacity,
-        'payload_size': payload_size,
-        'estimated_size': estimated_size,
-        'usage_percent': min(usage_percent, 100.0),
-        'headroom': headroom,
-        'mode': embed_mode,
+        "fits": fits,
+        "capacity": capacity,
+        "payload_size": payload_size,
+        "estimated_size": estimated_size,
+        "usage_percent": min(usage_percent, 100.0),
+        "headroom": headroom,
+        "mode": embed_mode,
     }

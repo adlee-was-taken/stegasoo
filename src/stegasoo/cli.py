@@ -33,12 +33,12 @@ from .constants import (
 )
 
 # Click context settings
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.version_option(__version__, '-v', '--version')
-@click.option('--json', 'json_output', is_flag=True, help='Output results as JSON')
+@click.version_option(__version__, "-v", "--version")
+@click.option("--json", "json_output", is_flag=True, help="Output results as JSON")
 @click.pass_context
 def cli(ctx, json_output):
     """
@@ -47,31 +47,47 @@ def cli(ctx, json_output):
     Hide messages in images using PIN + passphrase security.
     """
     ctx.ensure_object(dict)
-    ctx.obj['json'] = json_output
+    ctx.obj["json"] = json_output
 
 
 # =============================================================================
 # ENCODE COMMANDS
 # =============================================================================
 
+
 @cli.command()
-@click.argument('image', type=click.Path(exists=True))
-@click.option('-m', '--message', help='Message to encode')
-@click.option('-f', '--file', 'file_payload', type=click.Path(exists=True),
-              help='File to embed instead of message')
-@click.option('-o', '--output', type=click.Path(), help='Output image path')
-@click.option('--passphrase', prompt=True, hide_input=True,
-              confirmation_prompt=True, help='Passphrase (recommend 4+ words)')
-@click.option('--pin', prompt=True, hide_input=True,
-              confirmation_prompt=True, help='PIN code')
-@click.option('--compress/--no-compress', default=True,
-              help='Enable/disable compression (default: enabled)')
-@click.option('--algorithm', type=click.Choice(['zlib', 'lz4', 'none']),
-              default='zlib', help='Compression algorithm')
-@click.option('--dry-run', is_flag=True, help='Show capacity usage without encoding')
+@click.argument("image", type=click.Path(exists=True))
+@click.option("-m", "--message", help="Message to encode")
+@click.option(
+    "-f",
+    "--file",
+    "file_payload",
+    type=click.Path(exists=True),
+    help="File to embed instead of message",
+)
+@click.option("-o", "--output", type=click.Path(), help="Output image path")
+@click.option(
+    "--passphrase",
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+    help="Passphrase (recommend 4+ words)",
+)
+@click.option("--pin", prompt=True, hide_input=True, confirmation_prompt=True, help="PIN code")
+@click.option(
+    "--compress/--no-compress", default=True, help="Enable/disable compression (default: enabled)"
+)
+@click.option(
+    "--algorithm",
+    type=click.Choice(["zlib", "lz4", "none"]),
+    default="zlib",
+    help="Compression algorithm",
+)
+@click.option("--dry-run", is_flag=True, help="Show capacity usage without encoding")
 @click.pass_context
-def encode(ctx, image, message, file_payload, output, passphrase, pin,
-           compress, algorithm, dry_run):
+def encode(
+    ctx, image, message, file_payload, output, passphrase, pin, compress, algorithm, dry_run
+):
     """
     Encode a message or file into an image.
 
@@ -88,13 +104,13 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
 
     # Parse compression algorithm
     algo_map = {
-        'zlib': CompressionAlgorithm.ZLIB,
-        'lz4': CompressionAlgorithm.LZ4,
-        'none': CompressionAlgorithm.NONE,
+        "zlib": CompressionAlgorithm.ZLIB,
+        "lz4": CompressionAlgorithm.LZ4,
+        "none": CompressionAlgorithm.NONE,
     }
     compression_algo = algo_map[algorithm] if compress else CompressionAlgorithm.NONE
 
-    if algorithm == 'lz4' and not HAS_LZ4:
+    if algorithm == "lz4" and not HAS_LZ4:
         click.echo("Warning: LZ4 not available, falling back to zlib", err=True)
         compression_algo = CompressionAlgorithm.ZLIB
 
@@ -103,7 +119,7 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
         payload_size = Path(file_payload).stat().st_size
         payload_type = "file"
     else:
-        payload_size = len(message.encode('utf-8'))
+        payload_size = len(message.encode("utf-8"))
         payload_type = "text"
 
     # Get image capacity
@@ -123,7 +139,7 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
             "fits": payload_size < capacity_bytes,
         }
 
-        if ctx.obj.get('json'):
+        if ctx.obj.get("json"):
             click.echo(json.dumps(result, indent=2))
         else:
             click.echo(f"Image: {image} ({width}x{height})")
@@ -138,25 +154,29 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
     # For now, show what would be done
     output = output or f"{Path(image).stem}_encoded.png"
 
-    if ctx.obj.get('json'):
-        click.echo(json.dumps({
-            "status": "success",
-            "input": image,
-            "output": output,
-            "payload_type": payload_type,
-            "compression": algorithm_name(compression_algo),
-        }, indent=2))
+    if ctx.obj.get("json"):
+        click.echo(
+            json.dumps(
+                {
+                    "status": "success",
+                    "input": image,
+                    "output": output,
+                    "payload_type": payload_type,
+                    "compression": algorithm_name(compression_algo),
+                },
+                indent=2,
+            )
+        )
     else:
         click.echo(f"✓ Encoded {payload_type} to {output}")
         click.echo(f"  Compression: {algorithm_name(compression_algo)}")
 
 
 @cli.command()
-@click.argument('image', type=click.Path(exists=True))
-@click.option('--passphrase', prompt=True, hide_input=True, help='Passphrase')
-@click.option('--pin', prompt=True, hide_input=True, help='PIN code')
-@click.option('-o', '--output', type=click.Path(),
-              help='Output path for file payloads')
+@click.argument("image", type=click.Path(exists=True))
+@click.option("--passphrase", prompt=True, hide_input=True, help="Passphrase")
+@click.option("--pin", prompt=True, hide_input=True, help="PIN code")
+@click.option("-o", "--output", type=click.Path(), help="Output path for file payloads")
 @click.pass_context
 def decode(ctx, image, passphrase, pin, output):
     """
@@ -176,16 +196,17 @@ def decode(ctx, image, passphrase, pin, output):
         "message": "[Decoded message would appear here]",
     }
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(json.dumps(result, indent=2))
     else:
         click.echo(f"Decoded from {image}:")
-        click.echo(result['message'])
+        click.echo(result["message"])
 
 
 # =============================================================================
 # BATCH COMMANDS
 # =============================================================================
+
 
 @cli.group()
 def batch():
@@ -193,29 +214,50 @@ def batch():
     pass
 
 
-@batch.command('encode')
-@click.argument('images', nargs=-1, required=True, type=click.Path(exists=True))
-@click.option('-m', '--message', help='Message to encode in all images')
-@click.option('-f', '--file', 'file_payload', type=click.Path(exists=True),
-              help='File to embed in all images')
-@click.option('-o', '--output-dir', type=click.Path(),
-              help='Output directory (default: same as input)')
-@click.option('--suffix', default='_encoded', help='Output filename suffix')
-@click.option('--passphrase', prompt=True, hide_input=True,
-              confirmation_prompt=True, help='Passphrase (recommend 4+ words)')
-@click.option('--pin', prompt=True, hide_input=True,
-              confirmation_prompt=True, help='PIN code')
-@click.option('--compress/--no-compress', default=True,
-              help='Enable/disable compression')
-@click.option('--algorithm', type=click.Choice(['zlib', 'lz4', 'none']),
-              default='zlib', help='Compression algorithm')
-@click.option('-r', '--recursive', is_flag=True,
-              help='Search directories recursively')
-@click.option('-j', '--jobs', default=4, help='Parallel workers (default: 4)')
-@click.option('-v', '--verbose', is_flag=True, help='Show detailed output')
+@batch.command("encode")
+@click.argument("images", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-m", "--message", help="Message to encode in all images")
+@click.option(
+    "-f", "--file", "file_payload", type=click.Path(exists=True), help="File to embed in all images"
+)
+@click.option(
+    "-o", "--output-dir", type=click.Path(), help="Output directory (default: same as input)"
+)
+@click.option("--suffix", default="_encoded", help="Output filename suffix")
+@click.option(
+    "--passphrase",
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+    help="Passphrase (recommend 4+ words)",
+)
+@click.option("--pin", prompt=True, hide_input=True, confirmation_prompt=True, help="PIN code")
+@click.option("--compress/--no-compress", default=True, help="Enable/disable compression")
+@click.option(
+    "--algorithm",
+    type=click.Choice(["zlib", "lz4", "none"]),
+    default="zlib",
+    help="Compression algorithm",
+)
+@click.option("-r", "--recursive", is_flag=True, help="Search directories recursively")
+@click.option("-j", "--jobs", default=4, help="Parallel workers (default: 4)")
+@click.option("-v", "--verbose", is_flag=True, help="Show detailed output")
 @click.pass_context
-def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
-                 passphrase, pin, compress, algorithm, recursive, jobs, verbose):
+def batch_encode(
+    ctx,
+    images,
+    message,
+    file_payload,
+    output_dir,
+    suffix,
+    passphrase,
+    pin,
+    compress,
+    algorithm,
+    recursive,
+    jobs,
+    verbose,
+):
     """
     Encode message into multiple images.
 
@@ -232,7 +274,7 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
 
     # Progress callback
     def progress(current, total, item):
-        if not ctx.obj.get('json'):
+        if not ctx.obj.get("json"):
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
 
@@ -248,25 +290,23 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
         credentials=credentials,
         compress=compress,
         recursive=recursive,
-        progress_callback=progress if not ctx.obj.get('json') else None,
+        progress_callback=progress if not ctx.obj.get("json") else None,
     )
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(result.to_json())
     else:
         print_batch_result(result, verbose)
 
 
-@batch.command('decode')
-@click.argument('images', nargs=-1, required=True, type=click.Path(exists=True))
-@click.option('-o', '--output-dir', type=click.Path(),
-              help='Output directory for file payloads')
-@click.option('--passphrase', prompt=True, hide_input=True, help='Passphrase')
-@click.option('--pin', prompt=True, hide_input=True, help='PIN code')
-@click.option('-r', '--recursive', is_flag=True,
-              help='Search directories recursively')
-@click.option('-j', '--jobs', default=4, help='Parallel workers (default: 4)')
-@click.option('-v', '--verbose', is_flag=True, help='Show detailed output')
+@batch.command("decode")
+@click.argument("images", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-o", "--output-dir", type=click.Path(), help="Output directory for file payloads")
+@click.option("--passphrase", prompt=True, hide_input=True, help="Passphrase")
+@click.option("--pin", prompt=True, hide_input=True, help="PIN code")
+@click.option("-r", "--recursive", is_flag=True, help="Search directories recursively")
+@click.option("-j", "--jobs", default=4, help="Parallel workers (default: 4)")
+@click.option("-v", "--verbose", is_flag=True, help="Show detailed output")
 @click.pass_context
 def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verbose):
     """
@@ -282,7 +322,7 @@ def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verb
 
     # Progress callback
     def progress(current, total, item):
-        if not ctx.obj.get('json'):
+        if not ctx.obj.get("json"):
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
 
@@ -294,19 +334,18 @@ def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verb
         output_dir=Path(output_dir) if output_dir else None,
         credentials=credentials,
         recursive=recursive,
-        progress_callback=progress if not ctx.obj.get('json') else None,
+        progress_callback=progress if not ctx.obj.get("json") else None,
     )
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(result.to_json())
     else:
         print_batch_result(result, verbose)
 
 
-@batch.command('check')
-@click.argument('images', nargs=-1, required=True, type=click.Path(exists=True))
-@click.option('-r', '--recursive', is_flag=True,
-              help='Search directories recursively')
+@batch.command("check")
+@click.argument("images", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("-r", "--recursive", is_flag=True, help="Search directories recursively")
 @click.pass_context
 def batch_check(ctx, images, recursive):
     """
@@ -320,22 +359,22 @@ def batch_check(ctx, images, recursive):
     """
     results = batch_capacity_check(list(images), recursive)
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(json.dumps(results, indent=2))
     else:
         click.echo(f"{'Image':<40} {'Size':<12} {'Capacity':<12} {'Status'}")
         click.echo("─" * 80)
 
         for item in results:
-            if 'error' in item:
+            if "error" in item:
                 click.echo(f"{Path(item['path']).name:<40} {'ERROR':<12} {'':<12} {item['error']}")
             else:
-                name = Path(item['path']).name
+                name = Path(item["path"]).name
                 if len(name) > 38:
                     name = name[:35] + "..."
 
-                status = "✓" if item['valid'] else "⚠"
-                warnings = ", ".join(item.get('warnings', []))
+                status = "✓" if item["valid"] else "⚠"
+                warnings = ", ".join(item.get("warnings", []))
 
                 click.echo(
                     f"{name:<40} "
@@ -349,11 +388,16 @@ def batch_check(ctx, images, recursive):
 # UTILITY COMMANDS
 # =============================================================================
 
+
 @cli.command()
-@click.option('--words', default=DEFAULT_PASSPHRASE_WORDS,
-              help=f'Number of words in passphrase (default: {DEFAULT_PASSPHRASE_WORDS})')
-@click.option('--pin-length', default=DEFAULT_PIN_LENGTH,
-              help=f'PIN length (default: {DEFAULT_PIN_LENGTH})')
+@click.option(
+    "--words",
+    default=DEFAULT_PASSPHRASE_WORDS,
+    help=f"Number of words in passphrase (default: {DEFAULT_PASSPHRASE_WORDS})",
+)
+@click.option(
+    "--pin-length", default=DEFAULT_PIN_LENGTH, help=f"PIN length (default: {DEFAULT_PIN_LENGTH})"
+)
 @click.pass_context
 def generate(ctx, words, pin_length):
     """
@@ -368,24 +412,37 @@ def generate(ctx, words, pin_length):
     import secrets
 
     # Generate PIN
-    pin = ''.join(str(secrets.randbelow(10)) for _ in range(pin_length))
+    pin = "".join(str(secrets.randbelow(10)) for _ in range(pin_length))
     # Ensure PIN doesn't start with 0
-    if pin[0] == '0':
+    if pin[0] == "0":
         pin = str(secrets.randbelow(9) + 1) + pin[1:]
 
     # Generate passphrase (would use BIP-39 wordlist)
     # Placeholder - actual implementation uses constants.get_wordlist()
     try:
         from .constants import get_wordlist
+
         wordlist = get_wordlist()
         phrase_words = [secrets.choice(wordlist) for _ in range(words)]
     except (ImportError, FileNotFoundError):
         # Fallback for testing
-        sample_words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot',
-                        'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima']
+        sample_words = [
+            "alpha",
+            "bravo",
+            "charlie",
+            "delta",
+            "echo",
+            "foxtrot",
+            "golf",
+            "hotel",
+            "india",
+            "juliet",
+            "kilo",
+            "lima",
+        ]
         phrase_words = [secrets.choice(sample_words) for _ in range(words)]
 
-    passphrase = ' '.join(phrase_words)
+    passphrase = " ".join(phrase_words)
 
     result = {
         "passphrase": passphrase,
@@ -394,7 +451,7 @@ def generate(ctx, words, pin_length):
         "pin_length": pin_length,
     }
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(json.dumps(result, indent=2))
     else:
         click.echo(f"Passphrase: {passphrase}")
@@ -418,7 +475,7 @@ def info(ctx):
         },
     }
 
-    if ctx.obj.get('json'):
+    if ctx.obj.get("json"):
         click.echo(json.dumps(info_data, indent=2))
     else:
         click.echo(f"Stegasoo v{__version__}")
@@ -437,5 +494,5 @@ def main():
     cli(obj={})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

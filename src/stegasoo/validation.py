@@ -66,11 +66,9 @@ def validate_pin(pin: str, required: bool = False) -> ValidationResult:
         return ValidationResult.error("PIN must contain only digits")
 
     if len(pin) < MIN_PIN_LENGTH or len(pin) > MAX_PIN_LENGTH:
-        return ValidationResult.error(
-            f"PIN must be {MIN_PIN_LENGTH}-{MAX_PIN_LENGTH} digits"
-        )
+        return ValidationResult.error(f"PIN must be {MIN_PIN_LENGTH}-{MAX_PIN_LENGTH} digits")
 
-    if pin[0] == '0':
+    if pin[0] == "0":
         return ValidationResult.error("PIN cannot start with zero")
 
     return ValidationResult.ok(length=len(pin))
@@ -121,9 +119,7 @@ def validate_payload(payload: str | bytes | FilePayload) -> ValidationResult:
             )
 
         return ValidationResult.ok(
-            size=len(payload.data),
-            filename=payload.filename,
-            mime_type=payload.mime_type
+            size=len(payload.data), filename=payload.filename, mime_type=payload.mime_type
         )
 
     elif isinstance(payload, bytes):
@@ -143,9 +139,7 @@ def validate_payload(payload: str | bytes | FilePayload) -> ValidationResult:
 
 
 def validate_file_payload(
-    file_data: bytes,
-    filename: str = "",
-    max_size: int = MAX_FILE_PAYLOAD_SIZE
+    file_data: bytes, filename: str = "", max_size: int = MAX_FILE_PAYLOAD_SIZE
 ) -> ValidationResult:
     """
     Validate a file for embedding.
@@ -173,9 +167,7 @@ def validate_file_payload(
 
 
 def validate_image(
-    image_data: bytes,
-    name: str = "Image",
-    check_size: bool = True
+    image_data: bytes, name: str = "Image", check_size: bool = True
 ) -> ValidationResult:
     """
     Validate image data and dimensions.
@@ -202,18 +194,14 @@ def validate_image(
         num_pixels = width * height
 
         if check_size and num_pixels > MAX_IMAGE_PIXELS:
-            max_dim = int(MAX_IMAGE_PIXELS ** 0.5)
+            max_dim = int(MAX_IMAGE_PIXELS**0.5)
             return ValidationResult.error(
                 f"{name} too large ({width}×{height} = {num_pixels:,} pixels). "
                 f"Maximum: ~{MAX_IMAGE_PIXELS:,} pixels ({max_dim}×{max_dim})"
             )
 
         return ValidationResult.ok(
-            width=width,
-            height=height,
-            pixels=num_pixels,
-            mode=img.mode,
-            format=img.format
+            width=width, height=height, pixels=num_pixels, mode=img.mode, format=img.format
         )
 
     except Exception as e:
@@ -221,9 +209,7 @@ def validate_image(
 
 
 def validate_rsa_key(
-    key_data: bytes,
-    password: str | None = None,
-    required: bool = False
+    key_data: bytes, password: str | None = None, required: bool = False
 ) -> ValidationResult:
     """
     Validate RSA private key.
@@ -256,10 +242,7 @@ def validate_rsa_key(
         return ValidationResult.error(str(e))
 
 
-def validate_security_factors(
-    pin: str,
-    rsa_key_data: bytes | None
-) -> ValidationResult:
+def validate_security_factors(pin: str, rsa_key_data: bytes | None) -> ValidationResult:
     """
     Validate that at least one security factor is provided.
 
@@ -274,17 +257,13 @@ def validate_security_factors(
     has_key = bool(rsa_key_data and len(rsa_key_data) > 0)
 
     if not has_pin and not has_key:
-        return ValidationResult.error(
-            "You must provide at least a PIN or RSA Key"
-        )
+        return ValidationResult.error("You must provide at least a PIN or RSA Key")
 
     return ValidationResult.ok(has_pin=has_pin, has_key=has_key)
 
 
 def validate_file_extension(
-    filename: str,
-    allowed: set[str],
-    file_type: str = "File"
+    filename: str, allowed: set[str], file_type: str = "File"
 ) -> ValidationResult:
     """
     Validate file extension.
@@ -297,10 +276,10 @@ def validate_file_extension(
     Returns:
         ValidationResult with extension
     """
-    if not filename or '.' not in filename:
+    if not filename or "." not in filename:
         return ValidationResult.error(f"{file_type} must have a file extension")
 
-    ext = filename.rsplit('.', 1)[1].lower()
+    ext = filename.rsplit(".", 1)[1].lower()
 
     if ext not in allowed:
         return ValidationResult.error(
@@ -368,7 +347,7 @@ def validate_passphrase(passphrase: str) -> ValidationResult:
     if len(words) < RECOMMENDED_PASSPHRASE_WORDS:
         return ValidationResult.ok(
             word_count=len(words),
-            warning=f"Recommend {RECOMMENDED_PASSPHRASE_WORDS}+ words for better security"
+            warning=f"Recommend {RECOMMENDED_PASSPHRASE_WORDS}+ words for better security",
         )
 
     return ValidationResult.ok(word_count=len(words))
@@ -377,6 +356,7 @@ def validate_passphrase(passphrase: str) -> ValidationResult:
 # =============================================================================
 # NEW VALIDATORS FOR V3.2.0
 # =============================================================================
+
 
 def validate_reference_photo(photo_data: bytes) -> ValidationResult:
     """Validate reference photo. Alias for validate_image."""
@@ -418,7 +398,7 @@ def validate_dct_output_format(format_str: str) -> ValidationResult:
     Returns:
         ValidationResult
     """
-    valid_formats = {'png', 'jpeg'}
+    valid_formats = {"png", "jpeg"}
 
     if format_str.lower() not in valid_formats:
         return ValidationResult.error(
@@ -438,7 +418,7 @@ def validate_dct_color_mode(mode: str) -> ValidationResult:
     Returns:
         ValidationResult
     """
-    valid_modes = {'grayscale', 'color'}
+    valid_modes = {"grayscale", "color"}
 
     if mode.lower() not in valid_modes:
         return ValidationResult.error(
@@ -451,6 +431,7 @@ def validate_dct_color_mode(mode: str) -> ValidationResult:
 # ============================================================================
 # EXCEPTION-RAISING VALIDATORS (for CLI/API use)
 # ============================================================================
+
 
 def require_valid_pin(pin: str, required: bool = False) -> None:
     """Validate PIN, raising exception on failure."""
@@ -481,9 +462,7 @@ def require_valid_image(image_data: bytes, name: str = "Image") -> None:
 
 
 def require_valid_rsa_key(
-    key_data: bytes,
-    password: str | None = None,
-    required: bool = False
+    key_data: bytes, password: str | None = None, required: bool = False
 ) -> None:
     """Validate RSA key, raising exception on failure."""
     result = validate_rsa_key(key_data, password, required)

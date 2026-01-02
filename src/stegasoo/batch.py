@@ -23,6 +23,7 @@ from .constants import ALLOWED_IMAGE_EXTENSIONS, LOSSLESS_FORMATS
 
 class BatchStatus(Enum):
     """Status of individual batch items."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     SUCCESS = "success"
@@ -33,6 +34,7 @@ class BatchStatus(Enum):
 @dataclass
 class BatchItem:
     """Represents a single item in a batch operation."""
+
     input_path: Path
     output_path: Path | None = None
     status: BatchStatus = BatchStatus.PENDING
@@ -84,6 +86,7 @@ class BatchCredentials:
         )
         result = processor.batch_encode(images, creds, message="secret")
     """
+
     reference_photo: bytes
     passphrase: str  # v3.2.0: renamed from day_phrase
     pin: str = ""
@@ -101,27 +104,28 @@ class BatchCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'BatchCredentials':
+    def from_dict(cls, data: dict) -> "BatchCredentials":
         """
         Create BatchCredentials from a dictionary.
 
         Handles both v3.2.0 format (passphrase) and legacy formats (day_phrase, phrase).
         """
         # Handle legacy 'day_phrase' and 'phrase' keys
-        passphrase = data.get('passphrase') or data.get('day_phrase') or data.get('phrase', '')
+        passphrase = data.get("passphrase") or data.get("day_phrase") or data.get("phrase", "")
 
         return cls(
-            reference_photo=data['reference_photo'],
+            reference_photo=data["reference_photo"],
             passphrase=passphrase,
-            pin=data.get('pin', ''),
-            rsa_key_data=data.get('rsa_key_data'),
-            rsa_password=data.get('rsa_password'),
+            pin=data.get("pin", ""),
+            rsa_key_data=data.get("rsa_key_data"),
+            rsa_password=data.get("rsa_password"),
         )
 
 
 @dataclass
 class BatchResult:
     """Summary of a batch operation."""
+
     operation: str
     total: int = 0
     succeeded: int = 0
@@ -232,18 +236,17 @@ class BatchProcessor:
                     yield path
 
             elif path.is_dir():
-                pattern = '**/*' if recursive else '*'
+                pattern = "**/*" if recursive else "*"
                 for file_path in path.glob(pattern):
                     if file_path.is_file() and self._is_valid_image(file_path):
                         yield file_path
 
     def _is_valid_image(self, path: Path) -> bool:
         """Check if path is a valid image file."""
-        return path.suffix.lower().lstrip('.') in ALLOWED_IMAGE_EXTENSIONS
+        return path.suffix.lower().lstrip(".") in ALLOWED_IMAGE_EXTENSIONS
 
     def _normalize_credentials(
-        self,
-        credentials: dict | BatchCredentials | None
+        self, credentials: dict | BatchCredentials | None
     ) -> BatchCredentials:
         """
         Normalize credentials to BatchCredentials object.
@@ -341,7 +344,11 @@ class BatchProcessor:
                     self._do_encode(item, message, file_payload, creds, compress)
 
                 item.status = BatchStatus.SUCCESS
-                item.output_size = item.output_path.stat().st_size if item.output_path and item.output_path.exists() else 0
+                item.output_size = (
+                    item.output_path.stat().st_size
+                    if item.output_path and item.output_path.exists()
+                    else 0
+                )
                 item.message = f"Encoded to {item.output_path.name}"
 
             except Exception as e:
@@ -412,7 +419,9 @@ class BatchProcessor:
                         output_dir=item.output_path,
                         credentials=creds.to_dict(),
                     )
-                    item.message = decoded.get('message', '') if isinstance(decoded, dict) else str(decoded)
+                    item.message = (
+                        decoded.get("message", "") if isinstance(decoded, dict) else str(decoded)
+                    )
                 else:
                     # Use stegasoo decode
                     item.message = self._do_decode(item, creds)
@@ -441,10 +450,7 @@ class BatchProcessor:
         completed = 0
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(process_func, item): item
-                for item in result.items
-            }
+            futures = {executor.submit(process_func, item): item for item in result.items}
 
             for future in as_completed(futures):
                 item = future.result()
@@ -469,7 +475,7 @@ class BatchProcessor:
         message: str | None,
         file_payload: Path | None,
         creds: BatchCredentials,
-        compress: bool
+        compress: bool,
     ) -> None:
         """
         Perform actual encoding using stegasoo.encode.
@@ -555,16 +561,13 @@ class BatchProcessor:
             return self._mock_decode(item, creds)
 
     def _mock_encode(
-        self,
-        item: BatchItem,
-        message: str,
-        creds: BatchCredentials,
-        compress: bool
+        self, item: BatchItem, message: str, creds: BatchCredentials, compress: bool
     ) -> None:
         """Mock encode for testing - replace with actual stego.encode()"""
         # This is a placeholder - in real usage, you'd call your actual encode function
         # For now, just copy the file to simulate encoding
         import shutil
+
         if item.output_path:
             shutil.copy(item.input_path, item.output_path)
 
@@ -605,23 +608,27 @@ def batch_capacity_check(
                 capacity_bits = pixels * 3
                 capacity_bytes = (capacity_bits // 8) - 100  # Header overhead
 
-                results.append({
-                    "path": str(img_path),
-                    "dimensions": f"{width}x{height}",
-                    "pixels": pixels,
-                    "format": img.format,
-                    "mode": img.mode,
-                    "capacity_bytes": max(0, capacity_bytes),
-                    "capacity_kb": max(0, capacity_bytes // 1024),
-                    "valid": pixels <= MAX_IMAGE_PIXELS and img.format in LOSSLESS_FORMATS,
-                    "warnings": _get_image_warnings(img, img_path),
-                })
+                results.append(
+                    {
+                        "path": str(img_path),
+                        "dimensions": f"{width}x{height}",
+                        "pixels": pixels,
+                        "format": img.format,
+                        "mode": img.mode,
+                        "capacity_bytes": max(0, capacity_bytes),
+                        "capacity_kb": max(0, capacity_bytes // 1024),
+                        "valid": pixels <= MAX_IMAGE_PIXELS and img.format in LOSSLESS_FORMATS,
+                        "warnings": _get_image_warnings(img, img_path),
+                    }
+                )
         except Exception as e:
-            results.append({
-                "path": str(img_path),
-                "error": str(e),
-                "valid": False,
-            })
+            results.append(
+                {
+                    "path": str(img_path),
+                    "error": str(e),
+                    "valid": False,
+                }
+            )
 
     return results
 
@@ -638,13 +645,14 @@ def _get_image_warnings(img, path: Path) -> list[str]:
     if img.size[0] * img.size[1] > MAX_IMAGE_PIXELS:
         warnings.append(f"Image exceeds {MAX_IMAGE_PIXELS:,} pixel limit")
 
-    if img.mode not in ('RGB', 'RGBA'):
+    if img.mode not in ("RGB", "RGBA"):
         warnings.append(f"Non-RGB mode ({img.mode}) - will be converted")
 
     return warnings
 
 
 # CLI-friendly functions
+
 
 def print_batch_result(result: BatchResult, verbose: bool = False) -> None:
     """Print batch result summary to console."""
