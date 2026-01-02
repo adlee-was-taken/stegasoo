@@ -35,6 +35,12 @@ old_files/
 *.swp
 *.swo
 
+# Backup files
+*_old
+*_old.*
+*.bak
+*.orig
+
 # Testing
 .pytest_cache/
 .coverage
@@ -58,6 +64,7 @@ htmlcov/
 # Output test files.
 test_data/*.png
 
-#Project root scripts.
+# Dev scripts (local convenience scripts)
+build.sh
 rbld_containers.sh
 quick_web.sh

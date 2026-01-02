@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/adlee-was-taken/stegasoo/security/advisories/new
+    about: Report security vulnerabilities privately
+  - name: Documentation
+    url: https://github.com/adlee-was-taken/stegasoo#readme
+    about: Check the documentation before opening an issue
