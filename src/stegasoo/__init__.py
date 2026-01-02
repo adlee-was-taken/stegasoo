@@ -1,5 +1,5 @@
 """
-Stegasoo - Secure Steganography with Multi-Factor Authentication (v4.0.0)
+Stegasoo - Secure Steganography with Multi-Factor Authentication (v4.0.1)
 
 Changes in v4.0.0:
 - Added channel key support for deployment/group isolation
@@ -7,11 +7,11 @@ Changes in v4.0.0:
 - encode() and decode() now accept channel_key parameter
 """
 
-__version__ = "4.0.0"
+__version__ = "4.0.1"
 
 # Core functionality
 from .encode import encode
-from .decode import decode, decode_file
+from .decode import decode, decode_file, decode_text
 
 # Credential generation
 from .generate import (
@@ -153,11 +153,12 @@ DCT_BYTES_PER_PIXEL = 0.125
 __all__ = [
     # Version
     "__version__",
-    
+
     # Core
     "encode",
     "decode",
     "decode_file",
+    "decode_text",
     
     # Generation
     "generate_pin",

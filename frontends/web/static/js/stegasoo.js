@@ -751,57 +751,41 @@ const Stegasoo = {
     /**
      * Initialize channel key UI for encode/decode pages
      * @param {Object} config - Configuration object
-     * @param {string} config.radioName - Name of radio buttons (default: 'channel_key')
+     * @param {string} config.selectId - ID of channel select dropdown
      * @param {string} config.customInputId - ID of custom key input container
      * @param {string} config.keyInputId - ID of key input field
      * @param {string} config.generateBtnId - ID of generate button (optional)
-     * @param {string} config.customRadioId - ID of custom radio button
-     * @param {string[]} config.cardIds - Array of card/label IDs for active class toggling
      */
     initChannelKey(config = {}) {
-        const radioName = config.radioName || 'channel_key';
+        const selectId = config.selectId || 'channelSelect';
         const customInputId = config.customInputId || 'channelCustomInput';
         const keyInputId = config.keyInputId || 'channelKeyInput';
         const generateBtnId = config.generateBtnId;
-        const customRadioId = config.customRadioId || 'channelCustom';
-        const cardIds = config.cardIds || [];
-        
-        const radios = document.querySelectorAll(`input[name="${radioName}"]`);
+
+        const select = document.getElementById(selectId);
         const customInput = document.getElementById(customInputId);
         const keyInput = document.getElementById(keyInputId);
         const generateBtn = generateBtnId ? document.getElementById(generateBtnId) : null;
-        const customRadio = document.getElementById(customRadioId);
-        
-        // Toggle active class on mode-btn cards
-        const updateActiveState = () => {
-            radios.forEach(radio => {
-                const card = radio.closest('.mode-btn');
-                if (card) {
-                    card.classList.toggle('active', radio.checked);
-                }
-            });
-        };
-        
+
         // Show/hide custom input based on selection
-        radios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                updateActiveState();
-                const isCustom = customRadio?.checked;
-                customInput?.classList.toggle('d-none', !isCustom);
-                if (isCustom && keyInput) {
-                    keyInput.focus();
-                }
-            });
-        });
-        
+        const updateVisibility = () => {
+            const isCustom = select?.value === 'custom';
+            customInput?.classList.toggle('d-none', !isCustom);
+            if (isCustom && keyInput) {
+                keyInput.focus();
+            }
+        };
+
+        select?.addEventListener('change', updateVisibility);
+
         // Initial state
-        updateActiveState();
-        
+        updateVisibility();
+
         // Format and validate key input
         keyInput?.addEventListener('input', () => {
             this.formatChannelKeyInput(keyInput);
         });
-        
+
         // Generate button (if present)
         generateBtn?.addEventListener('click', () => {
             if (keyInput) {
@@ -810,26 +794,26 @@ const Stegasoo = {
             }
         });
     },
-    
+
     /**
      * Handle form submission with channel key validation
      * @param {HTMLFormElement} form - Form element
-     * @param {string} customRadioId - ID of custom radio button
+     * @param {string} selectId - ID of channel select dropdown
      * @param {string} keyInputId - ID of key input field
      * @returns {boolean} True if valid, false to prevent submission
      */
-    validateChannelKeyOnSubmit(form, customRadioId, keyInputId) {
-        const customRadio = document.getElementById(customRadioId);
+    validateChannelKeyOnSubmit(form, selectId, keyInputId) {
+        const select = document.getElementById(selectId);
         const keyInput = document.getElementById(keyInputId);
-        
-        if (customRadio?.checked && keyInput) {
+
+        if (select?.value === 'custom' && keyInput) {
             if (!this.validateChannelKey(keyInput.value)) {
                 keyInput.classList.add('is-invalid');
                 keyInput.focus();
                 return false;
             }
-            // Set the radio value to the actual key for form submission
-            customRadio.value = keyInput.value;
+            // Set the select value to the actual key for form submission
+            select.value = keyInput.value;
         }
         return true;
     },
@@ -880,20 +864,19 @@ const Stegasoo = {
         this.initCollapseChevrons();
         this.initPassphraseFontResize();
         
-        // Channel key (v4.0.0) - uses mode-btn style
+        // Channel key (v4.0.0) - uses select dropdown
         this.initChannelKey({
+            selectId: 'channelSelect',
             customInputId: 'channelCustomInput',
             keyInputId: 'channelKeyInput',
-            generateBtnId: 'channelKeyGenerate',
-            customRadioId: 'channelCustom',
-            cardIds: ['channelAutoCard', 'channelPublicCard', 'channelCustomCard']
+            generateBtnId: 'channelKeyGenerate'
         });
-        
+
         // Form submission with channel key validation
         const form = document.getElementById('encodeForm');
         const btn = document.getElementById('encodeBtn');
         form?.addEventListener('submit', (e) => {
-            if (!this.validateChannelKeyOnSubmit(form, 'channelCustom', 'channelKeyInput')) {
+            if (!this.validateChannelKeyOnSubmit(form, 'channelSelect', 'channelKeyInput')) {
                 e.preventDefault();
                 return false;
             }
@@ -913,19 +896,18 @@ const Stegasoo = {
         this.initCollapseChevrons();
         this.initPassphraseFontResize();
         
-        // Channel key (v4.0.0) - uses mode-btn style
+        // Channel key (v4.0.0) - uses select dropdown
         this.initChannelKey({
+            selectId: 'channelSelectDec',
             customInputId: 'channelCustomInputDec',
-            keyInputId: 'channelKeyInputDec',
-            customRadioId: 'channelCustomDec',
-            cardIds: ['channelAutoCardDec', 'channelPublicCardDec', 'channelCustomCardDec']
+            keyInputId: 'channelKeyInputDec'
         });
-        
+
         // Form submission with channel key validation and mode display
         const form = document.getElementById('decodeForm');
         const btn = document.getElementById('decodeBtn');
         form?.addEventListener('submit', (e) => {
-            if (!this.validateChannelKeyOnSubmit(form, 'channelCustomDec', 'channelKeyInputDec')) {
+            if (!this.validateChannelKeyOnSubmit(form, 'channelSelectDec', 'channelKeyInputDec')) {
                 e.preventDefault();
                 return false;
             }

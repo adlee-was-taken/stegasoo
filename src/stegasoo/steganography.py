@@ -56,23 +56,24 @@ EXT_TO_FORMAT = {
 }
 
 # =============================================================================
-# OVERHEAD CONSTANTS (v3.2.0 - Updated for date-independent format)
+# OVERHEAD CONSTANTS (v4.0.0 - Updated for channel key support)
 # =============================================================================
-# v3.2.0 Header format (no date field):
+# v4.0.0 Header format (with flags byte for channel key indicator):
 #   Magic:   4 bytes  (\x89ST3)
-#   Version: 1 byte   (4 for v3.2.0)
+#   Version: 1 byte   (5 for v4.0.0)
+#   Flags:   1 byte   (bit 0 = has channel key)
 #   Salt:    32 bytes
 #   IV:      12 bytes
 #   Tag:     16 bytes
 #   -----------------
-#   Total:   65 bytes
+#   Total:   66 bytes
 #
-# Previous v3.1.0 had date field (10 bytes + 1 byte length) = 76 bytes header
-# The old value of 104 was incorrect even for v3.1.0
+# v3.2.0 had 65 bytes (no flags byte)
+# v3.1.0 had date field (10 bytes + 1 byte length) = 76 bytes header
 
-HEADER_OVERHEAD = 65       # v3.2.0: Magic + version + salt + iv + tag
+HEADER_OVERHEAD = 66       # v4.0.0: Magic + version + flags + salt + iv + tag
 LENGTH_PREFIX = 4          # 4 bytes for payload length in LSB embedding
-ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX  # 69 bytes total
+ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX  # 70 bytes total
 
 # DCT output format options (v3.0.1)
 DCT_OUTPUT_PNG = 'png'

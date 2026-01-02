@@ -5,7 +5,7 @@ A secure steganography system for hiding encrypted messages in images using hybr
 ![Python](https://img.shields.io/badge/Python-3.10--3.12-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Security](https://img.shields.io/badge/Security-AES--256--GCM-red)
-![Version](https://img.shields.io/badge/Version-4.0.0-purple)
+![Version](https://img.shields.io/badge/Version-4.0.1-purple)
 
 ## Features
 

@@ -1,5 +1,5 @@
 """
-Stegasoo Constants and Configuration (v4.0.0 - Channel Key Support)
+Stegasoo Constants and Configuration (v4.0.1 - Channel Key Support)
 
 Central location for all magic numbers, limits, and crypto parameters.
 All version numbers, limits, and configuration values should be defined here.
@@ -21,7 +21,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "4.0.0"
+__version__ = "4.0.1"
 
 # ============================================================================
 # FILE FORMAT

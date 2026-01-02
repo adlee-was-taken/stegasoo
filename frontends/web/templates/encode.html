@@ -331,9 +331,71 @@
                         <span class="text-warning small">(provide at least one: PIN or RSA Key)</span>
                     </h6>
                     
+                    <div class="mb-3">
+                      <div class="security-box">
+                        <label class="form-label">
+                            <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
+                        </label>
+
+                        <!-- RSA Input Method Toggle -->
+                        <div class="btn-group w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
+                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
+                                <i class="bi bi-file-earmark me-1"></i>.pem File
+                            </label>
+
+                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
+                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
+                                <i class="bi bi-qr-code me-1"></i>QR Code
+                            </label>
+                        </div>
+
+                        <!-- .pem File Input -->
+                        <div id="rsaFileSection">
+                            <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
+                        </div>
+
+                        <!-- QR Code Input -->
+                        <div id="rsaQrSection" class="d-none">
+                            <div class="drop-zone p-3" id="qrDropZone">
+                                <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
+                                <div class="drop-zone-label text-center">
+                                    <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
+                                    <span class="text-muted small">Drop QR image or click to browse</span>
+                                </div>
+                                <!-- Crop animation container -->
+                                <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
+                                    <img class="qr-original" id="qrOriginal" alt="Original">
+                                    <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
+                                    <!-- Data panel -->
+                                    <div class="qr-data-panel">
+                                        <div class="qr-data-filename">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <span>RSA Key loaded</span>
+                                        </div>
+                                        <div class="qr-data-row">
+                                            <span class="qr-status-badge">RSA Key</span>
+                                            <span class="qr-data-value">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Key Password (always visible) -->
+                        <div class="input-group input-group-sm mt-2">
+                            <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
+                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- PIN + Channel Row -->
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                          <div class="security-box">
+                          <div class="security-box h-100">
                             <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                             <div class="input-group pin-input-container">
                               <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
@@ -344,116 +406,39 @@
                             <div class="form-text">Static 6-9 digit PIN</div>
                           </div>
                         </div>
-                        
+
                         <div class="col-md-8 mb-3">
-                          <div class="security-box">
+                          <div class="security-box h-100">
                             <label class="form-label">
-                                <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
+                                <i class="bi bi-broadcast me-1"></i> Channel
+                                <span class="badge bg-info ms-1">v4.0</span>
+                                <a href="/about#channel-keys" class="text-muted ms-1" title="Learn about channels"><i class="bi bi-info-circle"></i></a>
                             </label>
-                            
-                            <!-- RSA Input Method Toggle -->
-                            <div class="btn-group w-100 mb-2" role="group">
-                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
-                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
-                                    <i class="bi bi-file-earmark me-1"></i>.pem File
-                                </label>
-                                
-                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
-                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
-                                    <i class="bi bi-qr-code me-1"></i>QR Code
-                                </label>
+
+                            <select class="form-select" name="channel_key" id="channelSelect">
+                                <option value="auto" selected>Auto{% if channel_configured %} (Server Key){% endif %}</option>
+                                <option value="none">Public</option>
+                                <option value="custom">Custom</option>
+                            </select>
+
+                            <!-- Server channel indicator (compact) -->
+                            {% if channel_configured %}
+                            <div class="small text-success mt-2" id="channelServerInfo">
+                                <i class="bi bi-shield-lock me-1"></i>
+                                Server: <code>{{ channel_fingerprint[:4] }}-••••-···-••••-{{ channel_fingerprint[-4:] }}</code>
                             </div>
-                            
-                            <!-- .pem File Input -->
-                            <div id="rsaFileSection">
-                                <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
-                            </div>
-                            
-                            <!-- QR Code Input -->
-                            <div id="rsaQrSection" class="d-none">
-                                <div class="drop-zone p-3" id="qrDropZone">
-                                    <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
-                                    <div class="drop-zone-label text-center">
-                                        <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
-                                        <span class="text-muted small">Drop QR image or click to browse</span>
-                                    </div>
-                                    <!-- Crop animation container -->
-                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
-                                        <img class="qr-original" id="qrOriginal" alt="Original">
-                                        <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
-                                        <!-- Data panel -->
-                                        <div class="qr-data-panel">
-                                            <div class="qr-data-filename">
-                                                <i class="bi bi-check-circle-fill"></i>
-                                                <span>RSA Key loaded</span>
-                                            </div>
-                                            <div class="qr-data-row">
-                                                <span class="qr-status-badge">RSA Key</span>
-                                                <span class="qr-data-value">--</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Key Password (always visible) -->
-                            <div class="input-group input-group-sm mt-2">
-                                <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
-                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                            </div>
+                            {% endif %}
                           </div>
                         </div>
                     </div>
-                    
-                    <!-- ================================================================
-                         CHANNEL KEY (v4.0.0) - Deployment/Group Isolation
-                         ================================================================ -->
-                    <div class="mb-4">
-                      <div class="security-box">
-                        <label class="form-label">
-                            <i class="bi bi-broadcast me-1"></i> Channel
-                            <span class="badge bg-info ms-1">v4.0</span>
-                        </label>
-                        
-                        <div class="d-flex gap-2">
-                            <!-- Auto Mode -->
-                            <label class="mode-btn flex-fill {% if channel_configured %}active{% endif %}" id="channelAutoCard" for="channelAuto">
-                                <input class="form-check-input" type="radio" name="channel_key" id="channelAuto" value="auto" checked>
-                                <i class="bi bi-gear-fill {% if channel_configured %}text-success{% else %}text-secondary{% endif %} ms-2"></i>
-                                <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· {% if channel_configured %}Server Key{% else %}Public{% endif %}</span></span>
-                            </label>
-                            
-                            <!-- Public Mode -->
-                            <label class="mode-btn flex-fill" id="channelPublicCard" for="channelPublic">
-                                <input class="form-check-input" type="radio" name="channel_key" id="channelPublic" value="none">
-                                <i class="bi bi-globe text-info ms-2"></i>
-                                <span class="ms-2"><strong>Public</strong> <span class="text-muted d-none d-sm-inline">· No key</span></span>
-                            </label>
-                            
-                            <!-- Custom Key -->
-                            <label class="mode-btn flex-fill" id="channelCustomCard" for="channelCustom">
-                                <input class="form-check-input" type="radio" name="channel_key" id="channelCustom" value="custom">
-                                <i class="bi bi-key-fill text-warning ms-2"></i>
-                                <span class="ms-2"><strong>Custom</strong></span>
-                            </label>
-                        </div>
-                        
-                        <!-- Server channel indicator (compact) -->
-                        {% if channel_configured %}
-                        <div class="small text-success mt-2" id="channelServerInfo">
-                            <i class="bi bi-shield-lock me-1"></i>
-                            Server: <code>{{ channel_fingerprint }}</code>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Custom key input -->
-                        <div class="mt-2 d-none" id="channelCustomInput">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                <input type="text" name="channel_key_custom" class="form-control font-monospace" 
-                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" 
+
+                    <!-- Custom Channel Key Input (shown when Custom selected) -->
+                    <div class="mb-4 d-none" id="channelCustomInput">
+                        <div class="security-box">
+                            <label class="form-label"><i class="bi bi-key me-1"></i> Custom Channel Key</label>
+                            <div class="input-group">
+                                <input type="text" name="channel_key_custom" class="form-control font-monospace"
+                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                                        pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}"
                                        id="channelKeyInput">
                                 <button class="btn btn-outline-secondary" type="button" id="channelKeyGenerate" title="Generate random key">
@@ -464,7 +449,6 @@
                                 Invalid format. Use: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
                             </div>
                         </div>
-                      </div>
                     </div>
                     
                     <!-- Advanced Options (DCT sub-options only) -->

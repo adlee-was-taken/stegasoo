@@ -624,12 +624,15 @@ def get_active_channel_key() -> Optional[str]:
     return get_channel_key()
 
 
-def get_channel_fingerprint() -> Optional[str]:
+def get_channel_fingerprint(key: Optional[str] = None) -> Optional[str]:
     """
-    Get a display-safe fingerprint of the configured channel key.
-    
+    Get a display-safe fingerprint of a channel key.
+
+    Args:
+        key: Channel key (if None, uses configured key)
+
     Returns:
         Masked key like "ABCD-••••-••••-••••-••••-••••-••••-3456" or None
     """
     from .channel import get_channel_fingerprint as _get_fingerprint
-    return _get_fingerprint()
+    return _get_fingerprint(key)

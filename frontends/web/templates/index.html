@@ -25,10 +25,12 @@
     <div class="d-flex align-items-center justify-content-between">
         <div>
             <i class="bi bi-shield-lock me-2"></i>
-            <strong>Private Channel Active</strong>
-            <span class="text-muted ms-2">Messages are isolated to this deployment</span>
+            <strong>Private Channel Mode</strong>
         </div>
-        <code class="small">{{ channel_fingerprint }}</code>
+        <div class="key-capsule">
+            <span class="badge led-badge-yellow"><span class="led-indicator led-yellow me-1"></span>Key Loaded</span>
+            <code class="small ms-2">{{ channel_fingerprint }}</code>
+        </div>
     </div>
 </div>
 {% endif %}

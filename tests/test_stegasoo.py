@@ -1,11 +1,13 @@
 """
 Stegasoo Tests (v4.0.0)
 
-Tests for key generation, validation, encoding/decoding, and output formats.
+Tests for key generation, validation, encoding/decoding, output formats,
+and channel key functionality.
 
 Updated for v4.0.0:
 - Same API as v3.2.0 (passphrase, no date_str)
-- JPEG normalization for jpegio compatibility
+- Channel key support for deployment/group isolation
+- HEADER_OVERHEAD increased to 66 bytes (flags byte added)
 - Python 3.12 recommended (3.13 not supported)
 """
 
@@ -16,17 +18,20 @@ import io
 import stegasoo
 from stegasoo import (
     generate_pin,
-    generate_phrase,
+    generate_passphrase,
     generate_credentials,
     validate_pin,
     validate_message,
     validate_passphrase,
+    validate_channel_key,
     encode,
     decode,
     decode_text,
+    generate_channel_key,
+    get_channel_fingerprint,
     __version__,
 )
-from stegasoo.steganography import get_output_format, HEADER_OVERHEAD
+from stegasoo.steganography import get_output_format
 
 
 # =============================================================================
@@ -104,16 +109,16 @@ class TestKeygen:
             assert len(pin) == length
             assert pin.isdigit()
 
-    def test_generate_phrase_default(self):
-        """Default phrase should have 4 words (v3.2.0 change)."""
-        phrase = generate_phrase()
+    def test_generate_passphrase_default(self):
+        """Default passphrase should have 4 words (v3.2.0 change)."""
+        phrase = generate_passphrase()
         words = phrase.split()
         assert len(words) == 4  # Changed from 3 in v3.1.x
 
-    def test_generate_phrase_custom_length(self):
-        """Phrase generation should work for custom lengths."""
+    def test_generate_passphrase_custom_length(self):
+        """Passphrase generation should work for custom lengths."""
         for length in [3, 4, 5, 6, 8, 12]:
-            phrase = generate_phrase(length)
+            phrase = generate_passphrase(length)
             words = phrase.split()
             assert len(words) == length
 
@@ -287,19 +292,20 @@ class TestOutputFormat:
 
 
 # =============================================================================
-# Header Overhead Test (v3.2.0)
+# Header Overhead Test (v4.0.0)
 # =============================================================================
 
 class TestConstants:
     """Tests for constants and configuration."""
-    
+
     def test_header_overhead_value(self):
-        """Header overhead should be 65 bytes (v3.2.0 fix)."""
-        assert HEADER_OVERHEAD == 65
+        """Header overhead should be 66 bytes (v4.0.0: added flags byte)."""
+        from stegasoo.steganography import HEADER_OVERHEAD
+        assert HEADER_OVERHEAD == 66
 
 
 # =============================================================================
-# Encode/Decode Tests (v3.2.0 Updated)
+# Encode/Decode Tests (v4.0.0 Updated)
 # =============================================================================
 
 class TestEncodeDecode:
@@ -474,8 +480,8 @@ class TestEncodeDecode:
 
         assert decoded.message == message
 
-    def test_filename_has_no_date(self, png_image):
-        """v3.2.0: Output filename should not have date suffix."""
+    def test_filename_format(self, png_image):
+        """Output filename should have random hex and date suffix."""
         result = encode(
             message="Test",
             reference_photo=png_image,
@@ -483,10 +489,10 @@ class TestEncodeDecode:
             passphrase="test phrase here now",
             pin="123456"
         )
-        # Filename should be like "a1b2c3d4.png", not "a1b2c3d4_20251227.png"
-        # Check that there's no underscore followed by 8 digits
+        # Filename format: {random_hex}_{YYYYMMDD}.{ext}
+        # e.g., "a1b2c3d4_20251227.png"
         import re
-        assert not re.search(r'_\d{8}\.', result.filename)
+        assert re.search(r'^[a-f0-9]{8}_\d{8}\.png$', result.filename)
 
 
 # =============================================================================
@@ -604,4 +610,156 @@ class TestBackwardCompatibility:
                 passphrase="test phrase here now",
                 pin="123456",
                 date_str="2025-01-01"  # Removed parameter
+            )
+
+
+# =============================================================================
+# Channel Key Tests (v4.0.0)
+# =============================================================================
+
+class TestChannelKey:
+    """Tests for channel key functionality (v4.0.0)."""
+
+    def test_generate_channel_key_format(self):
+        """Generated channel key should have correct format."""
+        key = generate_channel_key()
+        # Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (8 groups of 4)
+        assert len(key) == 39
+        parts = key.split('-')
+        assert len(parts) == 8
+        for part in parts:
+            assert len(part) == 4
+            assert part.isalnum()
+
+    def test_validate_channel_key_valid(self):
+        """Valid channel key should pass validation."""
+        key = generate_channel_key()
+        assert validate_channel_key(key)
+
+    def test_validate_channel_key_invalid(self):
+        """Invalid channel key should fail validation."""
+        assert not validate_channel_key("")
+        assert not validate_channel_key("invalid")
+        assert not validate_channel_key("ABCD-1234")  # Too short
+
+    def test_channel_fingerprint_format(self):
+        """Channel fingerprint should mask middle sections."""
+        key = "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
+        fingerprint = get_channel_fingerprint(key)
+        assert fingerprint is not None
+        # First and last groups visible, middle masked
+        assert fingerprint.startswith("ABCD-")
+        assert fingerprint.endswith("-3456")
+        assert "••••" in fingerprint
+
+    def test_encode_decode_with_channel_key(self, png_image):
+        """Encode/decode should work with explicit channel key."""
+        message = "Secret with channel key!"
+        passphrase = "apple forest thunder mountain"
+        pin = "123456"
+        channel_key = generate_channel_key()
+
+        # Encode with channel key
+        result = encode(
+            message=message,
+            reference_photo=png_image,
+            carrier_image=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=channel_key
+        )
+
+        assert result.stego_image is not None
+
+        # Decode with same channel key
+        decoded = decode(
+            stego_image=result.stego_image,
+            reference_photo=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=channel_key
+        )
+
+        assert decoded.message == message
+
+    def test_decode_wrong_channel_key_fails(self, png_image):
+        """Decoding with wrong channel key should fail."""
+        message = "Secret message"
+        passphrase = "apple forest thunder mountain"
+        pin = "123456"
+        channel_key1 = generate_channel_key()
+        channel_key2 = generate_channel_key()
+
+        # Encode with one channel key
+        result = encode(
+            message=message,
+            reference_photo=png_image,
+            carrier_image=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=channel_key1
+        )
+
+        # Decode with different channel key should fail
+        with pytest.raises((stegasoo.DecryptionError, stegasoo.ExtractionError)):
+            decode(
+                stego_image=result.stego_image,
+                reference_photo=png_image,
+                passphrase=passphrase,
+                pin=pin,
+                channel_key=channel_key2
+            )
+
+    def test_encode_decode_public_mode(self, png_image):
+        """Encode/decode should work without channel key (public mode)."""
+        message = "Public message!"
+        passphrase = "apple forest thunder mountain"
+        pin = "123456"
+
+        # Encode without channel key (explicit public mode)
+        result = encode(
+            message=message,
+            reference_photo=png_image,
+            carrier_image=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=""  # Explicit public mode
+        )
+
+        # Decode without channel key
+        decoded = decode(
+            stego_image=result.stego_image,
+            reference_photo=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=""  # Explicit public mode
+        )
+
+        assert decoded.message == message
+
+    def test_channel_key_mismatch_public_vs_private(self, png_image):
+        """Decoding public message with channel key should fail."""
+        message = "Public message"
+        passphrase = "apple forest thunder mountain"
+        pin = "123456"
+
+        # Encode without channel key (public)
+        result = encode(
+            message=message,
+            reference_photo=png_image,
+            carrier_image=png_image,
+            passphrase=passphrase,
+            pin=pin,
+            channel_key=""  # Public mode
+        )
+
+        # Decode with channel key should fail
+        channel_key = generate_channel_key()
+        with pytest.raises((stegasoo.DecryptionError, stegasoo.ExtractionError)):
+            decode(
+                stego_image=result.stego_image,
+                reference_photo=png_image,
+                passphrase=passphrase,
+                pin=pin,
+                channel_key=channel_key
             )
