@@ -52,6 +52,59 @@
     color: rgba(246, 173, 85, 0.4);
     letter-spacing: 1px;
 }
+
+/* QR Crop Animation */
+.qr-crop-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.qr-crop-container img {
+    display: block;
+    max-height: 120px;
+    width: auto;
+    margin: 0 auto;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qr-crop-container .qr-original {
+    opacity: 1;
+}
+
+.qr-crop-container .qr-cropped {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+    max-height: 100px;
+}
+
+.qr-crop-container.animating .qr-original {
+    opacity: 0;
+    transform: scale(1.1);
+    filter: blur(4px);
+}
+
+.qr-crop-container.animating .qr-cropped {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.qr-crop-container .crop-badge {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    font-size: 0.65rem;
+    opacity: 0;
+    transition: opacity 0.3s ease 0.4s;
+}
+
+.qr-crop-container.animating .crop-badge {
+    opacity: 1;
+}
 </style>
 
 <div class="row justify-content-center">
@@ -302,7 +355,12 @@
                                         <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
                                         <span class="text-muted small">Drop QR image or click to browse</span>
                                     </div>
-                                    <img class="drop-zone-preview d-none" id="qrPreview" style="max-height: 80px;">
+                                    <!-- Crop animation container -->
+                                    <div class="qr-crop-container d-none" id="qrCropContainer">
+                                        <img class="qr-original" id="qrOriginal" alt="Original">
+                                        <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
+                                        <span class="crop-badge badge bg-success"><i class="bi bi-crop me-1"></i>Detected</span>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -806,47 +864,82 @@ document.addEventListener('paste', function(e) {
     }
 });
 
-// QR Code RSA Key scanning
+// QR Code RSA Key scanning with crop animation
 const rsaQrInput = document.getElementById('rsaQrInput');
-const qrPreview = document.getElementById('qrPreview');
+const qrCropContainer = document.getElementById('qrCropContainer');
+const qrOriginal = document.getElementById('qrOriginal');
+const qrCropped = document.getElementById('qrCropped');
+
 if (rsaQrInput) {
     rsaQrInput.addEventListener('change', function() {
         if (this.files && this.files[0]) {
             const file = this.files[0];
             
-            // Show image preview
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    if (qrPreview) {
-                        qrPreview.src = e.target.result;
-                        qrPreview.classList.remove('d-none');
+            if (!file.type.startsWith('image/')) return;
+            
+            // Reset animation state
+            qrCropContainer.classList.remove('animating');
+            qrCropContainer.classList.add('d-none');
+            
+            // Show original image first
+            const reader = new FileReader();
+            reader.onload = e => {
+                qrOriginal.src = e.target.result;
+                qrCropContainer.classList.remove('d-none');
+                
+                // Hide the label
+                document.querySelector('#qrDropZone .drop-zone-label').classList.add('d-none');
+                
+                // Now fetch cropped version and animate
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                fetch('/qr/crop', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('No QR code detected');
                     }
-                };
-                reader.readAsDataURL(file);
-            }
-            
-            // Extract key from QR
-            const formData = new FormData();
-            formData.append('qr_image', file);
-            
-            fetch('/extract-key-from-qr', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    alert('QR decode failed: ' + data.error);
-                    return;
-                }
-                // Visual feedback
-                document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
-                    '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded from QR';
-            })
-            .catch(err => {
-                alert('QR decode failed: ' + err);
-            });
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Load cropped image
+                    const croppedUrl = URL.createObjectURL(blob);
+                    qrCropped.src = croppedUrl;
+                    
+                    // Wait a moment to show original, then animate
+                    setTimeout(() => {
+                        qrCropContainer.classList.add('animating');
+                    }, 400);
+                    
+                    // Also verify key extraction works
+                    const keyFormData = new FormData();
+                    keyFormData.append('qr_image', file);
+                    
+                    return fetch('/extract-key-from-qr', {
+                        method: 'POST',
+                        body: keyFormData
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
+                            '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded';
+                        document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
+                    }
+                })
+                .catch(err => {
+                    // Crop failed - just show original with error
+                    console.log('QR crop/extract error:', err);
+                    document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
+                        '<i class="bi bi-exclamation-triangle text-warning me-1"></i>No QR detected';
+                    document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
+                });
+            };
+            reader.readAsDataURL(file);
         }
     });
 }

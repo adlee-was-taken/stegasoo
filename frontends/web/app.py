@@ -89,6 +89,7 @@ from stegasoo.qr_utils import (
     compress_data, decompress_data, auto_decompress,
     is_compressed, can_fit_in_qr, needs_compression,
     generate_qr_code, read_qr_code, extract_key_from_qr,
+    detect_and_crop_qr,
     has_qr_write, has_qr_read,
     QR_MAX_BINARY, COMPRESSION_PREFIX
 )
@@ -366,6 +367,43 @@ def generate_qr_download(token):
         )
     except Exception as e:
         return f"Error generating QR code: {e}", 500
+
+
+@app.route('/qr/crop', methods=['POST'])
+def qr_crop():
+    """
+    Detect and crop QR code from an image.
+    
+    Useful for extracting QR codes from photos taken at an angle,
+    with extra background, etc. Returns the cropped QR as PNG.
+    """
+    if not HAS_QRCODE_READ:
+        return jsonify({'error': 'QR code reading not available (install pyzbar)'}), 501
+    
+    image_file = request.files.get('image')
+    if not image_file:
+        return jsonify({'error': 'No image provided'}), 400
+    
+    try:
+        image_data = image_file.read()
+        
+        # Use the new crop function
+        cropped = detect_and_crop_qr(image_data)
+        
+        if cropped is None:
+            return jsonify({'error': 'No QR code detected in image'}), 404
+        
+        # Return as downloadable PNG or inline based on query param
+        as_attachment = request.args.get('download', '').lower() in ('1', 'true', 'yes')
+        
+        return send_file(
+            io.BytesIO(cropped),
+            mimetype='image/png',
+            as_attachment=as_attachment,
+            download_name='cropped_qr.png'
+        )
+    except Exception as e:
+        return jsonify({'error': f'Error processing image: {e}'}), 500
 
 
 @app.route('/generate/download-key', methods=['POST'])
