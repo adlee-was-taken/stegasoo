@@ -64,14 +64,36 @@ from stegasoo import (
     
     # Models
     FilePayload,
-    
-    # Constants
-    EMBED_MODE_LSB,
-    EMBED_MODE_DCT,
-    EMBED_MODE_AUTO,
-    DEFAULT_PASSPHRASE_WORDS,
-    DEFAULT_PIN_LENGTH,
 )
+
+# Import constants - try main module first, then constants submodule
+try:
+    from stegasoo import (
+        EMBED_MODE_LSB,
+        EMBED_MODE_DCT,
+        EMBED_MODE_AUTO,
+    )
+except ImportError:
+    from stegasoo.constants import (
+        EMBED_MODE_LSB,
+        EMBED_MODE_DCT,
+        EMBED_MODE_AUTO,
+    )
+
+# Import constants that may not be in main __init__
+try:
+    from stegasoo.constants import (
+        DEFAULT_PASSPHRASE_WORDS,
+        DEFAULT_PIN_LENGTH,
+        MIN_PIN_LENGTH,
+        MAX_PIN_LENGTH,
+    )
+except ImportError:
+    # Fallback defaults if constants not available
+    DEFAULT_PASSPHRASE_WORDS = 4
+    DEFAULT_PIN_LENGTH = 6
+    MIN_PIN_LENGTH = 6
+    MAX_PIN_LENGTH = 9
 
 # Optional: strip_image_metadata from utils
 try:

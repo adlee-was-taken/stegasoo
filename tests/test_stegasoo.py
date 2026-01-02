@@ -1,12 +1,12 @@
 """
-Stegasoo Tests (v3.2.0)
+Stegasoo Tests (v4.0.0)
 
 Tests for key generation, validation, encoding/decoding, and output formats.
 
-Updated for v3.2.0:
-- Single passphrase instead of daily phrases
-- No date_str parameter
-- passphrase_words parameter (default 4)
+Updated for v4.0.0:
+- Same API as v3.2.0 (passphrase, no date_str)
+- JPEG normalization for jpegio compatibility
+- Python 3.12 recommended (3.13 not supported)
 """
 
 import pytest
@@ -569,14 +569,11 @@ class TestVersion:
         assert len(parts) >= 2
         assert all(p.isdigit() for p in parts[:2])
 
-    def test_version_is_3_2_0(self):
-        """Version should be 3.2.0 or higher."""
+    def test_version_is_4_0_0(self):
+        """Version should be 4.0.0 or higher."""
         parts = stegasoo.__version__.split('.')
         major = int(parts[0])
-        minor = int(parts[1])
-        assert major >= 3
-        if major == 3:
-            assert minor >= 2
+        assert major >= 4
 
 
 # =============================================================================

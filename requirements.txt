@@ -27,6 +27,11 @@ click>=8.1.0
 pytest>=7.4.0
 pytest-cov>=4.1.0
 
+
+scipy>=1.16.3
+jpegio>=0.2.8
+numpy>=2.4.0
+
 # Optional: Better performance for Pillow
 # pillow-simd>=9.0.0  # Uncomment if available for your platform
 

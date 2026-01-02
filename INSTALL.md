@@ -12,8 +12,6 @@ Complete installation instructions for all platforms and deployment methods.
   - [Docker](#docker)
   - [Docker Compose](#docker-compose)
 - [Optional Dependencies](#optional-dependencies)
-  - [DCT Steganography (scipy + jpegio)](#dct-steganography-scipy--jpegio)
-  - [Compression (lz4)](#compression-lz4)
 - [Platform-Specific Notes](#platform-specific-notes)
 - [Verification](#verification)
 - [Troubleshooting](#troubleshooting)
@@ -22,11 +20,22 @@ Complete installation instructions for all platforms and deployment methods.
 
 ## Requirements
 
+### ⚠️ Python Version Requirements
+
+| Python Version | Status | Notes |
+|----------------|--------|-------|
+| 3.10 | ✅ Supported | |
+| 3.11 | ✅ Supported | Recommended |
+| 3.12 | ✅ Supported | Recommended |
+| 3.13 | ❌ **Not Supported** | jpegio C extension incompatible |
+
+**Important:** Python 3.13 (released October 2024) is **not compatible** with jpegio due to C extension ABI changes. Use Python 3.12 or earlier.
+
 ### Minimum Requirements
 
-| Requirement | Version |
-|-------------|---------|
-| Python | 3.10+ |
+| Requirement | Value |
+|-------------|-------|
+| Python | 3.10-3.12 |
 | RAM | 512 MB minimum (256MB for Argon2) |
 | Disk | ~100 MB |
 
@@ -36,7 +45,8 @@ Complete installation instructions for all platforms and deployment methods.
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
-  python3 \
+  python3.12 \
+  python3.12-venv \
   python3-pip \
   python3-dev \
   libzbar0 \
@@ -44,14 +54,24 @@ sudo apt-get install -y \
   build-essential
 ```
 
+**Linux (Arch):**
+```bash
+# Use pyenv for Python version management
+curl https://pyenv.run | bash
+pyenv install 3.12
+pyenv local 3.12
+
+sudo pacman -S zbar libjpeg-turbo base-devel
+```
+
 **macOS:**
 ```bash
-brew install python@3.11 zbar jpeg
+brew install python@3.12 zbar jpeg
 xcode-select --install  # For compilation
 ```
 
 **Windows:**
-- Install Python 3.10+ from [python.org](https://python.org)
+- Install Python 3.12 from [python.org](https://python.org)
 - Install Visual Studio Build Tools for compilation
 
 ---
@@ -62,10 +82,18 @@ xcode-select --install  # For compilation
 # Clone and install everything
 git clone https://github.com/adlee-was-taken/stegasoo.git
 cd stegasoo
+
+# Create venv with Python 3.12 (critical!)
+python3.12 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or: venv\Scripts\activate  # Windows
+
+# Install all dependencies
 pip install -e ".[all]"
 
 # Verify
 stegasoo --version
+python -c "from stegasoo import has_dct_support; print(f'DCT: {has_dct_support()}')"
 ```
 
 ---
@@ -81,10 +109,13 @@ Best for development or customization.
 git clone https://github.com/adlee-was-taken/stegasoo.git
 cd stegasoo
 
-# Create virtual environment (recommended)
-python -m venv venv
+# Create virtual environment with Python 3.12 (recommended)
+python3.12 -m venv venv
 source venv/bin/activate  # Linux/macOS
 # or: venv\Scripts\activate  # Windows
+
+# Verify Python version
+python -V  # Should show 3.12.x
 
 # Install core library only
 pip install -e .
@@ -161,7 +192,7 @@ docker run -it --rm stegasoo-cli /bin/bash
 
 # Run commands directly
 docker run --rm stegasoo-cli --help
-docker run --rm stegasoo-cli generate --pin --words 3
+docker run --rm stegasoo-cli generate --pin --words 4
 
 # With volume for files
 docker run --rm \
@@ -169,7 +200,7 @@ docker run --rm \
   stegasoo-cli encode \
     -r /data/ref.jpg \
     -c /data/carrier.png \
-    -p "phrase words here" \
+    -p "passphrase words here more" \
     --pin 123456 \
     -m "Secret message" \
     -o /data/stego.png
@@ -237,77 +268,6 @@ Adjust based on your available RAM:
 | 4 GB | 1G | 3 |
 | 8 GB+ | 1.5G | 4 |
 
-#### Development Mode
-
-For development with hot-reload:
-
-```bash
-# Create docker-compose.override.yml
-cat > docker-compose.override.yml << 'EOF'
-version: '3.8'
-services:
-  web:
-    volumes:
-      - ./src:/app/src:ro
-      - ./frontends/web:/app/frontends/web:ro
-    environment:
-      - FLASK_ENV=development
-    command: ["python", "app.py"]
-  api:
-    volumes:
-      - ./src:/app/src:ro
-      - ./frontends/api:/app/frontends/api:ro
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-EOF
-
-# Start with override
-docker-compose up
-```
-
-#### Production with Nginx
-
-For production deployment with SSL:
-
-```yaml
-# docker-compose.prod.yml
-version: '3.8'
-
-services:
-  web:
-    build:
-      context: .
-      target: web
-    expose:
-      - "5000"
-    restart: always
-
-  api:
-    build:
-      context: .
-      target: api
-    expose:
-      - "8000"
-    restart: always
-
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-    depends_on:
-      - web
-      - api
-    restart: always
-```
-
-Run with:
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
 ---
 
 ## Optional Dependencies
@@ -320,9 +280,9 @@ DCT mode enables JPEG-resilient steganography. It's automatically included with 
 
 ```bash
 # scipy is straightforward
-pip install scipy
+pip install scipy numpy
 
-# jpegio - try pip first
+# jpegio - MUST use Python 3.12 or earlier!
 pip install jpegio
 
 # If pip fails, build from source
@@ -382,19 +342,37 @@ Most straightforward installation. Use your package manager for system dependenc
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt-get install python3-dev libzbar0 libjpeg-dev
+sudo apt-get install python3.12 python3.12-venv python3-dev libzbar0 libjpeg-dev
+python3.12 -m venv venv
+source venv/bin/activate
 pip install stegasoo[all]
 ```
 
 **Fedora/RHEL:**
 ```bash
-sudo dnf install python3-devel zbar libjpeg-devel
+sudo dnf install python3.12 python3-devel zbar libjpeg-devel
+python3.12 -m venv venv
+source venv/bin/activate
 pip install stegasoo[all]
 ```
 
-**Arch:**
+**Arch (using pyenv):**
 ```bash
-sudo pacman -S python zbar libjpeg-turbo
+# Install pyenv
+curl https://pyenv.run | bash
+
+# Add to ~/.bashrc or ~/.zshrc
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+
+# Install Python 3.12
+pyenv install 3.12
+cd ~/Sources/stegasoo
+pyenv local 3.12
+
+# Create venv and install
+python -m venv venv
+source venv/bin/activate
 pip install stegasoo[all]
 ```
 
@@ -405,44 +383,37 @@ pip install stegasoo[all]
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install dependencies
-brew install python@3.11 zbar jpeg
+brew install python@3.12 zbar jpeg
+
+# Create venv
+python3.12 -m venv venv
+source venv/bin/activate
 
 # Install Stegasoo
-pip3 install stegasoo[all]
+pip install stegasoo[all]
 ```
 
 **Apple Silicon (M1/M2/M3):**
 
-jpegio may need Rosetta or native compilation:
+jpegio may need native compilation:
 ```bash
-# Try native first
+# Ensure you have native Python
+arch -arm64 brew install python@3.12
+arch -arm64 python3.12 -m venv venv
+source venv/bin/activate
 pip install jpegio
-
-# If fails, ensure you have native Python
-arch -arm64 brew install python@3.11
-arch -arm64 pip3 install jpegio
 ```
 
 ### Windows
 
-1. Install Python 3.10+ from [python.org](https://python.org)
+1. Install Python 3.12 from [python.org](https://python.org) (NOT 3.13!)
 2. Install Visual Studio Build Tools
 3. Install from pip:
 
 ```powershell
+python -m venv venv
+.\venv\Scripts\activate
 pip install stegasoo[all]
-```
-
-**For jpegio on Windows:**
-```powershell
-# May need pre-built wheel
-pip install jpegio
-
-# If fails, install build tools and compile
-pip install cython numpy
-git clone https://github.com/dwgoon/jpegio.git
-cd jpegio
-python setup.py install
 ```
 
 ### Raspberry Pi
@@ -474,6 +445,9 @@ stegasoo --version
 
 # Python import
 python -c "import stegasoo; print(stegasoo.__version__)"
+
+# Check Python version (must be 3.10-3.12)
+python -V
 ```
 
 ### Check All Features
@@ -481,6 +455,8 @@ python -c "import stegasoo; print(stegasoo.__version__)"
 ```python
 #!/usr/bin/env python3
 """Verify Stegasoo installation."""
+
+import sys
 
 def check_feature(name, check_fn):
     try:
@@ -495,9 +471,20 @@ def check_feature(name, check_fn):
 print("Stegasoo Installation Check")
 print("=" * 40)
 
+# Python version check
+py_version = sys.version_info
+print(f"\nPython: {py_version.major}.{py_version.minor}.{py_version.micro}")
+if py_version >= (3, 13):
+    print("  ⚠️  WARNING: Python 3.13+ not supported!")
+    print("      jpegio will not work. Use Python 3.12.")
+elif py_version >= (3, 10):
+    print("  ✓ Python version OK")
+else:
+    print("  ✗ Python 3.10+ required")
+
 # Core
 import stegasoo
-print(f"\nVersion: {stegasoo.__version__}")
+print(f"\nStegasoo Version: {stegasoo.__version__}")
 
 print("\nCore Features:")
 check_feature("Argon2", lambda: stegasoo.has_argon2())
@@ -556,7 +543,7 @@ python check_install.py
 
 ```bash
 # Quick test with CLI
-stegasoo generate --pin --words 3 --json > /tmp/creds.json
+stegasoo generate --pin --words 4 --json > /tmp/creds.json
 
 # Create test image
 python -c "
@@ -570,7 +557,7 @@ img.save('/tmp/test_ref.jpg')
 stegasoo encode \
   -r /tmp/test_ref.jpg \
   -c /tmp/test_carrier.png \
-  -p "test phrase words" \
+  -p "test phrase words here" \
   --pin 123456 \
   -m "Hello, Stegasoo!" \
   -o /tmp/test_stego.png
@@ -579,7 +566,7 @@ stegasoo encode \
 stegasoo decode \
   -r /tmp/test_ref.jpg \
   -s /tmp/test_stego.png \
-  -p "test phrase words" \
+  -p "test phrase words here" \
   --pin 123456
 ```
 
@@ -588,6 +575,25 @@ stegasoo decode \
 ## Troubleshooting
 
 ### Common Issues
+
+#### "jpegio crashes" / "free(): invalid size" / Core dump
+
+**This is the #1 issue!** You're using Python 3.13.
+
+```bash
+# Check your Python version
+python -V
+
+# If it shows 3.13, you need to use 3.12
+# Option 1: Use pyenv
+pyenv install 3.12
+pyenv local 3.12
+
+# Option 2: Use system Python 3.12
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -e ".[all]"
+```
 
 #### "No module named 'stegasoo'"
 
@@ -611,7 +617,7 @@ sudo apt-get install libffi-dev
 pip install --force-reinstall argon2-cffi
 ```
 
-#### "jpegio not available" / DCT JPEG fails
+#### "jpegio not available" (not crash, just missing)
 
 ```bash
 # Install build dependencies first
@@ -656,23 +662,12 @@ deploy:
       memory: 768M
 ```
 
-#### Docker: Build fails on jpegio
-
-The Dockerfile includes jpegio build dependencies. If still failing:
-
-```bash
-# Rebuild without cache
-docker-compose build --no-cache
-
-# Or build manually
-docker build --no-cache -t stegasoo-web --target web .
-```
-
 #### Slow performance
 
 - **Argon2 is intentionally slow** - This is a security feature
 - Expected encode/decode time: 2-5 seconds
 - DCT mode adds ~1-2 seconds for transforms
+- Large images (10MB+) may take 15-30 seconds
 
 #### "Carrier image too small"
 
@@ -704,7 +699,7 @@ docker build --no-cache -t stegasoo-web --target web .
 
 After installation:
 
-1. **Generate credentials**: `stegasoo generate --pin --words 3`
+1. **Generate credentials**: `stegasoo generate --pin --words 4`
 2. **Read the CLI docs**: [CLI.md](CLI.md)
 3. **Try the Web UI**: `cd frontends/web && python app.py`
 4. **Explore the API**: `cd frontends/api && python main.py`

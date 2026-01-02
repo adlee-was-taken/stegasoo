@@ -3,6 +3,57 @@
 {% block title %}Encode Message - Stegasoo{% endblock %}
 
 {% block content %}
+<style>
+/* Glowing passphrase input */
+.passphrase-input-container {
+    position: relative;
+}
+
+.passphrase-input {
+    background: rgba(30, 40, 50, 0.8) !important;
+    border: 2px solid rgba(99, 179, 237, 0.3) !important;
+    color: #63b3ed !important;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+    padding: 12px 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.passphrase-input:focus {
+    border-color: rgba(99, 179, 237, 0.8) !important;
+    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4), 0 0 40px rgba(99, 179, 237, 0.2) !important;
+    background: rgba(30, 40, 50, 0.95) !important;
+}
+
+.passphrase-input::placeholder {
+    color: rgba(99, 179, 237, 0.4);
+}
+
+/* Glowing PIN input */
+.pin-input-container .form-control {
+    background: rgba(30, 40, 50, 0.8) !important;
+    border: 2px solid rgba(246, 173, 85, 0.3) !important;
+    color: #f6ad55 !important;
+    font-family: 'Courier New', monospace;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.pin-input-container .form-control:focus {
+    border-color: rgba(246, 173, 85, 0.8) !important;
+    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4), 0 0 40px rgba(246, 173, 85, 0.2) !important;
+    background: rgba(30, 40, 50, 0.95) !important;
+}
+
+.pin-input-container .form-control::placeholder {
+    color: rgba(246, 173, 85, 0.4);
+    letter-spacing: 1px;
+}
+</style>
+
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card">
@@ -11,7 +62,7 @@
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
-                    <!-- v3.2.0: Removed client_date hidden field -->
+                    <!-- Removed client_date hidden field -->
                     
                     <!-- Embedding Mode Selection -->
                     <div class="mb-4">
@@ -182,15 +233,16 @@
                         </div>
                     </div>
                     
-                    <!-- v3.2.0: Renamed from day_phrase to passphrase, removed date selection -->
+                    <!-- Passphrase input with glow styling -->
                     <div class="mb-3">
                         <label class="form-label" id="passphraseLabel">
                             <i class="bi bi-chat-quote me-1"></i> Passphrase
-                            <span class="badge bg-success ms-2">v3.2.0</span>
                         </label>
-                        <input type="text" name="passphrase" class="form-control" 
-                               placeholder="e.g., apple forest thunder mountain" required
-                               id="passphraseInput">
+                        <div class="passphrase-input-container">
+                            <input type="text" name="passphrase" class="form-control passphrase-input" 
+                                   placeholder="e.g., apple forest thunder mountain" required
+                                   id="passphraseInput">
+                        </div>
                         <div class="form-text">
                             Your passphrase for this message
                         </div>
@@ -210,8 +262,8 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                           <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
-                          <div class="input-group">
-                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9" style="max-width: 140px;">
+                          <div class="input-group pin-input-container">
+                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
                             <button class="btn btn-outline-secondary" type="button" id="togglePin">
                               <i class="bi bi-eye"></i>
                             </button>
@@ -250,6 +302,7 @@
                                         <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
                                         <span class="text-muted small">Drop QR image or click to browse</span>
                                     </div>
+                                    <img class="drop-zone-preview d-none" id="qrPreview" style="max-height: 80px;">
                                 </div>
                             </div>
                             
@@ -406,12 +459,33 @@ function updatePayloadSection() {
 payloadTextRadio.addEventListener('change', updatePayloadSection);
 payloadFileRadio.addEventListener('change', updatePayloadSection);
 
-// Passphrase validation (v3.2.0)
+// Passphrase validation and auto-resize font
 const passphraseInput = document.getElementById('passphraseInput');
 const passphraseWarning = document.getElementById('passphraseWarning');
 
+// Stepped font sizes (characters -> rem)
+const fontSizeSteps = [
+    { maxChars: 30, size: 1.1 },
+    { maxChars: 45, size: 1.0 },
+    { maxChars: 60, size: 0.95 },
+    { maxChars: Infinity, size: 0.9 }
+];
+
+function adjustPassphraseFontSize() {
+    if (!passphraseInput) return;
+    const len = passphraseInput.value.length;
+    
+    for (const step of fontSizeSteps) {
+        if (len <= step.maxChars) {
+            passphraseInput.style.fontSize = step.size + 'rem';
+            break;
+        }
+    }
+}
+
 if (passphraseInput) {
     passphraseInput.addEventListener('input', function() {
+        // Word count warning
         const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
         const recommendedWords = {{ recommended_passphrase_words }};
         
@@ -420,7 +494,13 @@ if (passphraseInput) {
         } else {
             passphraseWarning.style.display = 'none';
         }
+        
+        // Auto-resize font
+        adjustPassphraseFontSize();
     });
+    
+    // Initial font size adjustment
+    adjustPassphraseFontSize();
 }
 
 // Payload file info display
@@ -728,11 +808,27 @@ document.addEventListener('paste', function(e) {
 
 // QR Code RSA Key scanning
 const rsaQrInput = document.getElementById('rsaQrInput');
+const qrPreview = document.getElementById('qrPreview');
 if (rsaQrInput) {
     rsaQrInput.addEventListener('change', function() {
         if (this.files && this.files[0]) {
+            const file = this.files[0];
+            
+            // Show image preview
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    if (qrPreview) {
+                        qrPreview.src = e.target.result;
+                        qrPreview.classList.remove('d-none');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            // Extract key from QR
             const formData = new FormData();
-            formData.append('qr_image', this.files[0]);
+            formData.append('qr_image', file);
             
             fetch('/extract-key-from-qr', {
                 method: 'POST',

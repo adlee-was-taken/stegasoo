@@ -234,15 +234,16 @@ def calculate_capacity(image_data: bytes, bits_per_channel: int = 1) -> int:
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
     
     img_file = Image.open(io.BytesIO(image_data))
-    img = img_file.convert('RGB') if img_file.mode != 'RGB' else img_file
-    
-    num_pixels = img.size[0] * img.size[1]
-    bits_per_pixel = 3 * bits_per_channel
-    max_bytes = (num_pixels * bits_per_pixel) // 8
-    
-    capacity = max(0, max_bytes - ENCRYPTION_OVERHEAD)
-    debug.print(f"LSB capacity: {capacity} bytes at {bits_per_channel} bit(s)/channel")
-    return capacity
+    try:
+        num_pixels = img_file.size[0] * img_file.size[1]
+        bits_per_pixel = 3 * bits_per_channel
+        max_bytes = (num_pixels * bits_per_pixel) // 8
+        
+        capacity = max(0, max_bytes - ENCRYPTION_OVERHEAD)
+        debug.print(f"LSB capacity: {capacity} bytes at {bits_per_channel} bit(s)/channel")
+        return capacity
+    finally:
+        img_file.close()
 
 
 def calculate_capacity_by_mode(
@@ -279,7 +280,10 @@ def calculate_capacity_by_mode(
     else:
         capacity = calculate_capacity(image_data, bits_per_channel)
         img = Image.open(io.BytesIO(image_data))
-        width, height = img.size
+        try:
+            width, height = img.size
+        finally:
+            img.close()
         
         return {
             'mode': EMBED_MODE_LSB,
@@ -378,7 +382,10 @@ def compare_modes(image_data: bytes) -> dict:
         Dict with comparison of LSB vs DCT modes
     """
     img = Image.open(io.BytesIO(image_data))
-    width, height = img.size
+    try:
+        width, height = img.size
+    finally:
+        img.close()
     
     lsb_bytes = calculate_capacity(image_data, 1)
     
@@ -590,6 +597,10 @@ def _embed_lsb(
     debug.validate(len(pixel_key) == 32,
                 f"Pixel key must be 32 bytes, got {len(pixel_key)}")
     
+    img_file = None
+    img = None
+    stego_img = None
+    
     try:
         img_file = Image.open(io.BytesIO(image_data))
         input_format = img_file.format
@@ -690,6 +701,14 @@ def _embed_lsb(
     except Exception as e:
         debug.exception(e, "embed_lsb")
         raise EmbeddingError(f"Failed to embed data: {e}") from e
+    finally:
+        # Properly close all PIL Images to prevent memory leaks
+        if stego_img is not None:
+            stego_img.close()
+        if img is not None and img is not img_file:
+            img.close()
+        if img_file is not None:
+            img_file.close()
 
 
 # =============================================================================
@@ -768,6 +787,9 @@ def _extract_lsb(
     debug.validate(bits_per_channel in (1, 2),
                 f"bits_per_channel must be 1 or 2, got {bits_per_channel}")
     
+    img_file = None
+    img = None
+    
     try:
         img_file = Image.open(io.BytesIO(image_data))
         debug.print(f"Image: {img_file.size[0]}x{img_file.size[1]}, format: {img_file.format}")
@@ -843,6 +865,12 @@ def _extract_lsb(
     except Exception as e:
         debug.exception(e, "extract_lsb")
         return None
+    finally:
+        # Properly close all PIL Images to prevent memory leaks
+        if img is not None and img is not img_file:
+            img.close()
+        if img_file is not None:
+            img_file.close()
 
 
 # =============================================================================
@@ -853,18 +881,24 @@ def get_image_dimensions(image_data: bytes) -> Tuple[int, int]:
     """Get image dimensions without loading full image."""
     debug.validate(len(image_data) > 0, "Image data cannot be empty")
     img = Image.open(io.BytesIO(image_data))
-    dimensions = img.size
-    debug.print(f"Image dimensions: {dimensions[0]}x{dimensions[1]}")
-    return dimensions
+    try:
+        dimensions = img.size
+        debug.print(f"Image dimensions: {dimensions[0]}x{dimensions[1]}")
+        return dimensions
+    finally:
+        img.close()
 
 
 def get_image_format(image_data: bytes) -> Optional[str]:
     """Get image format (PIL format string like 'PNG', 'JPEG')."""
     try:
         img = Image.open(io.BytesIO(image_data))
-        format_str = img.format
-        debug.print(f"Image format: {format_str}")
-        return format_str
+        try:
+            format_str = img.format
+            debug.print(f"Image format: {format_str}")
+            return format_str
+        finally:
+            img.close()
     except Exception as e:
         debug.print(f"Failed to get image format: {e}")
         return None

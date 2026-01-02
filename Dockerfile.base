@@ -1,0 +1,55 @@
+# Stegasoo Base Image
+# Contains all slow-to-compile dependencies (jpegio, scipy, argon2)
+# Build once: docker build -f Dockerfile.base -t stegasoo-base:latest .
+# Push to registry for team use: docker push yourregistry/stegasoo-base:latest
+
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_ROOT_USER_ACTION=ignore
+
+# Install system dependencies
+# NOTE: g++ is required for jpegio C++ compilation
+# NOTE: libjpeg-dev is required for jpegio
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libc-dev \
+    libffi-dev \
+    libzbar0 \
+    libjpeg-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the slow-to-compile packages
+# These rarely change, so they get cached in this base image
+RUN pip install --no-cache-dir \
+    cython \
+    numpy \
+    scipy>=1.10.0 \
+    jpegio>=0.2.0 \
+    argon2-cffi>=23.0.0 \
+    pillow>=10.0.0 \
+    cryptography>=41.0.0
+
+# Install web/api framework packages (also stable)
+RUN pip install --no-cache-dir \
+    flask>=3.0.0 \
+    gunicorn>=21.0.0 \
+    fastapi>=0.100.0 \
+    "uvicorn[standard]>=0.20.0" \
+    python-multipart>=0.0.6 \
+    qrcode>=7.3.0 \
+    pyzbar>=0.1.9 \
+    click>=8.0.0 \
+    lz4>=4.0.0
+
+# Verify key packages work
+RUN python -c "import jpegio; import scipy; import numpy; print('jpegio + scipy + numpy OK')"
+
+# Label for tracking
+LABEL org.opencontainers.image.title="Stegasoo Base"
+LABEL org.opencontainers.image.description="Pre-compiled dependencies for Stegasoo"
+LABEL org.opencontainers.image.version="4.0.0"

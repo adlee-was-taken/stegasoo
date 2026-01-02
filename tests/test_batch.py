@@ -1,7 +1,7 @@
 """
-Tests for Stegasoo batch processing module (v3.2.0).
+Tests for Stegasoo batch processing module (v4.0.0).
 
-Updated for v3.2.0:
+Updated for v4.0.0:
 - Uses 'passphrase' instead of 'phrase' in credentials dict
 - No date_str parameter
 - BatchCredentials.passphrase is a single string

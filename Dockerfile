@@ -1,19 +1,32 @@
 # Stegasoo Docker Image
-# Multi-stage build for smaller image size
+# Uses pre-built base image for fast rebuilds
+#
+# First time setup:
+#   docker build -f Dockerfile.base -t stegasoo-base:latest .
+#
+# Then build normally (fast!):
+#   docker-compose build
+#
+# Or if you don't have the base image, this falls back to building deps
+# (slow, but works)
 
-# Pin the base image digest for reproducibility
-# To update: docker manifest inspect python:3.11-slim -v | jq -r '.[0].Descriptor.digest'
-FROM python:3.11-slim@sha256:5501a4fe605abe24de87c2f3d6cf9fd760354416a0cad0296cf284fddcdca9e2 as base
+# ============================================================================
+# ARG to switch between base image and full build
+# ============================================================================
+ARG USE_BASE_IMAGE=true
 
-# Set environment variables
+# ============================================================================
+# Base stage - use pre-built image if available
+# ============================================================================
+FROM stegasoo-base:latest AS base-prebuilt
+
+FROM python:3.12-slim AS base-full
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-# Suppress pip "running as root" warnings during build
 ENV PIP_ROOT_USER_ACTION=ignore
 
 # Install system dependencies
-# NOTE: g++ is required for jpegio C++ compilation
-# NOTE: libjpeg-dev is required for jpegio
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -21,37 +34,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     libzbar0 \
     libjpeg-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install ALL dependencies (slow path)
+RUN pip install --no-cache-dir \
+    cython numpy scipy>=1.10.0 jpegio>=0.2.0 \
+    argon2-cffi>=23.0.0 pillow>=10.0.0 cryptography>=41.0.0 \
+    flask>=3.0.0 gunicorn>=21.0.0 \
+    fastapi>=0.100.0 "uvicorn[standard]>=0.20.0" python-multipart>=0.0.6 \
+    qrcode>=7.3.0 pyzbar>=0.1.9 click>=8.0.0 lz4>=4.0.0
+
 # ============================================================================
-# Builder stage - install Python packages
+# Select which base to use (default: prebuilt)
 # ============================================================================
-FROM base as builder
-
-WORKDIR /build
-
-# Copy package files (including README.md which pyproject.toml references)
-COPY pyproject.toml README.md ./
-COPY src/ src/
-COPY data/ data/
-
-# Install build dependencies for jpegio, then install the package
-# jpegio requires Cython and numpy to compile
-RUN pip install --no-cache-dir cython numpy && \
-    pip install --no-cache-dir ".[web]"
+FROM base-prebuilt AS base
 
 # ============================================================================
 # Production stage - Web UI
 # ============================================================================
-FROM base as web
+FROM base AS web
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Copy application files
+# Copy application files (this is all that rebuilds normally!)
 COPY src/ src/
 COPY data/ data/
 COPY frontends/web/ frontends/web/
@@ -75,25 +81,18 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run with gunicorn
 WORKDIR /app/frontends/web
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "60", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]
 
 # ============================================================================
 # API stage - REST API
 # ============================================================================
-FROM base as api
+FROM base AS api
 
 WORKDIR /app
 
-# Install API extras (includes DCT dependencies)
-COPY pyproject.toml README.md ./
+# Copy application files
 COPY src/ src/
 COPY data/ data/
-
-# Install build dependencies for jpegio, then install the package
-RUN pip install --no-cache-dir cython numpy && \
-    pip install --no-cache-dir ".[api]"
-
-# Copy API files
 COPY frontends/api/ frontends/api/
 
 # Create non-root user
@@ -117,20 +116,13 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 # ============================================================================
 # CLI stage - Command line tool
 # ============================================================================
-FROM base as cli
+FROM base AS cli
 
 WORKDIR /app
 
-# Install CLI extras
-COPY pyproject.toml README.md ./
+# Copy application files
 COPY src/ src/
 COPY data/ data/
-
-# Install build dependencies for jpegio (if dct extras needed), then install
-RUN pip install --no-cache-dir cython numpy && \
-    pip install --no-cache-dir ".[cli,dct]"
-
-# Copy CLI files
 COPY frontends/cli/ frontends/cli/
 
 # Create non-root user

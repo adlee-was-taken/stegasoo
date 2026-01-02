@@ -29,12 +29,16 @@ from flask import (
     jsonify, flash, redirect, url_for
 )
 
+import os
+os.environ['NUMPY_MADVISE_HUGEPAGE'] = '0'
+os.environ['OMP_NUM_THREADS'] = '1'
+
 # Add parent to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 import stegasoo
 from stegasoo import (
-    encode, decode, generate_credentials,
+    generate_credentials,
     export_rsa_key_pem, load_rsa_key,
     validate_pin, validate_message, validate_image,
     validate_rsa_key, validate_security_factors,
@@ -48,8 +52,7 @@ from stegasoo import (
     EMBED_MODE_DCT,
     EMBED_MODE_AUTO,
     has_dct_support,
-    compare_modes,
-    will_fit_by_mode,
+    # NOTE: encode, decode, compare_modes, will_fit_by_mode now use subprocess isolation
 )
 from stegasoo.constants import (
     __version__,
@@ -89,6 +92,17 @@ from stegasoo.qr_utils import (
     has_qr_write, has_qr_read,
     QR_MAX_BINARY, COMPRESSION_PREFIX
 )
+
+# ============================================================================
+# SUBPROCESS ISOLATION FOR STEGASOO OPERATIONS
+# ============================================================================
+# Runs encode/decode/compare in subprocesses to prevent jpegio/scipy crashes
+# from taking down the Flask server.
+
+from subprocess_stego import SubprocessStego
+
+# Initialize subprocess wrapper (worker script must be in same directory)
+subprocess_stego = SubprocessStego(timeout=180)  # 3 minute timeout for large images
 
 
 # ============================================================================
@@ -436,6 +450,7 @@ def api_compare_capacity():
     """
     Compare LSB and DCT capacity for an uploaded carrier image.
     Returns JSON with capacity info for both modes.
+    Uses subprocess isolation to prevent crashes.
     """
     carrier = request.files.get('carrier')
     if not carrier:
@@ -443,23 +458,28 @@ def api_compare_capacity():
     
     try:
         carrier_data = carrier.read()
-        comparison = compare_modes(carrier_data)
+        
+        # Use subprocess-isolated compare_modes
+        result = subprocess_stego.compare_modes(carrier_data)
+        
+        if not result.success:
+            return jsonify({'error': result.error or 'Comparison failed'}), 500
         
         return jsonify({
             'success': True,
-            'width': comparison['width'],
-            'height': comparison['height'],
+            'width': result.width,
+            'height': result.height,
             'lsb': {
-                'capacity_bytes': comparison['lsb']['capacity_bytes'],
-                'capacity_kb': round(comparison['lsb']['capacity_kb'], 1),
-                'output': comparison['lsb']['output'],
+                'capacity_bytes': result.lsb['capacity_bytes'],
+                'capacity_kb': round(result.lsb['capacity_kb'], 1),
+                'output': result.lsb.get('output', 'PNG'),
             },
             'dct': {
-                'capacity_bytes': comparison['dct']['capacity_bytes'],
-                'capacity_kb': round(comparison['dct']['capacity_kb'], 1),
-                'output': comparison['dct']['output'],
-                'available': comparison['dct']['available'],
-                'ratio': round(comparison['dct']['ratio_vs_lsb'], 1),
+                'capacity_bytes': result.dct['capacity_bytes'],
+                'capacity_kb': round(result.dct['capacity_kb'], 1),
+                'output': result.dct.get('output', 'JPEG'),
+                'available': result.dct.get('available', True),
+                'ratio': round(result.dct.get('ratio_vs_lsb', 0), 1),
             }
         })
     except Exception as e:
@@ -471,6 +491,7 @@ def api_check_fit():
     """
     Check if a payload will fit in the carrier with selected mode.
     Returns JSON with fit status and details.
+    Uses subprocess isolation to prevent crashes.
     """
     carrier = request.files.get('carrier')
     payload_size = request.form.get('payload_size', type=int)
@@ -487,16 +508,25 @@ def api_check_fit():
     
     try:
         carrier_data = carrier.read()
-        result = will_fit_by_mode(payload_size, carrier_data, embed_mode=embed_mode)
+        
+        # Use subprocess-isolated capacity check
+        result = subprocess_stego.check_capacity(
+            carrier_data=carrier_data,
+            payload_size=payload_size,
+            embed_mode=embed_mode,
+        )
+        
+        if not result.success:
+            return jsonify({'error': result.error or 'Capacity check failed'}), 500
         
         return jsonify({
             'success': True,
-            'fits': result['fits'],
-            'payload_size': result['payload_size'],
-            'capacity': result['capacity'],
-            'usage_percent': round(result['usage_percent'], 1),
-            'headroom': result['headroom'],
-            'mode': embed_mode,
+            'fits': result.fits,
+            'payload_size': result.payload_size,
+            'capacity': result.capacity,
+            'usage_percent': round(result.usage_percent, 1),
+            'headroom': result.headroom,
+            'mode': result.mode,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -641,37 +671,63 @@ def encode_page():
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # v3.2.0: No date parameter needed
-            encode_result = encode(
-                message=payload,
-                reference_photo=ref_data,
-                carrier_image=carrier_data,
-                passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
-                pin=pin,
-                rsa_key_data=rsa_key_data,
-                rsa_password=key_password,
-                # date_str removed in v3.2.0
-                embed_mode=embed_mode,
-                dct_output_format=dct_output_format if embed_mode == 'dct' else None,
-                dct_color_mode=dct_color_mode if embed_mode == 'dct' else None,
-            )
+            # Use subprocess-isolated encode to prevent crashes
+            if payload_type == 'file' and payload_file and payload_file.filename:
+                encode_result = subprocess_stego.encode(
+                    carrier_data=carrier_data,
+                    reference_data=ref_data,
+                    file_data=payload.data,
+                    file_name=payload.filename,
+                    file_mime=payload.mime_type,
+                    passphrase=passphrase,
+                    pin=pin if pin else None,
+                    rsa_key_data=rsa_key_data,
+                    rsa_password=key_password,
+                    embed_mode=embed_mode,
+                    dct_output_format=dct_output_format if embed_mode == 'dct' else 'png',
+                    dct_color_mode=dct_color_mode if embed_mode == 'dct' else 'color',
+                )
+            else:
+                encode_result = subprocess_stego.encode(
+                    carrier_data=carrier_data,
+                    reference_data=ref_data,
+                    message=payload,
+                    passphrase=passphrase,
+                    pin=pin if pin else None,
+                    rsa_key_data=rsa_key_data,
+                    rsa_password=key_password,
+                    embed_mode=embed_mode,
+                    dct_output_format=dct_output_format if embed_mode == 'dct' else 'png',
+                    dct_color_mode=dct_color_mode if embed_mode == 'dct' else 'color',
+                )
+            
+            # Check for subprocess errors
+            if not encode_result.success:
+                error_msg = encode_result.error or 'Encoding failed'
+                if 'capacity' in error_msg.lower():
+                    raise CapacityError(error_msg)
+                raise StegasooError(error_msg)
             
             # Determine actual output format for filename and storage
             if embed_mode == 'dct' and dct_output_format == 'jpeg':
                 output_ext = '.jpg'
                 output_mime = 'image/jpeg'
-                filename = encode_result.filename
-                if filename.endswith('.png'):
-                    filename = filename[:-4] + '.jpg'
             else:
                 output_ext = '.png'
                 output_mime = 'image/png'
-                filename = encode_result.filename
+            
+            # Use filename from result or generate one
+            filename = encode_result.filename
+            if not filename:
+                filename = generate_filename('stego', output_ext)
+            elif embed_mode == 'dct' and dct_output_format == 'jpeg' and filename.endswith('.png'):
+                filename = filename[:-4] + '.jpg'
             
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
             TEMP_FILES[file_id] = {
-                'data': encode_result.stego_image,
+                'data': encode_result.stego_data,
                 'filename': filename,
                 'timestamp': time.time(),
                 'embed_mode': embed_mode,
@@ -864,16 +920,23 @@ def decode_page():
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
             # v3.2.0: No date_str parameter needed
-            decode_result = decode(
-                stego_image=stego_data,
-                reference_photo=ref_data,
-                passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
-                pin=pin,
+            # Use subprocess-isolated decode to prevent crashes
+            decode_result = subprocess_stego.decode(
+                stego_data=stego_data,
+                reference_data=ref_data,
+                passphrase=passphrase,
+                pin=pin if pin else None,
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
-                # date_str removed in v3.2.0
                 embed_mode=embed_mode,
             )
+            
+            # Check for subprocess errors
+            if not decode_result.success:
+                error_msg = decode_result.error or 'Decoding failed'
+                if 'decrypt' in error_msg.lower() or decode_result.error_type == 'DecryptionError':
+                    raise DecryptionError(error_msg)
+                raise StegasooError(error_msg)
             
             if decode_result.is_file:
                 # File content - store temporarily for download
@@ -940,6 +1003,54 @@ def about():
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QRCODE_READ
     )
+
+
+# Add these two test routes anywhere in app.py after the app = Flask(...) line:
+
+@app.route('/test-capacity', methods=['POST'])
+def test_capacity():
+    """Minimal capacity test - no stegasoo code, just PIL."""
+    carrier = request.files.get('carrier')
+    if not carrier:
+        return jsonify({'error': 'No carrier image provided'}), 400
+    
+    try:
+        carrier_data = carrier.read()
+        buffer = io.BytesIO(carrier_data)
+        img = Image.open(buffer)
+        width, height = img.size
+        fmt = img.format
+        img.close()
+        buffer.close()
+        
+        pixels = width * height
+        lsb_bytes = (pixels * 3) // 8
+        dct_bytes = ((width // 8) * (height // 8) * 16) // 8 - 10
+        
+        return jsonify({
+            'success': True,
+            'width': width,
+            'height': height,
+            'format': fmt,
+            'lsb_kb': round(lsb_bytes / 1024, 1),
+            'dct_kb': round(dct_bytes / 1024, 1),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/test-capacity-nopil', methods=['POST'])
+def test_capacity_nopil():
+    """Ultra-minimal test - no PIL, no stegasoo."""
+    carrier = request.files.get('carrier')
+    if not carrier:
+        return jsonify({'error': 'No carrier image provided'}), 400
+    
+    carrier_data = carrier.read()
+    return jsonify({
+        'success': True,
+        'data_size': len(carrier_data),
+    })
 
 
 # ============================================================================

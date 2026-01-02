@@ -11,11 +11,11 @@
             </div>
             <div class="card-body">
                 <p class="lead">
-                    Stegasoo is a secure steganography tool that hides encrypted messages and files 
+                    Stegasoo is a steganography tool that hides encrypted messages and files 
                     inside ordinary images using multi-factor authentication.
                 </p>
                 
-                <h6 class="text-primary mt-4 mb-3"><i class="bi bi-stars me-2"></i>Key Features</h6>
+                <h6 class="text-primary mt-4 mb-3">Features</h6>
                 <div class="row">
                     <div class="col-md-6">
                         <ul class="list-unstyled">
@@ -32,13 +32,12 @@
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>AES-256-GCM Encryption</strong>
-                                <br><small class="text-muted">Military-grade authenticated encryption</small>
+                                <br><small class="text-muted">Authenticated encryption with integrity verification</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
-                                <strong>Single Passphrase</strong>
-                                <span class="badge bg-success ms-1">v3.2.0</span>
-                                <br><small class="text-muted">Stronger default security</small>
+                                <strong>LSB &amp; DCT Modes</strong>
+                                <br><small class="text-muted">Choose capacity (LSB) or JPEG resilience (DCT)</small>
                             </li>
                         </ul>
                     </div>
@@ -46,24 +45,23 @@
                         <ul class="list-unstyled">
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
-                                <strong>DCT Mode</strong>
-                                <span class="badge bg-warning text-dark ms-1">v3.0</span>
-                                <br><small class="text-muted">Survives JPEG recompression for social media</small>
-                            </li>
-                            <li class="mb-2">
-                                <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Random Pixel Embedding</strong>
-                                <br><small class="text-muted">Defeats statistical steganalysis</small>
+                                <br><small class="text-muted">Key-derived selection defeats statistical analysis</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
-                                <strong>Large Capacity</strong>
-                                <br><small class="text-muted">Up to {{ max_payload_kb }} KB payload, 24MP images</small>
+                                <strong>Large Image Support</strong>
+                                <br><small class="text-muted">Up to {{ max_payload_kb }} KB payload, tested with 14MB+ images</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Zero Server Storage</strong>
                                 <br><small class="text-muted">Nothing saved, files auto-expire</small>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>QR Code Keys</strong>
+                                <br><small class="text-muted">Import/export RSA keys via QR codes</small>
                             </li>
                         </ul>
                     </div>
@@ -78,8 +76,7 @@
             </div>
             <div class="card-body">
                 <p>
-                    <span class="badge bg-warning text-dark me-1">New in v3.0</span>
-                    Stegasoo now supports two embedding modes, each optimized for different use cases.
+                    Stegasoo supports two embedding modes, each optimized for different use cases.
                 </p>
                 
                 <div class="row mt-4">
@@ -120,7 +117,6 @@
                             <div class="card-header">
                                 <i class="bi bi-soundwave text-warning me-2"></i>
                                 <strong>DCT Mode</strong>
-                                <span class="badge bg-warning text-dark ms-2">v3.0</span>
                             </div>
                             <div class="card-body">
                                 <p class="small">
@@ -200,7 +196,7 @@
                 <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>How Security Works</h5>
             </div>
             <div class="card-body">
-                <p>Stegasoo uses <strong>hybrid multi-factor authentication</strong> to derive encryption keys:</p>
+                <p>Stegasoo uses <strong>multi-factor authentication</strong> to derive encryption keys:</p>
                 
                 <div class="row text-center my-4">
                     <div class="col-md-3 mb-3">
@@ -215,7 +211,6 @@
                         <div class="p-3 bg-dark rounded">
                             <i class="bi bi-chat-quote text-warning fs-2 d-block mb-2"></i>
                             <strong>Passphrase</strong>
-                            <span class="badge bg-success ms-1">v3.2.0</span>
                             <div class="small text-muted mt-1">Something you know</div>
                             <div class="small text-success">~44 bits (4 words)</div>
                         </div>
@@ -224,7 +219,7 @@
                         <div class="p-3 bg-dark rounded">
                             <i class="bi bi-123 text-danger fs-2 d-block mb-2"></i>
                             <strong>Static PIN</strong>
-                            <div class="small text-muted mt-1">Something you know (fixed)</div>
+                            <div class="small text-muted mt-1">Something you know</div>
                             <div class="small text-success">~20 bits (6 digits)</div>
                         </div>
                     </div>
@@ -233,7 +228,7 @@
                             <i class="bi bi-key text-primary fs-2 d-block mb-2"></i>
                             <strong>RSA Key</strong>
                             <div class="small text-muted mt-1">Something you have (optional)</div>
-                            <div class="small text-success">~128 bits (2048-bit)</div>
+                            <div class="small text-success">~128 bits</div>
                         </div>
                     </div>
                 </div>
@@ -247,145 +242,74 @@
                 <h6 class="mt-4">Key Derivation</h6>
                 <p>
                     {% if has_argon2 %}
-                    <span class="badge bg-success me-1"><i class="bi bi-check"></i> Argon2id Available</span>
-                    Using <strong>Argon2id</strong> with 256MB memory cost — the winner of the Password Hashing Competition 
-                    and current best practice for key derivation. This makes GPU/ASIC attacks infeasible.
+                    <span class="badge bg-success me-1"><i class="bi bi-check"></i> Argon2id</span>
+                    Using <strong>Argon2id</strong> with 256MB memory cost — memory-hard KDF that 
+                    makes GPU/ASIC attacks infeasible.
                     {% else %}
                     <span class="badge bg-warning text-dark me-1"><i class="bi bi-exclamation-triangle"></i> Argon2 Not Available</span>
                     Falling back to <strong>PBKDF2-SHA512</strong> with 600,000 iterations.
                     Install <code>argon2-cffi</code> for stronger security.
                     {% endif %}
                 </p>
-                
-                <h6 class="mt-4">Steganography Techniques</h6>
-                <p>
-                    <strong>LSB Mode:</strong> Uses Least Significant Bit embedding with pseudo-random pixel selection.
-                    The pixel locations are determined by a key derived from your credentials, making the 
-                    hidden data's location unpredictable without the correct inputs.
-                </p>
-                <p>
-                    <strong>DCT Mode:</strong> Uses Discrete Cosine Transform embedding with Quantization Index Modulation (QIM).
-                    Data is hidden in mid-frequency coefficients of 8×8 blocks, making it resilient to JPEG recompression.
-                    {% if has_dct %}
-                    <span class="badge bg-success"><i class="bi bi-check"></i> DCT Available</span>
-                    {% else %}
-                    <span class="badge bg-secondary">DCT Requires scipy</span>
-                    {% endif %}
-                </p>
             </div>
         </div>
         
+        <!-- Version History -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-file-earmark-binary me-2"></i>File Embedding</h5>
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Version History</h5>
             </div>
             <div class="card-body">
-                <p>
-                    Stegasoo supports embedding <strong>any file type</strong>, not just text messages.
-                </p>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="bi bi-check2-square text-success me-2"></i>Supported</h6>
-                        <ul class="small">
-                            <li>PDF documents</li>
-                            <li>ZIP/RAR archives</li>
-                            <li>Office documents (DOCX, XLSX, PPTX)</li>
-                            <li>Source code files</li>
-                            <li>Any binary file up to {{ max_payload_kb }} KB</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="bi bi-info-circle text-info me-2"></i>How It Works</h6>
-                        <ul class="small">
-                            <li>Original filename is preserved</li>
-                            <li>MIME type is stored for proper handling</li>
-                            <li>File is encrypted identically to text</li>
-                            <li>Decoding auto-detects text vs. file</li>
-                        </ul>
-                    </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm small">
+                        <thead>
+                            <tr>
+                                <th>Version</th>
+                                <th>Changes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>4.0.0</strong></td>
+                                <td>
+                                    Simplified auth (no date dependency), passphrase replaces day_phrase, 
+                                    4-word default, JPEG normalization fix, large image support (14MB+ tested),
+                                    subprocess isolation for stability, Python 3.10-3.12 required
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>3.2.0</td>
+                                <td>Single passphrase (removed day-of-week rotation), increased default words</td>
+                            </tr>
+                            <tr>
+                                <td>3.0.0</td>
+                                <td>DCT steganography mode, JPEG output, color preservation option</td>
+                            </tr>
+                            <tr>
+                                <td>2.2.0</td>
+                                <td>QR code RSA key import/export</td>
+                            </tr>
+                            <tr>
+                                <td>2.1.0</td>
+                                <td>File embedding, compression support</td>
+                            </tr>
+                            <tr>
+                                <td>2.0.0</td>
+                                <td>Web UI, REST API, RSA key support</td>
+                            </tr>
+                            <tr>
+                                <td>1.0.0</td>
+                                <td>Initial release, CLI only, LSB mode</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
                 
-                <div class="alert alert-info small mt-3">
-                    <i class="bi bi-lightbulb me-2"></i>
-                    <strong>Tip:</strong> For larger files, compress them first (ZIP) to maximize capacity.
-                    Note that DCT mode has ~10× less capacity than LSB mode.
+                <div class="alert alert-warning small mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Compatibility:</strong> v4.0 cannot decode messages from v3.1 or earlier (different format).
+                    Messages encoded with v3.2 should decode correctly.
                 </div>
-            </div>
-        </div>
-        
-        <!-- REST API Card -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-braces me-2"></i>REST API</h5>
-            </div>
-            <div class="card-body">
-                <p>
-                    <span class="badge bg-success me-1"><i class="bi bi-check-circle"></i> FastAPI</span>
-                    Stegasoo includes a complete REST API with automatic documentation and type validation.
-                </p>
-                
-                <h6 class="mt-4"><i class="bi bi-layers me-2"></i>Endpoints</h6>
-                <div class="row">
-                    <div class="col-md-6">
-                        <ul class="small">
-                            <li><code>POST /generate</code> – Generate credentials</li>
-                            <li><code>POST /encode</code> – Encode text (JSON)</li>
-                            <li><code>POST /encode/multipart</code> – Encode with uploads</li>
-                            <li><code>POST /decode</code> – Decode message (JSON)</li>
-                            <li><code>POST /decode/multipart</code> – Decode with uploads</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <ul class="small">
-                            <li><code>POST /image/info</code> – Get image capacity</li>
-                            <li><code>POST /extract-key-from-qr</code> – Extract RSA from QR</li>
-                            <li><code>GET /</code> – API status and capabilities</li>
-                            <li><code>GET /docs</code> – Swagger documentation</li>
-                            <li><code>GET /redoc</code> – ReDoc documentation</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <h6 class="mt-4"><i class="bi bi-code-slash me-2"></i>Example: DCT Encode</h6>
-                <pre class="bg-dark p-3 rounded small"><code># Encode with DCT mode for social media
-curl -X POST "http://localhost:8000/encode/multipart" \
-  -F "passphrase=apple forest thunder mountain" \
-  -F "pin=123456" \
-  -F "embed_mode=dct" \
-  -F "dct_output_format=jpeg" \
-  -F "reference_photo=@photo.jpg" \
-  -F "carrier=@meme.png" \
-  -F "message=secret message" \
-  --output stego.jpg</code></pre>
-                
-                <h6 class="mt-4"><i class="bi bi-terminal me-2"></i>Command Line</h6>
-                <pre class="bg-dark p-3 rounded small"><code># Generate credentials
-stegasoo generate --pin --words 4
-
-# Encode with LSB (default)
-stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder mountain" \
-  --pin 123456 -m "secret"
-
-# Encode with DCT for social media
-stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder mountain" \
-  --pin 123456 -m "secret" --mode dct --dct-format jpeg
-
-# Decode (auto-detects mode)
-stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" \
-  --pin 123456</code></pre>
-                
-                <p class="small text-muted mt-3 mb-0">
-                    <span class="badge bg-{% if has_argon2 %}success{% else %}warning{% endif %} me-1">
-                        {% if has_argon2 %}Argon2{% else %}PBKDF2{% endif %}
-                    </span>
-                    <span class="badge bg-{% if has_dct %}success{% else %}secondary{% endif %} me-1">
-                        {% if has_dct %}DCT Available{% else %}DCT Unavailable{% endif %}
-                    </span>
-                    <span class="badge bg-{% if has_qrcode_read %}success{% else %}secondary{% endif %}">
-                        {% if has_qrcode_read %}QR Reading{% else %}No QR Reading{% endif %}
-                    </span>
-                </p>
             </div>
         </div>
         
@@ -470,7 +394,7 @@ stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" \
             </div>
         </div>
         
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Limits &amp; Specifications</h5>
             </div>
@@ -514,10 +438,12 @@ stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" \
                             <td><strong>2048, 3072, 4096 bits</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase length
-                                <span class="badge bg-success ms-1">v3.2.0</span>
-                            </td>
+                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase length</td>
                             <td><strong>3-12 words</strong> (BIP-39, recommended: 4+ words)</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-code me-2"></i>Python version</td>
+                            <td><strong>3.10-3.12</strong> (3.13 not supported)</td>
                         </tr>
                     </tbody>
                 </table>
@@ -528,7 +454,7 @@ stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" \
             <p>
                 Stegasoo v{{ version }} &bull; 
                 <i class="bi bi-github me-1"></i>Open Source &bull;
-                Built with Python, Flask/FastAPI, and cryptography
+                Built with Python, Flask, and cryptography
             </p>
         </div>
     </div>

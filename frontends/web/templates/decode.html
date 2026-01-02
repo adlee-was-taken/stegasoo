@@ -3,6 +3,53 @@
 {% block title %}Decode Message - Stegasoo{% endblock %}
 
 {% block content %}
+<style>
+/* Glowing passphrase input */
+.passphrase-input {
+    background: rgba(30, 40, 50, 0.8) !important;
+    border: 2px solid rgba(99, 179, 237, 0.3) !important;
+    color: #63b3ed !important;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+    padding: 12px 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.passphrase-input:focus {
+    border-color: rgba(99, 179, 237, 0.8) !important;
+    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4), 0 0 40px rgba(99, 179, 237, 0.2) !important;
+    background: rgba(30, 40, 50, 0.95) !important;
+}
+
+.passphrase-input::placeholder {
+    color: rgba(99, 179, 237, 0.4);
+}
+
+/* Glowing PIN input */
+.pin-input-container .form-control {
+    background: rgba(30, 40, 50, 0.8) !important;
+    border: 2px solid rgba(246, 173, 85, 0.3) !important;
+    color: #f6ad55 !important;
+    font-family: 'Courier New', monospace;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.pin-input-container .form-control:focus {
+    border-color: rgba(246, 173, 85, 0.8) !important;
+    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4), 0 0 40px rgba(246, 173, 85, 0.2) !important;
+    background: rgba(30, 40, 50, 0.95) !important;
+}
+
+.pin-input-container .form-control::placeholder {
+    color: rgba(246, 173, 85, 0.4);
+    letter-spacing: 1px;
+}
+</style>
+
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card">
@@ -17,14 +64,14 @@
                 </div>
                
                 <label class="form-label text-muted">Decoded Message:</label>
-                <div class="position-relative">
-                  <div class="alert-message p-3 rounded bg-dark border border-secondary" id="decodedContent" style="white-space: pre-wrap;">{{ decoded_message }}</div>
-                  <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="navigator.clipboard.writeText(document.getElementById('decodedContent').innerText).then(() => this.innerHTML = '<i class=\'bi bi-check\'></i>').catch(() => alert('Failed to copy'))">
-                    <i class="bi bi-clipboard"></i> Copy
-                  </button>
+                <div class="alert-message p-3 rounded bg-dark border border-secondary mb-2" id="decodedContent" style="white-space: pre-wrap;">{{ decoded_message }}</div>
+                <div class="d-flex justify-content-end mb-3">
+                    <button class="btn btn-sm btn-outline-light" onclick="navigator.clipboard.writeText(document.getElementById('decodedContent').innerText).then(() => { this.innerHTML = '<i class=\'bi bi-check\'></i> Copied!'; setTimeout(() => this.innerHTML = '<i class=\'bi bi-clipboard\'></i> Copy', 2000); }).catch(() => alert('Failed to copy'))">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
                 </div>
 
-                <a href="/decode" class="btn btn-outline-light w-100 mt-3">
+                <a href="/decode" class="btn btn-outline-light w-100">
                     <i class="bi bi-arrow-repeat me-2"></i>Decode Another
                 </a>
                 
@@ -99,7 +146,7 @@
                         <label class="form-label">
                             <i class="bi bi-chat-quote me-1"></i> Passphrase
                         </label>
-                        <input type="text" name="passphrase" class="form-control" 
+                        <input type="text" name="passphrase" id="passphraseInput" class="form-control passphrase-input" 
                                placeholder="e.g., correct horse battery staple" required>
                         <div class="form-text">
                             The passphrase used during encoding (typically 4 words)
@@ -114,61 +161,59 @@
                     </h6>
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-
+                        <div class="col-md-4 mb-3">
                             <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
-                            <div class="input-group">
-                                <input type="password" name="pin" class="form-control" id="pinInput" placeholder="6-9 digits" maxlength="9">
+                            <div class="input-group pin-input-container">
+                                <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
                                 <button class="btn btn-outline-secondary" type="button" id="togglePin">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
-                            <div class="form-text">
-                                If PIN was used during encoding
-                            </div>
- 
+                            <div class="form-text">If PIN was used during encoding</div>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-8 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
-                            <ul class="nav nav-tabs nav-tabs-sm mb-2" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaFileTabDec" type="button">
-                                        <i class="bi bi-file-earmark me-1"></i>.pem File
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link py-1 px-2 small" data-bs-toggle="tab" data-bs-target="#rsaQrTabDec" type="button">
-                                        <i class="bi bi-qr-code me-1"></i>QR Code
-                                    </button>
-                                </li>
-                            </ul>
-                            <div class="tab-content">
-                                <div class="tab-pane fade show active" id="rsaFileTabDec" role="tabpanel">
-                                    <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
-                                </div>
-                                <div class="tab-pane fade" id="rsaQrTabDec" role="tabpanel">
-                                  <input type="file" name="rsa_key_qr" class="form-control form-control-sm" id="rsaKeyQrInput" accept="image/*">
-                                    <div class="form-text small">PNG, JPG, or other image of QR code</div>
+                            
+                            <!-- RSA Input Method Toggle -->
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
+                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
+                                    <i class="bi bi-file-earmark me-1"></i>.pem File
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
+                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
+                                    <i class="bi bi-qr-code me-1"></i>QR Code
+                                </label>
+                            </div>
+                            
+                            <!-- .pem File Input -->
+                            <div id="rsaFileSection">
+                                <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
+                            </div>
+                            
+                            <!-- QR Code Input -->
+                            <div id="rsaQrSection" class="d-none">
+                                <div class="drop-zone p-3" id="qrDropZone">
+                                    <input type="file" name="rsa_key_qr" accept="image/*" id="rsaKeyQrInput">
+                                    <div class="drop-zone-label text-center">
+                                        <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
+                                        <span class="text-muted small">Drop QR image or click to browse</span>
+                                    </div>
+                                    <img class="drop-zone-preview d-none" id="qrPreview" style="max-height: 80px;">
                                 </div>
                             </div>
-                            <div class="form-text">
-                                If RSA key was used during encoding (file or QR image)
+                            
+                            <!-- Key Password (always visible) -->
+                            <div class="input-group input-group-sm mt-2">
+                                <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
+                                <button class="btn btn-outline-secondary" type="button" id="toggleRsaPassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- RSA Key Password (shown when key selected) -->
-                    <div class="mb-3 d-none" id="rsaPasswordGroup">
-                        <label class="form-label">
-                            <i class="bi bi-key me-1"></i> RSA Key Password
-                        </label>
-                        <input type="password" name="rsa_password" class="form-control"
-                               placeholder="Password for the .pem file (if encrypted)">
-                        <div class="form-text">
-                            Leave blank if your key file is not password-protected
                         </div>
                     </div>
                     
@@ -276,7 +321,7 @@
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
-                        <strong>Format compatibility:</strong> v3.2.0 cannot decode messages from v3.1.0 (different format)
+                        <strong>Format compatibility:</strong> v4.0 cannot decode messages from v3.1 or earlier (different format)
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-info-circle-fill text-info me-1"></i>
@@ -304,22 +349,6 @@ document.getElementById('decodeForm')?.addEventListener('submit', function() {
     btn.disabled = true;
 });
 
-// Show RSA password field when key is selected
-const rsaKeyInput = document.getElementById('rsaKeyInput');
-const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
-const rsaPasswordGroup = document.getElementById('rsaPasswordGroup');
-
-function checkRsaKeySelected() {
-    const hasFile = (rsaKeyInput && rsaKeyInput.files.length > 0) || 
-                    (rsaKeyQrInput && rsaKeyQrInput.files.length > 0);
-    if (rsaPasswordGroup) {
-        rsaPasswordGroup.classList.toggle('d-none', !hasFile);
-    }
-}
-
-rsaKeyInput?.addEventListener('change', checkRsaKeySelected);
-rsaKeyQrInput?.addEventListener('change', checkRsaKeySelected);
-
 // PIN Toggle
 document.getElementById('togglePin')?.addEventListener('click', function() {
     const input = document.getElementById('pinInput');
@@ -332,6 +361,35 @@ document.getElementById('togglePin')?.addEventListener('click', function() {
         icon.classList.replace('bi-eye-slash', 'bi-eye');
     }
 });
+
+// RSA Password Toggle
+document.getElementById('toggleRsaPassword')?.addEventListener('click', function() {
+    const input = document.getElementById('rsaPasswordInput');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+
+// RSA Input Method Toggle (File vs QR)
+const rsaMethodFile = document.getElementById('rsaMethodFile');
+const rsaMethodQr = document.getElementById('rsaMethodQr');
+const rsaFileSection = document.getElementById('rsaFileSection');
+const rsaQrSection = document.getElementById('rsaQrSection');
+
+function updateRsaInputMethod() {
+    if (!rsaMethodFile || !rsaFileSection || !rsaQrSection) return;
+    const isFile = rsaMethodFile.checked;
+    rsaFileSection.classList.toggle('d-none', !isFile);
+    rsaQrSection.classList.toggle('d-none', isFile);
+}
+
+rsaMethodFile?.addEventListener('change', updateRsaInputMethod);
+rsaMethodQr?.addEventListener('change', updateRsaInputMethod);
 
 // Mode card highlighting
 const autoModeCard = document.getElementById('autoModeCard');
@@ -428,12 +486,85 @@ document.querySelectorAll('.drop-zone').forEach(zone => {
         
         const reader = new FileReader();
         reader.onload = e => {
-            preview.src = e.target.result;
-            preview.classList.remove('d-none');
+            if (preview) {
+                preview.src = e.target.result;
+                preview.classList.remove('d-none');
+            }
             label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
         };
         reader.readAsDataURL(file);
     }
 });
+
+// QR Code RSA Key scanning
+const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
+const qrPreview = document.getElementById('qrPreview');
+if (rsaKeyQrInput) {
+    rsaKeyQrInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            
+            // Show image preview
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    if (qrPreview) {
+                        qrPreview.src = e.target.result;
+                        qrPreview.classList.remove('d-none');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            // Extract key from QR
+            const formData = new FormData();
+            formData.append('qr_image', file);
+            
+            fetch('/extract-key-from-qr', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('QR decode failed: ' + data.error);
+                    return;
+                }
+                // Visual feedback
+                document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
+                    '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded from QR';
+            })
+            .catch(err => {
+                alert('QR decode failed: ' + err);
+            });
+        }
+    });
+}
+
+// Auto-resize passphrase input font to fit long passphrases
+const passphraseInput = document.getElementById('passphraseInput');
+if (passphraseInput) {
+    // Stepped font sizes (characters -> rem)
+    const fontSizeSteps = [
+        { maxChars: 30, size: 1.1 },
+        { maxChars: 45, size: 1.0 },
+        { maxChars: 60, size: 0.95 },
+        { maxChars: Infinity, size: 0.9 }
+    ];
+    
+    function adjustPassphraseFontSize() {
+        const len = passphraseInput.value.length;
+        
+        for (const step of fontSizeSteps) {
+            if (len <= step.maxChars) {
+                passphraseInput.style.fontSize = step.size + 'rem';
+                break;
+            }
+        }
+    }
+    
+    passphraseInput.addEventListener('input', adjustPassphraseFontSize);
+    adjustPassphraseFontSize(); // Initial call in case of pre-filled value
+}
 </script>
 {% endblock %}

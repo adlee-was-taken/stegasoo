@@ -2,10 +2,12 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.x.x   | :white_check_mark: |
-| 1.x.x   | :x:                |
+| Version | Supported          | Notes |
+| ------- | ------------------ | ----- |
+| 4.x.x   | ✅ Active | Current release |
+| 3.x.x   | ⚠️ Security fixes only | Upgrade recommended |
+| 2.x.x   | ❌ End of life | |
+| 1.x.x   | ❌ End of life | |
 
 ## Reporting a Vulnerability
 
@@ -34,7 +36,7 @@ Stegasoo is designed to hide the **existence** of a secret message within an ord
 | Goal | How It's Achieved |
 |------|-------------------|
 | **Confidentiality** | AES-256-GCM encryption with Argon2id key derivation |
-| **Steganography** | LSB embedding with pseudo-random pixel selection |
+| **Steganography** | LSB/DCT embedding with pseudo-random pixel/coefficient selection |
 | **Authentication** | Multi-factor: reference photo + passphrase + PIN (or RSA key) |
 | **Integrity** | GCM authentication tag detects tampering |
 
@@ -43,19 +45,42 @@ Stegasoo is designed to hide the **existence** of a secret message within an ord
 Stegasoo combines multiple authentication factors:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Key Derivation                          │
-│                                                             │
-│  Reference Photo ─────┐                                     │
-│  (something you have) │                                     │
-│                       ├──► Argon2id ──► AES-256 Key         │
-│  Day Passphrase ──────┤    (256MB RAM)                      │
-│  (something you know) │                                     │
-│                       │                                     │
-│  PIN or RSA Key ──────┘                                     │
-│  (second factor)                                            │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     Key Derivation                              │
+│                                                                 │
+│  Reference Photo ───────┐                                       │
+│  (something you have)   │                                       │
+│                         ├──► Argon2id ──► AES-256 Key           │
+│  Passphrase ────────────┤    (256MB RAM)                        │
+│  (something you know)   │                                       │
+│                         │                                       │
+│  PIN or RSA Key ────────┘                                       │
+│  (second factor)                                                │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+## Changes in v4.0
+
+### Removed: Date-Based Key Rotation
+
+**Previous versions (v3.x and earlier):**
+- Required a date parameter for encode/decode
+- Keys rotated daily based on "day phrase"
+- Users had to remember which date they used
+
+**Version 4.0:**
+- No date dependency
+- Single passphrase (no rotation)
+- Simpler but slightly reduced entropy per-message
+
+**Security Impact:** 
+- Minimal - the date only added ~10 bits of entropy
+- Passphrase default increased from 3 to 4 words to compensate (+11 bits)
+- Overall entropy remains similar or higher with 4-word default
+
+### Renamed: day_phrase → passphrase
+
+Terminology change only. No security impact.
 
 ## What Stegasoo Does NOT Protect Against
 
@@ -68,7 +93,9 @@ Stegasoo combines multiple authentication factors:
 - RS analysis
 - Machine learning classifiers
 
-**Mitigation:** Stegasoo uses pseudo-random pixel selection (not sequential), which helps but doesn't eliminate detectability.
+**DCT mode is more resilient** but not undetectable.
+
+**Mitigation:** Stegasoo uses pseudo-random pixel/coefficient selection, which helps but doesn't eliminate detectability.
 
 **Recommendation:** Don't rely on Stegasoo if your adversary has:
 - Access to the original carrier image
@@ -113,24 +140,28 @@ Stegasoo combines multiple authentication factors:
 
 **Recommendation:**
 - Use 8+ digit PINs
-- Use 4+ word passphrases
+- Use 4+ word passphrases (v4.0 default)
 - Consider RSA keys for high-security use cases
 
 ### 5. Image Modification
 
 **Risk:** Lossy compression destroys hidden data.
 
-**Data is destroyed by:**
+**LSB mode - data is destroyed by:**
 - JPEG compression
 - Resizing
 - Filters/effects
 - Screenshots
-- Social media upload (Instagram, Twitter, etc.)
+- Social media upload
+
+**DCT mode - more resilient but not immune:**
+- Survives moderate JPEG recompression
+- May fail with aggressive compression (quality < 70)
+- Still destroyed by resizing, filters, screenshots
 
 **Recommendation:** 
-- Always use lossless formats (PNG, BMP)
-- Transfer files directly (email, Signal, USB)
-- Never upload stego images to social media
+- LSB: Always use lossless formats (PNG, BMP), direct transfer
+- DCT: Use for social media, but test with your specific platform
 
 ### 6. Metadata Leakage
 
@@ -165,32 +196,34 @@ Stegasoo combines multiple authentication factors:
 | Encryption | AES-256-GCM | 12-byte IV, 16-byte tag |
 | Photo Hash | SHA-256 | Full image bytes |
 
-### Pixel Selection
+### Pixel/Coefficient Selection
 
-Pixels are selected pseudo-randomly using a key derived from:
+Selection key is derived from:
 ```
-pixel_key = SHA256(photo_hash || passphrase || date || pin/rsa_signature)
+selection_key = SHA256(photo_hash || passphrase || pin/rsa_signature)
 ```
 
 This prevents:
 - Sequential embedding patterns
 - Statistical detection of modified regions
 
-### Format
+### Message Format (v4.0)
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ Magic (4B) │ Version (1B) │ Date (10B) │ Salt (32B) │ IV (12B) │
-├──────────────────────────────────────────────────────────────┤
-│ Encrypted Payload (AES-256-GCM)                              │
-│ ├── Type (1B): 0x01=text, 0x02=file                          │
-│ ├── Length (4B)                                              │
-│ ├── Data (variable)                                          │
-│ └── [Filename if file] (variable)                            │
-├──────────────────────────────────────────────────────────────┤
-│ GCM Auth Tag (16B)                                           │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Magic (4B) │ Version (1B) │ Salt (32B) │ IV (12B)                │
+├──────────────────────────────────────────────────────────────────┤
+│ Encrypted Payload (AES-256-GCM)                                  │
+│ ├── Type (1B): 0x01=text, 0x02=file                              │
+│ ├── Length (4B)                                                  │
+│ ├── Data (variable)                                              │
+│ └── [Filename if file] (variable)                                │
+├──────────────────────────────────────────────────────────────────┤
+│ GCM Auth Tag (16B)                                               │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+**Note:** v4.0 removed the date field from the header, reducing overhead by 10 bytes.
 
 ## Best Practices
 
@@ -198,16 +231,17 @@ This prevents:
 
 1. **Use RSA keys** instead of PINs for authentication
 2. **Use unique reference photos** not available online
-3. **Use long passphrases** (4+ random words)
+3. **Use long passphrases** (4+ random words, recommend 6+)
 4. **Transfer via secure channels** (Signal, encrypted email)
 5. **Delete stego images** after message is read
 6. **Keep software updated** for security fixes
+7. **Use DCT mode** for social media sharing
 
 ### For Casual Privacy
 
 1. **6-digit PIN** is sufficient for non-adversarial use
-2. **3-word passphrase** provides reasonable security
-3. **PNG format** always for output
+2. **4-word passphrase** provides reasonable security (v4.0 default)
+3. **PNG format** for LSB mode output
 4. **Direct file transfer** (email attachment, AirDrop)
 
 ## Known Limitations
@@ -216,8 +250,8 @@ This prevents:
 |------------|--------|--------|
 | LSB is detectable | Statistical analysis can detect hidden data | By design (tradeoff for capacity) |
 | No forward secrecy | Compromised key decrypts all messages | Use different keys per message for high security |
-| Date in header | Reveals when message was encoded | By design (enables day-specific passphrases) |
 | No deniability | Single password = single message | Future: plausible deniability layers |
+| Python 3.13 incompatible | jpegio C extension crashes | Use Python 3.12 or earlier |
 
 ## Security Audit Status
 
@@ -231,6 +265,9 @@ If you're a security researcher interested in auditing Stegasoo, please reach ou
 
 | Version | Security Changes |
 |---------|------------------|
+| 4.0.0   | Removed date dependency, increased default passphrase to 4 words, added JPEG normalization |
+| 3.2.0   | DCT color mode added |
+| 3.0.0   | Added DCT steganography mode |
 | 2.2.0   | Added compression (no security impact) |
 | 2.1.0   | Upgraded to Argon2id, increased iterations |
 | 2.0.0   | Added RSA key support |

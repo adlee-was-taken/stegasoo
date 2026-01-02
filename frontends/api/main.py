@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API (v3.2.0)
+Stegasoo REST API (v4.0.0)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v4.0.0:
+- Updated from v3.2.0 with no functional API changes
+- Internal: JPEG normalization for jpegio compatibility
+- Internal: Python 3.12 recommended
 
 CHANGES in v3.2.0:
 - Removed date dependency from all operations
@@ -32,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 import stegasoo
 from stegasoo import (
     encode, decode, generate_credentials,
-    validate_image, calculate_capacity,
+    validate_image,
     __version__,
     StegasooError, DecryptionError, CapacityError,
     has_argon2,
@@ -74,6 +79,11 @@ app = FastAPI(
     title="Stegasoo API",
     description="""
 Secure steganography with hybrid authentication. Supports text messages and file embedding.
+
+## Version 4.0.0 Changes
+
+- **Python 3.12 recommended** - jpegio compatibility improvements
+- **JPEG normalization** - Handles quality=100 images automatically
 
 ## Version 3.2.0 Changes
 
@@ -1052,7 +1062,7 @@ async def api_image_info(
         if not result.is_valid:
             raise HTTPException(400, result.error_message)
         
-        capacity = calculate_capacity(image_data)
+        capacity = calculate_capacity_by_mode(image_data, 'lsb')
         
         response = ImageInfoResponse(
             width=result.details['width'],

@@ -2,6 +2,8 @@
 
 A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work under the hood.
 
+**Version 4.0** - Updated for simplified authentication (no date dependency)
+
 ---
 
 ## Table of Contents
@@ -20,14 +22,14 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           STEGASOO ARCHITECTURE                              │
+│                           STEGASOO ARCHITECTURE (v4.0)                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   INPUTS                    PROCESSING                      OUTPUT          │
 │   ───────                   ──────────                      ──────          │
 │                                                                             │
 │   Reference Photo ─┐                                                        │
-│   Day Phrase ──────┼──► Argon2id KDF ──► AES-256 Key                       │
+│   Passphrase ──────┼──► Argon2id KDF ──► AES-256 Key                       │
 │   PIN/RSA Key ─────┘                           │                            │
 │                                                ▼                            │
 │   Message/File ────────────────────────► AES-256-GCM ──► Ciphertext        │
@@ -38,6 +40,15 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### v4.0 Changes
+
+| Change | v3.x | v4.0 |
+|--------|------|------|
+| Authentication | day_phrase + date | passphrase (no date) |
+| Default words | 3 | 4 |
+| Header size | 75 bytes | 65 bytes (no date field) |
+| Python support | 3.10+ | 3.10-3.12 only |
 
 ### Module Responsibilities
 
@@ -58,10 +69,10 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 
 ```python
 # validation.py
-def validate_encode_inputs(reference_photo, carrier, message, day_phrase, pin, rsa_key):
+def validate_encode_inputs(reference_photo, carrier, message, passphrase, pin, rsa_key):
     # Check image dimensions (max 24 megapixels)
     # Validate PIN format (6-9 digits)
-    # Validate day phrase (3-12 words from BIP-39)
+    # Validate passphrase (3-12 words from BIP-39)
     # Check payload size vs carrier capacity
     # Ensure reference != carrier (security)
 ```
@@ -88,27 +99,28 @@ def get_image_hash(image_bytes: bytes) -> bytes:
 
 ```python
 # crypto.py
-def derive_key(reference_hash: bytes, day_phrase: str, pin: str, 
+def derive_key(reference_hash: bytes, passphrase: str, pin: str, 
                rsa_signature: bytes = None) -> bytes:
     """
     Combine all authentication factors into one AES key.
+    v4.0: No date parameter - simplified authentication.
     """
     # Concatenate all factors
-    key_material = reference_hash + day_phrase.encode() + pin.encode()
+    key_material = reference_hash + passphrase.encode() + pin.encode()
     
     if rsa_signature:
         key_material += rsa_signature
     
     # Argon2id parameters (memory-hard to resist GPU attacks)
     # - Memory: 256 MB
-    # - Iterations: 3
+    # - Iterations: 4
     # - Parallelism: 4
     # - Output: 32 bytes (256 bits)
     
     key = argon2.hash_password_raw(
         password=key_material,
         salt=random_salt,  # 16 bytes, stored with ciphertext
-        time_cost=3,
+        time_cost=4,
         memory_cost=262144,  # 256 MB
         parallelism=4,
         hash_len=32,
@@ -186,16 +198,19 @@ def encrypt(plaintext: bytes, key: bytes) -> bytes:
 def build_stego_header(encrypted_data: bytes, mode: str) -> bytes:
     """
     Build the header that precedes embedded data.
+    v4.0: Simplified header (no date field)
     """
     # Header format:
-    # [8 bytes]  - Magic number: "STGSOO" + version + mode
+    # [4 bytes]  - Magic number: "STGO" (v4)
+    # [1 byte]   - Version (0x04)
+    # [1 byte]   - Mode (0x01=LSB, 0x02=DCT)
     # [4 bytes]  - Payload length
     # [N bytes]  - Encrypted payload
     
     if mode == 'lsb':
-        magic = b'STGSOO\x03\x01'  # v3, mode 1 (LSB)
+        magic = b'STGO\x04\x01'  # v4, mode 1 (LSB)
     else:
-        magic = b'STGSOO\x03\x02'  # v3, mode 2 (DCT)
+        magic = b'STGO\x04\x02'  # v4, mode 2 (DCT)
     
     length = struct.pack('>I', len(encrypted_data))
     
@@ -210,452 +225,364 @@ This is where LSB and DCT diverge. See detailed sections below.
 
 ## The Decoding Pipeline
 
-Decoding is essentially the reverse:
-
-```
-Stego Image ──► Extract Header ──► Detect Mode ──► Extract Data ──► Decrypt ──► Decompress ──► Output
-                     │                  │
-                     ▼                  ▼
-              Validate Magic      LSB or DCT
-              Get Payload Size    extraction
-```
-
 ### Step 1: Mode Detection
 
 ```python
-# __init__.py
-def decode(stego_image: bytes, reference_photo: bytes, 
-           day_phrase: str, pin: str, rsa_key: bytes = None) -> bytes:
+def detect_mode(stego_image: bytes) -> str:
     """
-    Auto-detect embedding mode and decode.
+    Detect which embedding mode was used.
+    Checks format and magic bytes.
     """
-    # Try to read magic header from LSB positions first
-    header = extract_header_lsb(stego_image, seed=derive_seed(...))
+    img = Image.open(io.BytesIO(stego_image))
     
-    if header.startswith(b'STGSOO'):
-        version = header[6]
-        mode = header[7]
-        
-        if mode == 0x01:
-            return decode_lsb(...)
-        elif mode == 0x02:
-            return decode_dct(...)
+    # JPEG images with JPGS magic = DCT mode with jpegio
+    if img.format == 'JPEG':
+        # Check for jpegio magic
+        return 'dct'
     
-    raise InvalidStegoError("No valid Stegasoo header found")
+    # PNG/BMP: Read first few bytes from LSB
+    # Check for STGO or DCTS magic
+    magic = extract_header_lsb(stego_image, 6)
+    
+    if magic.startswith(b'STGO'):
+        mode_byte = magic[5]
+        return 'lsb' if mode_byte == 0x01 else 'dct'
+    elif magic.startswith(b'DCTS'):
+        return 'dct'
+    
+    return 'lsb'  # Default fallback
 ```
 
 ### Step 2: Key Re-derivation
 
-The receiver must provide the **exact same inputs** to derive the same key:
-- Same reference photo (processed to same hash)
-- Same day phrase
-- Same PIN
-- Same RSA key (if used)
+```python
+# Same process as encoding
+def derive_key_for_decode(reference_hash, passphrase, pin, rsa_signature=None):
+    # Must use SAME parameters as encoding
+    # No date parameter in v4.0
+    return derive_key(reference_hash, passphrase, pin, rsa_signature)
+```
 
-Any mismatch → wrong key → decryption fails (GCM tag mismatch)
-
-### Step 3: Extraction & Decryption
+### Step 3: Data Extraction
 
 ```python
-# crypto.py
-def decrypt(encrypted_blob: bytes, key: bytes) -> bytes:
+def extract_data(stego_image: bytes, mode: str) -> bytes:
     """
-    Decrypt AES-256-GCM encrypted data.
+    Extract raw bytes from stego image.
+    Mode-specific extraction.
     """
-    salt = encrypted_blob[0:16]
-    nonce = encrypted_blob[16:28]
-    tag = encrypted_blob[28:44]
-    ciphertext = encrypted_blob[44:]
+    if mode == 'dct':
+        return extract_from_dct(stego_image, pixel_key)
+    else:
+        return extract_from_lsb(stego_image, pixel_key)
+```
+
+### Step 4: Decryption & Payload Recovery
+
+```python
+def decrypt_and_recover(encrypted_data: bytes, key: bytes) -> Union[str, bytes]:
+    """
+    Decrypt and extract original message/file.
+    """
+    # Parse header
+    salt = encrypted_data[:16]
+    nonce = encrypted_data[16:28]
+    tag = encrypted_data[28:44]
+    ciphertext = encrypted_data[44:]
     
+    # Decrypt
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    plaintext = cipher.decrypt_and_verify(ciphertext, tag)
     
-    try:
-        plaintext = cipher.decrypt_and_verify(ciphertext, tag)
-        return plaintext
-    except ValueError:
-        raise DecryptionError("Authentication failed - wrong key or corrupted data")
+    # Decompress if needed
+    if plaintext[0] & FLAG_COMPRESSED:
+        plaintext = lz4.frame.decompress(plaintext[5:])
+    
+    # Extract payload
+    return parse_payload(plaintext)
 ```
 
 ---
 
 ## LSB Mode Deep Dive
 
-### What is LSB Steganography?
+### How LSB Embedding Works
 
-LSB (Least Significant Bit) hides data in the lowest bit of each color channel. Changing the LSB changes the pixel value by at most 1 (e.g., 142 → 141 or 143), which is imperceptible.
+LSB (Least Significant Bit) embedding modifies the lowest bit of each color channel in selected pixels.
 
 ```
-Original pixel (RGB): [142, 87, 203]
-Binary:               [10001110, 01010111, 11001011]
-                              ^        ^        ^
-                           LSB      LSB      LSB
+Original Pixel (RGB):
+  R: 11010110  G: 01101001  B: 10110100
+              ↓         ↓         ↓
+              └─────────┴─────────┘
+                 3 bits available
 
-To embed bits [1, 0, 1]:
-Modified:             [10001111, 01010110, 11001011]
-New pixel (RGB):      [143, 86, 203]
-
-Difference: Imperceptible to human eye
+After embedding "101":
+  R: 1101011[1]  G: 0110100[0]  B: 1011010[1]
+              ↑         ↑         ↑
+           modified  modified  modified
 ```
 
-### LSB Embedding Process
+### Pixel Selection Algorithm
 
 ```python
-# steganography.py
-def embed_lsb(carrier_image: bytes, payload: bytes, seed: bytes) -> bytes:
+def select_pixels(carrier_shape, num_bits, seed: bytes) -> List[Tuple[int, int, int]]:
     """
-    Embed payload using LSB steganography with pseudo-random pixel selection.
+    Generate pseudo-random pixel coordinates.
+    Distributes modifications across entire image.
     """
-    img = Image.open(io.BytesIO(carrier_image))
-    pixels = np.array(img)
+    height, width, channels = carrier_shape
+    total_positions = height * width * 3  # RGB channels
     
-    # 1. Calculate capacity
-    height, width, channels = pixels.shape
-    total_bits = height * width * channels  # 3 bits per pixel (RGB)
-    capacity_bytes = total_bits // 8
+    # Use seed to generate reproducible random order
+    rng = np.random.RandomState(int.from_bytes(seed[:4], 'big'))
+    all_positions = np.arange(total_positions)
+    rng.shuffle(all_positions)
     
-    if len(payload) > capacity_bytes:
-        raise CapacityError(f"Payload {len(payload)} > capacity {capacity_bytes}")
+    # Convert flat indices to (y, x, channel)
+    selected = []
+    for idx in all_positions[:num_bits]:
+        y = idx // (width * 3)
+        x = (idx % (width * 3)) // 3
+        c = idx % 3
+        selected.append((y, x, c))
     
-    # 2. Generate pseudo-random pixel order (defeats steganalysis)
-    rng = np.random.default_rng(seed=int.from_bytes(seed[:8], 'big'))
-    
-    # Create list of all (y, x, channel) positions
-    positions = [(y, x, c) 
-                 for y in range(height) 
-                 for x in range(width) 
-                 for c in range(channels)]
-    
-    # Shuffle deterministically based on seed
-    rng.shuffle(positions)
-    
-    # 3. Convert payload to bits
-    payload_bits = np.unpackbits(np.frombuffer(payload, dtype=np.uint8))
-    
-    # 4. Embed each bit
-    for i, bit in enumerate(payload_bits):
-        y, x, c = positions[i]
-        
-        # Clear LSB, then set to our bit
-        pixels[y, x, c] = (pixels[y, x, c] & 0xFE) | bit
-    
-    # 5. Save as PNG (lossless - preserves LSBs)
-    output = io.BytesIO()
-    Image.fromarray(pixels).save(output, format='PNG')
-    return output.getvalue()
+    return selected
 ```
 
-### Why Pseudo-Random Positions?
-
-Sequential embedding (left-to-right, top-to-bottom) creates statistical patterns detectable by steganalysis tools. Random scattering:
-
-```
-Sequential (detectable):          Random (undetectable):
-┌─────────────────────┐          ┌─────────────────────┐
-│█████████████........│          │.█..█.█...█..█.█..█.│
-│.....................│          │█...█..█.█..█...█.█.│
-│.....................│          │..█.█..█...█.█.█...█│
-│.....................│          │.█..█.█..█...█..█..█│
-└─────────────────────┘          └─────────────────────┘
-  ↑ Pattern visible               ↑ Uniform distribution
-```
-
-### LSB Extraction Process
+### Embedding Process
 
 ```python
-# steganography.py  
-def extract_lsb(stego_image: bytes, seed: bytes, length: int) -> bytes:
+def embed_lsb(carrier: np.ndarray, data: bytes, seed: bytes) -> np.ndarray:
     """
-    Extract payload from LSB positions.
+    Embed data using LSB substitution.
     """
-    img = Image.open(io.BytesIO(stego_image))
-    pixels = np.array(img)
+    bits = bytes_to_bits(data)
+    positions = select_pixels(carrier.shape, len(bits), seed)
     
-    # Regenerate same position sequence
-    rng = np.random.default_rng(seed=int.from_bytes(seed[:8], 'big'))
-    positions = [...]  # Same as embedding
-    rng.shuffle(positions)
+    stego = carrier.copy()
+    for i, (y, x, c) in enumerate(positions):
+        # Clear LSB and set to our bit
+        stego[y, x, c] = (stego[y, x, c] & 0xFE) | bits[i]
     
-    # Extract bits
-    bits = []
-    for i in range(length * 8):
-        y, x, c = positions[i]
-        bits.append(pixels[y, x, c] & 1)  # Get LSB
-    
-    # Convert bits to bytes
-    return np.packbits(bits).tobytes()
+    return stego
 ```
 
-### LSB Capacity Formula
+### Capacity Calculation
 
+```python
+def calculate_lsb_capacity(width: int, height: int) -> int:
+    """
+    Calculate maximum payload size for LSB mode.
+    """
+    total_bits = width * height * 3  # 3 bits per pixel (RGB)
+    header_bits = 10 * 8  # 10-byte stego header
+    available_bits = total_bits - header_bits
+    
+    return available_bits // 8  # Convert to bytes
 ```
-Capacity (bytes) = (Width × Height × 3 channels) / 8 bits
 
-Example: 1920×1080 image
-= 1920 × 1080 × 3 / 8
-= 777,600 bytes (~759 KB)
-```
-
-### LSB Limitations
-
-| Limitation | Description |
-|------------|-------------|
-| **JPEG destroys data** | JPEG recompression changes pixel values, destroying LSBs |
-| **Screenshots may corrupt** | Screen capture may alter pixels |
-| **Social media unusable** | All platforms recompress images |
-| **Steganalysis vulnerable** | Chi-square analysis can detect LSB patterns |
+**Example capacities:**
+- 1920×1080: ~770 KB
+- 4000×3000: ~4.5 MB
+- 800×600: ~180 KB
 
 ---
 
 ## DCT Mode Deep Dive
 
-### What is DCT Steganography?
+### How DCT Embedding Works
 
-DCT (Discrete Cosine Transform) hides data in the frequency coefficients of the image rather than raw pixels. JPEG images are already stored as DCT coefficients, making this approach survive JPEG recompression.
-
-### Understanding DCT Basics
+DCT (Discrete Cosine Transform) mode embeds data in the frequency-domain coefficients, making it resilient to JPEG compression.
 
 ```
-Spatial Domain (pixels)          Frequency Domain (DCT)
-┌────────────────────┐           ┌────────────────────┐
-│ 52  55  61  66 ... │           │ 415  -30  -6   3   │  DC + low freq
-│ 62  59  55  90 ... │   DCT     │ -22  -17   5  -3   │  
-│ 63  59  66  88 ... │  ────►    │  -9    9   4   2   │  
-│ 67  61  68  96 ... │           │  -4    2   1  -1   │  high freq
-│ ...                │           │  ...               │
-└────────────────────┘           └────────────────────┘
-    8×8 pixel block                 8×8 coefficient block
+Image Block (8×8 pixels)
+         ↓
+    DCT Transform
+         ↓
+DCT Coefficients (8×8)
+┌────────────────────┐
+│ DC  AC₁ AC₂ AC₃ ...│  ← Lower frequencies (top-left)
+│ AC₄ AC₅ AC₆ ...    │
+│ ...        ...     │  ← Mid frequencies (embed here)
+│ ...            ... │
+│           AC₆₃ ────│  ← Higher frequencies (bottom-right)
+└────────────────────┘
+         ↓
+   Modify select ACs
+         ↓
+    IDCT Transform
+         ↓
+Modified Image Block
 ```
 
-**Key insight**: Modifying mid-frequency coefficients is:
-1. Less visible than modifying pixels
-2. Survives JPEG recompression (coefficients are preserved)
-3. Harder to detect statistically
-
-### DCT Embedding Process (scipy-based, PNG output)
+### Coefficient Selection
 
 ```python
 # dct_steganography.py
-def embed_in_dct(payload: bytes, carrier: bytes, seed: bytes,
-                 output_format: str = 'png', color_mode: str = 'color') -> bytes:
+EMBED_POSITIONS = [
+    (0, 1), (1, 0), (2, 0), (1, 1), (0, 2), (0, 3), (1, 2), (2, 1), (3, 0),
+    (4, 0), (3, 1), (2, 2), (1, 3), (0, 4), (0, 5), (1, 4), (2, 3), (3, 2),
+    (4, 1), (5, 0), (5, 1), (4, 2), (3, 3), (2, 4), (1, 5), (0, 6), (0, 7),
+    (1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 1), (7, 0),
+]
+
+# Use positions 4-20 (mid-frequency, good balance)
+DEFAULT_EMBED_POSITIONS = EMBED_POSITIONS[4:20]  # 16 positions per block
+```
+
+**Why mid-frequency?**
+- DC coefficient (0,0): Too visible, contains brightness
+- Low AC: Visible changes, but survives compression
+- Mid AC: Best balance of invisibility + resilience
+- High AC: Invisible but destroyed by compression
+
+### Block Processing
+
+```python
+def embed_in_block(block: np.ndarray, bits: List[int]) -> np.ndarray:
     """
-    Embed payload in DCT coefficients.
+    Embed bits in a single 8×8 block.
     """
-    img = Image.open(io.BytesIO(carrier))
+    # Forward DCT
+    dct_block = dct_2d(block)
     
-    if color_mode == 'grayscale':
-        img = img.convert('L')
-        channels = [np.array(img)]
-    else:
-        # Convert to YCbCr (JPEG color space)
-        # Embed only in Y (luminance) channel
-        ycbcr = img.convert('YCbCr')
-        y, cb, cr = ycbcr.split()
-        channels = [np.array(y)]
-        color_channels = (cb, cr)  # Preserve for reconstruction
-    
-    y_channel = channels[0].astype(float)
-    height, width = y_channel.shape
-    
-    # 1. Pad to multiple of 8
-    pad_h = (8 - height % 8) % 8
-    pad_w = (8 - width % 8) % 8
-    y_padded = np.pad(y_channel, ((0, pad_h), (0, pad_w)), mode='edge')
-    
-    # 2. Process 8x8 blocks
-    blocks_h = y_padded.shape[0] // 8
-    blocks_w = y_padded.shape[1] // 8
-    total_blocks = blocks_h * blocks_w
-    
-    # 3. Generate random block order
-    rng = np.random.default_rng(seed=int.from_bytes(seed[:8], 'big'))
-    block_indices = list(range(total_blocks))
-    rng.shuffle(block_indices)
-    
-    # 4. Embed using QIM (Quantization Index Modulation)
-    payload_bits = np.unpackbits(np.frombuffer(payload, dtype=np.uint8))
-    bit_index = 0
-    
-    # Positions within 8x8 block for embedding (mid-frequency)
-    # Avoid DC (0,0) and very high frequencies
-    embed_positions = [(1,2), (2,1), (2,2), (1,3), (3,1), (2,3), (3,2), (3,3),
-                       (0,4), (4,0), (1,4), (4,1), (2,4), (4,2), (3,4), (4,3)]
-    
-    DELTA = 16  # Quantization step
-    
-    for block_idx in block_indices:
-        if bit_index >= len(payload_bits):
+    # Embed using quantization
+    for i, pos in enumerate(DEFAULT_EMBED_POSITIONS):
+        if i >= len(bits):
             break
-            
-        by = (block_idx // blocks_w) * 8
-        bx = (block_idx % blocks_w) * 8
         
-        # Extract 8x8 block
-        block = y_padded[by:by+8, bx:bx+8]
-        
-        # Apply DCT
-        dct_block = scipy.fftpack.dct(
-            scipy.fftpack.dct(block.T, norm='ortho').T, 
-            norm='ortho'
-        )
-        
-        # Embed bits in each position
-        for pos in embed_positions:
-            if bit_index >= len(payload_bits):
-                break
-            
-            coef = dct_block[pos]
-            bit = payload_bits[bit_index]
-            
-            # QIM embedding:
-            # Quantize coefficient, then adjust to encode bit
-            quantized = round(coef / DELTA)
-            if quantized % 2 != bit:
-                quantized += 1 if bit else -1
-            dct_block[pos] = quantized * DELTA
-            
-            bit_index += 1
-        
-        # Apply inverse DCT
-        block = scipy.fftpack.idct(
-            scipy.fftpack.idct(dct_block.T, norm='ortho').T,
-            norm='ortho'
-        )
-        
-        y_padded[by:by+8, bx:bx+8] = block
+        coef = dct_block[pos[0], pos[1]]
+        # Quantize and modify LSB
+        quantized = round(coef / QUANT_STEP)
+        if (quantized % 2) != bits[i]:
+            quantized += 1 if coef > 0 else -1
+        dct_block[pos[0], pos[1]] = quantized * QUANT_STEP
     
-    # 5. Reconstruct image
-    y_modified = y_padded[:height, :width]  # Remove padding
-    y_modified = np.clip(y_modified, 0, 255).astype(np.uint8)
-    
-    if color_mode == 'color':
-        # Merge modified Y with original Cb, Cr
-        result = Image.merge('YCbCr', (
-            Image.fromarray(y_modified),
-            color_channels[0],
-            color_channels[1]
-        )).convert('RGB')
-    else:
-        result = Image.fromarray(y_modified)
-    
-    # 6. Save
-    output = io.BytesIO()
-    if output_format == 'jpeg':
-        result.save(output, format='JPEG', quality=95)
-    else:
-        result.save(output, format='PNG')
-    
-    return output.getvalue()
+    # Inverse DCT
+    return idct_2d(dct_block)
 ```
 
-### DCT Embedding Process (jpegio-based, native JPEG)
+### jpegio Integration (Native JPEG Output)
 
 ```python
-# dct_steganography.py
-def embed_in_jpeg_native(payload: bytes, jpeg_carrier: bytes, seed: bytes) -> bytes:
+def embed_jpegio(data: bytes, carrier_jpeg: bytes, seed: bytes) -> bytes:
     """
     Embed directly in JPEG DCT coefficients using jpegio.
-    This preserves coefficients WITHOUT re-encoding.
+    Preserves JPEG structure perfectly.
+    
+    Note: Requires Python 3.12 or earlier (jpegio incompatible with 3.13)
     """
-    import jpegio
+    import jpegio as jio
     
-    # 1. Read JPEG structure (coefficients, quantization tables, etc.)
-    jpeg = jpegio.read(io.BytesIO(jpeg_carrier))
+    # Normalize problematic JPEGs (quality=100 causes crashes)
+    carrier_jpeg = normalize_jpeg_for_jpegio(carrier_jpeg)
     
-    # Y channel coefficients (component 0)
-    y_coefs = jpeg.coef_arrays[0]  # Shape: (height/8, width/8, 8, 8)
+    # Read existing JPEG coefficients
+    jpeg = jio.read(temp_file_from_bytes(carrier_jpeg))
+    coef_array = jpeg.coef_arrays[0]  # Y channel
     
-    # 2. Find embeddable coefficients
-    # Rules:
-    # - Skip DC coefficient (index 0,0 in each block)
-    # - Skip zero coefficients (would become non-zero, visible)
-    # - Skip ±1 coefficients (LSB change might zero them)
+    # Find usable coefficients (magnitude >= 2, non-DC)
+    positions = get_usable_positions(coef_array)
+    order = generate_order(len(positions), seed)
     
-    embeddable = []
-    for by in range(y_coefs.shape[0]):
-        for bx in range(y_coefs.shape[1]):
-            for i in range(8):
-                for j in range(8):
-                    if i == 0 and j == 0:  # Skip DC
-                        continue
-                    coef = y_coefs[by, bx, i, j]
-                    if abs(coef) >= 2:  # Safe to modify
-                        embeddable.append((by, bx, i, j))
-    
-    # 3. Shuffle positions
-    rng = np.random.default_rng(seed=int.from_bytes(seed[:8], 'big'))
-    rng.shuffle(embeddable)
-    
-    # 4. Embed bits in LSB of coefficients
-    payload_bits = np.unpackbits(np.frombuffer(payload, dtype=np.uint8))
-    
-    for i, bit in enumerate(payload_bits):
-        if i >= len(embeddable):
-            raise CapacityError("Payload too large for carrier")
+    # Embed by modifying coefficient LSBs
+    bits = bytes_to_bits(data)
+    for i, pos_idx in enumerate(order[:len(bits)]):
+        row, col = positions[pos_idx]
+        coef = coef_array[row, col]
         
-        by, bx, ci, cj = embeddable[i]
-        coef = y_coefs[by, bx, ci, cj]
-        
-        # Modify LSB
-        if coef > 0:
-            y_coefs[by, bx, ci, cj] = (abs(coef) & ~1) | bit
-        else:
-            y_coefs[by, bx, ci, cj] = -((abs(coef) & ~1) | bit)
+        if (coef & 1) != bits[i]:
+            # Flip LSB while preserving sign
+            if coef > 0:
+                coef_array[row, col] = coef - 1 if (coef & 1) else coef + 1
+            else:
+                coef_array[row, col] = coef + 1 if (coef & 1) else coef - 1
     
-    # 5. Write JPEG (preserves structure, no re-encoding)
-    jpeg.coef_arrays[0] = y_coefs
+    # Write modified JPEG
+    jio.write(jpeg, output_path)
+    return read_bytes(output_path)
+```
+
+### JPEG Normalization (v4.0)
+
+```python
+def normalize_jpeg_for_jpegio(image_data: bytes) -> bytes:
+    """
+    Normalize problematic JPEGs before jpegio processing.
     
-    output = io.BytesIO()
-    jpegio.write(jpeg, output)
-    return output.getvalue()
+    JPEGs with quality=100 have quantization tables with all values=1,
+    which causes jpegio to crash. Re-save at quality 95.
+    """
+    img = Image.open(io.BytesIO(image_data))
+    
+    if img.format != 'JPEG':
+        return image_data
+    
+    # Check if any quantization table has all values <= 1
+    needs_normalization = False
+    if hasattr(img, 'quantization'):
+        for table in img.quantization.values():
+            if max(table) <= 1:
+                needs_normalization = True
+                break
+    
+    if not needs_normalization:
+        return image_data
+    
+    # Re-save at safe quality
+    buffer = io.BytesIO()
+    img.save(buffer, format='JPEG', quality=95, subsampling=0)
+    return buffer.getvalue()
 ```
 
-### Why jpegio Matters
+### DCT Capacity Calculation
 
-```
-WITHOUT jpegio (broken):
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
-│ JPEG Input  │───►│ PIL Decode   │───►│ Modify      │───►│ PIL Encode   │
-│             │    │ (decompress) │    │ Pixels      │    │ (recompress) │
-└─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
-                                                                  │
-                                                                  ▼
-                                                          RE-QUANTIZATION
-                                                          DESTROYS DATA!
-
-WITH jpegio (correct):
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
-│ JPEG Input  │───►│ jpegio.read  │───►│ Modify      │───►│ jpegio.write │
-│             │    │ (raw coefs)  │    │ Coefs       │    │ (raw coefs)  │
-└─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
-                                                                  │
-                                                                  ▼
-                                                          COEFFICIENTS
-                                                          PRESERVED!
+```python
+def calculate_dct_capacity(width: int, height: int) -> int:
+    """
+    Calculate maximum payload for DCT mode.
+    """
+    blocks_x = width // 8
+    blocks_y = height // 8
+    total_blocks = blocks_x * blocks_y
+    
+    bits_per_block = len(DEFAULT_EMBED_POSITIONS)  # 16
+    total_bits = total_blocks * bits_per_block
+    
+    header_bits = 10 * 8  # Stego header
+    available_bits = total_bits - header_bits
+    
+    return available_bits // 8
 ```
 
-### DCT Capacity Formula
+**Example capacities:**
+- 1920×1080: ~64 KB
+- 4000×3000: ~375 KB
+- 800×600: ~14 KB
+
+### Why DCT Survives JPEG Compression
 
 ```
-Capacity depends on image content (more texture = more non-zero coefficients)
-
-Rough estimate:
-Capacity (bytes) ≈ (Width × Height × bits_per_block) / (64 × 8)
-
-Where bits_per_block ≈ 8-16 depending on image complexity
-
-Example: 1920×1080 image
-≈ 1920 × 1080 × 12 / 512
-≈ 48,600 bytes (~47 KB)
-
-Actual capacity varies from ~30 KB to ~75 KB for 1080p
+Original JPEG:    Stego JPEG:      Re-compressed:
+                                   
+DCT coefficients  Modified DCT     Coefficients 
+preserved in      coefficients     re-quantized
+file format       still valid      
+      │                 │                │
+      ▼                 ▼                ▼
+   [DCT] ──────►  [Modified] ──────►  [Still
+   [coefs]        [DCT coefs]         Modified!]
+                                   
+LSB changes survive because they're embedded in 
+the frequency domain, not spatial pixel values.
 ```
 
 ### DCT Advantages
 
 | Advantage | Description |
 |-----------|-------------|
-| **Survives JPEG recompression** | Coefficients mostly preserved |
-| **Social media compatible** | Works after Instagram/WhatsApp compression |
+| **JPEG resilient** | Survives social media upload |
 | **Better steganalysis resistance** | Harder to detect statistically |
 | **Natural-looking output** | JPEG artifacts expected |
 
@@ -667,6 +594,7 @@ Actual capacity varies from ~30 KB to ~75 KB for 1080p
 | **Slower processing** | DCT transforms are compute-intensive |
 | **Requires scipy/jpegio** | Additional dependencies |
 | **Quality-dependent** | Heavy recompression still degrades data |
+| **Python version** | jpegio requires Python 3.12 or earlier |
 
 ---
 
@@ -683,6 +611,7 @@ Actual capacity varies from ~30 KB to ~75 KB for 1080p
 | **Color Support** | Full color | Color or Grayscale |
 | **Detection Resistance** | Moderate | Better |
 | **Best For** | Email, cloud storage | Social media, messaging |
+| **Max Tested Image** | 14MB+ | 14MB+ |
 
 ---
 
@@ -691,16 +620,16 @@ Actual capacity varies from ~30 KB to ~75 KB for 1080p
 ### What Makes Stegasoo Secure?
 
 ```
-MULTI-FACTOR AUTHENTICATION
-────────────────────────────
+MULTI-FACTOR AUTHENTICATION (v4.0)
+──────────────────────────────────
 Factor 1: Reference Photo    ─┐
   • 80-256 bits entropy       │
   • "Something you have"      │
                               ├──► Combined entropy: 133-400+ bits
-Factor 2: Day Phrase         │    (Beyond brute force)
-  • 33-132 bits entropy       │
+Factor 2: Passphrase         │    (Beyond brute force)
+  • 43-132 bits entropy       │
   • "Something you know"      │
-  • Rotates daily             │
+  • 4 words default (v4.0)    │
                               │
 Factor 3: PIN                 │
   • 20-30 bits entropy        │
@@ -755,11 +684,11 @@ AUTHENTICATED ENCRYPTION (AES-256-GCM)
 
 ## Data Flow Diagrams
 
-### Complete Encode Flow
+### Complete Encode Flow (v4.0)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              ENCODE FLOW                                      │
+│                              ENCODE FLOW (v4.0)                               │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 User Inputs                    Processing                           Output
@@ -768,7 +697,7 @@ User Inputs                    Processing                           Output
 Reference Photo ──────┐
                       ├──► get_image_hash() ──► ref_hash (32 bytes)
                       │         │
-Day Phrase ───────────┤         ▼
+Passphrase ───────────┤         ▼
                       ├──► derive_key() ──────► aes_key (32 bytes)
 PIN ──────────────────┤    (Argon2id)               │
                       │                             │
@@ -801,11 +730,11 @@ Carrier Image ──────────────────────
                                                    (downloadable)
 ```
 
-### Complete Decode Flow
+### Complete Decode Flow (v4.0)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              DECODE FLOW                                      │
+│                              DECODE FLOW (v4.0)                               │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 User Inputs                    Processing                           Output
@@ -814,7 +743,7 @@ User Inputs                    Processing                           Output
 Reference Photo ──────┐
                       ├──► get_image_hash() ──► ref_hash (32 bytes)
                       │         │
-Day Phrase ───────────┤         ▼
+Passphrase ───────────┤         ▼
                       ├──► derive_key() ──────► aes_key (32 bytes)
 PIN ──────────────────┤    (Argon2id)               │
                       │    (MUST MATCH!)            │
@@ -866,3 +795,11 @@ Both modes share the same cryptographic foundation (Argon2id + AES-256-GCM) and 
 The choice comes down to your use case:
 - **Private channel?** → LSB (maximum capacity)
 - **Public platform?** → DCT (maximum compatibility)
+
+### v4.0 Simplifications
+
+- **No more date tracking** - encode/decode anytime without remembering dates
+- **Single passphrase** - no daily rotation to manage
+- **Default 4 words** - better security out of the box
+- **JPEG normalization** - handles quality=100 images automatically
+- **Large image support** - tested with 14MB+ images

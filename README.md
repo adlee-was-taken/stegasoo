@@ -2,39 +2,47 @@
 
 A secure steganography system for hiding encrypted messages in images using hybrid authentication.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![Python](https://img.shields.io/badge/Python-3.10--3.12-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Security](https://img.shields.io/badge/Security-AES--256--GCM-red)
-![Version](https://img.shields.io/badge/Version-3.0.2-purple)
+![Version](https://img.shields.io/badge/Version-4.0.0-purple)
 
 ## Features
 
 - 🔐 **AES-256-GCM** authenticated encryption
 - 🧠 **Argon2id** memory-hard key derivation (256MB RAM requirement)
 - 🎲 **Pseudo-random pixel selection** defeats steganalysis
-- 📅 **Daily key rotation** with BIP-39 passphrases
 - 🔑 **Multi-factor authentication**: PIN, RSA key, or both
 - 🖼️ **Reference photo** as "something you have"
 - 🌐 **Multiple interfaces**: CLI, Web UI, REST API
 - 📁 **File embedding** - Hide any file type (PDF, ZIP, documents)
 - 📱 **QR code support** - Encode/decode RSA keys via QR codes
-- 🆕 **DCT steganography** - JPEG-resilient embedding for social media (v3.0+)
+- 🆕 **DCT steganography** - JPEG-resilient embedding for social media
+- 🆕 **Large image support** - Process images up to 14MB+
 
-## What's New in v3.0.2
+## What's New in v4.0.0
 
 | Feature | Description |
 |---------|-------------|
-| **DCT Mode** | Frequency-domain embedding survives JPEG recompression |
-| **JPEG Output** | Native JPEG output using jpegio library |
-| **Color Preservation** | DCT color mode preserves carrier image colors |
-| **Auto-Detection** | Decoder automatically detects LSB vs DCT mode |
+| **Simplified Auth** | Removed date dependency - encode/decode anytime without tracking dates |
+| **Passphrase** | Renamed from "day phrase" to "passphrase" (no more daily rotation) |
+| **Python 3.12** | Requires Python 3.10-3.12 (jpegio incompatible with 3.13) |
+| **Large Image Fix** | JPEG normalization prevents crashes with quality=100 images |
+| **Subprocess Isolation** | WebUI runs encode/decode in subprocesses for stability |
+| **4-Word Default** | Default passphrase increased from 3 to 4 words |
+
+### Breaking Changes from v3.x
+
+- `day_phrase` parameter renamed to `passphrase` in all APIs
+- `date_str` parameter removed from encode/decode functions
+- Python 3.13 not supported (jpegio C extension incompatibility)
 
 ### Embedding Mode Comparison
 
 | Mode | Capacity (1080p) | JPEG Resilient | Best For |
 |------|------------------|----------------|----------|
 | **LSB** (default) | ~770 KB | ❌ No | Email, file transfer |
-| **DCT** (experimental) | ~65 KB | ✅ Yes | Social media, messaging apps |
+| **DCT** | ~65 KB | ✅ Yes | Social media, messaging apps |
 
 ## WebUI Preview
 
@@ -45,35 +53,36 @@ A secure steganography system for hiding encrypted messages in images using hybr
 ## Quick Start
 
 ```bash
-# Install with all features
+# Install with all features (requires Python 3.10-3.12)
 pip install -e ".[all]"
 
 # Generate credentials (memorize these!)
-stegasoo generate --pin --words 3
+stegasoo generate --pin --words 4
 
 # Encode a message (LSB mode - default)
 stegasoo encode \
   --ref photo.jpg \
   --carrier meme.png \
-  --phrase "apple forest thunder" \
+  --passphrase "apple forest thunder mountain" \
   --pin 123456 \
   --message "Secret message"
 
 # Encode for social media (DCT mode)
 stegasoo encode \
   --ref photo.jpg \
-  --carrier meme.png \
-  --phrase "apple forest thunder" \
+  --carrier meme.jpg \
+  --passphrase "apple forest thunder mountain" \
   --pin 123456 \
   --message "Secret message" \
   --mode dct \
-  --format jpeg
+  --dct-format jpeg \
+  --dct-color color
 
 # Decode (auto-detects mode)
 stegasoo decode \
   --ref photo.jpg \
   --stego stego.png \
-  --phrase "apple forest thunder" \
+  --passphrase "apple forest thunder mountain" \
   --pin 123456
 ```
 
@@ -93,8 +102,8 @@ Stegasoo uses multiple authentication factors combined with strong cryptography:
 │   Reference Photo ──┐                                           │
 │   (~80-256 bits)    │                                           │
 │                     ├──► Argon2id KDF ──► AES-256-GCM Key       │
-│   Day Phrase ───────┤    (256MB RAM)                            │
-│   (~33-132 bits)    │                                           │
+│   Passphrase ───────┤    (256MB RAM)                            │
+│   (~43-132 bits)    │                                           │
 │                     │                                           │
 │   Static PIN ───────┤                                           │
 │   (~20-30 bits)     │                                           │
@@ -110,8 +119,8 @@ Stegasoo uses multiple authentication factors combined with strong cryptography:
 | Component | Entropy | Purpose |
 |-----------|---------|---------|
 | Reference Photo | ~80-256 bits | Something you have |
-| Day Phrase (3-12 words) | ~33-132 bits | Something you know (rotates daily) |
-| PIN (6-9 digits) | ~20-30 bits | Something you know (static) |
+| Passphrase (3-12 words) | ~33-132 bits | Something you know |
+| PIN (6-9 digits) | ~20-30 bits | Something you know |
 | RSA Key (2048-4096 bit) | ~112-128 bits | Something you have (optional) |
 | **Combined** | **133-400+ bits** | **Beyond brute force** |
 
@@ -124,16 +133,16 @@ Stegasoo uses multiple authentication factors combined with strong cryptography:
 | Steganalysis | Pseudo-random pixel/coefficient selection |
 | GPU cracking | Argon2id requires 256MB RAM per attempt |
 | Side-channel | Constant-time operations in cryptography library |
-| JPEG recompression | DCT mode embeds in frequency domain (v3.0+) |
+| JPEG recompression | DCT mode embeds in frequency domain |
 
 ### Security Configurations
 
 | Configuration | Entropy | Use Case |
 |--------------|---------|----------|
-| 3-word phrase + 6-digit PIN | ~133 bits | Casual private messaging |
-| 6-word phrase + 9-digit PIN | ~176 bits | Standard security |
-| 3-word phrase + RSA 2048 | ~241 bits | File-based authentication |
-| 6-word phrase + PIN + RSA 4096 | ~304 bits | Maximum security |
+| 3-word passphrase + 6-digit PIN | ~133 bits | Casual private messaging |
+| 4-word passphrase + 9-digit PIN | ~176 bits | Standard security (recommended) |
+| 4-word passphrase + RSA 2048 | ~241 bits | File-based authentication |
+| 6-word passphrase + PIN + RSA 4096 | ~304 bits | Maximum security |
 
 ---
 
@@ -148,17 +157,20 @@ Full-featured CLI with piping support:
 stegasoo generate --rsa --rsa-bits 4096 -o mykey.pem -p "password"
 
 # Encode from file
-stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456 -f secret.txt
+stegasoo encode -r ref.jpg -c carrier.png -p "passphrase words here" --pin 123456 -f secret.txt
 
-# Encode for social media (DCT + JPEG)
-stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456 \
-  -m "Message" --mode dct --format jpeg
+# Encode for social media (DCT + JPEG with color preservation)
+stegasoo encode -r ref.jpg -c carrier.jpg -p "passphrase words here" --pin 123456 \
+  -m "Message" --mode dct --dct-format jpeg --dct-color color
 
 # Decode to stdout (quiet mode)
-stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q
+stegasoo decode -r ref.jpg -s stego.png -p "passphrase words here" --pin 123456 -q
 
-# Check image capacity (shows both LSB and DCT)
-stegasoo info carrier.png
+# Compare LSB vs DCT capacity for an image
+stegasoo compare carrier.png
+
+# Check available modes
+stegasoo modes
 ```
 
 📖 Full documentation: **[CLI.md](CLI.md)**
@@ -179,7 +191,8 @@ Features:
 - Real-time entropy calculator
 - Native mobile sharing (Web Share API)
 - DCT mode with advanced options panel
-- Automatic day-of-week detection
+- Subprocess isolation for stability
+- Large image support (14MB+ tested)
 
 📖 Full documentation: **[WEB_UI.md](WEB_UI.md)**
 
@@ -200,22 +213,23 @@ Example API calls:
 # Generate credentials
 curl -X POST http://localhost:8000/generate \
   -H "Content-Type: application/json" \
-  -d '{"use_pin": true, "words_per_phrase": 3}'
+  -d '{"use_pin": true, "passphrase_words": 4}'
 
 # Encode with DCT mode
 curl -X POST http://localhost:8000/encode/multipart \
   -F "message=Secret" \
-  -F "day_phrase=apple forest thunder" \
+  -F "passphrase=apple forest thunder mountain" \
   -F "pin=123456" \
-  -F "embedding_mode=dct" \
-  -F "output_format=jpeg" \
+  -F "embed_mode=dct" \
+  -F "dct_output_format=jpeg" \
+  -F "dct_color_mode=color" \
   -F "reference_photo=@photo.jpg" \
-  -F "carrier=@meme.png" \
+  -F "carrier=@meme.jpg" \
   --output stego.jpg
 
 # Decode (auto-detects mode)
 curl -X POST http://localhost:8000/decode/multipart \
-  -F "day_phrase=apple forest thunder" \
+  -F "passphrase=apple forest thunder mountain" \
   -F "pin=123456" \
   -F "reference_photo=@photo.jpg" \
   -F "stego_image=@stego.jpg"
@@ -234,7 +248,7 @@ stegasoo/
 │   ├── constants.py        # Configuration
 │   ├── crypto.py           # Encryption/decryption
 │   ├── steganography.py    # LSB image embedding
-│   ├── dct_steganography.py # DCT embedding (v3.0+)
+│   ├── dct_steganography.py # DCT embedding
 │   ├── keygen.py           # Credential generation
 │   ├── validation.py       # Input validation
 │   ├── models.py           # Data classes
@@ -244,6 +258,9 @@ stegasoo/
 │
 ├── frontends/
 │   ├── web/                # Flask web UI
+│   │   ├── app.py
+│   │   ├── subprocess_stego.py  # Subprocess isolation
+│   │   └── stego_worker.py      # Worker script
 │   ├── cli/                # Command-line interface
 │   └── api/                # FastAPI REST API
 │
@@ -251,6 +268,7 @@ stegasoo/
 │   └── bip39-words.txt     # BIP-39 wordlist
 │
 ├── pyproject.toml          # Package configuration
+├── requirements.txt        # Dependencies
 ├── Dockerfile              # Multi-stage Docker build
 ├── docker-compose.yml      # Container orchestration
 │
@@ -258,8 +276,31 @@ stegasoo/
 ├── INSTALL.md              # Installation guide
 ├── CLI.md                  # CLI documentation
 ├── API.md                  # API documentation
-└── WEB_UI.md               # Web UI documentation
+├── WEB_UI.md               # Web UI documentation
+├── SECURITY.md             # Security documentation
+└── UNDER_THE_HOOD.md       # Technical deep-dive
 ```
+
+---
+
+## Requirements
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Python | 3.10-3.12 | **3.13 not supported** (jpegio incompatibility) |
+| RAM | 512 MB+ | 256MB for Argon2 operations |
+| Disk | ~100 MB | |
+
+### Key Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `cryptography` | AES-256-GCM encryption |
+| `Pillow` | Image processing |
+| `argon2-cffi` | Memory-hard key derivation |
+| `scipy` | DCT transforms |
+| `jpegio` | JPEG coefficient manipulation |
+| `numpy` | Array operations |
 
 ---
 
@@ -269,11 +310,11 @@ stegasoo/
 
 | Limit | Value |
 |-------|-------|
-| Max image size | 4 megapixels |
+| Max image size | Tested up to 14MB |
 | Max message size | 50 KB |
 | Max file upload | 5 MB |
 | PIN length | 6-9 digits |
-| Phrase length | 3-12 words |
+| Passphrase length | 3-12 words |
 | RSA key sizes | 2048, 3072, 4096 bits |
 
 ### Environment Variables
@@ -302,8 +343,8 @@ ruff check src/ frontends/
 mypy src/
 
 # Check DCT support
-python -c "from stegasoo import has_dct_support; print(has_dct_support())"
-python -c "from stegasoo.dct_steganography import has_jpegio_support; print(has_jpegio_support())"
+python -c "from stegasoo import has_dct_support; print(f'DCT: {has_dct_support()}')"
+python -c "from stegasoo.dct_steganography import has_jpegio_support; print(f'jpegio: {has_jpegio_support()}')"
 ```
 
 ---
@@ -312,12 +353,48 @@ python -c "from stegasoo.dct_steganography import has_jpegio_support; print(has_
 
 | Version | Changes |
 |---------|---------|
-| **3.0.2** | Fixed JPEG output with jpegio integration |
-| **3.0.1** | Added DCT color mode, JPEG output (broken) |
-| **3.0.0** | Added DCT steganography mode |
+| **4.0.0** | Removed date dependency, renamed day_phrase→passphrase, Python 3.12 requirement, JPEG normalization fix, subprocess isolation, large image support |
+| **3.2.x** | DCT color mode, JPEG output fixes |
+| **3.0.x** | Added DCT steganography mode |
 | **2.2.x** | QR code support, file embedding |
 | **2.0.x** | Web UI, REST API, RSA keys |
 | **1.0.x** | Initial release, CLI only |
+
+---
+
+## Upgrading from v3.x
+
+### Code Changes Required
+
+```python
+# Old (v3.x)
+result = encode(
+    message="secret",
+    day_phrase="apple forest thunder",
+    date_str="2024-01-15",
+    ...
+)
+
+# New (v4.0)
+result = encode(
+    message="secret",
+    passphrase="apple forest thunder mountain",
+    # No date_str needed!
+    ...
+)
+```
+
+### CLI Changes
+
+```bash
+# Old (v3.x)
+stegasoo encode --phrase "words" --date 2024-01-15 ...
+
+# New (v4.0)
+stegasoo encode --passphrase "words here more" ...
+# or short form
+stegasoo encode -p "words here more" ...
+```
 
 ---
 
@@ -339,3 +416,5 @@ This tool is for educational and legitimate privacy purposes only. Users are res
 - **[CLI.md](CLI.md)** - Command-line interface reference
 - **[API.md](API.md)** - REST API documentation
 - **[WEB_UI.md](WEB_UI.md)** - Web interface guide
+- **[SECURITY.md](SECURITY.md)** - Security model and threat analysis
+- **[UNDER_THE_HOOD.md](UNDER_THE_HOOD.md)** - Technical implementation details
