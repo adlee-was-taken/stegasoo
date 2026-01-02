@@ -68,3 +68,4 @@ test_data/*.png
 build.sh
 rbld_containers.sh
 quick_web.sh
+project_stats.sh
