@@ -63,7 +63,8 @@
 
 .qr-crop-container img {
     display: block;
-    max-height: 120px;
+    max-height: 180px;
+    max-width: 180px;
     width: auto;
     margin: 0 auto;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -79,16 +80,19 @@
     left: 50%;
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0;
-    max-height: 100px;
+    max-height: 160px;
+    min-width: 140px;
+    min-height: 140px;
+    object-fit: contain;
 }
 
-.qr-crop-container.animating .qr-original {
+.qr-crop-container.scan-complete .qr-original {
     opacity: 0;
     transform: scale(1.1);
     filter: blur(4px);
 }
 
-.qr-crop-container.animating .qr-cropped {
+.qr-crop-container.scan-complete .qr-cropped {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
 }
@@ -102,7 +106,7 @@
     transition: opacity 0.3s ease 0.4s;
 }
 
-.qr-crop-container.animating .crop-badge {
+.qr-crop-container.scan-complete .crop-badge {
     opacity: 1;
 }
 </style>
@@ -117,78 +121,42 @@
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
                     <!-- Removed client_date hidden field -->
                     
-                    <!-- Embedding Mode Selection -->
-                    <div class="mb-4">
-                        <label class="form-label">
-                            <i class="bi bi-cpu me-1"></i> Embedding Mode
-                        </label>
-                        
-                        <div class="row g-2">
-                            <!-- LSB Mode Card -->
-                            <div class="col-md-6">
-                                <label class="card p-3 h-100 border-primary border-2 cursor-pointer" id="lsbModeCard" for="modeLsb" style="cursor: pointer;">
-                                    <input class="form-check-input position-absolute" type="radio" name="embed_mode" id="modeLsb" value="lsb" checked style="top: 1rem; right: 1rem;">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <i class="bi bi-grid-3x3-gap text-primary fs-4 me-2"></i>
-                                        <strong>LSB Mode</strong>
-                                        <span class="badge bg-success ms-auto me-4">Default</span>
-                                    </div>
-                                    <ul class="small text-muted mb-0 ps-3">
-                                        <li>Full color PNG output</li>
-                                        <li>Higher capacity (~375 KB/MP)</li>
-                                        <li>Best for email & file transfer</li>
-                                    </ul>
-                                </label>
-                            </div>
-                            
-                            <!-- DCT Mode Card -->
-                            <div class="col-md-6">
-                                <label class="card p-3 h-100 {% if not has_dct %}opacity-50{% endif %} cursor-pointer" id="dctModeCard" for="modeDct" style="cursor: pointer;">
-                                    <input class="form-check-input position-absolute" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %} style="top: 1rem; right: 1rem;">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <i class="bi bi-soundwave text-warning fs-4 me-2"></i>
-                                        <strong>DCT Mode</strong>
-                                        {% if has_dct %}
-                                        <span class="badge bg-warning text-dark ms-auto me-4">Social Media</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary ms-auto me-4">Unavailable</span>
-                                        {% endif %}
-                                    </div>
-                                    <ul class="small text-muted mb-0 ps-3">
-                                        <li>JPEG output, survives recompression</li>
-                                        <li>Lower capacity (~75 KB/MP)</li>
-                                        <li>Best for Instagram, WhatsApp, etc.</li>
-                                    </ul>
-                                    {% if not has_dct %}
-                                    <div class="alert alert-warning small mt-2 mb-0 py-1 px-2">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        Requires scipy: <code>pip install scipy</code>
-                                    </div>
-                                    {% endif %}
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <!-- Mode hint -->
-                        <div class="form-text mt-2" id="modeHint">
-                            <i class="bi bi-lightbulb me-1"></i>
-                            <strong>LSB</strong> for private channels (email, cloud storage). 
-                            <strong>DCT</strong> for social media that recompresses images.
-                        </div>
-                    </div>
-                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-image me-1"></i> Reference Photo
                             </label>
-                            <div class="drop-zone" id="refDropZone">
+                            <div class="drop-zone scan-container" id="refDropZone">
                                 <input type="file" name="reference_photo" accept="image/*" required>
                                 <div class="drop-zone-label">
                                     <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
                                     <span class="text-muted">Drop image or click to browse</span>
                                 </div>
                                 <img class="drop-zone-preview d-none" id="refPreview">
+                                <!-- Scan overlay elements -->
+                                <div class="scan-overlay">
+                                    <div class="scan-grid"></div>
+                                    <div class="scan-line"></div>
+                                </div>
+                                <!-- Corner brackets (shown after scan) -->
+                                <div class="scan-corners">
+                                    <div class="scan-corner tl"></div>
+                                    <div class="scan-corner tr"></div>
+                                    <div class="scan-corner bl"></div>
+                                    <div class="scan-corner br"></div>
+                                </div>
+                                <!-- Data panel (shown after scan) -->
+                                <div class="scan-data-panel">
+                                    <div class="scan-data-filename">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span id="refFileName">image.jpg</span>
+                                    </div>
+                                    <div class="scan-data-row">
+                                        <span class="scan-status-badge">Hash Acquired</span>
+                                        <span class="scan-data-value" id="refFileSize">--</span>
+                                    </div>
+                                    <div class="scan-hash-preview" id="refHashPreview">SHA256: ················</div>
+                                </div>
                             </div>
                             <div class="form-text">
                                 The secret photo both parties have (NOT transmitted)
@@ -199,13 +167,36 @@
                             <label class="form-label">
                                 <i class="bi bi-file-image me-1"></i> Carrier Image
                             </label>
-                            <div class="drop-zone" id="carrierDropZone">
+                            <div class="drop-zone pixel-container" id="carrierDropZone">
                                 <input type="file" name="carrier" accept="image/*" required id="carrierInput">
                                 <div class="drop-zone-label">
                                     <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
                                     <span class="text-muted">Drop image or click to browse</span>
                                 </div>
                                 <img class="drop-zone-preview d-none" id="carrierPreview">
+                                <!-- Pixel blocks overlay - populated by JS -->
+                                <div class="pixel-blocks"></div>
+                                <!-- Pixel scan line -->
+                                <div class="pixel-scan-line"></div>
+                                <!-- Corner brackets -->
+                                <div class="pixel-corners">
+                                    <div class="pixel-corner tl"></div>
+                                    <div class="pixel-corner tr"></div>
+                                    <div class="pixel-corner bl"></div>
+                                    <div class="pixel-corner br"></div>
+                                </div>
+                                <!-- Data panel -->
+                                <div class="pixel-data-panel">
+                                    <div class="pixel-data-filename">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span id="carrierFileName">image.jpg</span>
+                                    </div>
+                                    <div class="pixel-data-row">
+                                        <span class="pixel-status-badge">Carrier Loaded</span>
+                                        <span class="pixel-data-value" id="carrierFileSize">--</span>
+                                    </div>
+                                    <div class="pixel-dimensions" id="carrierDims">-- × -- px</div>
+                                </div>
                             </div>
                             <div class="form-text">
                                 The image to hide your message in (e.g., a meme)
@@ -221,9 +212,37 @@
                                 <strong>Carrier:</strong> <span id="carrierDimensions">-</span>
                             </div>
                             <div class="col-auto">
-                                <span class="badge bg-primary me-1" id="lsbCapacityBadge">LSB: -</span>
-                                <span class="badge bg-warning text-dark" id="dctCapacityBadge">DCT: -</span>
+                                <span class="badge bg-warning text-dark me-1" id="dctCapacityBadge">DCT: -</span>
+                                <span class="badge bg-primary" id="lsbCapacityBadge">LSB: -</span>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Embedding Mode Selection -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-cpu me-1"></i> Embedding Mode
+                        </label>
+                        
+                        <div class="d-flex gap-2">
+                            <!-- DCT Mode -->
+                            <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
+                                <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
+                                <i class="bi bi-soundwave text-warning ms-2"></i>
+                                <span class="ms-2"><strong>DCT</strong> <span class="text-muted">· Social Media</span></span>
+                                <i class="bi bi-info-circle text-muted mode-info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<b>DCT Mode</b><br>• JPEG output<br>• Survives recompression<br>• ~75 KB/MP capacity"></i>
+                                {% if not has_dct %}
+                                <span class="small text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>Requires scipy</span>
+                                {% endif %}
+                            </label>
+                            
+                            <!-- LSB Mode -->
+                            <label class="mode-btn flex-fill {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
+                                <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
+                                <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
+                                <span class="ms-2"><strong>LSB</strong> <span class="text-muted">· Email & Files</span></span>
+                                <i class="bi bi-info-circle text-muted mode-info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<b>LSB Mode</b><br>• Full color PNG output<br>• Higher capacity (~375 KB/MP)"></i>
+                            </label>
                         </div>
                     </div>
                     
@@ -317,7 +336,7 @@
                           <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                           <div class="input-group pin-input-container">
                             <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
-                            <button class="btn btn-outline-secondary" type="button" id="togglePin">
+                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
                               <i class="bi bi-eye"></i>
                             </button>
                           </div>
@@ -356,10 +375,20 @@
                                         <span class="text-muted small">Drop QR image or click to browse</span>
                                     </div>
                                     <!-- Crop animation container -->
-                                    <div class="qr-crop-container d-none" id="qrCropContainer">
+                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
                                         <img class="qr-original" id="qrOriginal" alt="Original">
                                         <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
-                                        <span class="crop-badge badge bg-success"><i class="bi bi-crop me-1"></i>Detected</span>
+                                        <!-- Data panel -->
+                                        <div class="qr-data-panel">
+                                            <div class="qr-data-filename">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                <span>RSA Key loaded</span>
+                                            </div>
+                                            <div class="qr-data-row">
+                                                <span class="qr-status-badge">RSA Key</span>
+                                                <span class="qr-data-value">--</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -367,7 +396,7 @@
                             <!-- Key Password (always visible) -->
                             <div class="input-group input-group-sm mt-2">
                                 <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
-                                <button class="btn btn-outline-secondary" type="button" id="toggleRsaPassword">
+                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
@@ -375,7 +404,7 @@
                     </div>
                     
                     <!-- Advanced Options (DCT sub-options only) -->
-                    <div class="mb-4 d-none" id="advancedOptionsContainer">
+                    <div class="mb-4 {% if not has_dct %}d-none{% endif %}" id="advancedOptionsContainer">
                         <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptions" role="button" aria-expanded="false">
                             <i class="bi bi-gear me-1"></i> DCT Options
                             <i class="bi bi-chevron-down ms-1" id="advancedChevron"></i>
@@ -489,10 +518,23 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
-// v3.2.0: Removed date detection - no longer needed!
+// ============================================================================
+// ENCODE PAGE - Initialize shared components
+// ============================================================================
 
-// Payload type switching
+Stegasoo.initPasswordToggles();
+Stegasoo.initRsaMethodToggle();
+Stegasoo.initDropZones();
+Stegasoo.initClipboardPaste(['input[name="carrier"]', 'input[name="reference_photo"]']);
+Stegasoo.initQrCropAnimation('rsaQrInput');
+Stegasoo.initPassphraseFontResize();
+
+// ============================================================================
+// ENCODE PAGE - Payload type switching
+// ============================================================================
+
 const payloadTextRadio = document.getElementById('payloadText');
 const payloadFileRadio = document.getElementById('payloadFile');
 const textSection = document.getElementById('textPayloadSection');
@@ -514,99 +556,73 @@ function updatePayloadSection() {
     }
 }
 
-payloadTextRadio.addEventListener('change', updatePayloadSection);
-payloadFileRadio.addEventListener('change', updatePayloadSection);
+payloadTextRadio?.addEventListener('change', updatePayloadSection);
+payloadFileRadio?.addEventListener('change', updatePayloadSection);
 
-// Passphrase validation and auto-resize font
+// ============================================================================
+// ENCODE PAGE - Passphrase validation
+// ============================================================================
+
 const passphraseInput = document.getElementById('passphraseInput');
 const passphraseWarning = document.getElementById('passphraseWarning');
 
-// Stepped font sizes (characters -> rem)
-const fontSizeSteps = [
-    { maxChars: 30, size: 1.1 },
-    { maxChars: 45, size: 1.0 },
-    { maxChars: 60, size: 0.95 },
-    { maxChars: Infinity, size: 0.9 }
-];
-
-function adjustPassphraseFontSize() {
-    if (!passphraseInput) return;
-    const len = passphraseInput.value.length;
+passphraseInput?.addEventListener('input', function() {
+    const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
+    const recommendedWords = {{ recommended_passphrase_words }};
     
-    for (const step of fontSizeSteps) {
-        if (len <= step.maxChars) {
-            passphraseInput.style.fontSize = step.size + 'rem';
-            break;
-        }
+    if (passphraseWarning) {
+        passphraseWarning.style.display = (words.length > 0 && words.length < recommendedWords) ? 'block' : 'none';
     }
-}
+});
 
-if (passphraseInput) {
-    passphraseInput.addEventListener('input', function() {
-        // Word count warning
-        const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
-        const recommendedWords = {{ recommended_passphrase_words }};
-        
-        if (words.length > 0 && words.length < recommendedWords) {
-            passphraseWarning.style.display = 'block';
-        } else {
-            passphraseWarning.style.display = 'none';
-        }
-        
-        // Auto-resize font
-        adjustPassphraseFontSize();
-    });
-    
-    // Initial font size adjustment
-    adjustPassphraseFontSize();
-}
+// ============================================================================
+// ENCODE PAGE - Payload file info
+// ============================================================================
 
-// Payload file info display
-payloadFileInput.addEventListener('change', function() {
+payloadFileInput?.addEventListener('change', function() {
     const fileInfo = document.getElementById('fileInfo');
     const fileInfoName = document.getElementById('fileInfoName');
     const fileInfoSize = document.getElementById('fileInfoSize');
     
     if (this.files && this.files[0]) {
         const file = this.files[0];
-        fileInfo.classList.remove('d-none');
-        fileInfoName.textContent = file.name;
+        fileInfo?.classList.remove('d-none');
+        if (fileInfoName) fileInfoName.textContent = file.name;
+        if (fileInfoSize) fileInfoSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
         
-        const sizeKB = (file.size / 1024).toFixed(1);
-        fileInfoSize.textContent = sizeKB + ' KB';
-        
-        // Update drop zone label
         const label = document.getElementById('payloadDropLabel');
-        label.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>${file.name}`;
+        if (label) label.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>${file.name}`;
     } else {
-        fileInfo.classList.add('d-none');
+        fileInfo?.classList.add('d-none');
     }
 });
 
-// Character counter
-if (messageInput) {
-    messageInput.addEventListener('input', function() {
-        const count = this.value.length;
-        const max = 250000;
-        const percent = Math.round((count / max) * 100);
-        
-        document.getElementById('charCount').textContent = count.toLocaleString();
-        document.getElementById('charPercent').textContent = percent + '%';
-        
-        const warning = document.getElementById('charWarning');
-        if (percent >= 80) {
-            warning.classList.remove('d-none');
-        } else {
-            warning.classList.add('d-none');
-        }
-    });
-}
+// ============================================================================
+// ENCODE PAGE - Character counter
+// ============================================================================
 
-// Carrier capacity fetching
+messageInput?.addEventListener('input', function() {
+    const count = this.value.length;
+    const max = 250000;
+    const percent = Math.round((count / max) * 100);
+    
+    const charCount = document.getElementById('charCount');
+    const charPercent = document.getElementById('charPercent');
+    const charWarning = document.getElementById('charWarning');
+    
+    if (charCount) charCount.textContent = count.toLocaleString();
+    if (charPercent) charPercent.textContent = percent + '%';
+    charWarning?.classList.toggle('d-none', percent < 80);
+});
+
+// ============================================================================
+// ENCODE PAGE - Carrier capacity
+// ============================================================================
+
 const capacityPanel = document.getElementById('capacityPanel');
 const carrierInput = document.getElementById('carrierInput');
 
-carrierInput.addEventListener('change', function() {
+carrierInput?.addEventListener('change', function() {
     if (this.files && this.files[0]) {
         fetchCapacityComparison(this.files[0]);
     }
@@ -622,333 +638,114 @@ function fetchCapacityComparison(file) {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.error) {
-            console.error('Capacity error:', data.error);
-            return;
-        }
+        if (data.error) return;
         
-        document.getElementById('carrierDimensions').textContent = 
-            `${data.width} × ${data.height} (${(data.width * data.height / 1000000).toFixed(1)} MP)`;
-        document.getElementById('lsbCapacityBadge').textContent = 
-            `LSB: ${data.lsb.capacity_kb} KB`;
-        document.getElementById('dctCapacityBadge').textContent = 
-            `DCT: ${data.dct.capacity_kb} KB`;
+        const dims = document.getElementById('carrierDimensions');
+        const lsbBadge = document.getElementById('lsbCapacityBadge');
+        const dctBadge = document.getElementById('dctCapacityBadge');
         
-        capacityPanel.classList.remove('d-none');
+        if (dims) dims.textContent = `${data.width} × ${data.height} (${(data.width * data.height / 1000000).toFixed(1)} MP)`;
+        if (lsbBadge) lsbBadge.textContent = `LSB: ${data.lsb.capacity_kb} KB`;
+        if (dctBadge) dctBadge.textContent = `DCT: ${data.dct.capacity_kb} KB`;
+        
+        capacityPanel?.classList.remove('d-none');
     })
     .catch(err => console.error('Capacity fetch failed:', err));
 }
 
 // ============================================================================
-// LSB/DCT Mode Switching
+// ENCODE PAGE - Mode switching (LSB/DCT)
 // ============================================================================
 
-const modeLsb = document.getElementById('modeLsb');
+// Initialize tooltips for mode info icons
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+});
+
+// Mode button active state toggle
+const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
+const modeBtns = { 'dct': document.getElementById('dctModeCard'), 'lsb': document.getElementById('lsbModeCard') };
+
+modeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
+        modeBtns[radio.value]?.classList.add('active');
+    });
+});
+
+// Show/hide DCT options
 const modeDct = document.getElementById('modeDct');
-const lsbModeCard = document.getElementById('lsbModeCard');
-const dctModeCard = document.getElementById('dctModeCard');
 const advancedOptionsContainer = document.getElementById('advancedOptionsContainer');
 
-// DCT Options elements
-const dctFormatPng = document.getElementById('dctFormatPng');
-const dctFormatJpeg = document.getElementById('dctFormatJpeg');
-const dctColorColor = document.getElementById('dctColorColor');
-const dctColorGrayscale = document.getElementById('dctColorGrayscale');
-const dctPngCard = document.getElementById('dctPngCard');
-const dctJpegCard = document.getElementById('dctJpegCard');
-const dctColorCard = document.getElementById('dctColorCard');
-const dctGrayscaleCard = document.getElementById('dctGrayscaleCard');
+document.querySelectorAll('input[name="embed_mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        advancedOptionsContainer?.classList.toggle('d-none', !modeDct?.checked);
+    });
+});
 
-function updateModeCardHighlight() {
-    lsbModeCard.classList.toggle('border-primary', modeLsb.checked);
-    lsbModeCard.classList.toggle('border-2', modeLsb.checked);
-    dctModeCard.classList.toggle('border-warning', modeDct.checked);
-    dctModeCard.classList.toggle('border-2', modeDct.checked);
-    
-    // Show/hide DCT options when DCT is selected
-    advancedOptionsContainer.classList.toggle('d-none', !modeDct.checked);
-}
-
-function updateDctFormatCardHighlight() {
-    if (dctPngCard && dctJpegCard) {
-        dctPngCard.classList.toggle('border-primary', dctFormatPng.checked);
-        dctPngCard.classList.toggle('border-2', dctFormatPng.checked);
-        dctJpegCard.classList.toggle('border-warning', dctFormatJpeg.checked);
-        dctJpegCard.classList.toggle('border-2', dctFormatJpeg.checked);
+// DCT format cards
+Stegasoo.initModeCards({
+    radioName: 'dct_output_format',
+    cards: {
+        'png': { id: 'dctPngCard', borderClass: 'border-primary' },
+        'jpeg': { id: 'dctJpegCard', borderClass: 'border-warning' }
     }
-}
+});
 
-function updateDctColorCardHighlight() {
-    if (dctColorCard && dctGrayscaleCard) {
-        dctColorCard.classList.toggle('border-success', dctColorColor.checked);
-        dctColorCard.classList.toggle('border-2', dctColorColor.checked);
-        dctGrayscaleCard.classList.toggle('border-secondary', dctColorGrayscale.checked);
-        dctGrayscaleCard.classList.toggle('border-2', dctColorGrayscale.checked);
+// DCT color cards
+Stegasoo.initModeCards({
+    radioName: 'dct_color_mode',
+    cards: {
+        'color': { id: 'dctColorCard', borderClass: 'border-success' },
+        'grayscale': { id: 'dctGrayscaleCard', borderClass: 'border-secondary' }
     }
-}
+});
 
-modeLsb.addEventListener('change', updateModeCardHighlight);
-modeDct.addEventListener('change', updateModeCardHighlight);
-dctFormatPng?.addEventListener('change', updateDctFormatCardHighlight);
-dctFormatJpeg?.addEventListener('change', updateDctFormatCardHighlight);
-dctColorColor?.addEventListener('change', updateDctColorCardHighlight);
-dctColorGrayscale?.addEventListener('change', updateDctColorCardHighlight);
-
-updateModeCardHighlight(); // Initial state
-updateDctFormatCardHighlight(); // Initial state
-updateDctColorCardHighlight(); // Initial state
-
-// Advanced options chevron rotation
+// Advanced options chevron
 const advancedOptionsEl = document.getElementById('advancedOptions');
-if (advancedOptionsEl) {
-    advancedOptionsEl.addEventListener('show.bs.collapse', function() {
-        document.getElementById('advancedChevron').classList.add('bi-chevron-up');
-        document.getElementById('advancedChevron').classList.remove('bi-chevron-down');
-    });
-    advancedOptionsEl.addEventListener('hide.bs.collapse', function() {
-        document.getElementById('advancedChevron').classList.remove('bi-chevron-up');
-        document.getElementById('advancedChevron').classList.add('bi-chevron-down');
-    });
-}
+advancedOptionsEl?.addEventListener('show.bs.collapse', () => {
+    document.getElementById('advancedChevron')?.classList.replace('bi-chevron-down', 'bi-chevron-up');
+});
+advancedOptionsEl?.addEventListener('hide.bs.collapse', () => {
+    document.getElementById('advancedChevron')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
+});
 
 // ============================================================================
-// Drag & drop with preview for images
+// ENCODE PAGE - Duplicate file check
 // ============================================================================
 
-document.querySelectorAll('.drop-zone').forEach(zone => {
-    const input = zone.querySelector('input[type="file"]');
-    const label = zone.querySelector('.drop-zone-label');
-    const preview = zone.querySelector('.drop-zone-preview');
-    const isPayloadZone = zone.id === 'payloadDropZone';
-    const isCarrierZone = zone.id === 'carrierDropZone';
-    
-    ['dragenter', 'dragover'].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.add('drag-over');
-        });
-    });
-    
-    ['dragleave', 'drop'].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.remove('drag-over');
-        });
-    });
-    
-    zone.addEventListener('drop', e => {
-        if (e.dataTransfer.files.length) {
-            input.files = e.dataTransfer.files;
-            input.dispatchEvent(new Event('change'));
-            
-            if (!isPayloadZone) {
-                showPreview(e.dataTransfer.files[0]);
-            }
-            
-            // Trigger capacity check for carrier
-            if (isCarrierZone && e.dataTransfer.files[0]) {
-                fetchCapacityComparison(e.dataTransfer.files[0]);
-            }
-        }
-    });
-    
-    if (!isPayloadZone) {
-        input.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                showPreview(this.files[0]);
-            }
-        });
-    }
-    
-    function showPreview(file) {
-        if (!file.type.startsWith('image/')) return;
-        
-        const reader = new FileReader();
-        reader.onload = e => {
-            if (preview) {
-                preview.src = e.target.result;
-                preview.classList.remove('d-none');
-            }
-            label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-// PIN Toggle Logic
-document.getElementById('togglePin').addEventListener('click', function() {
-    const input = document.getElementById('pinInput');
-    const icon = this.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('bi-eye', 'bi-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('bi-eye-slash', 'bi-eye');
-    }
-});
-
-// RSA Password Toggle Logic
-document.getElementById('toggleRsaPassword')?.addEventListener('click', function() {
-    const input = document.getElementById('rsaPasswordInput');
-    const icon = this.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('bi-eye', 'bi-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('bi-eye-slash', 'bi-eye');
-    }
-});
-
-// RSA Input Method Toggle (File vs QR)
-const rsaMethodFile = document.getElementById('rsaMethodFile');
-const rsaMethodQr = document.getElementById('rsaMethodQr');
-const rsaFileSection = document.getElementById('rsaFileSection');
-const rsaQrSection = document.getElementById('rsaQrSection');
-
-function updateRsaInputMethod() {
-    const isFile = rsaMethodFile.checked;
-    rsaFileSection.classList.toggle('d-none', !isFile);
-    rsaQrSection.classList.toggle('d-none', isFile);
-}
-
-rsaMethodFile?.addEventListener('change', updateRsaInputMethod);
-rsaMethodQr?.addEventListener('change', updateRsaInputMethod);
-
-// Prevent Same File Selection
 function checkDuplicateFiles() {
     const refInput = document.querySelector('input[name="reference_photo"]');
     const carInput = document.querySelector('input[name="carrier"]');
     
-    if (refInput.files[0] && carInput.files[0]) {
+    if (refInput?.files[0] && carInput?.files[0]) {
         if (refInput.files[0].name === carInput.files[0].name && 
             refInput.files[0].size === carInput.files[0].size) {
             alert("Security Warning: You cannot use the same image for both Reference and Carrier!");
             carInput.value = '';
-            document.getElementById('carrierPreview').classList.add('d-none');
-            document.querySelector('#carrierDropZone .drop-zone-label').innerHTML = 
-                '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>' +
-                '<span class="text-muted">Drop image or click to browse</span>';
-            capacityPanel.classList.add('d-none');
-        }
-    }
-}
-document.querySelector('input[name="reference_photo"]').addEventListener('change', checkDuplicateFiles);
-document.querySelector('input[name="carrier"]').addEventListener('change', checkDuplicateFiles);
-
-// Paste from Clipboard
-document.addEventListener('paste', function(e) {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-            const blob = items[i].getAsFile();
-            
-            const carrierInput = document.querySelector('input[name="carrier"]');
-            const refInput = document.querySelector('input[name="reference_photo"]');
-            
-            const targetInput = (!carrierInput.files.length) ? carrierInput : refInput;
-            
-            const container = new DataTransfer();
-            container.items.add(blob);
-            targetInput.files = container.files;
-            
-            targetInput.dispatchEvent(new Event('change'));
-            
-            // Trigger capacity check if pasted to carrier
-            if (targetInput === carrierInput) {
-                fetchCapacityComparison(blob);
+            document.getElementById('carrierPreview')?.classList.add('d-none');
+            const label = document.querySelector('#carrierDropZone .drop-zone-label');
+            if (label) {
+                label.innerHTML = '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i><span class="text-muted">Drop image or click to browse</span>';
             }
-            break;
+            capacityPanel?.classList.add('d-none');
         }
     }
-});
-
-// QR Code RSA Key scanning with crop animation
-const rsaQrInput = document.getElementById('rsaQrInput');
-const qrCropContainer = document.getElementById('qrCropContainer');
-const qrOriginal = document.getElementById('qrOriginal');
-const qrCropped = document.getElementById('qrCropped');
-
-if (rsaQrInput) {
-    rsaQrInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            const file = this.files[0];
-            
-            if (!file.type.startsWith('image/')) return;
-            
-            // Reset animation state
-            qrCropContainer.classList.remove('animating');
-            qrCropContainer.classList.add('d-none');
-            
-            // Show original image first
-            const reader = new FileReader();
-            reader.onload = e => {
-                qrOriginal.src = e.target.result;
-                qrCropContainer.classList.remove('d-none');
-                
-                // Hide the label
-                document.querySelector('#qrDropZone .drop-zone-label').classList.add('d-none');
-                
-                // Now fetch cropped version and animate
-                const formData = new FormData();
-                formData.append('image', file);
-                
-                fetch('/qr/crop', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('No QR code detected');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    // Load cropped image
-                    const croppedUrl = URL.createObjectURL(blob);
-                    qrCropped.src = croppedUrl;
-                    
-                    // Wait a moment to show original, then animate
-                    setTimeout(() => {
-                        qrCropContainer.classList.add('animating');
-                    }, 400);
-                    
-                    // Also verify key extraction works
-                    const keyFormData = new FormData();
-                    keyFormData.append('qr_image', file);
-                    
-                    return fetch('/extract-key-from-qr', {
-                        method: 'POST',
-                        body: keyFormData
-                    });
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
-                            '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded';
-                        document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
-                    }
-                })
-                .catch(err => {
-                    // Crop failed - just show original with error
-                    console.log('QR crop/extract error:', err);
-                    document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
-                        '<i class="bi bi-exclamation-triangle text-warning me-1"></i>No QR detected';
-                    document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-    });
 }
 
-// Form submission with loading state
-document.getElementById('encodeForm').addEventListener('submit', function() {
+document.querySelector('input[name="reference_photo"]')?.addEventListener('change', checkDuplicateFiles);
+document.querySelector('input[name="carrier"]')?.addEventListener('change', checkDuplicateFiles);
+
+// ============================================================================
+// ENCODE PAGE - Form submission
+// ============================================================================
+
+document.getElementById('encodeForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('encodeBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+    }
 });
 </script>
 {% endblock %}

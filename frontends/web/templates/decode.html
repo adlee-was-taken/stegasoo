@@ -59,7 +59,8 @@
 
 .qr-crop-container img {
     display: block;
-    max-height: 120px;
+    max-height: 180px;
+    max-width: 180px;
     width: auto;
     margin: 0 auto;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -75,16 +76,19 @@
     left: 50%;
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0;
-    max-height: 100px;
+    max-height: 160px;
+    min-width: 140px;
+    min-height: 140px;
+    object-fit: contain;
 }
 
-.qr-crop-container.animating .qr-original {
+.qr-crop-container.scan-complete .qr-original {
     opacity: 0;
     transform: scale(1.1);
     filter: blur(4px);
 }
 
-.qr-crop-container.animating .qr-cropped {
+.qr-crop-container.scan-complete .qr-cropped {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
 }
@@ -98,7 +102,7 @@
     transition: opacity 0.3s ease 0.4s;
 }
 
-.qr-crop-container.animating .crop-badge {
+.qr-crop-container.scan-complete .crop-badge {
     opacity: 1;
 }
 </style>
@@ -164,13 +168,37 @@
                             <label class="form-label">
                                 <i class="bi bi-image me-1"></i> Reference Photo
                             </label>
-                            <div class="drop-zone">
+                            <div class="drop-zone scan-container" id="refDropZone">
                                 <input type="file" name="reference_photo" accept="image/*" required>
                                 <div class="drop-zone-label">
                                     <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
                                     <span class="text-muted">Drop image or click to browse</span>
                                 </div>
-                                <img class="drop-zone-preview d-none">
+                                <img class="drop-zone-preview d-none" id="refPreview">
+                                <!-- Scan overlay elements -->
+                                <div class="scan-overlay">
+                                    <div class="scan-grid"></div>
+                                    <div class="scan-line"></div>
+                                </div>
+                                <!-- Corner brackets (shown after scan) -->
+                                <div class="scan-corners">
+                                    <div class="scan-corner tl"></div>
+                                    <div class="scan-corner tr"></div>
+                                    <div class="scan-corner bl"></div>
+                                    <div class="scan-corner br"></div>
+                                </div>
+                                <!-- Data panel (shown after scan) -->
+                                <div class="scan-data-panel">
+                                    <div class="scan-data-filename">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span id="refFileName">image.jpg</span>
+                                    </div>
+                                    <div class="scan-data-row">
+                                        <span class="scan-status-badge">Hash Acquired</span>
+                                        <span class="scan-data-value" id="refFileSize">--</span>
+                                    </div>
+                                    <div class="scan-hash-preview" id="refHashPreview">SHA256: ················</div>
+                                </div>
                             </div>
                             <div class="form-text">
                                 The same reference photo used for encoding
@@ -181,13 +209,36 @@
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-image me-1"></i> Stego Image
                             </label>
-                            <div class="drop-zone" id="stegoDropZone">
+                            <div class="drop-zone pixel-container" id="stegoDropZone">
                                 <input type="file" name="stego_image" accept="image/*" required>
                                 <div class="drop-zone-label">
                                     <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
                                     <span class="text-muted">Drop image or click to browse</span>
                                 </div>
-                                <img class="drop-zone-preview d-none">
+                                <img class="drop-zone-preview d-none" id="stegoPreview">
+                                <!-- Pixel blocks overlay - populated by JS -->
+                                <div class="pixel-blocks"></div>
+                                <!-- Pixel scan line -->
+                                <div class="pixel-scan-line"></div>
+                                <!-- Corner brackets -->
+                                <div class="pixel-corners">
+                                    <div class="pixel-corner tl"></div>
+                                    <div class="pixel-corner tr"></div>
+                                    <div class="pixel-corner bl"></div>
+                                    <div class="pixel-corner br"></div>
+                                </div>
+                                <!-- Data panel -->
+                                <div class="pixel-data-panel">
+                                    <div class="pixel-data-filename">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span id="stegoFileName">image.png</span>
+                                    </div>
+                                    <div class="pixel-data-row">
+                                        <span class="pixel-status-badge">Stego Loaded</span>
+                                        <span class="pixel-data-value" id="stegoFileSize">--</span>
+                                    </div>
+                                    <div class="pixel-dimensions" id="stegoDims">-- × -- px</div>
+                                </div>
                             </div>
                             <div class="form-text">
                                 The image containing the hidden message/file
@@ -218,7 +269,7 @@
                             <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                             <div class="input-group pin-input-container">
                                 <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
-                                <button class="btn btn-outline-secondary" type="button" id="togglePin">
+                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
@@ -257,10 +308,20 @@
                                         <span class="text-muted small">Drop QR image or click to browse</span>
                                     </div>
                                     <!-- Crop animation container -->
-                                    <div class="qr-crop-container d-none" id="qrCropContainer">
+                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
                                         <img class="qr-original" id="qrOriginal" alt="Original">
                                         <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
-                                        <span class="crop-badge badge bg-success"><i class="bi bi-crop me-1"></i>Detected</span>
+                                        <!-- Data panel -->
+                                        <div class="qr-data-panel">
+                                            <div class="qr-data-filename">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                <span>RSA Key loaded</span>
+                                            </div>
+                                            <div class="qr-data-row">
+                                                <span class="qr-status-badge">RSA Key</span>
+                                                <span class="qr-data-value">--</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -268,7 +329,7 @@
                             <!-- Key Password (always visible) -->
                             <div class="input-group input-group-sm mt-2">
                                 <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
-                                <button class="btn btn-outline-secondary" type="button" id="toggleRsaPassword">
+                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
@@ -398,266 +459,55 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
-// Form submit loading state
+// ============================================================================
+// DECODE PAGE - Initialize shared components
+// ============================================================================
+
+Stegasoo.initPasswordToggles();
+Stegasoo.initRsaMethodToggle();
+Stegasoo.initDropZones();
+Stegasoo.initClipboardPaste(['input[name="stego_image"]', 'input[name="reference_photo"]']);
+Stegasoo.initQrCropAnimation('rsaKeyQrInput');
+Stegasoo.initPassphraseFontResize();
+
+// ============================================================================
+// DECODE PAGE - Mode card highlighting
+// ============================================================================
+
+Stegasoo.initModeCards({
+    radioName: 'embed_mode',
+    cards: {
+        'auto': { id: 'autoModeCard', borderClass: 'border-success' },
+        'lsb': { id: 'lsbModeCardDec', borderClass: 'border-primary' },
+        'dct': { id: 'dctModeCardDec', borderClass: 'border-info' }
+    }
+});
+
+// ============================================================================
+// DECODE PAGE - Advanced options chevron
+// ============================================================================
+
+const advancedOptionsDec = document.getElementById('advancedOptionsDec');
+advancedOptionsDec?.addEventListener('show.bs.collapse', () => {
+    document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-down', 'bi-chevron-up');
+});
+advancedOptionsDec?.addEventListener('hide.bs.collapse', () => {
+    document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
+});
+
+// ============================================================================
+// DECODE PAGE - Form submission with mode-specific loading text
+// ============================================================================
+
 document.getElementById('decodeForm')?.addEventListener('submit', function() {
     const btn = document.getElementById('decodeBtn');
     const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
-    btn.disabled = true;
-});
-
-// PIN Toggle
-document.getElementById('togglePin')?.addEventListener('click', function() {
-    const input = document.getElementById('pinInput');
-    const icon = this.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('bi-eye', 'bi-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
     }
 });
-
-// RSA Password Toggle
-document.getElementById('toggleRsaPassword')?.addEventListener('click', function() {
-    const input = document.getElementById('rsaPasswordInput');
-    const icon = this.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('bi-eye', 'bi-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('bi-eye-slash', 'bi-eye');
-    }
-});
-
-// RSA Input Method Toggle (File vs QR)
-const rsaMethodFile = document.getElementById('rsaMethodFile');
-const rsaMethodQr = document.getElementById('rsaMethodQr');
-const rsaFileSection = document.getElementById('rsaFileSection');
-const rsaQrSection = document.getElementById('rsaQrSection');
-
-function updateRsaInputMethod() {
-    if (!rsaMethodFile || !rsaFileSection || !rsaQrSection) return;
-    const isFile = rsaMethodFile.checked;
-    rsaFileSection.classList.toggle('d-none', !isFile);
-    rsaQrSection.classList.toggle('d-none', isFile);
-}
-
-rsaMethodFile?.addEventListener('change', updateRsaInputMethod);
-rsaMethodQr?.addEventListener('change', updateRsaInputMethod);
-
-// Mode card highlighting
-const autoModeCard = document.getElementById('autoModeCard');
-const lsbModeCardDec = document.getElementById('lsbModeCardDec');
-const dctModeCardDec = document.getElementById('dctModeCardDec');
-const modeAuto = document.getElementById('modeAuto');
-const modeLsbDec = document.getElementById('modeLsbDec');
-const modeDctDec = document.getElementById('modeDctDec');
-
-function updateModeCardHighlightDec() {
-    autoModeCard?.classList.toggle('border-success', modeAuto?.checked);
-    autoModeCard?.classList.toggle('border-2', modeAuto?.checked);
-    lsbModeCardDec?.classList.toggle('border-primary', modeLsbDec?.checked);
-    lsbModeCardDec?.classList.toggle('border-2', modeLsbDec?.checked);
-    dctModeCardDec?.classList.toggle('border-info', modeDctDec?.checked);
-    dctModeCardDec?.classList.toggle('border-2', modeDctDec?.checked);
-}
-
-modeAuto?.addEventListener('change', updateModeCardHighlightDec);
-modeLsbDec?.addEventListener('change', updateModeCardHighlightDec);
-modeDctDec?.addEventListener('change', updateModeCardHighlightDec);
-updateModeCardHighlightDec(); // Initial state
-
-// Advanced options chevron rotation
-document.getElementById('advancedOptionsDec')?.addEventListener('show.bs.collapse', function() {
-    document.getElementById('advancedChevronDec').classList.add('bi-chevron-up');
-    document.getElementById('advancedChevronDec').classList.remove('bi-chevron-down');
-});
-document.getElementById('advancedOptionsDec')?.addEventListener('hide.bs.collapse', function() {
-    document.getElementById('advancedChevronDec').classList.remove('bi-chevron-up');
-    document.getElementById('advancedChevronDec').classList.add('bi-chevron-down');
-});
-
-// Paste from Clipboard
-document.addEventListener('paste', function(e) {
-    if (!document.getElementById('decodeForm')) return;
-
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-            const blob = items[i].getAsFile();
-            
-            const stegoInput = document.querySelector('input[name="stego_image"]');
-            const refInput = document.querySelector('input[name="reference_photo"]');
-            
-            const targetInput = (!stegoInput.files.length) ? stegoInput : refInput;
-            
-            const container = new DataTransfer();
-            container.items.add(blob);
-            targetInput.files = container.files;
-            
-            targetInput.dispatchEvent(new Event('change'));
-            break;
-        }
-    }
-});
-
-// Drag & drop with preview
-document.querySelectorAll('.drop-zone').forEach(zone => {
-    const input = zone.querySelector('input[type="file"]');
-    const label = zone.querySelector('.drop-zone-label');
-    const preview = zone.querySelector('.drop-zone-preview');
-    
-    ['dragenter', 'dragover'].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.add('drag-over');
-        });
-    });
-    
-    ['dragleave', 'drop'].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.remove('drag-over');
-        });
-    });
-    
-    zone.addEventListener('drop', e => {
-        if (e.dataTransfer.files.length) {
-            input.files = e.dataTransfer.files;
-            const file = e.dataTransfer.files[0];
-            showPreview(file);
-        }
-    });
-    
-    input.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            showPreview(this.files[0]);
-        }
-    });
-    
-    function showPreview(file) {
-        if (!file.type.startsWith('image/')) return;
-        
-        const reader = new FileReader();
-        reader.onload = e => {
-            if (preview) {
-                preview.src = e.target.result;
-                preview.classList.remove('d-none');
-            }
-            label.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-// QR Code RSA Key scanning with crop animation
-const rsaKeyQrInput = document.getElementById('rsaKeyQrInput');
-const qrCropContainer = document.getElementById('qrCropContainer');
-const qrOriginal = document.getElementById('qrOriginal');
-const qrCropped = document.getElementById('qrCropped');
-
-if (rsaKeyQrInput) {
-    rsaKeyQrInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            const file = this.files[0];
-            
-            if (!file.type.startsWith('image/')) return;
-            
-            // Reset animation state
-            qrCropContainer.classList.remove('animating');
-            qrCropContainer.classList.add('d-none');
-            
-            // Show original image first
-            const reader = new FileReader();
-            reader.onload = e => {
-                qrOriginal.src = e.target.result;
-                qrCropContainer.classList.remove('d-none');
-                
-                // Hide the label
-                document.querySelector('#qrDropZone .drop-zone-label').classList.add('d-none');
-                
-                // Now fetch cropped version and animate
-                const formData = new FormData();
-                formData.append('image', file);
-                
-                fetch('/qr/crop', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('No QR code detected');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    // Load cropped image
-                    const croppedUrl = URL.createObjectURL(blob);
-                    qrCropped.src = croppedUrl;
-                    
-                    // Wait a moment to show original, then animate
-                    setTimeout(() => {
-                        qrCropContainer.classList.add('animating');
-                    }, 400);
-                    
-                    // Also verify key extraction works
-                    const keyFormData = new FormData();
-                    keyFormData.append('qr_image', file);
-                    
-                    return fetch('/extract-key-from-qr', {
-                        method: 'POST',
-                        body: keyFormData
-                    });
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
-                            '<i class="bi bi-check-circle text-success me-1"></i>RSA Key loaded';
-                        document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
-                    }
-                })
-                .catch(err => {
-                    // Crop failed - just show original with error
-                    console.log('QR crop/extract error:', err);
-                    document.querySelector('#qrDropZone .drop-zone-label').innerHTML = 
-                        '<i class="bi bi-exclamation-triangle text-warning me-1"></i>No QR detected';
-                    document.querySelector('#qrDropZone .drop-zone-label').classList.remove('d-none');
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-}
-
-// Auto-resize passphrase input font to fit long passphrases
-const passphraseInput = document.getElementById('passphraseInput');
-if (passphraseInput) {
-    // Stepped font sizes (characters -> rem)
-    const fontSizeSteps = [
-        { maxChars: 30, size: 1.1 },
-        { maxChars: 45, size: 1.0 },
-        { maxChars: 60, size: 0.95 },
-        { maxChars: Infinity, size: 0.9 }
-    ];
-    
-    function adjustPassphraseFontSize() {
-        const len = passphraseInput.value.length;
-        
-        for (const step of fontSizeSteps) {
-            if (len <= step.maxChars) {
-                passphraseInput.style.fontSize = step.size + 'rem';
-                break;
-            }
-        }
-    }
-    
-    passphraseInput.addEventListener('input', adjustPassphraseFontSize);
-    adjustPassphraseFontSize(); // Initial call in case of pre-filled value
-}
 </script>
 {% endblock %}
