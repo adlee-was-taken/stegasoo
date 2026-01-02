@@ -22,20 +22,16 @@ NEW in v3.0.1: DCT output format selection (PNG or JPEG) and color mode (graysca
 """
 
 import io
+import mimetypes
+import os
+import secrets
 import sys
 import time
-import secrets
-import mimetypes
 from pathlib import Path
-from datetime import datetime
+
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
 from PIL import Image
 
-from flask import (
-    Flask, render_template, request, send_file,
-    jsonify, flash, redirect, url_for
-)
-
-import os
 os.environ['NUMPY_MADVISE_HUGEPAGE'] = '0'
 os.environ['OMP_NUM_THREADS'] = '1'
 
@@ -44,74 +40,75 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 import stegasoo
 from stegasoo import (
-    generate_credentials,
-    export_rsa_key_pem, load_rsa_key,
-    validate_pin, validate_message, validate_image,
-    validate_rsa_key, validate_security_factors,
-    validate_file_payload, validate_passphrase,
-    generate_filename,
-    StegasooError, DecryptionError, CapacityError,
-    has_argon2,
+    CapacityError,
+    DecryptionError,
     FilePayload,
-    # Embedding modes
-    EMBED_MODE_LSB,
-    EMBED_MODE_DCT,
-    EMBED_MODE_AUTO,
-    has_dct_support,
-    # Channel key functions (v4.0.0)
-    has_channel_key,
+    StegasooError,
+    export_rsa_key_pem,
+    generate_credentials,
+    generate_filename,
     get_channel_status,
+    has_argon2,
+    # Channel key functions (v4.0.0)
+    has_dct_support,
+    load_rsa_key,
     validate_channel_key,
-    generate_channel_key,
-    # NOTE: encode, decode, compare_modes, will_fit_by_mode now use subprocess isolation
+    validate_file_payload,
+    validate_image,
+    validate_message,
+    validate_passphrase,
+    validate_pin,
+    validate_rsa_key,
+    validate_security_factors,
 )
 from stegasoo.constants import (
-    __version__,
-    MAX_MESSAGE_SIZE, MAX_MESSAGE_CHARS,
-    MIN_PIN_LENGTH, MAX_PIN_LENGTH,
-    MIN_PASSPHRASE_WORDS, RECOMMENDED_PASSPHRASE_WORDS,
     DEFAULT_PASSPHRASE_WORDS,
-    VALID_RSA_SIZES, MAX_FILE_SIZE,
-    MAX_FILE_PAYLOAD_SIZE, MAX_UPLOAD_SIZE,
-    TEMP_FILE_EXPIRY, TEMP_FILE_EXPIRY_MINUTES,
-    THUMBNAIL_SIZE, THUMBNAIL_QUALITY,
+    MAX_FILE_PAYLOAD_SIZE,
+    MAX_FILE_SIZE,
+    MAX_MESSAGE_CHARS,
+    MAX_PIN_LENGTH,
+    MAX_UPLOAD_SIZE,
+    MIN_PASSPHRASE_WORDS,
+    MIN_PIN_LENGTH,
+    RECOMMENDED_PASSPHRASE_WORDS,
+    TEMP_FILE_EXPIRY,
+    TEMP_FILE_EXPIRY_MINUTES,
+    THUMBNAIL_QUALITY,
+    THUMBNAIL_SIZE,
+    VALID_RSA_SIZES,
+    __version__,
 )
 
 # QR Code support
 try:
-    import qrcode
-    from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M
+    import qrcode  # noqa: F401
+    from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M  # noqa: F401
     HAS_QRCODE = True
 except ImportError:
     HAS_QRCODE = False
 
 # QR Code reading
 try:
-    from pyzbar.pyzbar import decode as pyzbar_decode
+    from pyzbar.pyzbar import decode as pyzbar_decode  # noqa: F401
     HAS_QRCODE_READ = True
 except ImportError:
     HAS_QRCODE_READ = False
 
-import zlib
-import base64
 
 # Import QR utilities
-from stegasoo.qr_utils import (
-    compress_data, decompress_data, auto_decompress,
-    is_compressed, can_fit_in_qr, needs_compression,
-    generate_qr_code, read_qr_code, extract_key_from_qr,
-    detect_and_crop_qr,
-    has_qr_write, has_qr_read,
-    QR_MAX_BINARY, COMPRESSION_PREFIX
-)
-
 # ============================================================================
 # SUBPROCESS ISOLATION FOR STEGASOO OPERATIONS
 # ============================================================================
 # Runs encode/decode/compare in subprocesses to prevent jpegio/scipy crashes
 # from taking down the Flask server.
-
 from subprocess_stego import SubprocessStego
+
+from stegasoo.qr_utils import (
+    can_fit_in_qr,
+    detect_and_crop_qr,
+    extract_key_from_qr,
+    generate_qr_code,
+)
 
 # Initialize subprocess wrapper (worker script must be in same directory)
 subprocess_stego = SubprocessStego(timeout=180)  # 3 minute timeout for large images
@@ -139,7 +136,7 @@ def inject_globals():
     """Inject global variables into all templates."""
     # Get channel status (v4.0.0)
     channel_status = get_channel_status()
-    
+
     return {
         'version': __version__,
         'max_message_chars': MAX_MESSAGE_CHARS,
@@ -172,20 +169,20 @@ try:
     print(f"Current MAX_FILE_PAYLOAD_SIZE: {MAX_FILE_PAYLOAD_SIZE}")
     print(f"DCT support: {has_dct_support()}")
     print(f"QR code support: write={HAS_QRCODE}, read={HAS_QRCODE_READ}")
-    
+
     # Channel key status (v4.0.0)
     channel_status = get_channel_status()
     print(f"Channel key: {channel_status['mode']} mode")
     if channel_status['configured']:
         print(f"  Fingerprint: {channel_status.get('fingerprint')}")
         print(f"  Source: {channel_status.get('source')}")
-    
+
     DESIRED_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB
-    
+
     if hasattr(stegasoo, 'MAX_FILE_PAYLOAD_SIZE'):
         print(f"Overriding MAX_FILE_PAYLOAD_SIZE to {DESIRED_PAYLOAD_SIZE}")
         stegasoo.MAX_FILE_PAYLOAD_SIZE = DESIRED_PAYLOAD_SIZE
-    
+
 except Exception as e:
     print(f"Could not override stegasoo limits: {e}")
 
@@ -197,10 +194,10 @@ except Exception as e:
 def resolve_channel_key_form(channel_key_value: str) -> str:
     """
     Resolve channel key from form input.
-    
+
     Args:
         channel_key_value: Form value ('auto', 'none', or explicit key)
-        
+
     Returns:
         Value to pass to subprocess_stego ('auto', 'none', or explicit key)
     """
@@ -234,10 +231,10 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
                 img = img.convert('RGB')
             elif img.mode != 'RGB':
                 img = img.convert('RGB')
-            
+
             # Create thumbnail
             img.thumbnail(size, Image.Resampling.LANCZOS)
-            
+
             # Save to bytes
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=THUMBNAIL_QUALITY, optimize=True)
@@ -251,7 +248,7 @@ def cleanup_temp_files():
     """Remove expired temporary files."""
     now = time.time()
     expired = [fid for fid, info in TEMP_FILES.items() if now - info['timestamp'] > TEMP_FILE_EXPIRY]
-    
+
     for fid in expired:
         TEMP_FILES.pop(fid, None)
         # Also clean up corresponding thumbnail
@@ -294,12 +291,12 @@ def index():
 def api_channel_status():
     """
     Get current channel key status (v4.0.0).
-    
+
     Returns JSON with mode, fingerprint, and source.
     """
     # Use subprocess for isolation
     result = subprocess_stego.get_channel_status(reveal=False)
-    
+
     if result.success:
         return jsonify({
             'success': True,
@@ -324,16 +321,16 @@ def api_channel_status():
 def api_channel_validate():
     """
     Validate a channel key format (v4.0.0).
-    
+
     Returns JSON with validation result.
     """
     key = request.form.get('key', '') or request.json.get('key', '') if request.is_json else ''
-    
+
     if not key:
         return jsonify({'valid': False, 'error': 'No key provided'})
-    
+
     is_valid = validate_channel_key(key)
-    
+
     if is_valid:
         fingerprint = f"{key[:4]}-••••-••••-••••-••••-••••-••••-{key[-4:]}"
         return jsonify({
@@ -358,20 +355,20 @@ def generate():
         words_per_passphrase = int(request.form.get('words_per_passphrase', DEFAULT_PASSPHRASE_WORDS))
         use_pin = request.form.get('use_pin') == 'on'
         use_rsa = request.form.get('use_rsa') == 'on'
-        
+
         if not use_pin and not use_rsa:
             flash('You must select at least one security factor (PIN or RSA Key)', 'error')
             return render_template('generate.html', generated=False, has_qrcode=HAS_QRCODE)
-        
+
         pin_length = int(request.form.get('pin_length', 6))
         rsa_bits = int(request.form.get('rsa_bits', 2048))
-        
+
         # Clamp values
         words_per_passphrase = max(MIN_PASSPHRASE_WORDS, min(12, words_per_passphrase))
         pin_length = max(MIN_PIN_LENGTH, min(MAX_PIN_LENGTH, pin_length))
         if rsa_bits not in VALID_RSA_SIZES:
             rsa_bits = 2048
-        
+
         try:
             # v3.2.0 FIX: Use correct parameter name 'passphrase_words'
             creds = generate_credentials(
@@ -381,19 +378,19 @@ def generate():
                 rsa_bits=rsa_bits,
                 passphrase_words=words_per_passphrase,  # FIX: was words_per_passphrase=
             )
-            
+
             # Store RSA key temporarily for QR generation
             qr_token = None
             qr_needs_compression = False
             qr_too_large = False
-            
+
             if creds.rsa_key_pem and HAS_QRCODE:
                 # Check if key fits in QR code
                 if can_fit_in_qr(creds.rsa_key_pem, compress=True):
                     qr_needs_compression = True
                 else:
                     qr_too_large = True
-                
+
                 if not qr_too_large:
                     qr_token = secrets.token_urlsafe(16)
                     cleanup_temp_files()
@@ -404,7 +401,7 @@ def generate():
                         'type': 'rsa_key',
                         'compress': qr_needs_compression
                     }
-            
+
             # v3.2.0: Single passphrase instead of daily phrases
             return render_template('generate.html',
                 passphrase=creds.passphrase,  # v3.2.0: Single passphrase
@@ -428,7 +425,7 @@ def generate():
         except Exception as e:
             flash(f'Error generating credentials: {e}', 'error')
             return render_template('generate.html', generated=False, has_qrcode=HAS_QRCODE)
-    
+
     return render_template('generate.html', generated=False, has_qrcode=HAS_QRCODE)
 
 
@@ -437,19 +434,19 @@ def generate_qr(token):
     """Generate QR code for RSA key."""
     if not HAS_QRCODE:
         return "QR code support not available", 501
-    
+
     if token not in TEMP_FILES:
         return "Token expired or invalid", 404
-    
+
     file_info = TEMP_FILES[token]
     if file_info.get('type') != 'rsa_key':
         return "Invalid token type", 400
-    
+
     try:
         key_pem = file_info['data'].decode('utf-8')
         compress = file_info.get('compress', False)
         qr_png = generate_qr_code(key_pem, compress=compress)
-        
+
         return send_file(
             io.BytesIO(qr_png),
             mimetype='image/png',
@@ -464,19 +461,19 @@ def generate_qr_download(token):
     """Download QR code as PNG file."""
     if not HAS_QRCODE:
         return "QR code support not available", 501
-    
+
     if token not in TEMP_FILES:
         return "Token expired or invalid", 404
-    
+
     file_info = TEMP_FILES[token]
     if file_info.get('type') != 'rsa_key':
         return "Invalid token type", 400
-    
+
     try:
         key_pem = file_info['data'].decode('utf-8')
         compress = file_info.get('compress', False)
         qr_png = generate_qr_code(key_pem, compress=compress)
-        
+
         return send_file(
             io.BytesIO(qr_png),
             mimetype='image/png',
@@ -491,29 +488,29 @@ def generate_qr_download(token):
 def qr_crop():
     """
     Detect and crop QR code from an image.
-    
+
     Useful for extracting QR codes from photos taken at an angle,
     with extra background, etc. Returns the cropped QR as PNG.
     """
     if not HAS_QRCODE_READ:
         return jsonify({'error': 'QR code reading not available (install pyzbar)'}), 501
-    
+
     image_file = request.files.get('image')
     if not image_file:
         return jsonify({'error': 'No image provided'}), 400
-    
+
     try:
         image_data = image_file.read()
-        
+
         # Use the new crop function
         cropped = detect_and_crop_qr(image_data)
-        
+
         if cropped is None:
             return jsonify({'error': 'No QR code detected in image'}), 404
-        
+
         # Return as downloadable PNG or inline based on query param
         as_attachment = request.args.get('download', '').lower() in ('1', 'true', 'yes')
-        
+
         return send_file(
             io.BytesIO(cropped),
             mimetype='image/png',
@@ -567,18 +564,18 @@ def extract_key_from_qr_route():
             'success': False,
             'error': 'QR code reading not available. Install pyzbar and libzbar.'
         }), 501
-    
+
     qr_image = request.files.get('qr_image')
     if not qr_image:
         return jsonify({
             'success': False,
             'error': 'No QR image provided'
         }), 400
-    
+
     try:
         image_data = qr_image.read()
         key_pem = extract_key_from_qr(image_data)
-        
+
         if key_pem:
             return jsonify({
                 'success': True,
@@ -589,7 +586,7 @@ def extract_key_from_qr_route():
                 'success': False,
                 'error': 'No valid RSA key found in QR code'
             }), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -611,16 +608,16 @@ def api_compare_capacity():
     carrier = request.files.get('carrier')
     if not carrier:
         return jsonify({'error': 'No carrier image provided'}), 400
-    
+
     try:
         carrier_data = carrier.read()
-        
+
         # Use subprocess-isolated compare_modes
         result = subprocess_stego.compare_modes(carrier_data)
-        
+
         if not result.success:
             return jsonify({'error': result.error or 'Comparison failed'}), 500
-        
+
         return jsonify({
             'success': True,
             'width': result.width,
@@ -652,29 +649,29 @@ def api_check_fit():
     carrier = request.files.get('carrier')
     payload_size = request.form.get('payload_size', type=int)
     embed_mode = request.form.get('embed_mode', 'lsb')
-    
+
     if not carrier or payload_size is None:
         return jsonify({'error': 'Missing carrier or payload_size'}), 400
-    
+
     if embed_mode not in ('lsb', 'dct'):
         return jsonify({'error': 'Invalid embed_mode'}), 400
-    
+
     if embed_mode == 'dct' and not has_dct_support():
         return jsonify({'error': 'DCT mode requires scipy'}), 400
-    
+
     try:
         carrier_data = carrier.read()
-        
+
         # Use subprocess-isolated capacity check
         result = subprocess_stego.check_capacity(
             carrier_data=carrier_data,
             payload_size=payload_size,
             embed_mode=embed_mode,
         )
-        
+
         if not result.success:
             return jsonify({'error': result.error or 'Capacity check failed'}), 500
-        
+
         return jsonify({
             'success': True,
             'fits': result.fits,
@@ -701,55 +698,55 @@ def encode_page():
             carrier = request.files.get('carrier')
             rsa_key_file = request.files.get('rsa_key')
             payload_file = request.files.get('payload_file')
-            
+
             if not ref_photo or not carrier:
                 flash('Both reference photo and carrier image are required', 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             if not allowed_image(ref_photo.filename) or not allowed_image(carrier.filename):
                 flash('Invalid file type. Use PNG, JPG, or BMP', 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Get form data - v3.2.0: renamed from day_phrase to passphrase
             message = request.form.get('message', '')
             passphrase = request.form.get('passphrase', '')  # v3.2.0: Renamed
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
             payload_type = request.form.get('payload_type', 'text')
-            
+
             # NEW in v3.0 - Embedding mode
             embed_mode = request.form.get('embed_mode', 'lsb')
             if embed_mode not in ('lsb', 'dct'):
                 embed_mode = 'lsb'
-            
+
             # NEW in v3.0.1 - DCT output format
             dct_output_format = request.form.get('dct_output_format', 'png')
             if dct_output_format not in ('png', 'jpeg'):
                 dct_output_format = 'png'
-            
+
             # NEW in v3.0.1 - DCT color mode
             dct_color_mode = request.form.get('dct_color_mode', 'color')
             if dct_color_mode not in ('grayscale', 'color'):
                 dct_color_mode = 'color'
-            
+
             # NEW in v4.0.0 - Channel key
             channel_key = resolve_channel_key_form(request.form.get('channel_key', 'auto'))
-            
+
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Determine payload
             if payload_type == 'file' and payload_file and payload_file.filename:
                 # File payload
                 file_data = payload_file.read()
-                
+
                 result = validate_file_payload(file_data, payload_file.filename)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-                
+
                 mime_type, _ = mimetypes.guess_type(payload_file.filename)
                 payload = FilePayload(
                     data=file_data,
@@ -763,31 +760,31 @@ def encode_page():
                     flash(result.error_message, 'error')
                     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
                 payload = message
-            
+
             # v3.2.0: Renamed from day_phrase
             if not passphrase:
                 flash('Passphrase is required', 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # v3.2.0: Validate passphrase
             result = validate_passphrase(passphrase)
             if not result.is_valid:
                 flash(result.error_message, 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Show warning if passphrase is short
             if result.warning:
                 flash(result.warning, 'warning')
-            
+
             # Read files
             ref_data = ref_photo.read()
             carrier_data = carrier.read()
-            
+
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get('rsa_key_qr')
             rsa_key_from_qr = False
-            
+
             if rsa_key_file and rsa_key_file.filename:
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
@@ -799,36 +796,36 @@ def encode_page():
                 else:
                     flash('Could not extract RSA key from QR code image.', 'error')
                     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Validate security factors
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
                 flash(result.error_message, 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Determine key password
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
-            
+
             # Validate RSA key if provided
             if rsa_key_data:
                 result = validate_rsa_key(rsa_key_data, key_password)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Validate carrier image
             result = validate_image(carrier_data, "Carrier image")
             if not result.is_valid:
                 flash(result.error_message, 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated encode to prevent crashes
             if payload_type == 'file' and payload_file and payload_file.filename:
@@ -861,14 +858,14 @@ def encode_page():
                     dct_color_mode=dct_color_mode if embed_mode == 'dct' else 'color',
                     channel_key=channel_key,  # v4.0.0
                 )
-            
+
             # Check for subprocess errors
             if not encode_result.success:
                 error_msg = encode_result.error or 'Encoding failed'
                 if 'capacity' in error_msg.lower():
                     raise CapacityError(error_msg)
                 raise StegasooError(error_msg)
-            
+
             # Determine actual output format for filename and storage
             if embed_mode == 'dct' and dct_output_format == 'jpeg':
                 output_ext = '.jpg'
@@ -876,14 +873,14 @@ def encode_page():
             else:
                 output_ext = '.png'
                 output_mime = 'image/png'
-            
+
             # Use filename from result or generate one
             filename = encode_result.filename
             if not filename:
                 filename = generate_filename('stego', output_ext)
             elif embed_mode == 'dct' and dct_output_format == 'jpeg' and filename.endswith('.png'):
                 filename = filename[:-4] + '.jpg'
-            
+
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
@@ -899,9 +896,9 @@ def encode_page():
                 'channel_mode': encode_result.channel_mode,
                 'channel_fingerprint': encode_result.channel_fingerprint,
             }
-            
+
             return redirect(url_for('encode_result', file_id=file_id))
-            
+
         except CapacityError as e:
             flash(str(e), 'error')
             return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
@@ -911,7 +908,7 @@ def encode_page():
         except Exception as e:
             flash(f'Error: {e}', 'error')
             return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
-    
+
     return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
 
 
@@ -920,17 +917,17 @@ def encode_result(file_id):
     if file_id not in TEMP_FILES:
         flash('File expired or not found. Please encode again.', 'error')
         return redirect(url_for('encode_page'))
-    
+
     file_info = TEMP_FILES[file_id]
-    
+
     # Generate thumbnail
     thumbnail_data = generate_thumbnail(file_info['data'])
     thumbnail_id = None
-    
+
     if thumbnail_data:
         thumbnail_id = f"{file_id}_thumb"
         THUMBNAIL_FILES[thumbnail_id] = thumbnail_data
-    
+
     return render_template('encode_result.html',
         file_id=file_id,
         filename=file_info['filename'],
@@ -949,7 +946,7 @@ def encode_thumbnail(thumb_id):
     """Serve thumbnail image."""
     if thumb_id not in THUMBNAIL_FILES:
         return "Thumbnail not found", 404
-    
+
     return send_file(
         io.BytesIO(THUMBNAIL_FILES[thumb_id]),
         mimetype='image/jpeg',
@@ -962,10 +959,10 @@ def encode_download(file_id):
     if file_id not in TEMP_FILES:
         flash('File expired or not found.', 'error')
         return redirect(url_for('encode_page'))
-    
+
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get('mime_type', 'image/png')
-    
+
     return send_file(
         io.BytesIO(file_info['data']),
         mimetype=mime_type,
@@ -979,10 +976,10 @@ def encode_file_route(file_id):
     """Serve file for Web Share API."""
     if file_id not in TEMP_FILES:
         return "Not found", 404
-    
+
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get('mime_type', 'image/png')
-    
+
     return send_file(
         io.BytesIO(file_info['data']),
         mimetype=mime_type,
@@ -995,11 +992,11 @@ def encode_file_route(file_id):
 def encode_cleanup(file_id):
     """Manually cleanup a file after sharing."""
     TEMP_FILES.pop(file_id, None)
-    
+
     # Also cleanup thumbnail if exists
     thumb_id = f"{file_id}_thumb"
     THUMBNAIL_FILES.pop(thumb_id, None)
-    
+
     return jsonify({'status': 'ok'})
 
 
@@ -1015,45 +1012,45 @@ def decode_page():
             ref_photo = request.files.get('reference_photo')
             stego_image = request.files.get('stego_image')
             rsa_key_file = request.files.get('rsa_key')
-            
+
             if not ref_photo or not stego_image:
                 flash('Both reference photo and stego image are required', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Get form data - v3.2.0: renamed from day_phrase to passphrase
             passphrase = request.form.get('passphrase', '')  # v3.2.0: Renamed
             pin = request.form.get('pin', '').strip()
             rsa_password = request.form.get('rsa_password', '')
-            
+
             # NEW in v3.0 - Extraction mode
             embed_mode = request.form.get('embed_mode', 'auto')
             if embed_mode not in ('auto', 'lsb', 'dct'):
                 embed_mode = 'auto'
-            
+
             # NEW in v4.0.0 - Channel key
             channel_key = resolve_channel_key_form(request.form.get('channel_key', 'auto'))
-            
+
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # v3.2.0: Removed date handling (no stego_date needed)
-            
+
             # v3.2.0: Renamed from day_phrase
             if not passphrase:
                 flash('Passphrase is required', 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Read files
             ref_data = ref_photo.read()
             stego_data = stego_image.read()
-            
+
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get('rsa_key_qr')
             rsa_key_from_qr = False
-            
+
             if rsa_key_file and rsa_key_file.filename:
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
@@ -1065,30 +1062,30 @@ def decode_page():
                 else:
                     flash('Could not extract RSA key from QR code image.', 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Validate security factors
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
                 flash(result.error_message, 'error')
                 return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # Determine key password
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
-            
+
             # Validate RSA key if provided
             if rsa_key_data:
                 result = validate_rsa_key(rsa_key_data, key_password)
                 if not result.is_valid:
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-            
+
             # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated decode to prevent crashes
             decode_result = subprocess_stego.decode(
@@ -1101,7 +1098,7 @@ def decode_page():
                 embed_mode=embed_mode,
                 channel_key=channel_key,  # v4.0.0
             )
-            
+
             # Check for subprocess errors
             if not decode_result.success:
                 error_msg = decode_result.error or 'Decoding failed'
@@ -1112,12 +1109,12 @@ def decode_page():
                 if 'decrypt' in error_msg.lower() or decode_result.error_type == 'DecryptionError':
                     raise DecryptionError(error_msg)
                 raise StegasooError(error_msg)
-            
+
             if decode_result.is_file:
                 # File content - store temporarily for download
                 file_id = secrets.token_urlsafe(16)
                 cleanup_temp_files()
-                
+
                 filename = decode_result.filename or 'decoded_file'
                 TEMP_FILES[file_id] = {
                     'data': decode_result.file_data,
@@ -1125,7 +1122,7 @@ def decode_page():
                     'mime_type': decode_result.mime_type,
                     'timestamp': time.time()
                 }
-                
+
                 return render_template('decode.html',
                     decoded_file=True,
                     file_id=file_id,
@@ -1136,11 +1133,11 @@ def decode_page():
                 )
             else:
                 # Text content
-                return render_template('decode.html', 
+                return render_template('decode.html',
                     decoded_message=decode_result.message,
                     has_qrcode_read=HAS_QRCODE_READ
                 )
-            
+
         except DecryptionError:
             flash('Decryption failed. Check your passphrase, PIN, RSA key, reference photo, and channel key.', 'error')
             return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
@@ -1150,7 +1147,7 @@ def decode_page():
         except Exception as e:
             flash(f'Error: {e}', 'error')
             return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
-    
+
     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
 
 
@@ -1160,10 +1157,10 @@ def decode_download(file_id):
     if file_id not in TEMP_FILES:
         flash('File expired or not found.', 'error')
         return redirect(url_for('decode_page'))
-    
+
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get('mime_type', 'application/octet-stream')
-    
+
     return send_file(
         io.BytesIO(file_info['data']),
         mimetype=mime_type,
@@ -1174,7 +1171,7 @@ def decode_download(file_id):
 
 @app.route('/about')
 def about():
-    return render_template('about.html', 
+    return render_template('about.html',
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QRCODE_READ
     )
@@ -1188,7 +1185,7 @@ def test_capacity():
     carrier = request.files.get('carrier')
     if not carrier:
         return jsonify({'error': 'No carrier image provided'}), 400
-    
+
     try:
         carrier_data = carrier.read()
         buffer = io.BytesIO(carrier_data)
@@ -1197,11 +1194,11 @@ def test_capacity():
         fmt = img.format
         img.close()
         buffer.close()
-        
+
         pixels = width * height
         lsb_bytes = (pixels * 3) // 8
         dct_bytes = ((width // 8) * (height // 8) * 16) // 8 - 10
-        
+
         return jsonify({
             'success': True,
             'width': width,
@@ -1220,7 +1217,7 @@ def test_capacity_nopil():
     carrier = request.files.get('carrier')
     if not carrier:
         return jsonify({'error': 'No carrier image provided'}), 400
-    
+
     carrier_data = carrier.read()
     return jsonify({
         'success': True,

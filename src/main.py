@@ -17,7 +17,7 @@ import sys
 def main():
     """
     Main entry point for Stegasoo CLI.
-    
+
     Delegates to the CLI module for command parsing and execution.
     """
     try:

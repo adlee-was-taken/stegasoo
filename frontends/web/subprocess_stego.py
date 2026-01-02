@@ -10,9 +10,9 @@ CHANGES in v4.0.0:
 
 Usage:
     from subprocess_stego import SubprocessStego
-    
+
     stego = SubprocessStego()
-    
+
     # Encode with channel key
     result = stego.encode(
         carrier_data=carrier_bytes,
@@ -23,13 +23,13 @@ Usage:
         embed_mode="dct",
         channel_key="auto",  # or "none", or explicit key
     )
-    
+
     if result.success:
         stego_bytes = result.stego_data
         extension = result.extension
     else:
         error_message = result.error
-    
+
     # Decode
     result = stego.decode(
         stego_data=stego_bytes,
@@ -38,19 +38,18 @@ Usage:
         pin="123456",
         channel_key="auto",
     )
-    
+
     # Compare modes (capacity)
     result = stego.compare_modes(carrier_bytes)
 """
 
-import json
 import base64
+import json
 import subprocess
 import sys
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Union
-
+from pathlib import Path
+from typing import Any
 
 # Default timeout for operations (seconds)
 DEFAULT_TIMEOUT = 120
@@ -63,14 +62,14 @@ WORKER_SCRIPT = Path(__file__).parent / 'stego_worker.py'
 class EncodeResult:
     """Result from encode operation."""
     success: bool
-    stego_data: Optional[bytes] = None
-    filename: Optional[str] = None
-    stats: Optional[Dict[str, Any]] = None
+    stego_data: bytes | None = None
+    filename: str | None = None
+    stats: dict[str, Any] | None = None
     # Channel info (v4.0.0)
-    channel_mode: Optional[str] = None
-    channel_fingerprint: Optional[str] = None
-    error: Optional[str] = None
-    error_type: Optional[str] = None
+    channel_mode: str | None = None
+    channel_fingerprint: str | None = None
+    error: str | None = None
+    error_type: str | None = None
 
 
 @dataclass
@@ -78,12 +77,12 @@ class DecodeResult:
     """Result from decode operation."""
     success: bool
     is_file: bool = False
-    message: Optional[str] = None
-    file_data: Optional[bytes] = None
-    filename: Optional[str] = None
-    mime_type: Optional[str] = None
-    error: Optional[str] = None
-    error_type: Optional[str] = None
+    message: str | None = None
+    file_data: bytes | None = None
+    filename: str | None = None
+    mime_type: str | None = None
+    error: str | None = None
+    error_type: str | None = None
 
 
 @dataclass
@@ -92,9 +91,9 @@ class CompareResult:
     success: bool
     width: int = 0
     height: int = 0
-    lsb: Optional[Dict[str, Any]] = None
-    dct: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    lsb: dict[str, Any] | None = None
+    dct: dict[str, Any] | None = None
+    error: str | None = None
 
 
 @dataclass
@@ -107,38 +106,38 @@ class CapacityResult:
     usage_percent: float = 0.0
     headroom: int = 0
     mode: str = ""
-    error: Optional[str] = None
+    error: str | None = None
 
 
-@dataclass 
+@dataclass
 class ChannelStatusResult:
     """Result from channel status check (v4.0.0)."""
     success: bool
     mode: str = "public"
     configured: bool = False
-    fingerprint: Optional[str] = None
-    source: Optional[str] = None
-    key: Optional[str] = None
-    error: Optional[str] = None
+    fingerprint: str | None = None
+    source: str | None = None
+    key: str | None = None
+    error: str | None = None
 
 
 class SubprocessStego:
     """
     Subprocess-isolated steganography operations.
-    
+
     All operations run in a separate Python process. If jpegio or scipy
     crashes, only the subprocess dies - Flask keeps running.
     """
-    
+
     def __init__(
         self,
-        worker_path: Optional[Path] = None,
-        python_executable: Optional[str] = None,
+        worker_path: Path | None = None,
+        python_executable: str | None = None,
         timeout: int = DEFAULT_TIMEOUT,
     ):
         """
         Initialize subprocess wrapper.
-        
+
         Args:
             worker_path: Path to stego_worker.py (default: same directory)
             python_executable: Python interpreter to use (default: same as current)
@@ -147,24 +146,24 @@ class SubprocessStego:
         self.worker_path = worker_path or WORKER_SCRIPT
         self.python = python_executable or sys.executable
         self.timeout = timeout
-        
+
         if not self.worker_path.exists():
             raise FileNotFoundError(f"Worker script not found: {self.worker_path}")
-    
-    def _run_worker(self, params: Dict[str, Any], timeout: Optional[int] = None) -> Dict[str, Any]:
+
+    def _run_worker(self, params: dict[str, Any], timeout: int | None = None) -> dict[str, Any]:
         """
         Run the worker subprocess with given parameters.
-        
+
         Args:
             params: Dictionary of parameters (will be JSON-encoded)
             timeout: Operation timeout in seconds
-            
+
         Returns:
             Dictionary with results from worker
         """
         timeout = timeout or self.timeout
         input_json = json.dumps(params)
-        
+
         try:
             result = subprocess.run(
                 [self.python, str(self.worker_path)],
@@ -174,7 +173,7 @@ class SubprocessStego:
                 timeout=timeout,
                 cwd=str(self.worker_path.parent),
             )
-            
+
             if result.returncode != 0:
                 # Worker crashed
                 return {
@@ -182,16 +181,16 @@ class SubprocessStego:
                     'error': f'Worker crashed (exit code {result.returncode})',
                     'stderr': result.stderr,
                 }
-            
+
             if not result.stdout.strip():
                 return {
                     'success': False,
                     'error': 'Worker returned empty output',
                     'stderr': result.stderr,
                 }
-            
+
             return json.loads(result.stdout)
-            
+
         except subprocess.TimeoutExpired:
             return {
                 'success': False,
@@ -210,29 +209,29 @@ class SubprocessStego:
                 'error': str(e),
                 'error_type': type(e).__name__,
             }
-    
+
     def encode(
         self,
         carrier_data: bytes,
         reference_data: bytes,
-        message: Optional[str] = None,
-        file_data: Optional[bytes] = None,
-        file_name: Optional[str] = None,
-        file_mime: Optional[str] = None,
+        message: str | None = None,
+        file_data: bytes | None = None,
+        file_name: str | None = None,
+        file_mime: str | None = None,
         passphrase: str = "",
-        pin: Optional[str] = None,
-        rsa_key_data: Optional[bytes] = None,
-        rsa_password: Optional[str] = None,
+        pin: str | None = None,
+        rsa_key_data: bytes | None = None,
+        rsa_password: str | None = None,
         embed_mode: str = "lsb",
         dct_output_format: str = "png",
         dct_color_mode: str = "color",
         # Channel key (v4.0.0)
-        channel_key: Optional[str] = "auto",
-        timeout: Optional[int] = None,
+        channel_key: str | None = "auto",
+        timeout: int | None = None,
     ) -> EncodeResult:
         """
         Encode a message or file into an image.
-        
+
         Args:
             carrier_data: Carrier image bytes
             reference_data: Reference photo bytes
@@ -249,7 +248,7 @@ class SubprocessStego:
             dct_color_mode: 'grayscale' or 'color' (for DCT mode)
             channel_key: 'auto' (server config), 'none' (public), or explicit key (v4.0.0)
             timeout: Operation timeout in seconds
-            
+
         Returns:
             EncodeResult with stego_data and extension on success
         """
@@ -265,18 +264,18 @@ class SubprocessStego:
             'dct_color_mode': dct_color_mode,
             'channel_key': channel_key,  # v4.0.0
         }
-        
+
         if file_data:
             params['file_b64'] = base64.b64encode(file_data).decode('ascii')
             params['file_name'] = file_name
             params['file_mime'] = file_mime
-        
+
         if rsa_key_data:
             params['rsa_key_b64'] = base64.b64encode(rsa_key_data).decode('ascii')
             params['rsa_password'] = rsa_password
-        
+
         result = self._run_worker(params, timeout)
-        
+
         if result.get('success'):
             return EncodeResult(
                 success=True,
@@ -292,23 +291,23 @@ class SubprocessStego:
                 error=result.get('error', 'Unknown error'),
                 error_type=result.get('error_type'),
             )
-    
+
     def decode(
         self,
         stego_data: bytes,
         reference_data: bytes,
         passphrase: str = "",
-        pin: Optional[str] = None,
-        rsa_key_data: Optional[bytes] = None,
-        rsa_password: Optional[str] = None,
+        pin: str | None = None,
+        rsa_key_data: bytes | None = None,
+        rsa_password: str | None = None,
         embed_mode: str = "auto",
         # Channel key (v4.0.0)
-        channel_key: Optional[str] = "auto",
-        timeout: Optional[int] = None,
+        channel_key: str | None = "auto",
+        timeout: int | None = None,
     ) -> DecodeResult:
         """
         Decode a message or file from a stego image.
-        
+
         Args:
             stego_data: Stego image bytes
             reference_data: Reference photo bytes
@@ -319,7 +318,7 @@ class SubprocessStego:
             embed_mode: 'auto', 'lsb', or 'dct'
             channel_key: 'auto' (server config), 'none' (public), or explicit key (v4.0.0)
             timeout: Operation timeout in seconds
-            
+
         Returns:
             DecodeResult with message or file_data on success
         """
@@ -332,13 +331,13 @@ class SubprocessStego:
             'embed_mode': embed_mode,
             'channel_key': channel_key,  # v4.0.0
         }
-        
+
         if rsa_key_data:
             params['rsa_key_b64'] = base64.b64encode(rsa_key_data).decode('ascii')
             params['rsa_password'] = rsa_password
-        
+
         result = self._run_worker(params, timeout)
-        
+
         if result.get('success'):
             if result.get('is_file'):
                 return DecodeResult(
@@ -360,19 +359,19 @@ class SubprocessStego:
                 error=result.get('error', 'Unknown error'),
                 error_type=result.get('error_type'),
             )
-    
+
     def compare_modes(
         self,
         carrier_data: bytes,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> CompareResult:
         """
         Compare LSB and DCT capacity for a carrier image.
-        
+
         Args:
             carrier_data: Carrier image bytes
             timeout: Operation timeout in seconds
-            
+
         Returns:
             CompareResult with capacity information
         """
@@ -380,9 +379,9 @@ class SubprocessStego:
             'operation': 'compare',
             'carrier_b64': base64.b64encode(carrier_data).decode('ascii'),
         }
-        
+
         result = self._run_worker(params, timeout)
-        
+
         if result.get('success'):
             comparison = result.get('comparison', {})
             return CompareResult(
@@ -397,23 +396,23 @@ class SubprocessStego:
                 success=False,
                 error=result.get('error', 'Unknown error'),
             )
-    
+
     def check_capacity(
         self,
         carrier_data: bytes,
         payload_size: int,
         embed_mode: str = "lsb",
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> CapacityResult:
         """
         Check if a payload will fit in the carrier.
-        
+
         Args:
             carrier_data: Carrier image bytes
             payload_size: Size of payload in bytes
             embed_mode: 'lsb' or 'dct'
             timeout: Operation timeout in seconds
-            
+
         Returns:
             CapacityResult with fit information
         """
@@ -423,9 +422,9 @@ class SubprocessStego:
             'payload_size': payload_size,
             'embed_mode': embed_mode,
         }
-        
+
         result = self._run_worker(params, timeout)
-        
+
         if result.get('success'):
             r = result.get('result', {})
             return CapacityResult(
@@ -442,19 +441,19 @@ class SubprocessStego:
                 success=False,
                 error=result.get('error', 'Unknown error'),
             )
-    
+
     def get_channel_status(
         self,
         reveal: bool = False,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> ChannelStatusResult:
         """
         Get current channel key status (v4.0.0).
-        
+
         Args:
             reveal: Include full key in response
             timeout: Operation timeout in seconds
-            
+
         Returns:
             ChannelStatusResult with channel info
         """
@@ -462,9 +461,9 @@ class SubprocessStego:
             'operation': 'channel_status',
             'reveal': reveal,
         }
-        
+
         result = self._run_worker(params, timeout)
-        
+
         if result.get('success'):
             status = result.get('status', {})
             return ChannelStatusResult(
@@ -483,7 +482,7 @@ class SubprocessStego:
 
 
 # Convenience function for quick usage
-_default_stego: Optional[SubprocessStego] = None
+_default_stego: SubprocessStego | None = None
 
 
 def get_subprocess_stego() -> SubprocessStego:

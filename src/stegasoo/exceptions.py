@@ -89,7 +89,7 @@ class SteganographyError(StegasooError):
 
 class CapacityError(SteganographyError):
     """Carrier image too small for message."""
-    
+
     def __init__(self, needed: int, available: int):
         self.needed = needed
         self.available = available
@@ -129,7 +129,7 @@ class FileNotFoundError(FileError):
 
 class FileTooLargeError(FileError):
     """File exceeds size limit."""
-    
+
     def __init__(self, size: int, limit: int, filename: str = "File"):
         self.size = size
         self.limit = limit
@@ -141,7 +141,7 @@ class FileTooLargeError(FileError):
 
 class UnsupportedFileTypeError(FileError):
     """File type not supported."""
-    
+
     def __init__(self, extension: str, allowed: set[str]):
         self.extension = extension
         self.allowed = allowed

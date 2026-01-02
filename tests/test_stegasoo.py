@@ -11,28 +11,27 @@ Updated for v4.0.0:
 - Python 3.12 recommended (3.13 not supported)
 """
 
+import io
+
 import pytest
 from PIL import Image
-import io
 
 import stegasoo
 from stegasoo import (
-    generate_pin,
-    generate_passphrase,
-    generate_credentials,
-    validate_pin,
-    validate_message,
-    validate_passphrase,
-    validate_channel_key,
-    encode,
     decode,
     decode_text,
+    encode,
     generate_channel_key,
+    generate_credentials,
+    generate_passphrase,
+    generate_pin,
     get_channel_fingerprint,
-    __version__,
+    validate_channel_key,
+    validate_message,
+    validate_passphrase,
+    validate_pin,
 )
 from stegasoo.steganography import get_output_format
-
 
 # =============================================================================
 # Fixtures
@@ -94,7 +93,7 @@ def gif_image():
 
 class TestKeygen:
     """Tests for key generation functions."""
-    
+
     def test_generate_pin_default(self):
         """Default PIN should be 6 digits, no leading zero."""
         pin = generate_pin()
@@ -183,7 +182,7 @@ class TestKeygen:
 
 class TestValidation:
     """Tests for validation functions."""
-    
+
     def test_validate_pin_valid(self):
         """Valid PIN should pass validation."""
         result = validate_pin("123456")
@@ -253,7 +252,7 @@ class TestValidation:
 
 class TestOutputFormat:
     """Tests for output format handling."""
-    
+
     def test_png_stays_png(self):
         """PNG input should produce PNG output."""
         fmt, ext = get_output_format('PNG')
@@ -310,7 +309,7 @@ class TestConstants:
 
 class TestEncodeDecode:
     """Tests for encoding and decoding functions."""
-    
+
     def test_encode_decode_roundtrip(self, png_image):
         """Full encode/decode cycle should work."""
         message = "Secret message!"
@@ -501,7 +500,7 @@ class TestEncodeDecode:
 
 class TestDCTMode:
     """Tests for DCT steganography mode."""
-    
+
     @pytest.fixture
     def skip_if_no_dct(self):
         """Skip test if DCT support not available."""
@@ -567,7 +566,7 @@ class TestDCTMode:
 
 class TestVersion:
     """Tests for version information."""
-    
+
     def test_version_exists(self):
         """Version string should exist and be valid."""
         assert hasattr(stegasoo, '__version__')
@@ -588,7 +587,7 @@ class TestVersion:
 
 class TestBackwardCompatibility:
     """Tests for backward compatibility handling."""
-    
+
     def test_old_day_phrase_parameter_raises(self, png_image):
         """Using old day_phrase parameter should raise TypeError."""
         with pytest.raises(TypeError):

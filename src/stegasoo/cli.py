@@ -8,33 +8,29 @@ Changes in v3.2.0:
 - Updated help text to use 'passphrase' terminology
 """
 
-import sys
 import json
 from pathlib import Path
-from typing import Optional
 
 import click
 
-from .constants import (
-    __version__,
-    MAX_MESSAGE_SIZE,
-    MAX_FILE_PAYLOAD_SIZE,
-    DEFAULT_PIN_LENGTH,
-    DEFAULT_PASSPHRASE_WORDS,  # v3.2.0: renamed from DEFAULT_PHRASE_WORDS
-)
-from .compression import (
-    CompressionAlgorithm,
-    get_available_algorithms,
-    algorithm_name,
-    HAS_LZ4,
-)
 from .batch import (
     BatchProcessor,
-    BatchResult,
     batch_capacity_check,
     print_batch_result,
 )
-
+from .compression import (
+    HAS_LZ4,
+    CompressionAlgorithm,
+    algorithm_name,
+    get_available_algorithms,
+)
+from .constants import (
+    DEFAULT_PASSPHRASE_WORDS,  # v3.2.0: renamed from DEFAULT_PHRASE_WORDS
+    DEFAULT_PIN_LENGTH,
+    MAX_FILE_PAYLOAD_SIZE,
+    MAX_MESSAGE_SIZE,
+    __version__,
+)
 
 # Click context settings
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -47,7 +43,7 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 def cli(ctx, json_output):
     """
     Stegasoo - Steganography with hybrid authentication.
-    
+
     Hide messages in images using PIN + passphrase security.
     """
     ctx.ensure_object(dict)
@@ -61,35 +57,35 @@ def cli(ctx, json_output):
 @cli.command()
 @click.argument('image', type=click.Path(exists=True))
 @click.option('-m', '--message', help='Message to encode')
-@click.option('-f', '--file', 'file_payload', type=click.Path(exists=True), 
+@click.option('-f', '--file', 'file_payload', type=click.Path(exists=True),
               help='File to embed instead of message')
 @click.option('-o', '--output', type=click.Path(), help='Output image path')
-@click.option('--passphrase', prompt=True, hide_input=True, 
+@click.option('--passphrase', prompt=True, hide_input=True,
               confirmation_prompt=True, help='Passphrase (recommend 4+ words)')
 @click.option('--pin', prompt=True, hide_input=True,
               confirmation_prompt=True, help='PIN code')
-@click.option('--compress/--no-compress', default=True, 
+@click.option('--compress/--no-compress', default=True,
               help='Enable/disable compression (default: enabled)')
-@click.option('--algorithm', type=click.Choice(['zlib', 'lz4', 'none']), 
+@click.option('--algorithm', type=click.Choice(['zlib', 'lz4', 'none']),
               default='zlib', help='Compression algorithm')
 @click.option('--dry-run', is_flag=True, help='Show capacity usage without encoding')
 @click.pass_context
-def encode(ctx, image, message, file_payload, output, passphrase, pin, 
+def encode(ctx, image, message, file_payload, output, passphrase, pin,
            compress, algorithm, dry_run):
     """
     Encode a message or file into an image.
-    
+
     Examples:
-    
+
         stegasoo encode photo.png -m "Secret message" --passphrase --pin
-        
+
         stegasoo encode photo.png -f secret.pdf -o encoded.png
     """
     from PIL import Image
-    
+
     if not message and not file_payload:
         raise click.UsageError("Either --message or --file is required")
-    
+
     # Parse compression algorithm
     algo_map = {
         'zlib': CompressionAlgorithm.ZLIB,
@@ -97,11 +93,11 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
         'none': CompressionAlgorithm.NONE,
     }
     compression_algo = algo_map[algorithm] if compress else CompressionAlgorithm.NONE
-    
+
     if algorithm == 'lz4' and not HAS_LZ4:
         click.echo("Warning: LZ4 not available, falling back to zlib", err=True)
         compression_algo = CompressionAlgorithm.ZLIB
-    
+
     # Calculate payload size
     if file_payload:
         payload_size = Path(file_payload).stat().st_size
@@ -109,12 +105,12 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
     else:
         payload_size = len(message.encode('utf-8'))
         payload_type = "text"
-    
+
     # Get image capacity
     with Image.open(image) as img:
         width, height = img.size
         capacity_bytes = (width * height * 3 // 8) - 69  # v3.2.0: corrected overhead
-    
+
     if dry_run:
         result = {
             "image": image,
@@ -126,7 +122,7 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
             "usage_percent": round(payload_size / capacity_bytes * 100, 1),
             "fits": payload_size < capacity_bytes,
         }
-        
+
         if ctx.obj.get('json'):
             click.echo(json.dumps(result, indent=2))
         else:
@@ -137,11 +133,11 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
             click.echo(f"Usage: {result['usage_percent']}%")
             click.echo(f"Status: {'✓ Fits' if result['fits'] else '✗ Too large'}")
         return
-    
+
     # Actual encoding would happen here
     # For now, show what would be done
     output = output or f"{Path(image).stem}_encoded.png"
-    
+
     if ctx.obj.get('json'):
         click.echo(json.dumps({
             "status": "success",
@@ -159,17 +155,17 @@ def encode(ctx, image, message, file_payload, output, passphrase, pin,
 @click.argument('image', type=click.Path(exists=True))
 @click.option('--passphrase', prompt=True, hide_input=True, help='Passphrase')
 @click.option('--pin', prompt=True, hide_input=True, help='PIN code')
-@click.option('-o', '--output', type=click.Path(), 
+@click.option('-o', '--output', type=click.Path(),
               help='Output path for file payloads')
 @click.pass_context
 def decode(ctx, image, passphrase, pin, output):
     """
     Decode a message or file from an image.
-    
+
     Examples:
-    
+
         stegasoo decode encoded.png --passphrase --pin
-        
+
         stegasoo decode encoded.png -o ./extracted/
     """
     # Actual decoding would happen here
@@ -179,7 +175,7 @@ def decode(ctx, image, passphrase, pin, output):
         "payload_type": "text",
         "message": "[Decoded message would appear here]",
     }
-    
+
     if ctx.obj.get('json'):
         click.echo(json.dumps(result, indent=2))
     else:
@@ -222,27 +218,27 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
                  passphrase, pin, compress, algorithm, recursive, jobs, verbose):
     """
     Encode message into multiple images.
-    
+
     Examples:
-    
+
         stegasoo batch encode *.png -m "Secret" --passphrase --pin
-        
+
         stegasoo batch encode ./photos/ -r -o ./encoded/
     """
     if not message and not file_payload:
         raise click.UsageError("Either --message or --file is required")
-    
+
     processor = BatchProcessor(max_workers=jobs)
-    
+
     # Progress callback
     def progress(current, total, item):
         if not ctx.obj.get('json'):
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
-    
+
     # v3.2.0: Use 'passphrase' key instead of 'phrase'
     credentials = {"passphrase": passphrase, "pin": pin}
-    
+
     result = processor.batch_encode(
         images=list(images),
         message=message,
@@ -254,7 +250,7 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
         recursive=recursive,
         progress_callback=progress if not ctx.obj.get('json') else None,
     )
-    
+
     if ctx.obj.get('json'):
         click.echo(result.to_json())
     else:
@@ -275,24 +271,24 @@ def batch_encode(ctx, images, message, file_payload, output_dir, suffix,
 def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verbose):
     """
     Decode messages from multiple images.
-    
+
     Examples:
-    
+
         stegasoo batch decode encoded*.png --passphrase --pin
-        
+
         stegasoo batch decode ./encoded/ -r -o ./extracted/
     """
     processor = BatchProcessor(max_workers=jobs)
-    
+
     # Progress callback
     def progress(current, total, item):
         if not ctx.obj.get('json'):
             status = "✓" if item.status.value == "success" else "✗"
             click.echo(f"[{current}/{total}] {status} {item.input_path.name}")
-    
+
     # v3.2.0: Use 'passphrase' key instead of 'phrase'
     credentials = {"passphrase": passphrase, "pin": pin}
-    
+
     result = processor.batch_decode(
         images=list(images),
         output_dir=Path(output_dir) if output_dir else None,
@@ -300,7 +296,7 @@ def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verb
         recursive=recursive,
         progress_callback=progress if not ctx.obj.get('json') else None,
     )
-    
+
     if ctx.obj.get('json'):
         click.echo(result.to_json())
     else:
@@ -315,21 +311,21 @@ def batch_decode(ctx, images, output_dir, passphrase, pin, recursive, jobs, verb
 def batch_check(ctx, images, recursive):
     """
     Check capacity of multiple images.
-    
+
     Examples:
-    
+
         stegasoo batch check *.png
-        
+
         stegasoo batch check ./photos/ -r
     """
     results = batch_capacity_check(list(images), recursive)
-    
+
     if ctx.obj.get('json'):
         click.echo(json.dumps(results, indent=2))
     else:
         click.echo(f"{'Image':<40} {'Size':<12} {'Capacity':<12} {'Status'}")
         click.echo("─" * 80)
-        
+
         for item in results:
             if 'error' in item:
                 click.echo(f"{Path(item['path']).name:<40} {'ERROR':<12} {'':<12} {item['error']}")
@@ -337,10 +333,10 @@ def batch_check(ctx, images, recursive):
                 name = Path(item['path']).name
                 if len(name) > 38:
                     name = name[:35] + "..."
-                
+
                 status = "✓" if item['valid'] else "⚠"
                 warnings = ", ".join(item.get('warnings', []))
-                
+
                 click.echo(
                     f"{name:<40} "
                     f"{item['dimensions']:<12} "
@@ -354,7 +350,7 @@ def batch_check(ctx, images, recursive):
 # =============================================================================
 
 @cli.command()
-@click.option('--words', default=DEFAULT_PASSPHRASE_WORDS, 
+@click.option('--words', default=DEFAULT_PASSPHRASE_WORDS,
               help=f'Number of words in passphrase (default: {DEFAULT_PASSPHRASE_WORDS})')
 @click.option('--pin-length', default=DEFAULT_PIN_LENGTH,
               help=f'PIN length (default: {DEFAULT_PIN_LENGTH})')
@@ -362,21 +358,21 @@ def batch_check(ctx, images, recursive):
 def generate(ctx, words, pin_length):
     """
     Generate random credentials (passphrase + PIN).
-    
+
     Examples:
-    
+
         stegasoo generate
-        
+
         stegasoo generate --words 6 --pin-length 8
     """
     import secrets
-    
+
     # Generate PIN
     pin = ''.join(str(secrets.randbelow(10)) for _ in range(pin_length))
     # Ensure PIN doesn't start with 0
     if pin[0] == '0':
         pin = str(secrets.randbelow(9) + 1) + pin[1:]
-    
+
     # Generate passphrase (would use BIP-39 wordlist)
     # Placeholder - actual implementation uses constants.get_wordlist()
     try:
@@ -388,16 +384,16 @@ def generate(ctx, words, pin_length):
         sample_words = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot',
                         'golf', 'hotel', 'india', 'juliet', 'kilo', 'lima']
         phrase_words = [secrets.choice(sample_words) for _ in range(words)]
-    
+
     passphrase = ' '.join(phrase_words)
-    
+
     result = {
         "passphrase": passphrase,
         "pin": pin,
         "passphrase_words": words,
         "pin_length": pin_length,
     }
-    
+
     if ctx.obj.get('json'):
         click.echo(json.dumps(result, indent=2))
     else:
@@ -421,17 +417,17 @@ def info(ctx):
             "max_file_payload_bytes": MAX_FILE_PAYLOAD_SIZE,
         },
     }
-    
+
     if ctx.obj.get('json'):
         click.echo(json.dumps(info_data, indent=2))
     else:
         click.echo(f"Stegasoo v{__version__}")
-        click.echo(f"\nCompression algorithms:")
+        click.echo("\nCompression algorithms:")
         for algo in get_available_algorithms():
             click.echo(f"  • {algorithm_name(algo)}")
         if not HAS_LZ4:
             click.echo("    (install 'lz4' for LZ4 support)")
-        click.echo(f"\nLimits:")
+        click.echo("\nLimits:")
         click.echo(f"  • Max message: {MAX_MESSAGE_SIZE:,} bytes")
         click.echo(f"  • Max file payload: {MAX_FILE_PAYLOAD_SIZE:,} bytes")
 

@@ -10,56 +10,55 @@ Changes in v4.0.0:
 __version__ = "4.0.1"
 
 # Core functionality
-from .encode import encode
+# Channel key management (v4.0.0)
+from .channel import (
+    clear_channel_key,
+    format_channel_key,
+    generate_channel_key,
+    get_channel_key,
+    get_channel_status,
+    has_channel_key,
+    set_channel_key,
+    validate_channel_key,
+)
+
+# Crypto functions
+from .crypto import get_active_channel_key, get_channel_fingerprint, has_argon2
 from .decode import decode, decode_file, decode_text
+from .encode import encode
 
 # Credential generation
 from .generate import (
-    generate_pin,
-    generate_passphrase,
-    generate_rsa_key,
-    generate_credentials,
     export_rsa_key_pem,
+    generate_credentials,
+    generate_passphrase,
+    generate_pin,
+    generate_rsa_key,
     load_rsa_key,
 )
 
 # Image utilities
 from .image_utils import (
-    get_image_info,
     compare_capacity,
+    get_image_info,
+)
+
+# Steganography functions
+from .steganography import (
+    compare_modes,
+    has_dct_support,
+    will_fit_by_mode,
 )
 
 # Utilities
 from .utils import generate_filename
 
-# Crypto functions
-from .crypto import has_argon2, get_active_channel_key, get_channel_fingerprint
-
-# Channel key management (v4.0.0)
-from .channel import (
-    generate_channel_key,
-    get_channel_key,
-    set_channel_key,
-    clear_channel_key,
-    has_channel_key,
-    get_channel_status,
-    validate_channel_key,
-    format_channel_key,
-)
-
-# Steganography functions
-from .steganography import (
-    has_dct_support,
-    compare_modes,
-    will_fit_by_mode,
-)
-
 # QR Code utilities - optional, may not be available
 try:
     from .qr_utils import (
-        generate_qr_code,
-        extract_key_from_qr,
         detect_and_crop_qr,
+        extract_key_from_qr,
+        generate_qr_code,
     )
     HAS_QR_UTILS = True
 except ImportError:
@@ -70,12 +69,12 @@ except ImportError:
 
 # Validation
 from .validation import (
+    validate_file_payload,
+    validate_image,
+    validate_message,
     validate_passphrase,
     validate_pin,
     validate_rsa_key,
-    validate_message,
-    validate_file_payload,
-    validate_image,
     validate_security_factors,
 )
 
@@ -84,62 +83,61 @@ validate_reference_photo = validate_image
 validate_carrier = validate_image
 
 # Additional validators
-from .validation import (
-    validate_embed_mode,
-    validate_dct_output_format,
-    validate_dct_color_mode,
-)
-
-# Models
-from .models import (
-    ImageInfo,
-    CapacityComparison,
-    GenerateResult,
-    EncodeResult,
-    DecodeResult,
-    FilePayload,
-    Credentials,
-    ValidationResult,
+# Constants
+from .constants import (
+    DEFAULT_PASSPHRASE_WORDS,
+    EMBED_MODE_AUTO,
+    EMBED_MODE_DCT,
+    EMBED_MODE_LSB,
+    FORMAT_VERSION,
+    LOSSLESS_FORMATS,
+    MAX_IMAGE_PIXELS,
+    MAX_MESSAGE_SIZE,
+    MAX_PASSPHRASE_WORDS,
+    MAX_PIN_LENGTH,
+    MIN_IMAGE_PIXELS,
+    MIN_PASSPHRASE_WORDS,
+    MIN_PIN_LENGTH,
+    RECOMMENDED_PASSPHRASE_WORDS,
 )
 
 # Exceptions
 from .exceptions import (
-    StegasooError,
-    ValidationError,
-    PinValidationError,
-    MessageValidationError,
-    ImageValidationError,
-    KeyValidationError,
-    SecurityFactorError,
+    CapacityError,
     CryptoError,
-    EncryptionError,
     DecryptionError,
+    EmbeddingError,
+    EncryptionError,
+    ExtractionError,
+    ImageValidationError,
+    InvalidHeaderError,
     KeyDerivationError,
     KeyGenerationError,
     KeyPasswordError,
+    KeyValidationError,
+    MessageValidationError,
+    PinValidationError,
+    SecurityFactorError,
     SteganographyError,
-    CapacityError,
-    ExtractionError,
-    EmbeddingError,
-    InvalidHeaderError,
+    StegasooError,
+    ValidationError,
 )
 
-# Constants
-from .constants import (
-    FORMAT_VERSION,
-    MIN_PASSPHRASE_WORDS,
-    RECOMMENDED_PASSPHRASE_WORDS,
-    DEFAULT_PASSPHRASE_WORDS,
-    MAX_PASSPHRASE_WORDS,
-    MIN_PIN_LENGTH,
-    MAX_PIN_LENGTH,
-    MAX_MESSAGE_SIZE,
-    MIN_IMAGE_PIXELS,
-    MAX_IMAGE_PIXELS,
-    LOSSLESS_FORMATS,
-    EMBED_MODE_LSB,
-    EMBED_MODE_DCT,
-    EMBED_MODE_AUTO,
+# Models
+from .models import (
+    CapacityComparison,
+    Credentials,
+    DecodeResult,
+    EncodeResult,
+    FilePayload,
+    GenerateResult,
+    ImageInfo,
+    ValidationResult,
+)
+from .validation import (
+    validate_dct_color_mode,
+    validate_dct_output_format,
+    validate_embed_mode,
 )
 
 # Aliases for backward compatibility
@@ -159,7 +157,7 @@ __all__ = [
     "decode",
     "decode_file",
     "decode_text",
-    
+
     # Generation
     "generate_pin",
     "generate_passphrase",
@@ -167,7 +165,7 @@ __all__ = [
     "generate_credentials",
     "export_rsa_key_pem",
     "load_rsa_key",
-    
+
     # Channel key management (v4.0.0)
     "generate_channel_key",
     "get_channel_key",
@@ -179,28 +177,28 @@ __all__ = [
     "format_channel_key",
     "get_active_channel_key",
     "get_channel_fingerprint",
-    
+
     # Image utilities
     "get_image_info",
     "compare_capacity",
-    
+
     # Utilities
     "generate_filename",
-    
+
     # Crypto
     "has_argon2",
-    
+
     # Steganography
     "has_dct_support",
     "compare_modes",
     "will_fit_by_mode",
-    
+
     # QR utilities
     "generate_qr_code",
     "extract_key_from_qr",
     "detect_and_crop_qr",
     "HAS_QR_UTILS",
-    
+
     # Validation
     "validate_reference_photo",
     "validate_carrier",
@@ -214,7 +212,7 @@ __all__ = [
     "validate_dct_output_format",
     "validate_dct_color_mode",
     "validate_channel_key",
-    
+
     # Models
     "ImageInfo",
     "CapacityComparison",
@@ -224,7 +222,7 @@ __all__ = [
     "FilePayload",
     "Credentials",
     "ValidationResult",
-    
+
     # Exceptions
     "StegasooError",
     "ValidationError",
@@ -244,7 +242,7 @@ __all__ = [
     "ExtractionError",
     "EmbeddingError",
     "InvalidHeaderError",
-    
+
     # Constants
     "FORMAT_VERSION",
     "MIN_PASSPHRASE_WORDS",

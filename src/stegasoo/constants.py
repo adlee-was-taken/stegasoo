@@ -14,7 +14,6 @@ BREAKING CHANGES in v3.2.0:
 - Renamed day_phrase → passphrase throughout codebase
 """
 
-import os
 from pathlib import Path
 
 # ============================================================================
@@ -89,7 +88,7 @@ RECOMMENDED_PASSPHRASE_WORDS = 4  # Best practice guideline
 
 # Legacy aliases for backward compatibility during transition
 MIN_PHRASE_WORDS = MIN_PASSPHRASE_WORDS
-MAX_PHRASE_WORDS = MAX_PASSPHRASE_WORDS  
+MAX_PHRASE_WORDS = MAX_PASSPHRASE_WORDS
 DEFAULT_PHRASE_WORDS = DEFAULT_PASSPHRASE_WORDS
 
 # RSA configuration
@@ -180,11 +179,11 @@ def get_data_dir() -> Path:
         Path.cwd().parent / 'data',                            # One level up from cwd
         Path.cwd().parent.parent / 'data',                     # Two levels up from cwd
     ]
-    
+
     for path in candidates:
         if path.exists():
             return path
-    
+
     # Default to first candidate
     return candidates[0]
 
@@ -192,14 +191,14 @@ def get_data_dir() -> Path:
 def get_bip39_words() -> list[str]:
     """Load BIP-39 wordlist."""
     wordlist_path = get_data_dir() / 'bip39-words.txt'
-    
+
     if not wordlist_path.exists():
         raise FileNotFoundError(
             f"BIP-39 wordlist not found at {wordlist_path}. "
             "Please ensure bip39-words.txt is in the data directory."
         )
-    
-    with open(wordlist_path, 'r') as f:
+
+    with open(wordlist_path) as f:
         return [line.strip() for line in f if line.strip()]
 
 
@@ -240,18 +239,18 @@ DCT_BYTES_PER_PIXEL = 0.125  # Approximate for DCT mode (varies by implementatio
 def detect_stego_mode(encrypted_data: bytes) -> str:
     """
     Detect embedding mode from encrypted payload header.
-    
+
     Args:
         encrypted_data: First few bytes of extracted payload
-        
+
     Returns:
         'lsb' or 'dct' or 'unknown'
     """
     if len(encrypted_data) < 4:
         return 'unknown'
-    
+
     header = encrypted_data[:4]
-    
+
     if header == b'\x89ST3':
         return EMBED_MODE_LSB
     elif header == b'\x89DCT':

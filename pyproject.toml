@@ -114,8 +114,17 @@ target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 line-length = 100
+exclude = ["frontends/web/test_routes.py"]  # Debug snippet, not a real module
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# YCbCr colorspace variables (R, G, B, Y, Cb, Cr) are standard names
+"src/stegasoo/dct_steganography.py" = ["N803", "N806"]
+# Package __init__.py has imports after try/except and aliases - intentional structure
+"src/stegasoo/__init__.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"

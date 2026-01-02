@@ -69,13 +69,13 @@ def main():
         print("\nOptional: add passphrase, pin, key path")
         print("  python debug_jpegio.py stego.jpg ref.jpg 'passphrase' '123456' key.pem")
         sys.exit(1)
-    
+
     stego_path = sys.argv[1]
     ref_path = sys.argv[2]
     passphrase = sys.argv[3] if len(sys.argv) > 3 else "test"
     pin = sys.argv[4] if len(sys.argv) > 4 else ""
     key_path = sys.argv[5] if len(sys.argv) > 5 else None
-    
+
     print(f"\n{'='*60}")
     print("JPEGIO DCT EXTRACTION DEBUG")
     print(f"{'='*60}")
@@ -84,7 +84,7 @@ def main():
     print(f"Passphrase:  '{passphrase}'")
     print(f"PIN:         '{pin}'")
     print(f"Key:         {key_path}")
-    
+
     # Load stego image with jpegio
     print(f"\n[1] Loading stego image with jpegio...")
     try:
@@ -96,7 +96,7 @@ def main():
     except Exception as e:
         print(f"    ✗ Failed: {e}")
         sys.exit(1)
-    
+
     # Get coefficient array (channel 0)
     coef_array = jpeg.coef_arrays[0]
     print(f"\n[2] Coefficient array analysis...")
@@ -104,21 +104,21 @@ def main():
     print(f"    Non-zero coefficients: {np.count_nonzero(coef_array)}")
     print(f"    Min value: {coef_array.min()}")
     print(f"    Max value: {coef_array.max()}")
-    
+
     # Get usable positions
     print(f"\n[3] Finding usable positions (|coef| >= 2, non-DC)...")
     positions = get_usable_positions(coef_array)
     print(f"    Usable positions: {len(positions)}")
     print(f"    Capacity: ~{len(positions) // 8} bytes")
-    
+
     # Generate seed (this needs to match the encode seed!)
     print(f"\n[4] Generating seed...")
-    
+
     # Load reference photo
     ref_data = Path(ref_path).read_bytes()
     ref_hash = hashlib.sha256(ref_data).digest()
     print(f"    Reference hash: {ref_hash[:8].hex()}...")
-    
+
     # Load RSA key if provided
     rsa_component = b""
     if key_path:
@@ -130,7 +130,7 @@ def main():
                 rsa_key = load_rsa_key(key_data, password=None)
             except:
                 rsa_key = load_rsa_key(key_data, password="testpass")
-            
+
             # Get public key bytes for seed
             from cryptography.hazmat.primitives import serialization
             pub_bytes = rsa_key.public_key().public_bytes(
@@ -141,7 +141,7 @@ def main():
             print(f"    RSA key loaded, hash: {rsa_component[:8].hex()}...")
         except Exception as e:
             print(f"    ✗ Could not load RSA key: {e}")
-    
+
     # Build seed like stegasoo does
     # This is the critical part - must match encoding!
     seed_parts = [
@@ -152,12 +152,12 @@ def main():
     ]
     seed = hashlib.sha256(b"".join(seed_parts)).digest()
     print(f"    Combined seed: {seed[:8].hex()}...")
-    
+
     # Generate order
     print(f"\n[5] Generating coefficient order...")
     order = generate_order(len(positions), seed)
     print(f"    First 10 indices: {order[:10]}")
-    
+
     # Try to extract header
     print(f"\n[6] Extracting header (first 80 bits = 10 bytes)...")
     HEADER_SIZE = 10
@@ -165,7 +165,7 @@ def main():
     header_bytes = bits_to_bytes(header_bits)
     print(f"    Raw header bytes: {header_bytes.hex()}")
     print(f"    As ASCII (if printable): {repr(header_bytes)}")
-    
+
     # Check for JPGS magic
     JPEGIO_MAGIC = b'JPGS'
     if header_bytes[:4] == JPEGIO_MAGIC:
@@ -176,7 +176,7 @@ def main():
         print(f"    Version: {version}")
         print(f"    Flags: {flags}")
         print(f"    Data length: {data_length} bytes")
-        
+
         if data_length > 0 and data_length < len(positions) // 8:
             print(f"\n[7] Extracting payload ({data_length} bytes)...")
             total_bits = (HEADER_SIZE + data_length) * 8
@@ -191,10 +191,10 @@ def main():
         print(f"    ✗ No JPEGIO magic found")
         print(f"    Expected: {JPEGIO_MAGIC.hex()} ('JPGS')")
         print(f"    Got:      {header_bytes[:4].hex()} ('{header_bytes[:4]}')")
-        
+
         # Try alternate interpretations
         print(f"\n[7] Trying alternate header interpretations...")
-        
+
         # Maybe it's scipy DCT format?
         DCT_MAGIC = b'DCTS'
         if header_bytes[:4] == DCT_MAGIC:
@@ -202,7 +202,7 @@ def main():
         else:
             # Show bit distribution
             print(f"    First 32 extracted bits: {header_bits[:32]}")
-            
+
             # Check if bits look random or patterned
             ones = sum(header_bits[:80])
             print(f"    Bit distribution: {ones}/80 ones ({100*ones/80:.1f}%)")

@@ -17,9 +17,9 @@ Usage:
     echo '{"operation": "encode", ...}' | python stego_worker.py
 """
 
-import sys
-import json
 import base64
+import json
+import sys
 import traceback
 from pathlib import Path
 
@@ -31,10 +31,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 def _resolve_channel_key(channel_key_param):
     """
     Resolve channel_key parameter to value for stegasoo.
-    
+
     Args:
         channel_key_param: 'auto', 'none', explicit key, or None
-        
+
     Returns:
         None (auto), "" (public), or explicit key string
     """
@@ -49,41 +49,41 @@ def _resolve_channel_key(channel_key_param):
 def _get_channel_info(resolved_key):
     """
     Get channel mode and fingerprint for response.
-    
+
     Returns:
         (mode, fingerprint) tuple
     """
-    from stegasoo import has_channel_key, get_channel_status
-    
+    from stegasoo import get_channel_status, has_channel_key
+
     if resolved_key == "":
         return "public", None
-    
+
     if resolved_key is not None:
         # Explicit key
         fingerprint = f"{resolved_key[:4]}-••••-••••-••••-••••-••••-••••-{resolved_key[-4:]}"
         return "private", fingerprint
-    
+
     # Auto mode - check server config
     if has_channel_key():
         status = get_channel_status()
         return "private", status.get('fingerprint')
-    
+
     return "public", None
 
 
 def encode_operation(params: dict) -> dict:
     """Handle encode operation."""
-    from stegasoo import encode, FilePayload
-    
+    from stegasoo import FilePayload, encode
+
     # Decode base64 inputs
     carrier_data = base64.b64decode(params['carrier_b64'])
     reference_data = base64.b64decode(params['reference_b64'])
-    
+
     # Optional RSA key
     rsa_key_data = None
     if params.get('rsa_key_b64'):
         rsa_key_data = base64.b64decode(params['rsa_key_b64'])
-    
+
     # Determine payload type
     if params.get('file_b64'):
         file_data = base64.b64decode(params['file_b64'])
@@ -94,10 +94,10 @@ def encode_operation(params: dict) -> dict:
         )
     else:
         payload = params.get('message', '')
-    
+
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
-    
+
     # Call encode with correct parameter names
     result = encode(
         message=payload,
@@ -112,7 +112,7 @@ def encode_operation(params: dict) -> dict:
         dct_color_mode=params.get('dct_color_mode', 'color'),
         channel_key=resolved_channel_key,  # v4.0.0
     )
-    
+
     # Build stats dict if available
     stats = None
     if hasattr(result, 'stats') and result.stats:
@@ -121,10 +121,10 @@ def encode_operation(params: dict) -> dict:
             'capacity_used': getattr(result.stats, 'capacity_used', 0),
             'bytes_embedded': getattr(result.stats, 'bytes_embedded', 0),
         }
-    
+
     # Get channel info for response (v4.0.0)
     channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
-    
+
     return {
         'success': True,
         'stego_b64': base64.b64encode(result.stego_image).decode('ascii'),
@@ -138,19 +138,19 @@ def encode_operation(params: dict) -> dict:
 def decode_operation(params: dict) -> dict:
     """Handle decode operation."""
     from stegasoo import decode
-    
+
     # Decode base64 inputs
     stego_data = base64.b64decode(params['stego_b64'])
     reference_data = base64.b64decode(params['reference_b64'])
-    
+
     # Optional RSA key
     rsa_key_data = None
     if params.get('rsa_key_b64'):
         rsa_key_data = base64.b64decode(params['rsa_key_b64'])
-    
+
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
-    
+
     # Call decode with correct parameter names
     result = decode(
         stego_image=stego_data,
@@ -162,7 +162,7 @@ def decode_operation(params: dict) -> dict:
         embed_mode=params.get('embed_mode', 'auto'),
         channel_key=resolved_channel_key,  # v4.0.0
     )
-    
+
     if result.is_file:
         return {
             'success': True,
@@ -182,10 +182,10 @@ def decode_operation(params: dict) -> dict:
 def compare_operation(params: dict) -> dict:
     """Handle compare_modes operation."""
     from stegasoo import compare_modes
-    
+
     carrier_data = base64.b64decode(params['carrier_b64'])
     result = compare_modes(carrier_data)
-    
+
     return {
         'success': True,
         'comparison': result,
@@ -195,15 +195,15 @@ def compare_operation(params: dict) -> dict:
 def capacity_check_operation(params: dict) -> dict:
     """Handle will_fit_by_mode operation."""
     from stegasoo import will_fit_by_mode
-    
+
     carrier_data = base64.b64decode(params['carrier_b64'])
-    
+
     result = will_fit_by_mode(
         payload=params['payload_size'],
         carrier_image=carrier_data,
         embed_mode=params.get('embed_mode', 'lsb'),
     )
-    
+
     return {
         'success': True,
         'result': result,
@@ -213,10 +213,10 @@ def capacity_check_operation(params: dict) -> dict:
 def channel_status_operation(params: dict) -> dict:
     """Handle channel status check (v4.0.0)."""
     from stegasoo import get_channel_status
-    
+
     status = get_channel_status()
     reveal = params.get('reveal', False)
-    
+
     return {
         'success': True,
         'status': {
@@ -234,13 +234,13 @@ def main():
     try:
         # Read all input
         input_text = sys.stdin.read()
-        
+
         if not input_text.strip():
             output = {'success': False, 'error': 'No input provided'}
         else:
             params = json.loads(input_text)
             operation = params.get('operation')
-            
+
             if operation == 'encode':
                 output = encode_operation(params)
             elif operation == 'decode':
@@ -253,7 +253,7 @@ def main():
                 output = channel_status_operation(params)
             else:
                 output = {'success': False, 'error': f'Unknown operation: {operation}'}
-    
+
     except json.JSONDecodeError as e:
         output = {'success': False, 'error': f'Invalid JSON: {e}'}
     except Exception as e:
@@ -263,7 +263,7 @@ def main():
             'error_type': type(e).__name__,
             'traceback': traceback.format_exc(),
         }
-    
+
     # Write output as JSON
     print(json.dumps(output), flush=True)
 

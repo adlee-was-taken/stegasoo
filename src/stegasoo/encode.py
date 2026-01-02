@@ -7,41 +7,40 @@ Changes in v4.0.0:
 - Added channel_key parameter for deployment/group isolation
 """
 
-from typing import Optional, Union
 from pathlib import Path
 
-from .models import EncodeInput, EncodeResult, FilePayload
-from .crypto import encrypt_message, derive_pixel_key
+from .constants import EMBED_MODE_LSB
+from .crypto import derive_pixel_key, encrypt_message
+from .debug import debug
+from .models import EncodeResult, FilePayload
 from .steganography import embed_in_image
+from .utils import generate_filename
 from .validation import (
-    require_valid_payload,
-    require_valid_image,
     require_security_factors,
+    require_valid_image,
+    require_valid_payload,
     require_valid_pin,
     require_valid_rsa_key,
 )
-from .utils import generate_filename
-from .constants import EMBED_MODE_LSB
-from .debug import debug
 
 
 def encode(
-    message: Union[str, bytes, FilePayload],
+    message: str | bytes | FilePayload,
     reference_photo: bytes,
     carrier_image: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None,
-    rsa_password: Optional[str] = None,
-    output_format: Optional[str] = None,
+    rsa_key_data: bytes | None = None,
+    rsa_password: str | None = None,
+    output_format: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
-    channel_key: Optional[Union[str, bool]] = None,
+    channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
     Encode a message or file into an image.
-    
+
     Args:
         message: Text message, raw bytes, or FilePayload to hide
         reference_photo: Shared reference photo bytes
@@ -58,10 +57,10 @@ def encode(
             - None or "auto": Use server's configured key
             - str: Use this specific channel key
             - "" or False: No channel key (public mode)
-        
+
     Returns:
         EncodeResult with stego image and metadata
-        
+
     Example:
         >>> result = encode(
         ...     message="Secret message",
@@ -72,7 +71,7 @@ def encode(
         ... )
         >>> with open('stego.png', 'wb') as f:
         ...     f.write(result.stego_image)
-        
+
     Example with explicit channel key:
         >>> result = encode(
         ...     message="Secret message",
@@ -86,30 +85,30 @@ def encode(
     debug.print(f"encode: passphrase length={len(passphrase.split())} words, "
                 f"pin={'set' if pin else 'none'}, mode={embed_mode}, "
                 f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}")
-    
+
     # Validate inputs
     require_valid_payload(message)
     require_valid_image(reference_photo, "Reference photo")
     require_valid_image(carrier_image, "Carrier image")
     require_security_factors(pin, rsa_key_data)
-    
+
     if pin:
         require_valid_pin(pin)
     if rsa_key_data:
         require_valid_rsa_key(rsa_key_data, rsa_password)
-    
+
     # Encrypt message (with channel key)
     encrypted = encrypt_message(
         message, reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
-    
+
     debug.print(f"Encrypted payload: {len(encrypted)} bytes")
-    
+
     # Derive pixel/coefficient selection key (with channel key)
     pixel_key = derive_pixel_key(
         reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
-    
+
     # Embed in image
     stego_data, stats, extension = embed_in_image(
         encrypted,
@@ -120,10 +119,10 @@ def encode(
         dct_output_format=dct_output_format,
         dct_color_mode=dct_color_mode,
     )
-    
+
     # Generate filename
     filename = generate_filename(extension=extension)
-    
+
     # Create result
     if hasattr(stats, 'pixels_modified'):
         # LSB mode stats
@@ -148,25 +147,25 @@ def encode(
 
 
 def encode_file(
-    filepath: Union[str, Path],
+    filepath: str | Path,
     reference_photo: bytes,
     carrier_image: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None,
-    rsa_password: Optional[str] = None,
-    output_format: Optional[str] = None,
-    filename_override: Optional[str] = None,
+    rsa_key_data: bytes | None = None,
+    rsa_password: str | None = None,
+    output_format: str | None = None,
+    filename_override: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
-    channel_key: Optional[Union[str, bool]] = None,
+    channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
     Encode a file into an image.
-    
+
     Convenience wrapper that loads a file and encodes it.
-    
+
     Args:
         filepath: Path to file to embed
         reference_photo: Shared reference photo bytes
@@ -181,12 +180,12 @@ def encode_file(
         dct_output_format: 'png' or 'jpeg'
         dct_color_mode: 'grayscale' or 'color'
         channel_key: Channel key parameter (see encode())
-        
+
     Returns:
         EncodeResult
     """
     payload = FilePayload.from_file(str(filepath), filename_override)
-    
+
     return encode(
         message=payload,
         reference_photo=reference_photo,
@@ -210,18 +209,18 @@ def encode_bytes(
     carrier_image: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None,
-    rsa_password: Optional[str] = None,
-    output_format: Optional[str] = None,
-    mime_type: Optional[str] = None,
+    rsa_key_data: bytes | None = None,
+    rsa_password: str | None = None,
+    output_format: str | None = None,
+    mime_type: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
-    channel_key: Optional[Union[str, bool]] = None,
+    channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
     Encode raw bytes with metadata into an image.
-    
+
     Args:
         data: Raw bytes to embed
         filename: Filename to associate with data
@@ -237,12 +236,12 @@ def encode_bytes(
         dct_output_format: 'png' or 'jpeg'
         dct_color_mode: 'grayscale' or 'color'
         channel_key: Channel key parameter (see encode())
-        
+
     Returns:
         EncodeResult
     """
     payload = FilePayload(data=data, filename=filename, mime_type=mime_type)
-    
+
     return encode(
         message=payload,
         reference_photo=reference_photo,

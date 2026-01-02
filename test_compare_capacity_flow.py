@@ -131,36 +131,36 @@ if HAS_JPEGIO:
     print("\n" + "=" * 60)
     print("JPEGIO SPECIFIC TEST")
     print("=" * 60)
-    
+
     import tempfile
     import os
-    
+
     # Reload image data
     with open(image_path, 'rb') as f:
         carrier_data = f.read()
-    
+
     print("\n[J1] Checking if image is JPEG...")
     img = Image.open(io.BytesIO(carrier_data))
     is_jpeg = img.format == 'JPEG'
     img.close()
     print(f"  Is JPEG: {is_jpeg}")
-    
+
     if is_jpeg:
         print("\n[J2] Writing to temp file...")
         fd, temp_path = tempfile.mkstemp(suffix='.jpg')
         os.write(fd, carrier_data)
         os.close(fd)
         print(f"  Temp file: {temp_path}")
-        
+
         print("\n[J3] Reading with jpegio...")
         try:
             jpeg = jio.read(temp_path)
             print(f"  jpegio.read() OK")
-            
+
             print("\n[J4] Accessing coefficient arrays...")
             coef = jpeg.coef_arrays[0]
             print(f"  Coef shape: {coef.shape}, dtype: {coef.dtype}")
-            
+
             print("\n[J5] Counting usable positions...")
             positions = []
             h, w = coef.shape
@@ -171,31 +171,31 @@ if HAS_JPEGIO:
                     if abs(coef[row, col]) >= 2:
                         positions.append((row, col))
             print(f"  Usable positions: {len(positions)}")
-            
+
             print("\n[J6] Cleaning up jpegio object...")
             del coef
             del jpeg
             gc.collect()
             print("  Deleted jpeg object")
-            
+
             print("\n[J7] Removing temp file...")
             os.unlink(temp_path)
             print("  Temp file removed")
-            
+
             gc.collect()
             print("\n[J8] Final GC...")
-            
+
         except Exception as e:
             print(f"  ERROR: {e}")
             import traceback
             traceback.print_exc()
-        
+
         print("\n[J9] Waiting for delayed crash...")
         for i in range(3):
             time.sleep(1)
             print(f"  {i+1}s...")
             gc.collect()
-        
+
         print("\n" + "=" * 60)
         print("JPEGIO TEST PASSED - No crash detected")
         print("=" * 60)
