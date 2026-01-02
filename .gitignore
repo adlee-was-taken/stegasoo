@@ -35,6 +35,12 @@ old_files/
 *.swp
 *.swo
 
+# Backup files
+*_old
+*_old.*
+*.bak
+*.orig
+
 # Testing
 .pytest_cache/
 .coverage
