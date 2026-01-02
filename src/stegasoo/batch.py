@@ -105,10 +105,10 @@ class BatchCredentials:
         """
         Create BatchCredentials from a dictionary.
 
-        Handles both v3.2.0 format (passphrase) and legacy format (day_phrase).
+        Handles both v3.2.0 format (passphrase) and legacy formats (day_phrase, phrase).
         """
-        # Handle legacy 'day_phrase' key
-        passphrase = data.get('passphrase') or data.get('day_phrase', '')
+        # Handle legacy 'day_phrase' and 'phrase' keys
+        passphrase = data.get('passphrase') or data.get('day_phrase') or data.get('phrase', '')
 
         return cls(
             reference_photo=data['reference_photo'],

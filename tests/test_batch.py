@@ -49,9 +49,23 @@ def sample_images(temp_dir):
 
 
 @pytest.fixture
-def sample_credentials():
+def sample_reference_photo():
+    """Create a sample reference photo as bytes."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    img = Image.new('RGB', (100, 100), color=(128, 128, 128))
+    buf = BytesIO()
+    img.save(buf, 'PNG')
+    return buf.getvalue()
+
+
+@pytest.fixture
+def sample_credentials(sample_reference_photo):
     """Create sample v3.2.0 credentials dict."""
     return {
+        "reference_photo": sample_reference_photo,
         "passphrase": "test phrase four words",  # v3.2.0: single passphrase
         "pin": "123456"
     }
@@ -109,9 +123,10 @@ class TestBatchResult:
 class TestBatchCredentials:
     """Tests for BatchCredentials dataclass (v3.2.0)."""
 
-    def test_from_dict_new_format(self):
+    def test_from_dict_new_format(self, sample_reference_photo):
         """Should parse v3.2.0 format with 'passphrase' key."""
         data = {
+            "reference_photo": sample_reference_photo,
             "passphrase": "test phrase four words",
             "pin": "123456"
         }
@@ -119,9 +134,10 @@ class TestBatchCredentials:
         assert creds.passphrase == "test phrase four words"
         assert creds.pin == "123456"
 
-    def test_from_dict_legacy_format(self):
+    def test_from_dict_legacy_format(self, sample_reference_photo):
         """Should parse legacy format with 'day_phrase' key for migration."""
         data = {
+            "reference_photo": sample_reference_photo,
             "day_phrase": "legacy phrase here",  # Old key name
             "pin": "123456"
         }
@@ -130,9 +146,10 @@ class TestBatchCredentials:
         assert creds.passphrase == "legacy phrase here"
         assert creds.pin == "123456"
 
-    def test_to_dict(self):
+    def test_to_dict(self, sample_reference_photo):
         """Should serialize to v3.2.0 format."""
         creds = BatchCredentials(
+            reference_photo=sample_reference_photo,
             passphrase="test phrase four words",
             pin="123456"
         )
@@ -141,9 +158,10 @@ class TestBatchCredentials:
         assert result['pin'] == "123456"
         assert 'day_phrase' not in result  # Old key should not be present
 
-    def test_passphrase_is_string(self):
+    def test_passphrase_is_string(self, sample_reference_photo):
         """Passphrase should be a string, not a dict."""
         creds = BatchCredentials(
+            reference_photo=sample_reference_photo,
             passphrase="test phrase four words",
             pin="123456"
         )
@@ -380,9 +398,10 @@ class TestPrintBatchResult:
 class TestCredentialsMigration:
     """Tests for v3.1.x to v3.2.0 credentials migration."""
 
-    def test_old_phrase_key_accepted(self):
+    def test_old_phrase_key_accepted(self, sample_reference_photo):
         """Old 'phrase' key should be accepted for migration."""
         old_format = {
+            "reference_photo": sample_reference_photo,
             "phrase": "old style phrase",
             "pin": "123456"
         }
@@ -390,18 +409,20 @@ class TestCredentialsMigration:
         creds = BatchCredentials.from_dict(old_format)
         assert creds.passphrase == "old style phrase"
 
-    def test_old_day_phrase_key_accepted(self):
+    def test_old_day_phrase_key_accepted(self, sample_reference_photo):
         """Old 'day_phrase' key should be accepted for migration."""
         old_format = {
+            "reference_photo": sample_reference_photo,
             "day_phrase": "old day phrase",
             "pin": "123456"
         }
         creds = BatchCredentials.from_dict(old_format)
         assert creds.passphrase == "old day phrase"
 
-    def test_new_passphrase_key_preferred(self):
+    def test_new_passphrase_key_preferred(self, sample_reference_photo):
         """New 'passphrase' key should take precedence if both present."""
         mixed_format = {
+            "reference_photo": sample_reference_photo,
             "passphrase": "new style passphrase",
             "day_phrase": "old day phrase",
             "pin": "123456"
