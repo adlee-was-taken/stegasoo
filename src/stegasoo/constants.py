@@ -109,6 +109,8 @@ THUMBNAIL_QUALITY = 85
 
 # QR Code limits
 QR_MAX_BINARY = 2900  # Safe limit for binary data in QR
+QR_CROP_PADDING_PERCENT = 0.1  # Default padding when cropping QR codes
+QR_CROP_MIN_PADDING_PX = 10  # Minimum padding in pixels
 
 # ============================================================================
 # FILE TYPES

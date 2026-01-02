@@ -42,12 +42,14 @@ try:
     from .qr_utils import (
         generate_qr_code,
         extract_key_from_qr,
+        detect_and_crop_qr,
     )
     HAS_QR_UTILS = True
 except ImportError:
     HAS_QR_UTILS = False
     generate_qr_code = None
     extract_key_from_qr = None
+    detect_and_crop_qr = None
 
 # Validation
 from .validation import (
@@ -166,6 +168,7 @@ __all__ = [
     # QR utilities
     "generate_qr_code",
     "extract_key_from_qr",
+    "detect_and_crop_qr",
     "HAS_QR_UTILS",
     
     # Validation

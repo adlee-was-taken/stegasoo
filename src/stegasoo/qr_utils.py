@@ -34,9 +34,15 @@ except ImportError:
     HAS_QRCODE_READ = False
 
 
+from .constants import (
+    QR_MAX_BINARY,
+    QR_CROP_PADDING_PERCENT,
+    QR_CROP_MIN_PADDING_PX,
+)
+
+
 # Constants
 COMPRESSION_PREFIX = "STEGASOO-Z:"
-QR_MAX_BINARY = 2900  # Safe limit for binary data in QR
 
 
 def compress_data(data: str) -> str:
@@ -381,6 +387,121 @@ def extract_key_from_qr_file(filepath: str) -> Optional[str]:
     """
     with open(filepath, 'rb') as f:
         return extract_key_from_qr(f.read())
+
+
+def detect_and_crop_qr(
+    image_data: bytes,
+    padding_percent: float = QR_CROP_PADDING_PERCENT,
+    min_padding_px: int = QR_CROP_MIN_PADDING_PX
+) -> Optional[bytes]:
+    """
+    Detect QR code in image and crop to it, handling rotation.
+    
+    Uses the QR code's corner coordinates to compute an axis-aligned
+    bounding box, then adds padding to ensure rotated QR codes aren't clipped.
+    
+    Args:
+        image_data: Input image bytes (PNG, JPG, etc.)
+        padding_percent: Padding as fraction of QR size (default 10%)
+        min_padding_px: Minimum padding in pixels (default 10)
+        
+    Returns:
+        Cropped PNG image bytes, or None if no QR code found
+        
+    Raises:
+        RuntimeError: If pyzbar library not available
+    """
+    if not HAS_QRCODE_READ:
+        raise RuntimeError(
+            "pyzbar library not installed. Run: pip install pyzbar\n"
+            "Also requires system library: sudo apt-get install libzbar0"
+        )
+    
+    try:
+        img: Image.Image = Image.open(io.BytesIO(image_data))
+        original_mode = img.mode
+        
+        # Convert for pyzbar detection
+        if img.mode not in ('RGB', 'L'):
+            detect_img = img.convert('RGB')
+        else:
+            detect_img = img
+        
+        # Decode QR codes to get corner positions
+        decoded = pyzbar_decode(detect_img, symbols=[ZBarSymbol.QRCODE])
+        
+        if not decoded:
+            return None
+        
+        # Get the polygon corners of the first QR code
+        # pyzbar returns a Polygon with Point objects (x, y attributes)
+        polygon = decoded[0].polygon
+        
+        if len(polygon) < 4:
+            # Fallback to rect if polygon not available
+            rect = decoded[0].rect
+            min_x, min_y = rect.left, rect.top
+            max_x, max_y = rect.left + rect.width, rect.top + rect.height
+        else:
+            # Extract corner coordinates - handles any rotation
+            xs = [p.x for p in polygon]
+            ys = [p.y for p in polygon]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+        
+        # Calculate QR dimensions and padding
+        qr_width = max_x - min_x
+        qr_height = max_y - min_y
+        
+        # Use larger dimension for padding calculation (handles rotation)
+        qr_size = max(qr_width, qr_height)
+        padding = max(int(qr_size * padding_percent), min_padding_px)
+        
+        # Calculate crop box with padding, clamped to image bounds
+        img_width, img_height = img.size
+        crop_left = max(0, min_x - padding)
+        crop_top = max(0, min_y - padding)
+        crop_right = min(img_width, max_x + padding)
+        crop_bottom = min(img_height, max_y + padding)
+        
+        # Crop the original image (preserves original mode/quality)
+        cropped = img.crop((crop_left, crop_top, crop_right, crop_bottom))
+        
+        # Convert to PNG bytes
+        buf = io.BytesIO()
+        # Preserve transparency if present
+        if original_mode in ('RGBA', 'LA', 'P'):
+            cropped.save(buf, format='PNG')
+        else:
+            cropped.save(buf, format='PNG')
+        buf.seek(0)
+        return buf.getvalue()
+        
+    except Exception as e:
+        # Log for debugging but return None for clean API
+        import sys
+        print(f"QR crop error: {e}", file=sys.stderr)
+        return None
+
+
+def detect_and_crop_qr_file(
+    filepath: str,
+    padding_percent: float = QR_CROP_PADDING_PERCENT,
+    min_padding_px: int = QR_CROP_MIN_PADDING_PX
+) -> Optional[bytes]:
+    """
+    Detect QR code in image file and crop to it.
+    
+    Args:
+        filepath: Path to image file
+        padding_percent: Padding as fraction of QR size (default 10%)
+        min_padding_px: Minimum padding in pixels (default 10)
+        
+    Returns:
+        Cropped PNG image bytes, or None if no QR code found
+    """
+    with open(filepath, 'rb') as f:
+        return detect_and_crop_qr(f.read(), padding_percent, min_padding_px)
 
 
 def has_qr_write() -> bool:
