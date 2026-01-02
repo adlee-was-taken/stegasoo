@@ -91,6 +91,24 @@
                         </span>
                         <div class="small text-muted mt-2">Full color PNG, spatial LSB embedding</div>
                     {% endif %}
+                    
+                    <!-- Channel info (v4.0.0) -->
+                    <div class="mt-3">
+                        {% if channel_mode == 'private' %}
+                        <span class="badge bg-warning text-dark fs-6">
+                            <i class="bi bi-shield-lock me-1"></i>Private Channel
+                        </span>
+                        {% if channel_fingerprint %}
+                        <div class="small text-muted mt-1">
+                            <code>{{ channel_fingerprint }}</code>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <span class="badge bg-info fs-6">
+                            <i class="bi bi-globe me-1"></i>Public Channel
+                        </span>
+                        {% endif %}
+                    </div>
                 </div>
                 
                 <div class="d-grid gap-2">
@@ -122,6 +140,9 @@
                         {% if color_mode == 'color' %}
                         <li>Color preserved - extraction works on both color and grayscale</li>
                         {% endif %}
+                        {% endif %}
+                        {% if channel_mode == 'private' %}
+                        <li><i class="bi bi-shield-lock text-warning me-1"></i>Recipient needs the <strong>same channel key</strong> to decode</li>
                         {% endif %}
                     </ul>
                 </div>

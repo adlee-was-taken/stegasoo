@@ -98,8 +98,8 @@ def memory_usage() -> Dict[str, Union[float, str]]:
         mem_info = process.memory_info()
         
         return {
-            'rss_mb': mem_info.rss / 1024 / 1024,  # Resident Set Size
-            'vms_mb': mem_info.vms / 1024 / 1024,  # Virtual Memory Size
+            'rss_mb': mem_info.rss / 1024 / 1024,
+            'vms_mb': mem_info.vms / 1024 / 1024,
             'percent': process.memory_percent(),
         }
     except ImportError:
@@ -117,7 +117,7 @@ def hexdump(data: bytes, offset: int = 0, length: int = 64) -> str:
     for i in range(0, len(data_to_dump), 16):
         chunk = data_to_dump[i:i+16]
         hex_str = ' '.join(f'{b:02x}' for b in chunk)
-        hex_str = hex_str.ljust(47)  # Pad to consistent width
+        hex_str = hex_str.ljust(47)
         ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
         result.append(f"{offset + i:08x}: {hex_str}  {ascii_str}")
     
@@ -127,7 +127,6 @@ def hexdump(data: bytes, offset: int = 0, length: int = 64) -> str:
     return '\n'.join(result)
 
 
-# Create singleton instance for easy import
 class Debug:
     """Debugging utility class."""
     

@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Stegasoo Web Frontend (v3.2.0)
+Stegasoo Web Frontend (v4.0.0)
 
 Flask-based web UI for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v4.0.0:
+- Added channel key support for deployment/group isolation
+- New /api/channel/status endpoint
+- Channel key selector on encode/decode pages
+- Messages encoded with channel key require same key to decode
 
 CHANGES in v3.2.0:
 - Removed date dependency from all operations
@@ -52,6 +58,11 @@ from stegasoo import (
     EMBED_MODE_DCT,
     EMBED_MODE_AUTO,
     has_dct_support,
+    # Channel key functions (v4.0.0)
+    has_channel_key,
+    get_channel_status,
+    validate_channel_key,
+    generate_channel_key,
     # NOTE: encode, decode, compare_modes, will_fit_by_mode now use subprocess isolation
 )
 from stegasoo.constants import (
@@ -126,6 +137,9 @@ THUMBNAIL_FILES: dict[str, bytes] = {}
 @app.context_processor
 def inject_globals():
     """Inject global variables into all templates."""
+    # Get channel status (v4.0.0)
+    channel_status = get_channel_status()
+    
     return {
         'version': __version__,
         'max_message_chars': MAX_MESSAGE_CHARS,
@@ -140,6 +154,11 @@ def inject_globals():
         'default_passphrase_words': DEFAULT_PASSPHRASE_WORDS,
         # NEW in v3.0
         'has_dct': has_dct_support(),
+        # NEW in v4.0.0 - Channel key status
+        'channel_mode': channel_status['mode'],
+        'channel_configured': channel_status['configured'],
+        'channel_fingerprint': channel_status.get('fingerprint'),
+        'channel_source': channel_status.get('source'),
     }
 
 
@@ -154,6 +173,13 @@ try:
     print(f"DCT support: {has_dct_support()}")
     print(f"QR code support: write={HAS_QRCODE}, read={HAS_QRCODE_READ}")
     
+    # Channel key status (v4.0.0)
+    channel_status = get_channel_status()
+    print(f"Channel key: {channel_status['mode']} mode")
+    if channel_status['configured']:
+        print(f"  Fingerprint: {channel_status.get('fingerprint')}")
+        print(f"  Source: {channel_status.get('source')}")
+    
     DESIRED_PAYLOAD_SIZE = 2 * 1024 * 1024  # 2MB
     
     if hasattr(stegasoo, 'MAX_FILE_PAYLOAD_SIZE'):
@@ -162,6 +188,33 @@ try:
     
 except Exception as e:
     print(f"Could not override stegasoo limits: {e}")
+
+
+# ============================================================================
+# CHANNEL KEY HELPER (v4.0.0)
+# ============================================================================
+
+def resolve_channel_key_form(channel_key_value: str) -> str:
+    """
+    Resolve channel key from form input.
+    
+    Args:
+        channel_key_value: Form value ('auto', 'none', or explicit key)
+        
+    Returns:
+        Value to pass to subprocess_stego ('auto', 'none', or explicit key)
+    """
+    if not channel_key_value or channel_key_value == 'auto':
+        return 'auto'
+    elif channel_key_value == 'none':
+        return 'none'
+    else:
+        # Explicit key - validate format
+        if validate_channel_key(channel_key_value):
+            return channel_key_value
+        else:
+            # Invalid format, fall back to auto
+            return 'auto'
 
 
 def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes:
@@ -232,6 +285,71 @@ def format_size(size_bytes: int) -> str:
 def index():
     return render_template('index.html')
 
+
+# ============================================================================
+# CHANNEL KEY API (v4.0.0)
+# ============================================================================
+
+@app.route('/api/channel/status')
+def api_channel_status():
+    """
+    Get current channel key status (v4.0.0).
+    
+    Returns JSON with mode, fingerprint, and source.
+    """
+    # Use subprocess for isolation
+    result = subprocess_stego.get_channel_status(reveal=False)
+    
+    if result.success:
+        return jsonify({
+            'success': True,
+            'mode': result.mode,
+            'configured': result.configured,
+            'fingerprint': result.fingerprint,
+            'source': result.source,
+        })
+    else:
+        # Fallback to direct call if subprocess fails
+        status = get_channel_status()
+        return jsonify({
+            'success': True,
+            'mode': status['mode'],
+            'configured': status['configured'],
+            'fingerprint': status.get('fingerprint'),
+            'source': status.get('source'),
+        })
+
+
+@app.route('/api/channel/validate', methods=['POST'])
+def api_channel_validate():
+    """
+    Validate a channel key format (v4.0.0).
+    
+    Returns JSON with validation result.
+    """
+    key = request.form.get('key', '') or request.json.get('key', '') if request.is_json else ''
+    
+    if not key:
+        return jsonify({'valid': False, 'error': 'No key provided'})
+    
+    is_valid = validate_channel_key(key)
+    
+    if is_valid:
+        fingerprint = f"{key[:4]}-••••-••••-••••-••••-••••-••••-{key[-4:]}"
+        return jsonify({
+            'valid': True,
+            'fingerprint': fingerprint,
+        })
+    else:
+        return jsonify({
+            'valid': False,
+            'error': 'Invalid format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
+        })
+
+
+# ============================================================================
+# GENERATE
+# ============================================================================
 
 @app.route('/generate', methods=['GET', 'POST'])
 def generate():
@@ -614,6 +732,9 @@ def encode_page():
             if dct_color_mode not in ('grayscale', 'color'):
                 dct_color_mode = 'color'
             
+            # NEW in v4.0.0 - Channel key
+            channel_key = resolve_channel_key_form(request.form.get('channel_key', 'auto'))
+            
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
@@ -708,7 +829,7 @@ def encode_page():
                 flash(result.error_message, 'error')
                 return render_template('encode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # v3.2.0: No date parameter needed
+            # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated encode to prevent crashes
             if payload_type == 'file' and payload_file and payload_file.filename:
                 encode_result = subprocess_stego.encode(
@@ -724,6 +845,7 @@ def encode_page():
                     embed_mode=embed_mode,
                     dct_output_format=dct_output_format if embed_mode == 'dct' else 'png',
                     dct_color_mode=dct_color_mode if embed_mode == 'dct' else 'color',
+                    channel_key=channel_key,  # v4.0.0
                 )
             else:
                 encode_result = subprocess_stego.encode(
@@ -737,6 +859,7 @@ def encode_page():
                     embed_mode=embed_mode,
                     dct_output_format=dct_output_format if embed_mode == 'dct' else 'png',
                     dct_color_mode=dct_color_mode if embed_mode == 'dct' else 'color',
+                    channel_key=channel_key,  # v4.0.0
                 )
             
             # Check for subprocess errors
@@ -772,6 +895,9 @@ def encode_page():
                 'output_format': dct_output_format if embed_mode == 'dct' else 'png',
                 'color_mode': dct_color_mode if embed_mode == 'dct' else None,
                 'mime_type': output_mime,
+                # Channel info (v4.0.0)
+                'channel_mode': encode_result.channel_mode,
+                'channel_fingerprint': encode_result.channel_fingerprint,
             }
             
             return redirect(url_for('encode_result', file_id=file_id))
@@ -812,6 +938,9 @@ def encode_result(file_id):
         embed_mode=file_info.get('embed_mode', 'lsb'),
         output_format=file_info.get('output_format', 'png'),
         color_mode=file_info.get('color_mode'),
+        # Channel info (v4.0.0)
+        channel_mode=file_info.get('channel_mode', 'public'),
+        channel_fingerprint=file_info.get('channel_fingerprint'),
     )
 
 
@@ -901,6 +1030,9 @@ def decode_page():
             if embed_mode not in ('auto', 'lsb', 'dct'):
                 embed_mode = 'auto'
             
+            # NEW in v4.0.0 - Channel key
+            channel_key = resolve_channel_key_form(request.form.get('channel_key', 'auto'))
+            
             # Check DCT availability
             if embed_mode == 'dct' and not has_dct_support():
                 flash('DCT mode requires scipy. Install with: pip install scipy', 'error')
@@ -957,7 +1089,7 @@ def decode_page():
                     flash(result.error_message, 'error')
                     return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
             
-            # v3.2.0: No date_str parameter needed
+            # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated decode to prevent crashes
             decode_result = subprocess_stego.decode(
                 stego_data=stego_data,
@@ -967,11 +1099,16 @@ def decode_page():
                 rsa_key_data=rsa_key_data,
                 rsa_password=key_password,
                 embed_mode=embed_mode,
+                channel_key=channel_key,  # v4.0.0
             )
             
             # Check for subprocess errors
             if not decode_result.success:
                 error_msg = decode_result.error or 'Decoding failed'
+                # Check for channel key related errors
+                if 'channel key' in error_msg.lower():
+                    flash(error_msg, 'error')
+                    return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
                 if 'decrypt' in error_msg.lower() or decode_result.error_type == 'DecryptionError':
                     raise DecryptionError(error_msg)
                 raise StegasooError(error_msg)
@@ -1005,7 +1142,7 @@ def decode_page():
                 )
             
         except DecryptionError:
-            flash('Decryption failed. Check your passphrase, PIN, RSA key, and reference photo.', 'error')
+            flash('Decryption failed. Check your passphrase, PIN, RSA key, reference photo, and channel key.', 'error')
             return render_template('decode.html', has_qrcode_read=HAS_QRCODE_READ)
         except StegasooError as e:
             flash(str(e), 'error')

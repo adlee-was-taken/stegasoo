@@ -1,15 +1,19 @@
 """
-Subprocess Steganography Wrapper
+Subprocess Steganography Wrapper (v4.0.0)
 
 Runs stegasoo operations in isolated subprocesses to prevent crashes
 from taking down the Flask server.
+
+CHANGES in v4.0.0:
+- Added channel_key parameter to encode() and decode() methods
+- Channel keys enable deployment/group isolation
 
 Usage:
     from subprocess_stego import SubprocessStego
     
     stego = SubprocessStego()
     
-    # Encode
+    # Encode with channel key
     result = stego.encode(
         carrier_data=carrier_bytes,
         reference_data=ref_bytes,
@@ -17,6 +21,7 @@ Usage:
         passphrase="my passphrase",
         pin="123456",
         embed_mode="dct",
+        channel_key="auto",  # or "none", or explicit key
     )
     
     if result.success:
@@ -31,6 +36,7 @@ Usage:
         reference_data=ref_bytes,
         passphrase="my passphrase",
         pin="123456",
+        channel_key="auto",
     )
     
     # Compare modes (capacity)
@@ -60,6 +66,9 @@ class EncodeResult:
     stego_data: Optional[bytes] = None
     filename: Optional[str] = None
     stats: Optional[Dict[str, Any]] = None
+    # Channel info (v4.0.0)
+    channel_mode: Optional[str] = None
+    channel_fingerprint: Optional[str] = None
     error: Optional[str] = None
     error_type: Optional[str] = None
 
@@ -98,6 +107,18 @@ class CapacityResult:
     usage_percent: float = 0.0
     headroom: int = 0
     mode: str = ""
+    error: Optional[str] = None
+
+
+@dataclass 
+class ChannelStatusResult:
+    """Result from channel status check (v4.0.0)."""
+    success: bool
+    mode: str = "public"
+    configured: bool = False
+    fingerprint: Optional[str] = None
+    source: Optional[str] = None
+    key: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -205,6 +226,8 @@ class SubprocessStego:
         embed_mode: str = "lsb",
         dct_output_format: str = "png",
         dct_color_mode: str = "color",
+        # Channel key (v4.0.0)
+        channel_key: Optional[str] = "auto",
         timeout: Optional[int] = None,
     ) -> EncodeResult:
         """
@@ -224,6 +247,7 @@ class SubprocessStego:
             embed_mode: 'lsb' or 'dct'
             dct_output_format: 'png' or 'jpeg' (for DCT mode)
             dct_color_mode: 'grayscale' or 'color' (for DCT mode)
+            channel_key: 'auto' (server config), 'none' (public), or explicit key (v4.0.0)
             timeout: Operation timeout in seconds
             
         Returns:
@@ -239,6 +263,7 @@ class SubprocessStego:
             'embed_mode': embed_mode,
             'dct_output_format': dct_output_format,
             'dct_color_mode': dct_color_mode,
+            'channel_key': channel_key,  # v4.0.0
         }
         
         if file_data:
@@ -258,6 +283,8 @@ class SubprocessStego:
                 stego_data=base64.b64decode(result['stego_b64']),
                 filename=result.get('filename'),
                 stats=result.get('stats'),
+                channel_mode=result.get('channel_mode'),
+                channel_fingerprint=result.get('channel_fingerprint'),
             )
         else:
             return EncodeResult(
@@ -275,6 +302,8 @@ class SubprocessStego:
         rsa_key_data: Optional[bytes] = None,
         rsa_password: Optional[str] = None,
         embed_mode: str = "auto",
+        # Channel key (v4.0.0)
+        channel_key: Optional[str] = "auto",
         timeout: Optional[int] = None,
     ) -> DecodeResult:
         """
@@ -288,6 +317,7 @@ class SubprocessStego:
             rsa_key_data: Optional RSA key PEM bytes
             rsa_password: RSA key password if encrypted
             embed_mode: 'auto', 'lsb', or 'dct'
+            channel_key: 'auto' (server config), 'none' (public), or explicit key (v4.0.0)
             timeout: Operation timeout in seconds
             
         Returns:
@@ -300,6 +330,7 @@ class SubprocessStego:
             'passphrase': passphrase,
             'pin': pin,
             'embed_mode': embed_mode,
+            'channel_key': channel_key,  # v4.0.0
         }
         
         if rsa_key_data:
@@ -408,6 +439,44 @@ class SubprocessStego:
             )
         else:
             return CapacityResult(
+                success=False,
+                error=result.get('error', 'Unknown error'),
+            )
+    
+    def get_channel_status(
+        self,
+        reveal: bool = False,
+        timeout: Optional[int] = None,
+    ) -> ChannelStatusResult:
+        """
+        Get current channel key status (v4.0.0).
+        
+        Args:
+            reveal: Include full key in response
+            timeout: Operation timeout in seconds
+            
+        Returns:
+            ChannelStatusResult with channel info
+        """
+        params = {
+            'operation': 'channel_status',
+            'reveal': reveal,
+        }
+        
+        result = self._run_worker(params, timeout)
+        
+        if result.get('success'):
+            status = result.get('status', {})
+            return ChannelStatusResult(
+                success=True,
+                mode=status.get('mode', 'public'),
+                configured=status.get('configured', False),
+                fingerprint=status.get('fingerprint'),
+                source=status.get('source'),
+                key=status.get('key') if reveal else None,
+            )
+        else:
+            return ChannelStatusResult(
                 success=False,
                 error=result.get('error', 'Unknown error'),
             )

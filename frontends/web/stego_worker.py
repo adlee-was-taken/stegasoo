@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Stegasoo Subprocess Worker
+Stegasoo Subprocess Worker (v4.0.0)
 
 This script runs in a subprocess and handles encode/decode operations.
 If it crashes due to jpegio/scipy issues, the parent Flask process survives.
+
+CHANGES in v4.0.0:
+- Added channel_key support for encode/decode operations
+- New channel_status operation
 
 Communication is via JSON over stdin/stdout:
 - Input: JSON object with operation parameters
@@ -22,6 +26,49 @@ from pathlib import Path
 # Ensure stegasoo is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 sys.path.insert(0, str(Path(__file__).parent))
+
+
+def _resolve_channel_key(channel_key_param):
+    """
+    Resolve channel_key parameter to value for stegasoo.
+    
+    Args:
+        channel_key_param: 'auto', 'none', explicit key, or None
+        
+    Returns:
+        None (auto), "" (public), or explicit key string
+    """
+    if channel_key_param is None or channel_key_param == "auto":
+        return None  # Auto mode - use server config
+    elif channel_key_param == "none":
+        return ""  # Public mode
+    else:
+        return channel_key_param  # Explicit key
+
+
+def _get_channel_info(resolved_key):
+    """
+    Get channel mode and fingerprint for response.
+    
+    Returns:
+        (mode, fingerprint) tuple
+    """
+    from stegasoo import has_channel_key, get_channel_status
+    
+    if resolved_key == "":
+        return "public", None
+    
+    if resolved_key is not None:
+        # Explicit key
+        fingerprint = f"{resolved_key[:4]}-••••-••••-••••-••••-••••-••••-{resolved_key[-4:]}"
+        return "private", fingerprint
+    
+    # Auto mode - check server config
+    if has_channel_key():
+        status = get_channel_status()
+        return "private", status.get('fingerprint')
+    
+    return "public", None
 
 
 def encode_operation(params: dict) -> dict:
@@ -48,6 +95,9 @@ def encode_operation(params: dict) -> dict:
     else:
         payload = params.get('message', '')
     
+    # Resolve channel key (v4.0.0)
+    resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
+    
     # Call encode with correct parameter names
     result = encode(
         message=payload,
@@ -60,6 +110,7 @@ def encode_operation(params: dict) -> dict:
         embed_mode=params.get('embed_mode', 'lsb'),
         dct_output_format=params.get('dct_output_format', 'png'),
         dct_color_mode=params.get('dct_color_mode', 'color'),
+        channel_key=resolved_channel_key,  # v4.0.0
     )
     
     # Build stats dict if available
@@ -71,11 +122,16 @@ def encode_operation(params: dict) -> dict:
             'bytes_embedded': getattr(result.stats, 'bytes_embedded', 0),
         }
     
+    # Get channel info for response (v4.0.0)
+    channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
+    
     return {
         'success': True,
         'stego_b64': base64.b64encode(result.stego_image).decode('ascii'),
         'filename': getattr(result, 'filename', None),
         'stats': stats,
+        'channel_mode': channel_mode,
+        'channel_fingerprint': channel_fingerprint,
     }
 
 
@@ -92,6 +148,9 @@ def decode_operation(params: dict) -> dict:
     if params.get('rsa_key_b64'):
         rsa_key_data = base64.b64decode(params['rsa_key_b64'])
     
+    # Resolve channel key (v4.0.0)
+    resolved_channel_key = _resolve_channel_key(params.get('channel_key', 'auto'))
+    
     # Call decode with correct parameter names
     result = decode(
         stego_image=stego_data,
@@ -101,6 +160,7 @@ def decode_operation(params: dict) -> dict:
         rsa_key_data=rsa_key_data,
         rsa_password=params.get('rsa_password'),
         embed_mode=params.get('embed_mode', 'auto'),
+        channel_key=resolved_channel_key,  # v4.0.0
     )
     
     if result.is_file:
@@ -150,6 +210,25 @@ def capacity_check_operation(params: dict) -> dict:
     }
 
 
+def channel_status_operation(params: dict) -> dict:
+    """Handle channel status check (v4.0.0)."""
+    from stegasoo import get_channel_status
+    
+    status = get_channel_status()
+    reveal = params.get('reveal', False)
+    
+    return {
+        'success': True,
+        'status': {
+            'mode': status['mode'],
+            'configured': status['configured'],
+            'fingerprint': status.get('fingerprint'),
+            'source': status.get('source'),
+            'key': status.get('key') if reveal and status['configured'] else None,
+        }
+    }
+
+
 def main():
     """Main entry point - read JSON from stdin, write JSON to stdout."""
     try:
@@ -170,6 +249,8 @@ def main():
                 output = compare_operation(params)
             elif operation == 'capacity':
                 output = capacity_check_operation(params)
+            elif operation == 'channel_status':
+                output = channel_status_operation(params)
             else:
                 output = {'success': False, 'error': f'Unknown operation: {operation}'}
     

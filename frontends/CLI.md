@@ -1,21 +1,23 @@
-# Stegasoo CLI Documentation (v3.2.0)
+# Stegasoo CLI Documentation (v4.0.0)
 
 Complete command-line interface reference for Stegasoo steganography operations.
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [What's New in v3.2.0](#whats-new-in-v320)
+- [What's New in v4.0.0](#whats-new-in-v400)
 - [Quick Start](#quick-start)
 - [Commands](#commands)
   - [generate](#generate-command)
   - [encode](#encode-command)
   - [decode](#decode-command)
   - [verify](#verify-command)
+  - [channel](#channel-command)
   - [info](#info-command)
   - [compare](#compare-command)
   - [modes](#modes-command)
   - [strip-metadata](#strip-metadata-command)
+- [Channel Keys](#channel-keys)
 - [Embedding Modes](#embedding-modes)
 - [Security Factors](#security-factors)
 - [Workflow Examples](#workflow-examples)
@@ -56,28 +58,31 @@ stegasoo --help
 
 # Check DCT support
 python -c "from stegasoo import has_dct_support; print('DCT:', 'available' if has_dct_support() else 'requires scipy')"
+
+# Check channel key status
+stegasoo channel show
 ```
 
 ---
 
-## What's New in v3.2.0
+## What's New in v4.0.0
 
-Version 3.2.0 brings major simplifications to the authentication system:
+Version 4.0.0 adds **channel key** support for deployment/group isolation:
 
-| Change | Before (v3.1) | After (v3.2.0) |
-|--------|---------------|----------------|
-| Passphrase | Daily rotation (7 phrases) | Single passphrase |
-| Date parameter | Required for encode/decode | Removed entirely |
-| Default words | 3 words per phrase | 4 words |
-| Terminology | `day_phrase`, `phrase` | `passphrase` |
+| Feature | Description |
+|---------|-------------|
+| Channel keys | 256-bit keys that isolate message groups |
+| Deployment isolation | Different deployments can't read each other's messages |
+| CLI management | New `stegasoo channel` command group |
+| Flexible override | Use server config, explicit key, or public mode |
 
 **Key benefits:**
-- ✅ No need to remember which day a message was encoded
-- ✅ True asynchronous communication
-- ✅ Simpler credential management
-- ✅ Stronger default security (4 words = ~44 bits entropy)
+- ✅ Isolate messages between teams, deployments, or groups
+- ✅ Same credentials can't decode messages from different channels
+- ✅ Backward compatible (public mode = no channel key)
+- ✅ Easy key distribution via environment variables or config files
 
-**Migration:** Old stego images encoded with v3.1.x cannot be decoded with v3.2.0 due to the removed date-based key derivation. Keep v3.1.x installed if you need to access old images.
+**Breaking change:** v4.0.0 messages (with channel key) cannot be decoded by v3.x installations.
 
 ---
 
@@ -87,7 +92,10 @@ Version 3.2.0 brings major simplifications to the authentication system:
 # 1. Generate credentials (do this once, memorize results)
 stegasoo generate
 
-# 2. Encode a message (LSB mode - default)
+# 2. (Optional) Set up channel key for deployment isolation
+stegasoo channel generate --save
+
+# 3. Encode a message (uses configured channel key automatically)
 stegasoo encode \
   --ref secret_photo.jpg \
   --carrier meme.png \
@@ -95,22 +103,20 @@ stegasoo encode \
   --pin 123456 \
   --message "Meet at midnight"
 
-# 3. Encode for social media (DCT mode)
-stegasoo encode \
-  --ref secret_photo.jpg \
-  --carrier meme.png \
-  --passphrase "apple forest thunder mountain" \
-  --pin 123456 \
-  --message "Meet at midnight" \
-  --mode dct \
-  --dct-format jpeg
-
-# 4. Decode a message (auto-detects mode)
+# 4. Decode a message (uses same channel key)
 stegasoo decode \
   --ref secret_photo.jpg \
   --stego stego_abc123.png \
   --passphrase "apple forest thunder mountain" \
   --pin 123456
+
+# 5. Decode without channel key (public mode)
+stegasoo decode \
+  --ref secret_photo.jpg \
+  --stego public_stego.png \
+  --passphrase "words here now" \
+  --pin 123456 \
+  --no-channel
 ```
 
 ---
@@ -119,7 +125,7 @@ stegasoo decode \
 
 ### Generate Command
 
-Generate credentials for encoding/decoding operations. Creates a passphrase and optionally a PIN and/or RSA key.
+Generate credentials for encoding/decoding operations.
 
 #### Synopsis
 
@@ -135,97 +141,32 @@ stegasoo generate [OPTIONS]
 | `--rsa/--no-rsa` | | flag | `--no-rsa` | Generate an RSA key |
 | `--pin-length` | | 6-9 | 6 | PIN length in digits |
 | `--rsa-bits` | | choice | 2048 | RSA key size (2048, 3072, 4096) |
-| `--words` | | 3-12 | 4 | Words in passphrase (v3.2.0: default increased to 4) |
+| `--words` | | 3-12 | 4 | Words in passphrase |
 | `--output` | `-o` | path | | Save RSA key to file |
 | `--password` | `-p` | string | | Password for RSA key file |
 | `--json` | | flag | | Output as JSON |
 
 #### Examples
 
-**Basic generation with PIN (default):**
 ```bash
+# Basic generation with PIN (default)
 stegasoo generate
-```
 
-Output:
-```
-============================================================
-  STEGASOO CREDENTIALS (v3.2.0)
-============================================================
-
-⚠️  MEMORIZE THESE AND CLOSE THIS WINDOW
-    Do not screenshot or save to file!
-
-─── STATIC PIN ───
-    847293
-
-─── PASSPHRASE ───
-    abandon ability able about
-
-─── SECURITY ───
-    Passphrase entropy: 44 bits (4 words)
-    PIN entropy:        19 bits
-    Combined:           63 bits
-    + photo entropy:    80-256 bits
-
-✓ v3.2.0: Use this passphrase anytime - no date needed!
-```
-
-**Generate with more words for higher security:**
-```bash
+# Generate with more words for higher security
 stegasoo generate --words 6
-```
 
-**Generate with RSA key:**
-```bash
+# Generate with RSA key
 stegasoo generate --rsa --rsa-bits 4096
-```
 
-**Save RSA key to encrypted file:**
-```bash
+# Save RSA key to encrypted file
 stegasoo generate --rsa -o mykey.pem -p "mysecretpassword"
-```
-
-**Maximum security (longer passphrase + both factors):**
-```bash
-stegasoo generate --pin --rsa --words 6 --pin-length 9
-```
-
-**JSON output for scripting:**
-```bash
-stegasoo generate --json
-```
-
-Output:
-```json
-{
-  "passphrase": "abandon ability able about",
-  "pin": "847293",
-  "rsa_key": null,
-  "entropy": {
-    "passphrase": 44,
-    "pin": 19,
-    "rsa": 0,
-    "total": 63
-  }
-}
-```
-
-**Extract passphrase from JSON:**
-```bash
-stegasoo generate --json | jq -r '.passphrase'
-```
-
-**RSA only (no PIN):**
-```bash
-stegasoo generate --no-pin --rsa -o key.pem -p "password123"
 ```
 
 ---
 
 ### Encode Command
 
-Encode a secret message or file into an image using steganography.
+Encode a secret message or file into an image.
 
 #### Synopsis
 
@@ -237,158 +178,76 @@ stegasoo encode [OPTIONS]
 
 | Option | Short | Type | Required | Default | Description |
 |--------|-------|------|----------|---------|-------------|
-| `--ref` | `-r` | path | ✓ | | Reference photo (shared secret) |
-| `--carrier` | `-c` | path | ✓ | | Carrier image to hide message in |
-| `--passphrase` | `-p` | string | ✓ | | Passphrase (v3.2.0: single, no date needed) |
+| `--ref` | `-r` | path | ✓ | | Reference photo |
+| `--carrier` | `-c` | path | ✓ | | Carrier image |
+| `--passphrase` | `-p` | string | ✓ | | Passphrase |
 | `--message` | `-m` | string | | | Message to encode |
 | `--message-file` | `-f` | path | | | Read message from file |
 | `--embed-file` | `-e` | path | | | Embed a binary file |
 | `--pin` | | string | * | | Static PIN (6-9 digits) |
 | `--key` | `-k` | path | * | | RSA key file |
-| `--key-qr` | | path | * | | RSA key from QR code image |
-| `--key-password` | | string | | | Password for RSA key |
+| `--key-qr` | | path | * | | RSA key from QR code |
+| `--key-password` | | string | | | RSA key password |
+| `--channel` | | string | | auto | Channel key (v4.0.0) |
+| `--channel-file` | | path | | | Read channel key from file |
+| `--no-channel` | | flag | | | Force public mode |
 | `--output` | `-o` | path | | | Output filename |
-| `--mode` | | choice | | `lsb` | Embedding mode: `lsb` or `dct` |
-| `--dct-format` | | choice | | `png` | DCT output: `png` or `jpeg` |
-| `--dct-color` | | choice | | `grayscale` | DCT color: `grayscale` or `color` |
+| `--mode` | | choice | | `lsb` | Embedding mode |
+| `--dct-format` | | choice | | `png` | DCT output format |
+| `--dct-color` | | choice | | `grayscale` | DCT color mode |
 | `--quiet` | `-q` | flag | | | Suppress output |
 
 \* At least one of `--pin`, `--key`, or `--key-qr` is required.
 
-#### Message Input Methods
+#### Channel Key Options
 
-1. **Command line argument:**
-   ```bash
-   stegasoo encode -r ref.jpg -c carrier.png -p "four word passphrase" --pin 123456 -m "Secret message"
-   ```
-
-2. **From file:**
-   ```bash
-   stegasoo encode -r ref.jpg -c carrier.png -p "four word passphrase" --pin 123456 -f message.txt
-   ```
-
-3. **From stdin (pipe):**
-   ```bash
-   echo "Secret message" | stegasoo encode -r ref.jpg -c carrier.png -p "four word passphrase" --pin 123456
-   ```
-
-4. **Embed binary file:**
-   ```bash
-   stegasoo encode -r ref.jpg -c carrier.png -p "four word passphrase" --pin 123456 -e secret.pdf
-   ```
+| Option | Effect |
+|--------|--------|
+| *(none)* | Use server-configured key (auto mode) |
+| `--channel KEY` | Use explicit channel key |
+| `--channel auto` | Same as no option |
+| `--channel-file F` | Read channel key from file |
+| `--no-channel` | Force public mode (no isolation) |
 
 #### Examples
 
-**Basic encoding with PIN (LSB mode - default):**
 ```bash
+# Basic encoding (uses server channel key if configured)
 stegasoo encode \
-  --ref photos/vacation.jpg \
-  --carrier memes/funny_cat.png \
-  --passphrase "correct horse battery staple" \
+  -r photo.jpg -c meme.png \
+  -p "correct horse battery staple" \
   --pin 847293 \
-  --message "The package arrives Tuesday"
-```
+  -m "The package arrives Tuesday"
 
-Output:
-```
-Mode: LSB (12.4% capacity)
-✓ Encoded successfully!
-  Output: a1b2c3d4.png
-  Size: 245,832 bytes
-  Capacity used: 12.4%
-```
-
-**DCT mode for social media (JPEG output):**
-```bash
+# With explicit channel key
 stegasoo encode \
-  --ref photos/vacation.jpg \
-  --carrier memes/funny_cat.png \
-  --passphrase "correct horse battery staple" \
+  -r photo.jpg -c meme.png \
+  -p "correct horse battery staple" \
   --pin 847293 \
-  --message "The package arrives Tuesday" \
-  --mode dct \
-  --dct-format jpeg
-```
+  -m "Secret message" \
+  --channel ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
 
-Output:
-```
-Mode: DCT (grayscale, JPEG) (45.2% capacity)
-✓ Encoded successfully!
-  Output: a1b2c3d4.jpg
-  Size: 89,432 bytes
-  Capacity used: 45.2%
-  DCT output: JPEG (grayscale)
-```
-
-**DCT mode with color preservation:**
-```bash
+# Public mode (no channel isolation)
 stegasoo encode \
-  -r ref.jpg \
-  -c carrier.png \
-  -p "phrase words here now" \
-  --pin 123456 \
-  -m "Message" \
-  --mode dct \
-  --dct-color color \
-  --dct-format png
-```
+  -r photo.jpg -c meme.png \
+  -p "correct horse battery staple" \
+  --pin 847293 \
+  -m "Public message" \
+  --no-channel
 
-**With RSA key:**
-```bash
+# DCT mode for social media
 stegasoo encode \
-  -r reference.jpg \
-  -c carrier.png \
-  -p "apple forest thunder mountain" \
-  -k mykey.pem \
-  --key-password "secretpassword" \
-  -m "Encrypted with RSA"
-```
-
-**Both PIN and RSA (maximum security):**
-```bash
-stegasoo encode \
-  -r ref.jpg \
-  -c carrier.png \
-  -p "word1 word2 word3 word4" \
-  --pin 123456 \
-  -k mykey.pem \
-  --key-password "pass" \
-  -m "Double-locked message"
-```
-
-**Custom output filename:**
-```bash
-stegasoo encode \
-  -r ref.jpg \
-  -c carrier.png \
-  -p "phrase words here now" \
-  --pin 123456 \
-  -m "Message" \
-  -o holiday_photo.png
-```
-
-**Embed a binary file:**
-```bash
-stegasoo encode \
-  -r ref.jpg \
-  -c large_image.png \
-  -p "secure phrase words here" \
-  --pin 123456 \
-  -e secret_document.pdf \
-  -o output.png
-```
-
-**Quiet mode for scripting:**
-```bash
-stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456 -m "msg" -q -o out.png
-# No output, just creates the file
+  -r photo.jpg -c meme.png \
+  -p "words here" --pin 847293 \
+  -m "Secret" \
+  --mode dct --dct-format jpeg
 ```
 
 ---
 
 ### Decode Command
 
-Decode a secret message or file from a stego image. **Automatically detects LSB vs DCT mode.**
+Decode a secret message or file from a stego image.
 
 #### Synopsis
 
@@ -398,100 +257,56 @@ stegasoo decode [OPTIONS]
 
 #### Options
 
-| Option | Short | Type | Required | Description |
-|--------|-------|------|----------|-------------|
-| `--ref` | `-r` | path | ✓ | Reference photo (same as encoding) |
-| `--stego` | `-s` | path | ✓ | Stego image to decode |
-| `--passphrase` | `-p` | string | ✓ | Passphrase used for encoding |
-| `--pin` | | string | * | Static PIN |
-| `--key` | `-k` | path | * | RSA key file |
-| `--key-qr` | | path | * | RSA key from QR code image |
-| `--key-password` | | string | | Password for RSA key |
-| `--output` | `-o` | path | | Save message to file |
-| `--mode` | | choice | | Extraction mode: `auto`, `lsb`, or `dct` |
-| `--quiet` | `-q` | flag | | Output only the message |
-| `--force` | | flag | | Overwrite existing output file |
-
-\* Must provide the same security factors used during encoding.
+| Option | Short | Type | Required | Default | Description |
+|--------|-------|------|----------|---------|-------------|
+| `--ref` | `-r` | path | ✓ | | Reference photo |
+| `--stego` | `-s` | path | ✓ | | Stego image |
+| `--passphrase` | `-p` | string | ✓ | | Passphrase |
+| `--pin` | | string | * | | Static PIN |
+| `--key` | `-k` | path | * | | RSA key file |
+| `--key-qr` | | path | * | | RSA key from QR code |
+| `--key-password` | | string | | | RSA key password |
+| `--channel` | | string | | auto | Channel key (v4.0.0) |
+| `--channel-file` | | path | | | Read channel key from file |
+| `--no-channel` | | flag | | | Force public mode |
+| `--output` | `-o` | path | | | Save output to file |
+| `--mode` | | choice | | `auto` | Extraction mode |
+| `--quiet` | `-q` | flag | | | Minimal output |
+| `--force` | | flag | | | Overwrite existing file |
 
 #### Examples
 
-**Basic decoding with PIN:**
 ```bash
+# Basic decoding (uses server channel key)
 stegasoo decode \
-  --ref photos/vacation.jpg \
-  --stego received_image.png \
-  --passphrase "correct horse battery staple" \
+  -r photo.jpg -s stego.png \
+  -p "correct horse battery staple" \
   --pin 847293
-```
 
-Output:
-```
-✓ Decoded successfully!
-
-The package arrives Tuesday
-```
-
-**Decoding DCT image (auto-detected):**
-```bash
+# With explicit channel key
 stegasoo decode \
-  --ref photos/vacation.jpg \
-  --stego received_image.jpg \
-  --passphrase "correct horse battery staple" \
-  --pin 847293
-```
+  -r photo.jpg -s stego.png \
+  -p "words here" --pin 847293 \
+  --channel ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
 
-**With RSA key:**
-```bash
+# Decode public image (no channel key was used)
 stegasoo decode \
-  -r reference.jpg \
-  -s stego_image.png \
-  -p "apple forest thunder mountain" \
-  -k mykey.pem \
-  --key-password "secretpassword"
-```
+  -r photo.jpg -s stego.png \
+  -p "words here" --pin 847293 \
+  --no-channel
 
-**Save decoded message to file:**
-```bash
+# Save to file
 stegasoo decode \
-  -r ref.jpg \
-  -s stego.png \
-  -p "passphrase words here now" \
-  --pin 123456 \
-  -o decoded_message.txt
-```
-
-Output:
-```
-✓ Decoded successfully!
-  Saved to: decoded_message.txt
-```
-
-**Quiet mode (message only):**
-```bash
-stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q
-```
-
-Output:
-```
-The package arrives Tuesday
-```
-
-**Pipe to another command:**
-```bash
-stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q | gpg --decrypt
-```
-
-**Force specific extraction mode:**
-```bash
-stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 --mode dct
+  -r photo.jpg -s stego.png \
+  -p "words" --pin 123456 \
+  -o decoded.txt
 ```
 
 ---
 
 ### Verify Command
 
-Verify that a stego image can be decoded without extracting the actual message content.
+Verify credentials without extracting the message.
 
 #### Synopsis
 
@@ -501,207 +316,169 @@ stegasoo verify [OPTIONS]
 
 #### Options
 
-| Option | Short | Type | Required | Description |
-|--------|-------|------|----------|-------------|
-| `--ref` | `-r` | path | ✓ | Reference photo |
-| `--stego` | `-s` | path | ✓ | Stego image to verify |
-| `--passphrase` | `-p` | string | ✓ | Passphrase |
-| `--pin` | | string | * | Static PIN |
-| `--key` | `-k` | path | * | RSA key file |
-| `--key-qr` | | path | * | RSA key from QR code |
-| `--key-password` | | string | | Password for RSA key |
-| `--mode` | | choice | | Extraction mode: `auto`, `lsb`, or `dct` |
-| `--json` | | flag | | Output as JSON |
+Same as `decode`, minus `--output` and `--force`. Adds `--json` for JSON output.
 
 #### Examples
 
-**Basic verification:**
 ```bash
-stegasoo verify -r photo.jpg -s stego.png -p "my passphrase here" --pin 123456
+# Quick verification
+stegasoo verify -r photo.jpg -s stego.png -p "phrase" --pin 123456
+
+# With explicit channel key
+stegasoo verify -r photo.jpg -s stego.png -p "phrase" --pin 123456 \
+  --channel ABCD-1234-...
+
+# JSON output
+stegasoo verify -r photo.jpg -s stego.png -p "phrase" --pin 123456 --json
 ```
 
-Output:
-```
-✓ Valid stego image
-  Payload:  text (142 bytes)
-  Size:     142 bytes
-```
+---
 
-**JSON output:**
+### Channel Command
+
+Manage channel keys for deployment/group isolation.
+
+#### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `generate` | Create a new channel key |
+| `show` | Display current channel key status |
+| `set` | Save a channel key to config |
+| `clear` | Remove channel key from config |
+
+#### channel generate
+
 ```bash
-stegasoo verify -r photo.jpg -s stego.png -p "words here" --pin 123456 --json
+stegasoo channel generate [OPTIONS]
 ```
 
-Output:
-```json
-{
-  "valid": true,
-  "stego_file": "stego.png",
-  "payload_type": "text",
-  "payload_size": 142
-}
-```
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--save` | `-s` | Save to user config (~/.stegasoo/channel.key) |
+| `--save-project` | | Save to project config (./config/channel.key) |
+| `--env` | `-e` | Output as environment variable export |
+| `--quiet` | `-q` | Output only the key |
 
-**Failed verification:**
+**Examples:**
+
 ```bash
-stegasoo verify -r photo.jpg -s stego.png -p "wrong passphrase" --pin 123456
+# Just display a new key
+stegasoo channel generate
+
+# Save to user config
+stegasoo channel generate --save
+
+# Add to .env file
+stegasoo channel generate --env >> .env
+
+# For scripts
+KEY=$(stegasoo channel generate -q)
 ```
 
-Output:
+#### channel show
+
+```bash
+stegasoo channel show [OPTIONS]
 ```
-✗ Verification failed
-  Error: Decryption failed: Invalid authentication tag
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--reveal` | `-r` | Show full key (not just fingerprint) |
+| `--json` | | Output as JSON |
+
+**Examples:**
+
+```bash
+# Show status (fingerprint only)
+stegasoo channel show
+
+# Reveal full key
+stegasoo channel show --reveal
+
+# JSON for scripts
+stegasoo channel show --json
+```
+
+**Output:**
+
+```
+─── CHANNEL KEY STATUS ───
+
+    Mode: PRIVATE
+    Fingerprint: ABCD-••••-••••-••••-••••-••••-••••-3456
+    Source: ~/.stegasoo/channel.key
+
+    Messages require this channel key to decode.
+```
+
+#### channel set
+
+```bash
+stegasoo channel set [KEY] [OPTIONS]
+```
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--file` | `-f` | Read key from file |
+| `--project` | `-p` | Save to project config instead of user |
+
+**Examples:**
+
+```bash
+# Set from command line
+stegasoo channel set ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+
+# Set from file
+stegasoo channel set --file channel.key
+
+# Set in project config
+stegasoo channel set XXXX-... --project
+```
+
+#### channel clear
+
+```bash
+stegasoo channel clear [OPTIONS]
+```
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--project` | `-p` | Clear project config |
+| `--all` | | Clear both user and project configs |
+| `--force` | `-f` | Skip confirmation |
+
+**Examples:**
+
+```bash
+# Clear user config (with confirmation)
+stegasoo channel clear
+
+# Clear project config
+stegasoo channel clear --project
+
+# Clear all configs without confirmation
+stegasoo channel clear --all --force
 ```
 
 ---
 
 ### Info Command
 
-Display information about an image's capacity for both LSB and DCT modes.
-
-#### Synopsis
+Show information about an image file.
 
 ```bash
 stegasoo info IMAGE [OPTIONS]
-```
-
-#### Options
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `--json` | flag | Output as JSON |
-
-#### Examples
-
-**Check carrier image capacity:**
-```bash
-stegasoo info vacation_photo.png
-```
-
-Output:
-```
-Image: vacation_photo.png
-  Dimensions:  1920 × 1080
-  Pixels:      2,073,600
-  Mode:        RGB
-  Format:      PNG
-
-  Capacity:
-    LSB mode:  ~776,970 bytes (758.8 KB)
-    DCT mode:  ~64,800 bytes (63.3 KB) ✓
-    DCT ratio: 8.3% of LSB
-    DCT options: grayscale/color, png/jpeg
-```
-
-**JSON output:**
-```bash
-stegasoo info photo.png --json
-```
-
-Output:
-```json
-{
-  "file": "photo.png",
-  "width": 1920,
-  "height": 1080,
-  "pixels": 2073600,
-  "mode": "RGB",
-  "format": "PNG",
-  "capacity": {
-    "lsb": {
-      "bytes": 776970,
-      "kb": 758.8
-    },
-    "dct": {
-      "bytes": 64800,
-      "kb": 63.3,
-      "available": true,
-      "ratio_vs_lsb": 8.3,
-      "output_formats": ["png", "jpeg"],
-      "color_modes": ["grayscale", "color"]
-    }
-  }
-}
 ```
 
 ---
 
 ### Compare Command
 
-Compare LSB and DCT embedding modes for an image with recommendations.
-
-#### Synopsis
+Compare embedding mode capacities for an image.
 
 ```bash
 stegasoo compare IMAGE [OPTIONS]
-```
-
-#### Options
-
-| Option | Short | Type | Description |
-|--------|-------|------|-------------|
-| `--payload-size` | `-s` | int | Check if specific payload size fits |
-| `--json` | | flag | Output as JSON |
-
-#### Examples
-
-**Basic comparison:**
-```bash
-stegasoo compare carrier.png
-```
-
-Output:
-```
-=== Mode Comparison: carrier.png ===
-  Dimensions: 1920 × 1080
-
-  ┌─── LSB Mode ───
-  │ Capacity:  776,970 bytes (758.8 KB)
-  │ Output:    PNG
-  │ Status:    ✓ Available
-  │
-  ├─── DCT Mode ───
-  │ Capacity:  64,800 bytes (63.3 KB)
-  │ Ratio:     8.3% of LSB capacity
-  │ Status:    ✓ Available
-  │ Formats:   PNG (lossless), JPEG (smaller)
-  │ Colors:    Grayscale (default), Color
-  │
-  └─── Recommendation ───
-    LSB for larger payloads, DCT for better stealth
-    DCT supports color output with --dct-color color
-```
-
-**Check if payload fits:**
-```bash
-stegasoo compare carrier.png --payload-size 50000
-```
-
-Output:
-```
-=== Mode Comparison: carrier.png ===
-  Dimensions: 1920 × 1080
-
-  ┌─── LSB Mode ───
-  │ Capacity:  776,970 bytes (758.8 KB)
-  │ Output:    PNG
-  │ Status:    ✓ Available
-  │
-  ├─── DCT Mode ───
-  │ Capacity:  64,800 bytes (63.3 KB)
-  │ Ratio:     8.3% of LSB capacity
-  │ Status:    ✓ Available
-  │ Formats:   PNG (lossless), JPEG (smaller)
-  │ Colors:    Grayscale (default), Color
-  │
-  ├─── Payload Check ───
-  │ Size:      50,000 bytes
-  │ LSB mode:  ✓ Fits
-  │ DCT mode:  ✓ Fits
-  │
-  └─── Recommendation ───
-    DCT mode for better stealth (payload fits both modes)
-    Use --dct-color color to preserve original colors
 ```
 
 ---
@@ -710,118 +487,111 @@ Output:
 
 Show available embedding modes and their status.
 
-#### Synopsis
-
 ```bash
 stegasoo modes
 ```
 
-#### Example Output
-
-```
-=== Stegasoo Embedding Modes (v3.2.0) ===
-
-  LSB Mode (Spatial LSB)
-    Status:      ✓ Always available
-    Output:      PNG/BMP (full color)
-    Capacity:    ~375 KB per megapixel
-    Use case:    Larger payloads, color preservation
-    CLI flag:    --mode lsb (default)
-
-  DCT Mode (Frequency Domain)
-    Status:      ✓ Available
-    Capacity:    ~75 KB per megapixel (~20% of LSB)
-    Use case:    Better stealth, frequency domain hiding
-    CLI flag:    --mode dct
-
-  DCT Options
-    Output format:
-      --dct-format png     Lossless, larger file (default)
-      --dct-format jpeg    Lossy, smaller, more natural
-
-    Color mode:
-      --dct-color grayscale   Traditional DCT (default)
-      --dct-color color       Preserves original colors
-
-  v3.2.0 Changes:
-    ✓ No date parameters needed
-    ✓ Single passphrase (no daily rotation)
-    ✓ Default passphrase increased to 4 words
-    ✓ True asynchronous communications
-
-  Examples:
-    # Traditional DCT (grayscale PNG)
-    stegasoo encode ... --mode dct
-
-    # Color-preserving DCT with JPEG output
-    stegasoo encode ... --mode dct --dct-color color --dct-format jpeg
-
-    # Compare modes for an image
-    stegasoo compare carrier.png
-```
+Now also displays channel key status.
 
 ---
 
 ### Strip-Metadata Command
 
-Remove all metadata (EXIF, GPS, etc.) from an image.
-
-#### Synopsis
+Remove all metadata from an image.
 
 ```bash
 stegasoo strip-metadata IMAGE [OPTIONS]
 ```
 
-#### Options
+---
 
-| Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
-| `--output` | `-o` | path | | Output file (default: overwrites as PNG) |
-| `--format` | `-f` | choice | PNG | Output format: `PNG` or `BMP` |
-| `--quiet` | `-q` | flag | | Suppress output |
+## Channel Keys
 
-#### Examples
+Channel keys provide **deployment/group isolation** - messages encoded with a channel key can only be decoded by systems with the same key.
 
+### Key Format
+
+```
+ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+└──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘
+  8 groups of 4 alphanumeric characters (256 bits)
+```
+
+### Storage Locations
+
+Channel keys are checked in this order:
+
+| Priority | Location | Best For |
+|----------|----------|----------|
+| 1 | `STEGASOO_CHANNEL_KEY` env var | Docker, CI/CD |
+| 2 | `./config/channel.key` | Project-specific |
+| 3 | `~/.stegasoo/channel.key` | User default |
+
+### Modes
+
+| Mode | Description | CLI Option |
+|------|-------------|------------|
+| **Auto** | Use server-configured key | *(default)* |
+| **Explicit** | Use specific key | `--channel KEY` |
+| **Public** | No channel isolation | `--no-channel` |
+
+### Fingerprints
+
+For security, full keys aren't displayed by default. Instead, a fingerprint is shown:
+
+```
+Full key:    ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+Fingerprint: ABCD-••••-••••-••••-••••-••••-••••-3456
+```
+
+### Use Cases
+
+**Team isolation:**
 ```bash
-# Strip metadata, save as PNG
-stegasoo strip-metadata photo.jpg -o clean.png
+# Team A
+export STEGASOO_CHANNEL_KEY=AAAA-1111-...
 
-# Overwrite in place (converts to PNG)
-stegasoo strip-metadata photo.jpg
+# Team B  
+export STEGASOO_CHANNEL_KEY=BBBB-2222-...
+
+# Messages from Team A can only be decoded by Team A
 ```
 
-Output:
+**Development vs Production:**
+```bash
+# Development
+./config/channel.key contains DEV-KEY-...
+
+# Production
+STEGASOO_CHANNEL_KEY=PROD-KEY-... in Docker
+
+# Dev messages can't be decoded in production
 ```
-✓ Metadata stripped
-  Input:  photo.jpg (2,456,789 bytes)
-  Output: clean.png (1,234,567 bytes)
+
+**Public messages:**
+```bash
+# Anyone with credentials can decode
+stegasoo encode ... --no-channel
+stegasoo decode ... --no-channel
 ```
 
 ---
 
 ## Embedding Modes
 
-Stegasoo supports two steganography algorithms.
-
 ### LSB Mode (Default)
-
-**Least Significant Bit** embedding modifies pixel values directly.
 
 ```bash
 stegasoo encode ... --mode lsb
-# or just omit --mode (LSB is default)
 ```
 
 | Aspect | Details |
 |--------|---------|
-| **Capacity** | ~3 bits/pixel (~375 KB for 1920×1080) |
-| **Output** | PNG only (lossless required) |
-| **Resilience** | ❌ Destroyed by JPEG compression |
-| **Best For** | Maximum capacity, controlled channels |
+| **Capacity** | ~375 KB for 1920×1080 |
+| **Output** | PNG only |
+| **Best For** | Maximum capacity |
 
 ### DCT Mode
-
-**Discrete Cosine Transform** embedding hides data in frequency coefficients.
 
 ```bash
 stegasoo encode ... --mode dct --dct-format jpeg --dct-color color
@@ -829,251 +599,136 @@ stegasoo encode ... --mode dct --dct-format jpeg --dct-color color
 
 | Aspect | Details |
 |--------|---------|
-| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080) |
+| **Capacity** | ~65 KB for 1920×1080 |
 | **Output** | PNG or JPEG |
-| **Resilience** | ✅ Better resistance to analysis |
-| **Best For** | Social media, stealth requirements |
-
-### DCT Options
-
-| Option | Values | Default | Description |
-|--------|--------|---------|-------------|
-| `--dct-format` | `png`, `jpeg` | `png` | Output image format |
-| `--dct-color` | `grayscale`, `color` | `grayscale` | Color processing |
-
-### Choosing the Right Mode
-
-```
-Need maximum capacity?
-           │
-    ┌──────┴──────┐
-    ▼             ▼
-   YES           NO
-    │             │
-    ▼             ▼
-Use LSB       Need stealth?
-(default)          │
-           ┌──────┴──────┐
-           ▼             ▼
-          YES           NO
-           │             │
-           ▼             ▼
-        Use DCT       Use LSB
-        --mode dct    (default)
-```
-
-### Capacity Comparison
-
-| Mode | 1920×1080 Capacity |
-|------|-------------------|
-| LSB (PNG) | ~375 KB |
-| DCT (PNG) | ~65 KB |
-| DCT (JPEG) | ~50 KB |
+| **Best For** | Social media, stealth |
 
 ---
 
 ## Security Factors
 
-Stegasoo uses multiple authentication factors:
-
 | Factor | Description | Entropy |
 |--------|-------------|---------|
-| Reference Photo | A photo both parties have | ~80-256 bits |
-| Passphrase | BIP-39 word phrase | ~44 bits (4 words) |
-| Static PIN | Numeric PIN (6-9 digits) | ~20 bits (6 digits) |
-| RSA Key | Shared key file | ~128 bits effective |
-
-### Minimum Requirements
-
-- At least one of PIN or RSA key must be provided
-- Reference photo is always required
-- Passphrase is always required
-
-### Security Configurations
-
-| Configuration | Entropy (excl. photo) | Use Case |
-|--------------|----------------------|----------|
-| 4-word passphrase + 6-digit PIN | ~63 bits | Standard use |
-| 6-word passphrase + 6-digit PIN | ~85 bits | Enhanced security |
-| 4-word passphrase + RSA 2048 | ~172 bits | File-based auth |
-| 6-word passphrase + PIN + RSA | ~213 bits | Maximum security |
+| Reference Photo | Shared image | ~80-256 bits |
+| Passphrase | BIP-39 words | ~44 bits (4 words) |
+| Static PIN | Numeric (6-9) | ~20 bits (6 digits) |
+| RSA Key | Shared key file | ~128 bits |
+| Channel Key (v4.0.0) | Deployment isolation | ~256 bits |
 
 ---
 
 ## Workflow Examples
 
-### Basic Secure Communication
+### Team Setup with Channel Key
 
-**Setup (once):**
+**Initial setup (team lead):**
 ```bash
-# Both parties generate credentials
-stegasoo generate
+# Generate team channel key
+stegasoo channel generate -q > team_channel.key
 
-# Or share RSA key securely
-stegasoo generate --rsa -o shared_key.pem -p "agreedpassword"
-# Securely transfer shared_key.pem to recipient
+# Distribute to team members securely
+# (encrypted email, secure file share, etc.)
 ```
 
-**Sender:**
+**Team member setup:**
 ```bash
-# For email, file transfer, etc. (no recompression)
-stegasoo encode \
-  -r our_shared_photo.jpg \
-  -c random_meme.png \
-  -p "our shared passphrase here" \
-  --pin 847293 \
-  -m "Meeting moved to 3pm"
+# Save received key
+stegasoo channel set --file team_channel.key
+
+# Verify
+stegasoo channel show
 ```
 
-**Sender (social media):**
+**Daily use:**
 ```bash
-# For platforms that may recompress
-stegasoo encode \
-  -r our_shared_photo.jpg \
-  -c random_meme.png \
-  -p "our shared passphrase here" \
-  --pin 847293 \
-  -m "Meeting moved to 3pm" \
-  --mode dct \
-  --dct-format jpeg
+# Channel key is used automatically
+stegasoo encode -r ref.jpg -c meme.png -p "phrase" --pin 123456 -m "Team message"
+stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456
 ```
 
-**Recipient:**
-```bash
-# Works for both LSB and DCT (auto-detected)
-stegasoo decode \
-  -r our_shared_photo.jpg \
-  -s received_image.png \
-  -p "our shared passphrase here" \
-  --pin 847293
+### Docker Deployment
+
+**docker-compose.yml:**
+```yaml
+x-common-env: &common-env
+  STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}
+
+services:
+  web:
+    environment:
+      <<: *common-env
+  api:
+    environment:
+      <<: *common-env
 ```
 
-### Batch Processing
-
-**Encode multiple messages:**
+**.env (gitignored):**
 ```bash
-#!/bin/bash
-PASSPHRASE="apple forest thunder mountain"
-PIN="123456"
-REF="reference.jpg"
-
-for file in messages/*.txt; do
-  name=$(basename "$file" .txt)
-  stegasoo encode \
-    -r "$REF" \
-    -c "carriers/${name}.png" \
-    -p "$PASSPHRASE" \
-    --pin "$PIN" \
-    -f "$file" \
-    -o "output/${name}_stego.png" \
-    -q
-  echo "Encoded: $name"
-done
+STEGASOO_CHANNEL_KEY=ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
 ```
 
-**Encode for social media (DCT):**
+### CI/CD Pipeline
+
 ```bash
-#!/bin/bash
-for file in messages/*.txt; do
-  name=$(basename "$file" .txt)
-  stegasoo encode \
-    -r "$REF" \
-    -c "carriers/${name}.png" \
-    -p "$PASSPHRASE" \
-    --pin "$PIN" \
-    -f "$file" \
-    --mode dct \
-    --dct-format jpeg \
-    -o "output/${name}_social.jpg" \
-    -q
-  echo "Encoded for social: $name"
-done
+# Generate key for CI
+CHANNEL_KEY=$(stegasoo channel generate -q)
+
+# Use in pipeline
+STEGASOO_CHANNEL_KEY=$CHANNEL_KEY stegasoo encode ...
 ```
 
 ---
 
 ## Piping & Scripting
 
-### Stdin/Stdout Support
-
-**Encode from pipe:**
-```bash
-cat secret.txt | stegasoo encode -r ref.jpg -c carrier.png -p "phrase words" --pin 123456 -o out.png
-```
-
-**Decode to pipe:**
-```bash
-stegasoo decode -r ref.jpg -s stego.png -p "phrase words" --pin 123456 -q | less
-```
-
-**Chain with encryption:**
-```bash
-# Encode GPG-encrypted content
-gpg -e -r recipient@email.com secret.txt
-cat secret.txt.gpg | base64 | stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456
-
-# Decode and decrypt
-stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q | base64 -d | gpg -d
-```
-
-### JSON Output for Scripts
+### Extract channel key for scripts
 
 ```bash
-# Get credentials as JSON
-creds=$(stegasoo generate --json)
+# Get just the key
+KEY=$(stegasoo channel show --json | jq -r '.key // empty')
 
-# Extract specific fields
-passphrase=$(echo "$creds" | jq -r '.passphrase')
-pin=$(echo "$creds" | jq -r '.pin')
-entropy=$(echo "$creds" | jq -r '.entropy.total')
+# Get fingerprint
+FINGERPRINT=$(stegasoo channel show --json | jq -r '.fingerprint // "none"')
 
-echo "Passphrase: $passphrase"
-echo "PIN: $pin"
-echo "Total entropy: $entropy bits"
-```
-
-### Error Handling in Scripts
-
-```bash
-#!/bin/bash
-set -e
-
-if ! stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456 -q 2>/dev/null; then
-  echo "Decryption failed - check credentials"
-  exit 1
+# Check if configured
+if stegasoo channel show --json | jq -e '.configured' > /dev/null; then
+  echo "Channel key is configured"
 fi
+```
+
+### Generate and use immediately
+
+```bash
+# Generate, save, and use
+stegasoo channel generate --save
+stegasoo encode -r ref.jpg -c carrier.png -p "phrase" --pin 123456 -m "message"
 ```
 
 ---
 
 ## Error Handling
 
-### Common Errors
+### Channel Key Errors
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| "Must provide --pin or --key" | No security factor given | Add `--pin` or `--key` option |
-| "PIN must be 6-9 digits" | Invalid PIN format | Use numeric PIN, 6-9 chars |
-| "Payload too large for LSB mode" | Message exceeds capacity | Use larger carrier or shorter message |
-| "Payload too large for DCT mode" | DCT has less space | Use LSB mode or shorter message |
-| "Decryption failed" | Wrong credentials | Verify passphrase, PIN, ref photo |
-| "DCT mode requires scipy" | Missing library | Install: `pip install scipy` |
+| "Invalid channel key format" | Key doesn't match pattern | Use `stegasoo channel generate` |
+| "Message encoded with channel key but none configured" | Missing channel key | Set key or use `--channel` |
+| "Message encoded without channel key" | Used `--no-channel` to encode | Decode with `--no-channel` |
+| "Channel key mismatch" | Wrong key | Verify correct key |
 
-### Troubleshooting Decryption Failures
+### Troubleshooting
 
-1. **Check passphrase:** Must be exact match (case-sensitive)
-2. **Verify reference photo:** Must be the exact same file, not a resized copy
-3. **Check stego image:** 
-   - LSB: Ensure it wasn't resized, recompressed, or converted
-   - DCT: More resilient but not immune to heavy processing
-4. **Verify PIN/key:** Must match exactly what was used for encoding
+```bash
+# Check current channel status
+stegasoo channel show
 
-### v3.2.0 Migration Note
+# Try decoding with explicit key
+stegasoo decode ... --channel XXXX-XXXX-...
 
-If you're trying to decode images created with v3.1.x:
-- v3.2.0 **cannot** decode v3.1.x images (date-based key derivation removed)
-- Keep v3.1.x installed to access old images
-- Re-encode old messages with v3.2.0 for forward compatibility
+# Try decoding without channel key
+stegasoo decode ... --no-channel
+```
 
 ---
 
@@ -1091,35 +746,9 @@ If you're trying to decode images created with v3.1.x:
 
 | Variable | Description |
 |----------|-------------|
+| `STEGASOO_CHANNEL_KEY` | Channel key for deployment isolation (v4.0.0) |
 | `PYTHONPATH` | Include `src/` for development |
 | `STEGASOO_DEBUG` | Enable debug output (set to `1`) |
-
----
-
-## Dependencies
-
-### Core Dependencies
-
-- `pillow` - Image processing
-- `cryptography` - Encryption
-- `argon2-cffi` - Key derivation
-- `click` - CLI framework
-
-### DCT Mode Dependencies
-
-- `scipy` - DCT transformations
-
-Install DCT dependencies:
-```bash
-pip install scipy
-```
-
-Check availability:
-```bash
-stegasoo modes
-# or
-python -c "from stegasoo import has_dct_support; print('DCT:', has_dct_support())"
-```
 
 ---
 

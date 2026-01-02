@@ -11,8 +11,7 @@
             </div>
             <div class="card-body">
                 <p class="lead">
-                    Stegasoo is a steganography tool that hides encrypted messages and files 
-                    inside ordinary images using multi-factor authentication.
+                    Stegasoo hides encrypted messages and files inside images using multi-factor authentication.
                 </p>
                 
                 <h6 class="text-primary mt-4 mb-3">Features</h6>
@@ -22,22 +21,22 @@
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Text &amp; File Embedding</strong>
-                                <br><small class="text-muted">Hide messages or any file type (PDF, ZIP, documents)</small>
+                                <br><small class="text-muted">Any file type: PDF, ZIP, documents</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Multi-Factor Security</strong>
-                                <br><small class="text-muted">Combines photo + passphrase + PIN/RSA key</small>
+                                <br><small class="text-muted">Photo + passphrase + PIN/RSA key</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>AES-256-GCM Encryption</strong>
-                                <br><small class="text-muted">Authenticated encryption with integrity verification</small>
+                                <br><small class="text-muted">Authenticated encryption with integrity check</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
-                                <strong>LSB &amp; DCT Modes</strong>
-                                <br><small class="text-muted">Choose capacity (LSB) or JPEG resilience (DCT)</small>
+                                <strong>DCT &amp; LSB Modes</strong>
+                                <br><small class="text-muted">JPEG resilience (DCT) or high capacity (LSB)</small>
                             </li>
                         </ul>
                     </div>
@@ -46,12 +45,12 @@
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Random Pixel Embedding</strong>
-                                <br><small class="text-muted">Key-derived selection defeats statistical analysis</small>
+                                <br><small class="text-muted">Defeats statistical analysis</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>Large Image Support</strong>
-                                <br><small class="text-muted">Up to {{ max_payload_kb }} KB payload, tested with 14MB+ images</small>
+                                <br><small class="text-muted">Up to {{ max_payload_kb }} KB, tested with 14MB+ images</small>
                             </li>
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
@@ -61,7 +60,13 @@
                             <li class="mb-2">
                                 <i class="bi bi-check-circle text-success me-2"></i>
                                 <strong>QR Code Keys</strong>
-                                <br><small class="text-muted">Import/export RSA keys via QR codes</small>
+                                <br><small class="text-muted">Import/export RSA keys via QR</small>
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle text-success me-2"></i>
+                                <strong>Channel Keys</strong>
+                                <span class="badge bg-info ms-1">v4.0</span>
+                                <br><small class="text-muted">Group/deployment isolation</small>
                             </li>
                         </ul>
                     </div>
@@ -75,67 +80,61 @@
                 <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Embedding Modes</h5>
             </div>
             <div class="card-body">
-                <p>
-                    Stegasoo supports two embedding modes, each optimized for different use cases.
-                </p>
+                <p>Two modes optimized for different use cases.</p>
                 
                 <div class="row mt-4">
-                    <!-- LSB Mode -->
-                    <div class="col-md-6 mb-4">
-                        <div class="card bg-dark h-100">
-                            <div class="card-header">
-                                <i class="bi bi-grid-3x3-gap text-primary me-2"></i>
-                                <strong>LSB Mode</strong>
-                                <span class="badge bg-success ms-2">Default</span>
-                            </div>
-                            <div class="card-body">
-                                <p class="small">
-                                    <strong>LSB (Least Significant Bit)</strong> embeds data in the lowest bit 
-                                    of each color channel. Changing the LSB changes pixel values by at most 1, 
-                                    which is imperceptible to the human eye.
-                                </p>
-                                <ul class="small mb-0">
-                                    <li><strong>Capacity:</strong> ~375 KB per megapixel</li>
-                                    <li><strong>Output:</strong> PNG (lossless)</li>
-                                    <li><strong>Color:</strong> Full color preserved</li>
-                                    <li><strong>Speed:</strong> Fast (~0.5s)</li>
-                                </ul>
-                                <hr>
-                                <div class="small">
-                                    <i class="bi bi-check-circle text-success me-1"></i> Email attachments<br>
-                                    <i class="bi bi-check-circle text-success me-1"></i> Cloud storage (Dropbox, Drive)<br>
-                                    <i class="bi bi-check-circle text-success me-1"></i> Direct file transfer<br>
-                                    <i class="bi bi-x-circle text-danger me-1"></i> Social media (recompresses)
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- DCT Mode -->
                     <div class="col-md-6 mb-4">
                         <div class="card bg-dark h-100">
                             <div class="card-header">
                                 <i class="bi bi-soundwave text-warning me-2"></i>
                                 <strong>DCT Mode</strong>
+                                <span class="badge bg-success ms-2">Default</span>
                             </div>
                             <div class="card-body">
                                 <p class="small">
-                                    <strong>DCT (Discrete Cosine Transform)</strong> embeds data in frequency 
-                                    coefficients rather than raw pixels. This survives JPEG recompression 
-                                    because coefficients are preserved during re-encoding.
+                                    <strong>DCT (Discrete Cosine Transform)</strong> embeds data in frequency coefficients. Survives JPEG recompression.
                                 </p>
                                 <ul class="small mb-0">
-                                    <li><strong>Capacity:</strong> ~75 KB per megapixel</li>
+                                    <li><strong>Capacity:</strong> ~75 KB/MP</li>
                                     <li><strong>Output:</strong> JPEG or PNG</li>
                                     <li><strong>Color:</strong> Color or grayscale</li>
-                                    <li><strong>Speed:</strong> Slower (~2s)</li>
+                                    <li><strong>Speed:</strong> ~2s</li>
                                 </ul>
                                 <hr>
                                 <div class="small">
                                     <i class="bi bi-check-circle text-success me-1"></i> Instagram, Facebook<br>
                                     <i class="bi bi-check-circle text-success me-1"></i> WhatsApp, Signal, Telegram<br>
                                     <i class="bi bi-check-circle text-success me-1"></i> Twitter/X<br>
-                                    <i class="bi bi-check-circle text-success me-1"></i> Any platform that recompresses
+                                    <i class="bi bi-check-circle text-success me-1"></i> Any recompressing platform
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- LSB Mode -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card bg-dark h-100">
+                            <div class="card-header">
+                                <i class="bi bi-grid-3x3-gap text-primary me-2"></i>
+                                <strong>LSB Mode</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="small">
+                                    <strong>LSB (Least Significant Bit)</strong> embeds data in the lowest bit of each color channel. Imperceptible to the eye.
+                                </p>
+                                <ul class="small mb-0">
+                                    <li><strong>Capacity:</strong> ~375 KB/MP</li>
+                                    <li><strong>Output:</strong> PNG (lossless)</li>
+                                    <li><strong>Color:</strong> Full color</li>
+                                    <li><strong>Speed:</strong> ~0.5s</li>
+                                </ul>
+                                <hr>
+                                <div class="small">
+                                    <i class="bi bi-check-circle text-success me-1"></i> Email attachments<br>
+                                    <i class="bi bi-check-circle text-success me-1"></i> Cloud storage<br>
+                                    <i class="bi bi-check-circle text-success me-1"></i> Direct file transfer<br>
+                                    <i class="bi bi-x-circle text-danger me-1"></i> Social media
                                 </div>
                             </div>
                         </div>
@@ -149,35 +148,30 @@
                         <thead>
                             <tr>
                                 <th>Aspect</th>
+                                <th>DCT Mode <span class="badge bg-success ms-1">Default</span></th>
                                 <th>LSB Mode</th>
-                                <th>DCT Mode</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td>Capacity (1080p)</td>
-                                <td class="text-success">~770 KB</td>
                                 <td class="text-warning">~50 KB</td>
+                                <td class="text-success">~770 KB</td>
                             </tr>
                             <tr>
                                 <td>Survives JPEG</td>
-                                <td class="text-danger">❌ No</td>
                                 <td class="text-success">✅ Yes</td>
+                                <td class="text-danger">❌ No</td>
                             </tr>
                             <tr>
                                 <td>Social Media</td>
-                                <td class="text-danger">❌ Broken</td>
                                 <td class="text-success">✅ Works</td>
+                                <td class="text-danger">❌ Broken</td>
                             </tr>
                             <tr>
                                 <td>Detection Resistance</td>
-                                <td>Moderate</td>
                                 <td>Better</td>
-                            </tr>
-                            <tr>
-                                <td>Dependencies</td>
-                                <td>Pillow, NumPy</td>
-                                <td>+ scipy, jpegio</td>
+                                <td>Moderate</td>
                             </tr>
                         </tbody>
                     </table>
@@ -185,8 +179,7 @@
                 
                 <div class="alert alert-info small mt-3 mb-0">
                     <i class="bi bi-lightbulb me-2"></i>
-                    <strong>Auto-Detection:</strong> When decoding, Stegasoo automatically detects whether 
-                    LSB or DCT mode was used. You don't need to specify the mode during decoding.
+                    <strong>Auto-Detection:</strong> Mode is detected automatically when decoding.
                 </div>
             </div>
         </div>
@@ -196,61 +189,146 @@
                 <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>How Security Works</h5>
             </div>
             <div class="card-body">
-                <p>Stegasoo uses <strong>multi-factor authentication</strong> to derive encryption keys:</p>
+                <p>Multi-factor authentication derives encryption keys:</p>
                 
                 <div class="row text-center my-4">
-                    <div class="col-md-3 mb-3">
-                        <div class="p-3 bg-dark rounded">
+                    <div class="col-6 col-lg-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100 d-flex flex-column align-items-center">
                             <i class="bi bi-image text-info fs-2 d-block mb-2"></i>
                             <strong>Reference Photo</strong>
                             <div class="small text-muted mt-1">Something you have</div>
-                            <div class="small text-success">~80-256 bits</div>
+                            <div class="small text-success mt-auto pt-2">~80-256 bits</div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="p-3 bg-dark rounded">
+                    <div class="col-6 col-lg-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100 d-flex flex-column align-items-center">
                             <i class="bi bi-chat-quote text-warning fs-2 d-block mb-2"></i>
                             <strong>Passphrase</strong>
                             <div class="small text-muted mt-1">Something you know</div>
-                            <div class="small text-success">~44 bits (4 words)</div>
+                            <div class="small text-success mt-auto pt-2">~44 bits (4 words)</div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="p-3 bg-dark rounded">
+                    <div class="col-6 col-lg-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100 d-flex flex-column align-items-center">
                             <i class="bi bi-123 text-danger fs-2 d-block mb-2"></i>
                             <strong>Static PIN</strong>
                             <div class="small text-muted mt-1">Something you know</div>
-                            <div class="small text-success">~20 bits (6 digits)</div>
+                            <div class="small text-success mt-auto pt-2">~20 bits (6 digits)</div>
                         </div>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="p-3 bg-dark rounded">
+                    <div class="col-6 col-lg-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100 d-flex flex-column align-items-center">
                             <i class="bi bi-key text-primary fs-2 d-block mb-2"></i>
                             <strong>RSA Key</strong>
-                            <div class="small text-muted mt-1">Something you have (optional)</div>
-                            <div class="small text-success">~128 bits</div>
+                            <div class="small text-muted mt-1">Optional</div>
+                            <div class="small text-success mt-auto pt-2">~128 bits</div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="alert alert-secondary">
                     <i class="bi bi-calculator me-2"></i>
-                    <strong>Combined entropy:</strong> 144-424+ bits depending on configuration.
-                    For reference, 128 bits is considered computationally infeasible to brute force.
+                    <strong>Combined entropy:</strong> 144-424+ bits. 128 bits is infeasible to brute force.
                 </div>
                 
                 <h6 class="mt-4">Key Derivation</h6>
                 <p>
                     {% if has_argon2 %}
                     <span class="badge bg-success me-1"><i class="bi bi-check"></i> Argon2id</span>
-                    Using <strong>Argon2id</strong> with 256MB memory cost — memory-hard KDF that 
-                    makes GPU/ASIC attacks infeasible.
+                    256MB memory cost. Memory-hard KDF defeats GPU/ASIC attacks.
                     {% else %}
                     <span class="badge bg-warning text-dark me-1"><i class="bi bi-exclamation-triangle"></i> Argon2 Not Available</span>
-                    Falling back to <strong>PBKDF2-SHA512</strong> with 600,000 iterations.
+                    Using PBKDF2-SHA512 with 600k iterations.
                     Install <code>argon2-cffi</code> for stronger security.
                     {% endif %}
                 </p>
+            </div>
+        </div>
+        
+        <!-- Channel Keys (v4.0.0) -->
+        <div class="card mb-4" id="channel-keys">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-broadcast me-2"></i>Channel Keys
+                    <span class="badge bg-info ms-2">v4.0</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    Channel keys provide <strong>deployment/group isolation</strong>. Messages encoded with one channel key 
+                    cannot be decoded with a different key, even if all other credentials match.
+                </p>
+                
+                <div class="row mt-4">
+                    <!-- Auto Mode -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-dark h-100">
+                            <div class="card-header text-center">
+                                <i class="bi bi-gear-fill text-success fs-2 d-block mb-2"></i>
+                                <strong>Auto</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="small mb-2">Uses server-configured key if available, otherwise public mode.</p>
+                                <ul class="small mb-0">
+                                    <li>Set via <code>STEGASOO_CHANNEL_KEY</code> env var</li>
+                                    <li>Or <code>channel_key</code> in config file</li>
+                                    <li>All users share the same channel</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Public Mode -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-dark h-100">
+                            <div class="card-header text-center">
+                                <i class="bi bi-globe text-info fs-2 d-block mb-2"></i>
+                                <strong>Public</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="small mb-2">No channel key. Compatible with other public installations.</p>
+                                <ul class="small mb-0">
+                                    <li>Default if no server key configured</li>
+                                    <li>Anyone can decode (with credentials)</li>
+                                    <li>Interoperable between deployments</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Mode -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-dark h-100">
+                            <div class="card-header text-center">
+                                <i class="bi bi-key-fill text-warning fs-2 d-block mb-2"></i>
+                                <strong>Custom</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="small mb-2">Your own group key. Share with recipients.</p>
+                                <ul class="small mb-0">
+                                    <li>Format: <code>XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</code></li>
+                                    <li>32 chars (128 bits entropy)</li>
+                                    <li>Private group communication</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if channel_configured %}
+                <div class="alert alert-success mt-3 mb-0">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    <strong>This server has a channel key configured:</strong>
+                    <code class="ms-2">{{ channel_fingerprint }}</code>
+                    <span class="text-muted ms-2">({{ channel_source }})</span>
+                </div>
+                {% else %}
+                <div class="alert alert-info mt-3 mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    This server is running in <strong>public mode</strong>. 
+                    Set <code>STEGASOO_CHANNEL_KEY</code> to enable server-wide channel isolation.
+                </div>
+                {% endif %}
             </div>
         </div>
         
@@ -272,18 +350,18 @@
                             <tr>
                                 <td><strong>4.0.0</strong></td>
                                 <td>
-                                    Simplified auth (no date dependency), passphrase replaces day_phrase, 
-                                    4-word default, JPEG normalization fix, large image support (14MB+ tested),
-                                    subprocess isolation for stability, Python 3.10-3.12 required
+                                    <strong>Channel keys</strong> for group/deployment isolation,
+                                    DCT default, simplified auth, passphrase replaces day_phrase, 
+                                    4-word default, JPEG fix, large image support, subprocess isolation, Python 3.10-3.12
                                 </td>
                             </tr>
                             <tr>
                                 <td>3.2.0</td>
-                                <td>Single passphrase (removed day-of-week rotation), increased default words</td>
+                                <td>Single passphrase, more default words</td>
                             </tr>
                             <tr>
                                 <td>3.0.0</td>
-                                <td>DCT steganography mode, JPEG output, color preservation option</td>
+                                <td>DCT mode, JPEG output, color preservation</td>
                             </tr>
                             <tr>
                                 <td>2.2.0</td>
@@ -291,11 +369,11 @@
                             </tr>
                             <tr>
                                 <td>2.1.0</td>
-                                <td>File embedding, compression support</td>
+                                <td>File embedding, compression</td>
                             </tr>
                             <tr>
                                 <td>2.0.0</td>
-                                <td>Web UI, REST API, RSA key support</td>
+                                <td>Web UI, REST API, RSA keys</td>
                             </tr>
                             <tr>
                                 <td>1.0.0</td>
@@ -303,12 +381,6 @@
                             </tr>
                         </tbody>
                     </table>
-                </div>
-                
-                <div class="alert alert-warning small mt-3 mb-0">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    <strong>Compatibility:</strong> v4.0 cannot decode messages from v3.1 or earlier (different format).
-                    Messages encoded with v3.2 should decode correctly.
                 </div>
             </div>
         </div>
@@ -329,11 +401,11 @@
                         <div id="setup" class="accordion-collapse collapse show" data-bs-parent="#usageAccordion">
                             <div class="accordion-body">
                                 <ol>
-                                    <li>Both parties agree on a <strong>reference photo</strong> (shared secretly, never transmitted)</li>
-                                    <li>Go to <a href="/generate">Generate</a> and create credentials</li>
-                                    <li><strong>Memorize</strong> the passphrase and PIN</li>
-                                    <li>If using RSA, download and securely store the key file</li>
-                                    <li>Share credentials with your contact through a secure channel</li>
+                                    <li>Agree on a <strong>reference photo</strong> (never transmitted)</li>
+                                    <li>Go to <a href="/generate">Generate</a> to create credentials</li>
+                                    <li>Memorize passphrase and PIN</li>
+                                    <li>If using RSA, store the key file securely</li>
+                                    <li>Share credentials via secure channel</li>
                                 </ol>
                             </div>
                         </div>
@@ -343,24 +415,23 @@
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed bg-dark text-light" type="button" 
                                     data-bs-toggle="collapse" data-bs-target="#encoding">
-                                <i class="bi bi-2-circle me-2"></i>Encoding a Message
+                                <i class="bi bi-2-circle me-2"></i>Encoding
                             </button>
                         </h2>
                         <div id="encoding" class="accordion-collapse collapse" data-bs-parent="#usageAccordion">
                             <div class="accordion-body">
                                 <ol>
                                     <li>Go to <a href="/encode">Encode</a></li>
-                                    <li>Choose your <strong>embedding mode</strong>:
+                                    <li>Upload <strong>reference photo</strong> and <strong>carrier image</strong></li>
+                                    <li>Choose mode:
                                         <ul>
-                                            <li><strong>LSB</strong> – for email, cloud storage, direct transfer</li>
-                                            <li><strong>DCT</strong> – for social media (Instagram, WhatsApp, etc.)</li>
+                                            <li><strong>DCT</strong> (default): social media</li>
+                                            <li><strong>LSB</strong>: email, cloud, direct transfer</li>
                                         </ul>
                                     </li>
-                                    <li>Upload your <strong>reference photo</strong> and <strong>carrier image</strong></li>
-                                    <li>Enter your message or select a file to embed</li>
-                                    <li>Enter your <strong>passphrase</strong> and PIN/key</li>
-                                    <li>Download the resulting stego image</li>
-                                    <li>Send through any channel!</li>
+                                    <li>Enter message or select file</li>
+                                    <li>Enter passphrase and PIN/key</li>
+                                    <li>Download stego image</li>
                                 </ol>
                             </div>
                         </div>
@@ -370,22 +441,21 @@
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed bg-dark text-light" type="button" 
                                     data-bs-toggle="collapse" data-bs-target="#decoding">
-                                <i class="bi bi-3-circle me-2"></i>Decoding a Message
+                                <i class="bi bi-3-circle me-2"></i>Decoding
                             </button>
                         </h2>
                         <div id="decoding" class="accordion-collapse collapse" data-bs-parent="#usageAccordion">
                             <div class="accordion-body">
                                 <ol>
                                     <li>Go to <a href="/decode">Decode</a></li>
-                                    <li>Upload your <strong>reference photo</strong> (same one used for encoding)</li>
-                                    <li>Upload the <strong>stego image</strong> you received</li>
-                                    <li>Enter your <strong>passphrase</strong></li>
-                                    <li>Enter your PIN and/or RSA key</li>
-                                    <li>View the decoded message or download the extracted file</li>
+                                    <li>Upload <strong>reference photo</strong></li>
+                                    <li>Upload <strong>stego image</strong></li>
+                                    <li>Enter passphrase and PIN/key</li>
+                                    <li>View message or download file</li>
                                 </ol>
                                 <div class="alert alert-info small mt-3 mb-0">
                                     <i class="bi bi-magic me-2"></i>
-                                    <strong>Auto-detection:</strong> Stegasoo automatically detects LSB vs DCT mode.
+                                    Mode is auto-detected.
                                 </div>
                             </div>
                         </div>
@@ -396,67 +466,64 @@
         
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Limits &amp; Specifications</h5>
+                <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Limits &amp; Specs</h5>
             </div>
             <div class="card-body">
                 <table class="table table-dark table-striped small">
                     <tbody>
                         <tr>
-                            <td><i class="bi bi-file-text me-2"></i>Max text message</td>
-                            <td><strong>2 million characters</strong></td>
+                            <td><i class="bi bi-file-text me-2"></i>Max text</td>
+                            <td><strong>2M characters</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-file-earmark me-2"></i>Max file payload</td>
+                            <td><i class="bi bi-file-earmark me-2"></i>Max file</td>
                             <td><strong>{{ max_payload_kb }} KB</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-image me-2"></i>Max carrier image</td>
-                            <td><strong>24 megapixels</strong> (~6000×4000)</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-grid-3x3 me-2"></i>LSB capacity</td>
-                            <td><strong>~375 KB/megapixel</strong></td>
+                            <td><i class="bi bi-image me-2"></i>Max carrier</td>
+                            <td><strong>24 MP</strong> (~6000x4000)</td>
                         </tr>
                         <tr>
                             <td><i class="bi bi-soundwave me-2"></i>DCT capacity</td>
-                            <td><strong>~75 KB/megapixel</strong></td>
+                            <td><strong>~75 KB/MP</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-upload me-2"></i>Max upload size</td>
+                            <td><i class="bi bi-grid-3x3 me-2"></i>LSB capacity</td>
+                            <td><strong>~375 KB/MP</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-upload me-2"></i>Max upload</td>
                             <td><strong>30 MB</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-clock me-2"></i>Temp file expiry</td>
-                            <td><strong>5 minutes</strong></td>
+                            <td><i class="bi bi-clock me-2"></i>File expiry</td>
+                            <td><strong>5 min</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-key me-2"></i>PIN length</td>
+                            <td><i class="bi bi-key me-2"></i>PIN</td>
                             <td><strong>6-9 digits</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-shield me-2"></i>RSA key sizes</td>
-                            <td><strong>2048, 3072, 4096 bits</strong></td>
+                            <td><i class="bi bi-shield me-2"></i>RSA keys</td>
+                            <td><strong>2048, 3072, 4096 bit</strong></td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase length</td>
-                            <td><strong>3-12 words</strong> (BIP-39, recommended: 4+ words)</td>
+                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase</td>
+                            <td><strong>3-12 words</strong> (BIP-39)</td>
                         </tr>
                         <tr>
-                            <td><i class="bi bi-code me-2"></i>Python version</td>
-                            <td><strong>3.10-3.12</strong> (3.13 not supported)</td>
+                            <td><i class="bi bi-code me-2"></i>Python Version</td>
+                            <td><strong>3.10-3.12</strong></td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-box me-2"></i>Built with</td>
+                            <td>Flask, Pillow, NumPy, SciPy, jpegio, cryptography, argon2-cffi</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
         
-        <div class="text-center mt-4 text-muted small">
-            <p>
-                Stegasoo v{{ version }} &bull; 
-                <i class="bi bi-github me-1"></i>Open Source &bull;
-                Built with Python, Flask, and cryptography
-            </p>
-        </div>
     </div>
 </div>
 {% endblock %}

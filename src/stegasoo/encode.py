@@ -1,7 +1,10 @@
 """
-Stegasoo Encode Module (v3.2.0)
+Stegasoo Encode Module (v4.0.0)
 
 High-level encoding functions for hiding messages and files in images.
+
+Changes in v4.0.0:
+- Added channel_key parameter for deployment/group isolation
 """
 
 from typing import Optional, Union
@@ -34,6 +37,7 @@ def encode(
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> EncodeResult:
     """
     Encode a message or file into an image.
@@ -50,6 +54,10 @@ def encode(
         embed_mode: 'lsb' (default) or 'dct'
         dct_output_format: For DCT mode - 'png' or 'jpeg'
         dct_color_mode: For DCT mode - 'grayscale' or 'color'
+        channel_key: Channel key for deployment/group isolation:
+            - None or "auto": Use server's configured key
+            - str: Use this specific channel key
+            - "" or False: No channel key (public mode)
         
     Returns:
         EncodeResult with stego image and metadata
@@ -64,9 +72,20 @@ def encode(
         ... )
         >>> with open('stego.png', 'wb') as f:
         ...     f.write(result.stego_image)
+        
+    Example with explicit channel key:
+        >>> result = encode(
+        ...     message="Secret message",
+        ...     reference_photo=ref_bytes,
+        ...     carrier_image=carrier_bytes,
+        ...     passphrase="apple forest thunder mountain",
+        ...     pin="123456",
+        ...     channel_key="ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
+        ... )
     """
     debug.print(f"encode: passphrase length={len(passphrase.split())} words, "
-                f"pin={'set' if pin else 'none'}, mode={embed_mode}")
+                f"pin={'set' if pin else 'none'}, mode={embed_mode}, "
+                f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}")
     
     # Validate inputs
     require_valid_payload(message)
@@ -79,16 +98,16 @@ def encode(
     if rsa_key_data:
         require_valid_rsa_key(rsa_key_data, rsa_password)
     
-    # Encrypt message
+    # Encrypt message (with channel key)
     encrypted = encrypt_message(
-        message, reference_photo, passphrase, pin, rsa_key_data
+        message, reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
     
     debug.print(f"Encrypted payload: {len(encrypted)} bytes")
     
-    # Derive pixel/coefficient selection key
+    # Derive pixel/coefficient selection key (with channel key)
     pixel_key = derive_pixel_key(
-        reference_photo, passphrase, pin, rsa_key_data
+        reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
     
     # Embed in image
@@ -114,7 +133,7 @@ def encode(
             pixels_modified=stats.pixels_modified,
             total_pixels=stats.total_pixels,
             capacity_used=stats.capacity_used,
-            date_used=None,  # No longer used in v3.2.0
+            date_used=None,  # No longer used in v3.2.0+
         )
     else:
         # DCT mode stats
@@ -141,6 +160,7 @@ def encode_file(
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> EncodeResult:
     """
     Encode a file into an image.
@@ -160,6 +180,7 @@ def encode_file(
         embed_mode: 'lsb' or 'dct'
         dct_output_format: 'png' or 'jpeg'
         dct_color_mode: 'grayscale' or 'color'
+        channel_key: Channel key parameter (see encode())
         
     Returns:
         EncodeResult
@@ -178,6 +199,7 @@ def encode_file(
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,
         dct_color_mode=dct_color_mode,
+        channel_key=channel_key,
     )
 
 
@@ -195,6 +217,7 @@ def encode_bytes(
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
     dct_color_mode: str = "grayscale",
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> EncodeResult:
     """
     Encode raw bytes with metadata into an image.
@@ -213,6 +236,7 @@ def encode_bytes(
         embed_mode: 'lsb' or 'dct'
         dct_output_format: 'png' or 'jpeg'
         dct_color_mode: 'grayscale' or 'color'
+        channel_key: Channel key parameter (see encode())
         
     Returns:
         EncodeResult
@@ -231,4 +255,5 @@ def encode_bytes(
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,
         dct_color_mode=dct_color_mode,
+        channel_key=channel_key,
     )

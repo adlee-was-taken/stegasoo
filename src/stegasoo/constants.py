@@ -1,14 +1,17 @@
 """
-Stegasoo Constants and Configuration (v3.2.0 - Date Independent)
+Stegasoo Constants and Configuration (v4.0.0 - Channel Key Support)
 
 Central location for all magic numbers, limits, and crypto parameters.
 All version numbers, limits, and configuration values should be defined here.
 
+BREAKING CHANGES in v4.0.0:
+- Added channel key support for deployment/group isolation
+- FORMAT_VERSION bumped to 5 (adds flags byte to header)
+- Header size increased by 1 byte for flags
+
 BREAKING CHANGES in v3.2.0:
 - Removed date dependency from cryptographic operations
 - Renamed day_phrase → passphrase throughout codebase
-- FORMAT_VERSION bumped to 4 to indicate incompatibility
-- Increased default passphrase length to compensate for removed date entropy
 """
 
 import os
@@ -28,8 +31,9 @@ MAGIC_HEADER = b'\x89ST3'
 
 # FORMAT VERSION HISTORY:
 # Version 1-3: Date-dependent encryption (v3.0.x - v3.1.x)
-# Version 4: Date-independent encryption (v3.2.0+) - BREAKING CHANGE
-FORMAT_VERSION = 4
+# Version 4: Date-independent encryption (v3.2.0)
+# Version 5: Channel key support (v4.0.0) - adds flags byte to header
+FORMAT_VERSION = 5
 
 # Payload type markers
 PAYLOAD_TEXT = 0x01

@@ -266,6 +266,7 @@
                     
                     <div class="row">
                         <div class="col-md-4 mb-3">
+                          <div class="security-box">
                             <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
                             <div class="input-group pin-input-container">
                                 <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
@@ -274,9 +275,11 @@
                                 </button>
                             </div>
                             <div class="form-text">If PIN was used during encoding</div>
+                          </div>
                         </div>
                         
                         <div class="col-md-8 mb-3">
+                          <div class="security-box">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
@@ -333,7 +336,62 @@
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
+                          </div>
                         </div>
+                    </div>
+                    
+                    <!-- ================================================================
+                         CHANNEL KEY (v4.0.0) - Deployment/Group Isolation
+                         ================================================================ -->
+                    <div class="mb-4">
+                      <div class="security-box">
+                        <label class="form-label">
+                            <i class="bi bi-broadcast me-1"></i> Channel
+                            <span class="badge bg-info ms-1">v4.0</span>
+                        </label>
+                        
+                        <div class="d-flex gap-2">
+                            <!-- Auto Mode -->
+                            <label class="mode-btn flex-fill {% if channel_configured %}active{% endif %}" id="channelAutoCardDec" for="channelAutoDec">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelAutoDec" value="auto" checked>
+                                <i class="bi bi-gear-fill {% if channel_configured %}text-success{% else %}text-secondary{% endif %} ms-2"></i>
+                                <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· {% if channel_configured %}Server Key{% else %}Public{% endif %}</span></span>
+                            </label>
+                            
+                            <!-- Public Mode -->
+                            <label class="mode-btn flex-fill" id="channelPublicCardDec" for="channelPublicDec">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelPublicDec" value="none">
+                                <i class="bi bi-globe text-info ms-2"></i>
+                                <span class="ms-2"><strong>Public</strong> <span class="text-muted d-none d-sm-inline">· No key</span></span>
+                            </label>
+                            
+                            <!-- Custom Key -->
+                            <label class="mode-btn flex-fill" id="channelCustomCardDec" for="channelCustomDec">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelCustomDec" value="custom">
+                                <i class="bi bi-key-fill text-warning ms-2"></i>
+                                <span class="ms-2"><strong>Custom</strong></span>
+                            </label>
+                        </div>
+                        
+                        <!-- Server channel indicator (compact) -->
+                        {% if channel_configured %}
+                        <div class="small text-success mt-2">
+                            <i class="bi bi-shield-lock me-1"></i>
+                            Server: <code>{{ channel_fingerprint }}</code>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Custom key input -->
+                        <div class="mt-2 d-none" id="channelCustomInputDec">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                <input type="text" name="channel_key_custom" class="form-control font-monospace" 
+                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" 
+                                       pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}"
+                                       id="channelKeyInputDec">
+                            </div>
+                        </div>
+                      </div>
                     </div>
                     
                     <!-- ================================================================
@@ -355,51 +413,34 @@
                                         <span class="badge bg-info ms-1">v3.0</span>
                                     </label>
                                     
-                                    <div class="row g-2">
+                                    <div class="d-flex gap-2">
                                         <!-- Auto Mode -->
-                                        <div class="col-4">
-                                            <div class="form-check card p-2 text-center h-100" id="autoModeCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
-                                                <label class="form-check-label w-100" for="modeAuto">
-                                                    <i class="bi bi-magic text-success fs-4 d-block mb-1"></i>
-                                                    <strong>Auto</strong>
-                                                    <div class="small text-muted">Try both</div>
-                                                </label>
-                                            </div>
-                                        </div>
+                                        <label class="mode-btn flex-fill active" id="autoModeCard" for="modeAuto">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
+                                            <i class="bi bi-magic text-success"></i>
+                                            <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· Try both</span></span>
+                                        </label>
                                         
                                         <!-- LSB Mode -->
-                                        <div class="col-4">
-                                            <div class="form-check card p-2 text-center h-100" id="lsbModeCardDec">
-                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeLsbDec" value="lsb">
-                                                <label class="form-check-label w-100" for="modeLsbDec">
-                                                    <i class="bi bi-grid-3x3-gap text-primary fs-4 d-block mb-1"></i>
-                                                    <strong>LSB</strong>
-                                                    <div class="small text-muted">Spatial only</div>
-                                                </label>
-                                            </div>
-                                        </div>
+                                        <label class="mode-btn flex-fill" id="lsbModeCardDec" for="modeLsbDec">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsbDec" value="lsb">
+                                            <i class="bi bi-grid-3x3-gap text-primary"></i>
+                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Spatial</span></span>
+                                        </label>
                                         
                                         <!-- DCT Mode -->
-                                        <div class="col-4">
-                                            <div class="form-check card p-2 text-center h-100 {% if not has_dct %}opacity-50{% endif %}" id="dctModeCardDec">
-                                                <input class="form-check-input mx-auto" type="radio" name="embed_mode" id="modeDctDec" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                                <label class="form-check-label w-100" for="modeDctDec">
-                                                    <i class="bi bi-soundwave text-info fs-4 d-block mb-1"></i>
-                                                    <strong>DCT</strong>
-                                                    <div class="small text-muted">
-                                                        {% if has_dct %}Frequency only{% else %}N/A{% endif %}
-                                                    </div>
-                                                </label>
-                                            </div>
-                                        </div>
+                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %}" id="dctModeCardDec" for="modeDctDec">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDctDec" value="dct" {% if not has_dct %}disabled{% endif %}>
+                                            <i class="bi bi-soundwave text-warning"></i>
+                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Frequency</span></span>
+                                        </label>
                                     </div>
                                     
                                     <div class="form-text mt-2">
                                         <i class="bi bi-lightbulb me-1"></i>
-                                        <strong>Auto</strong> tries LSB first, then DCT. Use specific mode if you know how it was encoded.
+                                        <strong>Auto</strong> tries LSB first, then DCT.
                                         {% if not has_dct %}
-                                        <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>DCT requires scipy: <code>pip install scipy</code></span>
+                                        <span class="text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>DCT requires scipy</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -443,6 +484,10 @@
                         <strong>Format compatibility:</strong> v4.0 cannot decode messages from v3.1 or earlier (different format)
                     </li>
                     <li class="mb-2">
+                        <i class="bi bi-broadcast text-info me-1"></i>
+                        <strong>Channel key:</strong> Use the same channel (Auto/Public/Custom) that was used during encoding
+                    </li>
+                    <li class="mb-2">
                         <i class="bi bi-info-circle-fill text-info me-1"></i>
                         If using an RSA key, verify the <strong>password is correct</strong> (if key is encrypted)
                     </li>
@@ -461,53 +506,28 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
-// ============================================================================
-// DECODE PAGE - Initialize shared components
-// ============================================================================
+// Extraction mode button active state toggle
+const extractModeRadios = document.querySelectorAll('input[name="embed_mode"]');
+const extractModeBtns = { 
+    'auto': document.getElementById('autoModeCard'), 
+    'lsb': document.getElementById('lsbModeCardDec'), 
+    'dct': document.getElementById('dctModeCardDec') 
+};
 
-Stegasoo.initPasswordToggles();
-Stegasoo.initRsaMethodToggle();
-Stegasoo.initDropZones();
-Stegasoo.initClipboardPaste(['input[name="stego_image"]', 'input[name="reference_photo"]']);
-Stegasoo.initQrCropAnimation('rsaKeyQrInput');
-Stegasoo.initPassphraseFontResize();
-
-// ============================================================================
-// DECODE PAGE - Mode card highlighting
-// ============================================================================
-
-Stegasoo.initModeCards({
-    radioName: 'embed_mode',
-    cards: {
-        'auto': { id: 'autoModeCard', borderClass: 'border-success' },
-        'lsb': { id: 'lsbModeCardDec', borderClass: 'border-primary' },
-        'dct': { id: 'dctModeCardDec', borderClass: 'border-info' }
-    }
+extractModeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        Object.values(extractModeBtns).forEach(btn => btn?.classList.remove('active'));
+        extractModeBtns[radio.value]?.classList.add('active');
+    });
 });
 
-// ============================================================================
-// DECODE PAGE - Advanced options chevron
-// ============================================================================
-
+// Advanced options chevron
 const advancedOptionsDec = document.getElementById('advancedOptionsDec');
 advancedOptionsDec?.addEventListener('show.bs.collapse', () => {
     document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-down', 'bi-chevron-up');
 });
 advancedOptionsDec?.addEventListener('hide.bs.collapse', () => {
     document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
-});
-
-// ============================================================================
-// DECODE PAGE - Form submission with mode-specific loading text
-// ============================================================================
-
-document.getElementById('decodeForm')?.addEventListener('submit', function() {
-    const btn = document.getElementById('decodeBtn');
-    const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
-    }
 });
 </script>
 {% endblock %}

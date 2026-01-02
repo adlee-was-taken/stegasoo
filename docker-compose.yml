@@ -1,5 +1,9 @@
 version: '3.8'
 
+# Shared environment variables
+x-common-env: &common-env
+  STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}
+
 services:
   # ============================================================================
   # Web UI (Flask)
@@ -12,12 +16,13 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=production
+      <<: *common-env
+      FLASK_ENV: production
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 768M  # Increased for scipy + Argon2
+          memory: 768M
         reservations:
           memory: 384M
 
@@ -31,32 +36,12 @@ services:
     container_name: stegasoo-api
     ports:
       - "8000:8000"
+    environment:
+      <<: *common-env
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 768M  # Increased for scipy + Argon2
+          memory: 768M
         reservations:
           memory: 384M
-
-  # ============================================================================
-  # Nginx Reverse Proxy (optional, for production)
-  # ============================================================================
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: stegasoo-nginx
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  #     - ./certs:/etc/nginx/certs:ro
-  #   depends_on:
-  #     - web
-  #     - api
-  #   restart: unless-stopped
-
-# ============================================================================
-# Development overrides
-# ============================================================================
-# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up

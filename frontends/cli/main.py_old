@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """
-Stegasoo CLI - Command-line interface for steganography operations (v4.0.0).
-
-CHANGES in v4.0.0:
-- Added channel key support for deployment/group isolation
-- Messages encoded with a channel key can only be decoded with the same key
-- New `channel` command group for key management
+Stegasoo CLI - Command-line interface for steganography operations (v3.2.0).
 
 CHANGES in v3.2.0:
 - Removed date dependency from all operations
@@ -21,7 +16,6 @@ Usage:
     stegasoo info [OPTIONS]
     stegasoo compare [OPTIONS]
     stegasoo modes [OPTIONS]
-    stegasoo channel [SUBCOMMAND]
 """
 
 import sys
@@ -70,18 +64,6 @@ from stegasoo import (
     
     # Models
     FilePayload,
-    
-    # Channel key functions (v4.0.0)
-    generate_channel_key,
-    get_channel_key,
-    set_channel_key,
-    clear_channel_key,
-    has_channel_key,
-    get_channel_status,
-    validate_channel_key,
-    format_channel_key,
-    get_active_channel_key,
-    get_channel_fingerprint,
 )
 
 # Import constants - try main module first, then constants submodule
@@ -154,13 +136,13 @@ def cli():
     - Reference photo (something you have)
     - Passphrase (something you know)
     - Static PIN or RSA key (additional security)
-    - Channel key (deployment/group isolation) [v4.0.0]
     
     \b
-    Version 4.0.0 Changes:
-    - Channel key support for group/deployment isolation
-    - Messages encoded with a channel key require the same key to decode
-    - New `stegasoo channel` command for key management
+    Version 3.2.0 Changes:
+    - No more date parameters - encode/decode anytime!
+    - Simplified passphrase (no daily rotation)
+    - Default passphrase increased to 4 words
+    - True asynchronous communications
     
     \b
     Embedding Modes:
@@ -173,60 +155,6 @@ def cli():
     - Output format: png (lossless) or jpeg (smaller, natural)
     """
     pass
-
-
-# ============================================================================
-# CHANNEL KEY HELPERS
-# ============================================================================
-
-def resolve_channel_key_option(channel: Optional[str], channel_file: Optional[str], 
-                                no_channel: bool) -> Optional[str]:
-    """
-    Resolve channel key from CLI options.
-    
-    Returns:
-        None: Use server-configured key (auto mode)
-        "": Public mode (no channel key)
-        str: Explicit channel key
-    """
-    if no_channel:
-        return ""  # Public mode
-    
-    if channel_file:
-        # Load from file
-        path = Path(channel_file)
-        if not path.exists():
-            raise click.ClickException(f"Channel key file not found: {channel_file}")
-        key = path.read_text().strip()
-        if not validate_channel_key(key):
-            raise click.ClickException(f"Invalid channel key format in file: {channel_file}")
-        return key
-    
-    if channel:
-        if channel.lower() == 'auto':
-            return None  # Use server config
-        # Explicit key provided
-        if not validate_channel_key(channel):
-            raise click.ClickException(
-                f"Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX\n"
-                f"Generate a new key with: stegasoo channel generate"
-            )
-        return channel
-    
-    # Default: use server-configured key (auto mode)
-    return None
-
-
-def format_channel_status_line(quiet: bool = False) -> Optional[str]:
-    """Get a one-line status for channel key configuration."""
-    if quiet:
-        return None
-    
-    status = get_channel_status()
-    if status['mode'] == 'public':
-        return None
-    
-    return f"Channel: {status['fingerprint']} ({status['source']})"
 
 
 # ============================================================================
@@ -301,7 +229,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         # Pretty output
         click.echo()
         click.secho("=" * 60, fg='cyan')
-        click.secho("  STEGASOO CREDENTIALS (v4.0.0)", fg='cyan', bold=True)
+        click.secho("  STEGASOO CREDENTIALS (v3.2.0)", fg='cyan', bold=True)
         click.secho("=" * 60, fg='cyan')
         click.echo()
         
@@ -341,276 +269,11 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         click.secho(f"    + photo entropy:    80-256 bits", dim=True)
         click.echo()
         
-        # Show channel key status
-        if has_channel_key():
-            status = get_channel_status()
-            click.secho("─── CHANNEL KEY ───", fg='magenta')
-            click.echo(f"    Status: Private mode")
-            click.echo(f"    Fingerprint: {status['fingerprint']}")
-            click.secho(f"    (configured via {status['source']})", dim=True)
-            click.echo()
-        
-        click.secho("✓ v4.0.0: Use this passphrase anytime - no date needed!", fg='cyan')
+        click.secho("✓ v3.2.0: Use this passphrase anytime - no date needed!", fg='cyan')
         click.echo()
         
     except Exception as e:
         raise click.ClickException(str(e))
-
-
-# ============================================================================
-# CHANNEL COMMAND GROUP (v4.0.0)
-# ============================================================================
-
-@cli.group()
-def channel():
-    """
-    Manage channel keys for deployment/group isolation.
-    
-    Channel keys allow different deployments or groups to use Stegasoo
-    without being able to read each other's messages, even with identical
-    credentials.
-    
-    \b
-    Key Storage (checked in order):
-    1. Environment variable: STEGASOO_CHANNEL_KEY
-    2. Project config: ./config/channel.key
-    3. User config: ~/.stegasoo/channel.key
-    
-    \b
-    Subcommands:
-        generate  Create a new channel key
-        show      Display current channel key status
-        set       Save a channel key to config file
-        clear     Remove channel key from config
-    
-    \b
-    Examples:
-        stegasoo channel generate
-        stegasoo channel show
-        stegasoo channel set XXXX-XXXX-...
-        stegasoo channel clear
-    """
-    pass
-
-
-@channel.command('generate')
-@click.option('--save', '-s', is_flag=True, help='Save to user config (~/.stegasoo/channel.key)')
-@click.option('--save-project', is_flag=True, help='Save to project config (./config/channel.key)')
-@click.option('--env', '-e', is_flag=True, help='Output as environment variable export')
-@click.option('--quiet', '-q', is_flag=True, help='Output only the key')
-def channel_generate(save, save_project, env, quiet):
-    """
-    Generate a new channel key.
-    
-    Creates a cryptographically secure 256-bit channel key in the format:
-    XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
-    
-    \b
-    Examples:
-        # Just display a new key
-        stegasoo channel generate
-        
-        # Save to user config
-        stegasoo channel generate --save
-        
-        # Output for .env file
-        stegasoo channel generate --env >> .env
-        
-        # For scripts
-        KEY=$(stegasoo channel generate -q)
-    """
-    key = generate_channel_key()
-    
-    if save and save_project:
-        raise click.UsageError("Cannot use both --save and --save-project")
-    
-    if save:
-        set_channel_key(key, location='user')
-        if not quiet:
-            click.secho("✓ Channel key saved to ~/.stegasoo/channel.key", fg='green')
-            click.echo()
-    
-    if save_project:
-        set_channel_key(key, location='project')
-        if not quiet:
-            click.secho("✓ Channel key saved to ./config/channel.key", fg='green')
-            click.echo()
-    
-    if env:
-        click.echo(f"STEGASOO_CHANNEL_KEY={key}")
-    elif quiet:
-        click.echo(key)
-    else:
-        click.echo()
-        click.secho("─── NEW CHANNEL KEY ───", fg='cyan', bold=True)
-        click.echo()
-        click.secho(f"    {key}", fg='bright_yellow', bold=True)
-        click.echo()
-        
-        fingerprint = f"{key[:4]}-••••-••••-••••-••••-••••-••••-{key[-4:]}"
-        click.echo(f"    Fingerprint: {fingerprint}")
-        click.echo()
-        
-        click.secho("Usage:", dim=True)
-        click.echo("    # Environment variable (recommended)")
-        click.echo(f"    export STEGASOO_CHANNEL_KEY={key}")
-        click.echo()
-        click.echo("    # Or save to config")
-        click.echo("    stegasoo channel generate --save")
-        click.echo()
-        click.echo("    # Or add to .env file")
-        click.echo("    stegasoo channel generate --env >> .env")
-        click.echo()
-
-
-@channel.command('show')
-@click.option('--reveal', '-r', is_flag=True, help='Show full key (not just fingerprint)')
-@click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
-def channel_show(reveal, as_json):
-    """
-    Display current channel key status.
-    
-    Shows whether a channel key is configured and where it comes from.
-    By default shows only fingerprint; use --reveal to see full key.
-    
-    \b
-    Examples:
-        stegasoo channel show
-        stegasoo channel show --reveal
-        stegasoo channel show --json
-    """
-    status = get_channel_status()
-    
-    if as_json:
-        import json
-        output = {
-            'mode': status['mode'],
-            'configured': status['configured'],
-            'fingerprint': status.get('fingerprint'),
-            'source': status.get('source'),
-        }
-        if reveal and status['configured']:
-            output['key'] = status.get('key')
-        click.echo(json.dumps(output, indent=2))
-        return
-    
-    click.echo()
-    click.secho("─── CHANNEL KEY STATUS ───", fg='cyan', bold=True)
-    click.echo()
-    
-    if status['mode'] == 'public':
-        click.secho("    Mode: PUBLIC", fg='yellow', bold=True)
-        click.echo("    No channel key configured.")
-        click.echo()
-        click.secho("    Messages can be read by any Stegasoo installation", dim=True)
-        click.secho("    with matching credentials.", dim=True)
-    else:
-        click.secho("    Mode: PRIVATE", fg='green', bold=True)
-        click.echo(f"    Fingerprint: {status['fingerprint']}")
-        click.echo(f"    Source: {status['source']}")
-        
-        if reveal:
-            click.echo()
-            click.secho(f"    Full key: {status['key']}", fg='bright_yellow')
-        
-        click.echo()
-        click.secho("    Messages require this channel key to decode.", dim=True)
-    
-    click.echo()
-
-
-@channel.command('set')
-@click.argument('key', required=False)
-@click.option('--file', '-f', 'key_file', type=click.Path(exists=True), help='Read key from file')
-@click.option('--project', '-p', is_flag=True, help='Save to project config instead of user config')
-def channel_set(key, key_file, project):
-    """
-    Save a channel key to config file.
-    
-    Saves to user config (~/.stegasoo/channel.key) by default,
-    or project config (./config/channel.key) with --project.
-    
-    \b
-    Examples:
-        stegasoo channel set XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
-        stegasoo channel set --file channel.key
-        stegasoo channel set XXXX-... --project
-    """
-    if not key and not key_file:
-        raise click.UsageError("Must provide KEY argument or --file option")
-    
-    if key and key_file:
-        raise click.UsageError("Cannot use both KEY argument and --file option")
-    
-    if key_file:
-        key = Path(key_file).read_text().strip()
-    
-    if not validate_channel_key(key):
-        raise click.ClickException(
-            f"Invalid channel key format.\n"
-            f"Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX\n"
-            f"Generate a new key with: stegasoo channel generate"
-        )
-    
-    location = 'project' if project else 'user'
-    set_channel_key(key, location=location)
-    
-    status = get_channel_status()
-    click.secho(f"✓ Channel key saved", fg='green')
-    click.echo(f"  Location: {status['source']}")
-    click.echo(f"  Fingerprint: {status['fingerprint']}")
-
-
-@channel.command('clear')
-@click.option('--project', '-p', is_flag=True, help='Clear project config instead of user config')
-@click.option('--all', 'clear_all', is_flag=True, help='Clear both user and project configs')
-@click.option('--force', '-f', is_flag=True, help='Skip confirmation')
-def channel_clear(project, clear_all, force):
-    """
-    Remove channel key from config.
-    
-    Clears user config by default. Use --project for project config,
-    or --all to clear both.
-    
-    Note: This does not affect environment variables.
-    
-    \b
-    Examples:
-        stegasoo channel clear
-        stegasoo channel clear --project
-        stegasoo channel clear --all
-    """
-    if not force:
-        if clear_all:
-            msg = "Clear channel key from both user and project configs?"
-        elif project:
-            msg = "Clear channel key from project config (./config/channel.key)?"
-        else:
-            msg = "Clear channel key from user config (~/.stegasoo/channel.key)?"
-        
-        if not click.confirm(msg):
-            click.echo("Cancelled.")
-            return
-    
-    if clear_all:
-        clear_channel_key(location='user')
-        clear_channel_key(location='project')
-        click.secho("✓ Cleared channel key from user and project configs", fg='green')
-    elif project:
-        clear_channel_key(location='project')
-        click.secho("✓ Cleared channel key from project config", fg='green')
-    else:
-        clear_channel_key(location='user')
-        click.secho("✓ Cleared channel key from user config", fg='green')
-    
-    # Show current status
-    status = get_channel_status()
-    if status['configured']:
-        click.echo()
-        click.secho(f"Note: Channel key still active from {status['source']}", fg='yellow')
-        click.echo(f"  Fingerprint: {status['fingerprint']}")
-    else:
-        click.echo("  Mode is now: PUBLIC")
 
 
 # ============================================================================
@@ -628,9 +291,6 @@ def channel_clear(project, clear_all, force):
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
-@click.option('--channel', 'channel_key', help='Channel key (or "auto" for server config)')
-@click.option('--channel-file', type=click.Path(exists=True), help='Read channel key from file')
-@click.option('--no-channel', is_flag=True, help='Force public mode (no channel key)')
 @click.option('--output', '-o', type=click.Path(), help='Output file (default: auto-generated)')
 @click.option('--mode', 'embed_mode', type=click.Choice(['lsb', 'dct']), default='lsb',
               help='Embedding mode: lsb (default, color) or dct (requires scipy)')
@@ -640,23 +300,18 @@ def channel_clear(project, clear_all, force):
               help='DCT color mode: grayscale (default) or color (preserves original colors)')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress output except errors')
 def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin, key, key_qr, 
-               key_password, channel_key, channel_file, no_channel, output, embed_mode, 
-               dct_output_format, dct_color_mode, quiet):
+               key_password, output, embed_mode, dct_output_format, dct_color_mode, quiet):
     """
     Encode a secret message or file into an image.
     
     Requires a reference photo, carrier image, and passphrase.
     Must provide either --pin or --key/--key-qr (or both).
     
-    v4.0.0: Channel key support for deployment isolation.
     v3.2.0: No --date parameter needed! Encode and decode anytime.
     
-    \b
-    Channel Key Options:
-        (no option)       Use server-configured key (auto mode)
-        --channel KEY     Use explicit channel key
-        --channel-file F  Read channel key from file
-        --no-channel      Force public mode (no isolation)
+    For text messages, use -m or -f or pipe via stdin.
+    For binary files, use -e/--embed-file.
+    RSA key can be provided as a .pem file (--key) or QR code image (--key-qr).
     
     \b
     Embedding Modes:
@@ -670,16 +325,24 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
                      - Better resistance to visual analysis
     
     \b
+    DCT Options:
+        --dct-format png     Lossless output (default)
+        --dct-format jpeg    Smaller file, more natural appearance
+        
+        --dct-color grayscale   Convert to grayscale (default, traditional)
+        --dct-color color       Preserve original colors (experimental)
+    
+    \b
     Examples:
-        # Text message with PIN (auto channel key)
-        stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder" --pin 123456 -m "secret"
+        # Text message with PIN (LSB mode, default)
+        stegasoo encode -r photo.jpg -c meme.png -p "apple forest thunder mountain" --pin 123456 -m "secret"
         
-        # Explicit channel key
-        stegasoo encode -r photo.jpg -c meme.png -p "words here" --pin 123456 -m "msg" \\
-            --channel ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+        # DCT mode - grayscale PNG (traditional)
+        stegasoo encode -r photo.jpg -c meme.png -p "secure words here now" --pin 123456 -m "secret" --mode dct
         
-        # Public mode (no channel key)
-        stegasoo encode -r photo.jpg -c meme.png -p "words" --pin 123456 -m "msg" --no-channel
+        # DCT mode - color JPEG
+        stegasoo encode -r photo.jpg -c meme.png -p "my strong passphrase" --pin 123456 -m "secret" \\
+            --mode dct --dct-color color --dct-format jpeg
     """
     # Check DCT mode availability
     if embed_mode == 'dct' and not has_dct_support():
@@ -692,12 +355,6 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
         if dct_output_format != 'png' or dct_color_mode != 'grayscale':
             if not quiet:
                 click.secho("Note: --dct-format and --dct-color only apply to DCT mode", fg='yellow', dim=True)
-    
-    # Resolve channel key
-    try:
-        resolved_channel_key = resolve_channel_key_option(channel_key, channel_file, no_channel)
-    except click.ClickException:
-        raise
     
     # Determine what to encode
     payload = None
@@ -774,18 +431,8 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
             if embed_mode == 'dct':
                 mode_desc += f" ({dct_color_mode}, {dct_output_format.upper()})"
             click.echo(f"Mode: {mode_desc} ({fit_check['usage_percent']:.1f}% capacity)")
-            
-            # Show channel status
-            channel_status = format_channel_status_line()
-            if resolved_channel_key == "":
-                click.echo("Channel: PUBLIC (no isolation)")
-            elif resolved_channel_key:
-                fingerprint = f"{resolved_channel_key[:4]}-••••-...-{resolved_channel_key[-4:]}"
-                click.echo(f"Channel: {fingerprint} (explicit)")
-            elif channel_status:
-                click.echo(channel_status)
         
-        # v4.0.0: Include channel_key parameter
+        # v3.2.0: No date_str parameter
         result = encode(
             message=payload,
             reference_photo=ref_photo,
@@ -797,7 +444,6 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
             embed_mode=embed_mode,
             dct_output_format=dct_output_format,
             dct_color_mode=dct_color_mode,
-            channel_key=resolved_channel_key,
         )
         
         # Determine output path
@@ -839,55 +485,49 @@ def encode_cmd(ref, carrier, message, message_file, embed_file, passphrase, pin,
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
-@click.option('--channel', 'channel_key', help='Channel key (or "auto" for server config)')
-@click.option('--channel-file', type=click.Path(exists=True), help='Read channel key from file')
-@click.option('--no-channel', is_flag=True, help='Force public mode (no channel key)')
 @click.option('--output', '-o', type=click.Path(), help='Save decoded content to file')
 @click.option('--mode', 'embed_mode', type=click.Choice(['auto', 'lsb', 'dct']), default='auto',
               help='Extraction mode: auto (default), lsb, or dct')
 @click.option('--quiet', '-q', is_flag=True, help='Output only the content (for text) or suppress messages (for files)')
 @click.option('--force', is_flag=True, help='Overwrite existing output file')
-def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, channel_file,
-               no_channel, output, embed_mode, quiet, force):
+def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, output, embed_mode, quiet, force):
     """
     Decode a secret message or file from a stego image.
     
     Must use the same credentials that were used for encoding.
     Automatically detects whether content is text or a file.
+    RSA key can be provided as a .pem file (--key) or QR code image (--key-qr).
     
-    v4.0.0: Channel key support - must match what was used for encoding.
     v3.2.0: No --date parameter needed! Just use your passphrase.
     
+    Note: Extraction works the same regardless of whether the image was
+    created with color mode or grayscale mode - both use the same Y channel.
+    
     \b
-    Channel Key Options:
-        (no option)       Use server-configured key (auto mode)
-        --channel KEY     Use explicit channel key
-        --channel-file F  Read channel key from file
-        --no-channel      Force public mode (for images encoded without channel key)
+    Extraction Modes:
+        --mode auto  Auto-detect (default) - tries LSB first, then DCT
+        --mode lsb   Only try LSB extraction
+        --mode dct   Only try DCT extraction (requires scipy)
     
     \b
     Examples:
-        # Decode with auto channel key
-        stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder" --pin 123456
+        # Decode with PIN (auto-detect mode)
+        stegasoo decode -r photo.jpg -s stego.png -p "apple forest thunder mountain" --pin 123456
         
-        # Decode with explicit channel key
-        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 \\
-            --channel ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+        # Explicitly specify DCT mode
+        stegasoo decode -r photo.jpg -s stego.png -p "my passphrase here" --pin 123456 --mode dct
         
-        # Decode public image (no channel key was used)
-        stegasoo decode -r photo.jpg -s stego.png -p "words" --pin 123456 --no-channel
+        # Decode with RSA key file
+        stegasoo decode -r photo.jpg -s stego.png -p "strong words" -k mykey.pem
+        
+        # Save output to file
+        stegasoo decode -r photo.jpg -s stego.png -p "passphrase" --pin 123456 -o output.txt
     """
     # Check DCT mode availability
     if embed_mode == 'dct' and not has_dct_support():
         raise click.ClickException(
             "DCT mode requires scipy. Install with: pip install scipy"
         )
-    
-    # Resolve channel key
-    try:
-        resolved_channel_key = resolve_channel_key_option(channel_key, channel_file, no_channel)
-    except click.ClickException:
-        raise
     
     # Load key if provided (from .pem file or QR code image)
     rsa_key_data = None
@@ -923,7 +563,7 @@ def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, channel_k
         ref_photo = Path(ref).read_bytes()
         stego_image = Path(stego).read_bytes()
         
-        # v4.0.0: Include channel_key parameter
+        # v3.2.0: No date_str parameter
         result = decode(
             stego_image=stego_image,
             reference_photo=ref_photo,
@@ -932,7 +572,6 @@ def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, channel_k
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
             embed_mode=embed_mode,
-            channel_key=resolved_channel_key,
         )
         
         if result.is_file:
@@ -973,10 +612,6 @@ def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, channel_k
                     click.echo(result.message)
         
     except (DecryptionError, ExtractionError) as e:
-        # Provide helpful hints for channel key mismatches
-        error_msg = str(e)
-        if 'channel key' in error_msg.lower():
-            raise click.ClickException(error_msg)
         raise click.ClickException(f"Decryption failed: {e}")
     except StegasooError as e:
         raise click.ClickException(str(e))
@@ -996,21 +631,15 @@ def decode_cmd(ref, stego, passphrase, pin, key, key_qr, key_password, channel_k
 @click.option('--key', '-k', type=click.Path(exists=True), help='RSA key file (.pem)')
 @click.option('--key-qr', type=click.Path(exists=True), help='RSA key from QR code image')
 @click.option('--key-password', help='RSA key password (for encrypted .pem files)')
-@click.option('--channel', 'channel_key', help='Channel key (or "auto" for server config)')
-@click.option('--channel-file', type=click.Path(exists=True), help='Read channel key from file')
-@click.option('--no-channel', is_flag=True, help='Force public mode (no channel key)')
 @click.option('--mode', 'embed_mode', type=click.Choice(['auto', 'lsb', 'dct']), default='auto',
               help='Extraction mode: auto (default), lsb, or dct')
 @click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
-def verify(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, channel_file,
-           no_channel, embed_mode, as_json):
+def verify(ref, stego, passphrase, pin, key, key_qr, key_password, embed_mode, as_json):
     """
     Verify that a stego image can be decoded without extracting the message.
     
     Quick check to validate credentials are correct and data is intact.
     Does NOT output the actual message content.
-    
-    v4.0.0: Also verifies channel key matches.
     
     \b
     Examples:
@@ -1018,19 +647,13 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, 
         
         stegasoo verify -r photo.jpg -s stego.png -p "words here" -k mykey.pem --json
         
-        stegasoo verify -r photo.jpg -s stego.png -p "test phrase" --pin 123456 --no-channel
+        stegasoo verify -r photo.jpg -s stego.png -p "test phrase" --pin 123456 --mode dct
     """
     # Check DCT mode availability
     if embed_mode == 'dct' and not has_dct_support():
         raise click.ClickException(
             "DCT mode requires scipy. Install with: pip install scipy"
         )
-    
-    # Resolve channel key
-    try:
-        resolved_channel_key = resolve_channel_key_option(channel_key, channel_file, no_channel)
-    except click.ClickException:
-        raise
     
     # Load key if provided
     rsa_key_data = None
@@ -1062,7 +685,7 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, 
         ref_photo = Path(ref).read_bytes()
         stego_image = Path(stego).read_bytes()
         
-        # Attempt to decode (v4.0.0: with channel_key)
+        # Attempt to decode
         result = decode(
             stego_image=stego_image,
             reference_photo=ref_photo,
@@ -1071,44 +694,51 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, 
             rsa_key_data=rsa_key_data,
             rsa_password=effective_key_password,
             embed_mode=embed_mode,
-            channel_key=resolved_channel_key,
         )
         
         # Calculate payload size
         if result.is_file:
-            payload_size = len(result.file_data)
-            content_type = result.mime_type or 'file'
+            payload_size = len(result.file_data) if result.file_data else 0
+            payload_type = "file"
+            payload_desc = result.filename or "unnamed file"
+            if result.mime_type:
+                payload_desc += f" ({result.mime_type})"
         else:
-            payload_size = len(result.message.encode('utf-8'))
-            content_type = 'text'
+            payload_size = len(result.message.encode('utf-8')) if result.message else 0
+            payload_type = "text"
+            payload_desc = f"{payload_size} bytes"
         
         if as_json:
             import json
-            output = {
-                'valid': True,
-                'content_type': content_type,
-                'payload_size': payload_size,
-                'filename': result.filename if result.is_file else None,
+            output_data = {
+                "valid": True,
+                "stego_file": stego,
+                "payload_type": payload_type,
+                "payload_size": payload_size,
             }
-            click.echo(json.dumps(output, indent=2))
+            if result.is_file:
+                output_data["filename"] = result.filename
+                output_data["mime_type"] = result.mime_type
+            click.echo(json.dumps(output_data, indent=2))
         else:
-            click.secho("✓ Verification successful!", fg='green')
-            click.echo(f"  Content type: {content_type}")
-            click.echo(f"  Payload size: {payload_size:,} bytes")
-            if result.is_file and result.filename:
-                click.echo(f"  Filename: {result.filename}")
+            click.secho("✓ Valid stego image", fg='green', bold=True)
+            click.echo(f"  Payload:  {payload_type} ({payload_desc})")
+            click.echo(f"  Size:     {payload_size:,} bytes")
         
     except (DecryptionError, ExtractionError) as e:
         if as_json:
             import json
-            output = {
-                'valid': False,
-                'error': str(e),
+            output_data = {
+                "valid": False,
+                "stego_file": stego,
+                "error": str(e),
             }
-            click.echo(json.dumps(output, indent=2))
+            click.echo(json.dumps(output_data, indent=2))
             sys.exit(1)
         else:
-            raise click.ClickException(f"Verification failed: {e}")
+            click.secho("✗ Verification failed", fg='red', bold=True)
+            click.echo(f"  Error: {e}")
+            sys.exit(1)
     except StegasooError as e:
         raise click.ClickException(str(e))
     except Exception as e:
@@ -1124,38 +754,64 @@ def verify(ref, stego, passphrase, pin, key, key_qr, key_password, channel_key, 
 @click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
 def info(image, as_json):
     """
-    Show information about an image file.
+    Show information about an image.
     
-    Displays dimensions, format, capacity estimates for different modes,
-    and whether the image appears suitable as a carrier.
-    
-    \b
-    Examples:
-        stegasoo info photo.png
-        stegasoo info carrier.jpg --json
+    Displays dimensions, capacity for both LSB and DCT modes.
     """
     try:
         image_data = Path(image).read_bytes()
-        img_info = get_image_info(image_data)
+        
+        result = validate_image(image_data, check_size=False)
+        if not result.is_valid:
+            raise click.ClickException(result.error_message)
+        
+        # Get capacity comparison
+        comparison = compare_modes(image_data)
         
         if as_json:
             import json
-            click.echo(json.dumps(img_info, indent=2))
+            output_data = {
+                "file": image,
+                "width": result.details['width'],
+                "height": result.details['height'],
+                "pixels": result.details['pixels'],
+                "mode": result.details['mode'],
+                "format": result.details['format'],
+                "capacity": {
+                    "lsb": {
+                        "bytes": comparison['lsb']['capacity_bytes'],
+                        "kb": round(comparison['lsb']['capacity_kb'], 1),
+                    },
+                    "dct": {
+                        "bytes": comparison['dct']['capacity_bytes'],
+                        "kb": round(comparison['dct']['capacity_kb'], 1),
+                        "available": comparison['dct']['available'],
+                        "ratio_vs_lsb": round(comparison['dct']['ratio_vs_lsb'], 1),
+                        "output_formats": ["png", "jpeg"],
+                        "color_modes": ["grayscale", "color"],
+                    },
+                },
+            }
+            click.echo(json.dumps(output_data, indent=2))
             return
         
         click.echo()
-        click.secho(f"=== Image Info: {image} ===", fg='cyan', bold=True)
-        click.echo(f"  Format:     {img_info.get('format', 'Unknown')}")
-        click.echo(f"  Dimensions: {img_info.get('width', '?')} × {img_info.get('height', '?')}")
-        click.echo(f"  Mode:       {img_info.get('mode', '?')}")
-        click.echo(f"  Size:       {len(image_data):,} bytes")
+        click.secho(f"Image: {image}", bold=True)
+        click.echo(f"  Dimensions:  {result.details['width']} × {result.details['height']}")
+        click.echo(f"  Pixels:      {result.details['pixels']:,}")
+        click.echo(f"  Mode:        {result.details['mode']}")
+        click.echo(f"  Format:      {result.details['format']}")
+        click.echo()
         
-        if 'lsb_capacity' in img_info:
-            click.echo()
-            click.secho("  Capacity Estimates:", fg='green')
-            click.echo(f"    LSB mode: {img_info['lsb_capacity']:,} bytes")
-            if 'dct_capacity' in img_info:
-                click.echo(f"    DCT mode: {img_info['dct_capacity']:,} bytes")
+        click.secho("  Capacity:", bold=True)
+        click.echo(f"    LSB mode:  ~{comparison['lsb']['capacity_bytes']:,} bytes ({comparison['lsb']['capacity_kb']:.1f} KB)")
+        
+        dct_status = "✓" if comparison['dct']['available'] else "✗ (scipy not installed)"
+        click.echo(f"    DCT mode:  ~{comparison['dct']['capacity_bytes']:,} bytes ({comparison['dct']['capacity_kb']:.1f} KB) {dct_status}")
+        click.echo(f"    DCT ratio: {comparison['dct']['ratio_vs_lsb']:.1f}% of LSB")
+        
+        if comparison['dct']['available']:
+            click.secho("    DCT options: grayscale/color, png/jpeg", dim=True)
         
         click.echo()
         
@@ -1169,31 +825,23 @@ def info(image, as_json):
 
 @cli.command()
 @click.argument('image', type=click.Path(exists=True))
-@click.option('--payload', '-p', type=click.Path(exists=True), help='Check if this file would fit')
-@click.option('--size', '-s', type=int, help='Check if this many bytes would fit')
+@click.option('--payload-size', '-s', type=int, help='Check if specific payload size fits')
 @click.option('--json', 'as_json', is_flag=True, help='Output as JSON')
-def compare(image, payload, size, as_json):
+def compare(image, payload_size, as_json):
     """
-    Compare embedding mode capacities for an image.
+    Compare LSB and DCT embedding modes for an image.
     
-    Shows LSB vs DCT capacity and helps choose the right mode.
-    Optionally checks if a specific payload would fit.
+    Shows capacity for each mode and recommends which to use.
+    Optionally checks if a specific payload size would fit.
     
     \b
     Examples:
         stegasoo compare carrier.png
-        stegasoo compare carrier.png --payload secret.pdf
-        stegasoo compare carrier.png --size 50000
+        stegasoo compare carrier.png --payload-size 50000
+        stegasoo compare carrier.png --json
     """
     try:
         image_data = Path(image).read_bytes()
-        
-        # Get payload size if provided
-        payload_size = None
-        if payload:
-            payload_size = len(Path(payload).read_bytes())
-        elif size:
-            payload_size = size
         
         comparison = compare_modes(image_data)
         
@@ -1356,7 +1004,7 @@ def modes():
     Displays which modes are available and their characteristics.
     """
     click.echo()
-    click.secho("=== Stegasoo Embedding Modes (v4.0.0) ===", fg='cyan', bold=True)
+    click.secho("=== Stegasoo Embedding Modes (v3.2.0) ===", fg='cyan', bold=True)
     click.echo()
     
     # LSB Mode
@@ -1391,41 +1039,24 @@ def modes():
     click.echo("      --dct-color color       Preserves original colors")
     click.echo()
     
-    # Channel Key Status (v4.0.0)
-    click.secho("  Channel Key (v4.0.0)", fg='cyan', bold=True)
-    status = get_channel_status()
-    if status['mode'] == 'public':
-        click.echo("    Status:      PUBLIC (no key configured)")
-        click.echo("    Effect:      Messages readable by any installation")
-    else:
-        click.echo("    Status:      PRIVATE")
-        click.echo(f"    Fingerprint: {status['fingerprint']}")
-        click.echo(f"    Source:      {status['source']}")
-        click.echo("    Effect:      Messages isolated to this channel")
-    click.echo()
-    click.echo("    CLI flags:")
-    click.echo("      --channel KEY        Use explicit channel key")
-    click.echo("      --channel-file F     Read key from file")
-    click.echo("      --no-channel         Force public mode")
-    click.echo()
-    
-    # v4.0.0 Changes
-    click.secho("  v4.0.0 Changes:", fg='cyan', bold=True)
-    click.echo("    ✓ Channel key support for deployment isolation")
-    click.echo("    ✓ New `stegasoo channel` command group")
-    click.echo("    ✓ Messages encoded with channel key require same key to decode")
+    # v3.2.0 Note
+    click.secho("  v3.2.0 Changes:", fg='cyan', bold=True)
+    click.echo("    ✓ No date parameters needed")
+    click.echo("    ✓ Single passphrase (no daily rotation)")
+    click.echo("    ✓ Default passphrase increased to 4 words")
+    click.echo("    ✓ True asynchronous communications")
     click.echo()
     
     # Examples
     click.secho("  Examples:", dim=True)
-    click.echo("    # Generate channel key")
-    click.echo("    stegasoo channel generate --save")
+    click.echo("    # Traditional DCT (grayscale PNG)")
+    click.echo("    stegasoo encode ... --mode dct")
     click.echo()
-    click.echo("    # Encode with channel isolation")
-    click.echo("    stegasoo encode ... --channel XXXX-XXXX-...")
+    click.echo("    # Color-preserving DCT with JPEG output")
+    click.echo("    stegasoo encode ... --mode dct --dct-color color --dct-format jpeg")
     click.echo()
-    click.echo("    # Decode public message (no channel key)")
-    click.echo("    stegasoo decode ... --no-channel")
+    click.echo("    # Compare modes for an image")
+    click.echo("    stegasoo compare carrier.png")
     click.echo()
 
 

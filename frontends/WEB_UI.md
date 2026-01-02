@@ -1,11 +1,11 @@
-# Stegasoo Web UI Documentation (v3.2.0)
+# Stegasoo Web UI Documentation (v3.3.0)
 
 Complete guide for the Stegasoo web-based steganography interface.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [What's New in v3.2.0](#whats-new-in-v320)
+- [What's New in v3.3.0](#whats-new-in-v330)
 - [Installation & Setup](#installation--setup)
 - [Pages & Features](#pages--features)
   - [Home Page](#home-page)
@@ -14,8 +14,8 @@ Complete guide for the Stegasoo web-based steganography interface.
   - [Decode Message](#decode-message)
   - [About Page](#about-page)
 - [Embedding Modes](#embedding-modes)
-  - [LSB Mode (Default)](#lsb-mode-default)
-  - [DCT Mode](#dct-mode)
+  - [DCT Mode (Default)](#dct-mode-default)
+  - [LSB Mode](#lsb-mode)
 - [User Interface Guide](#user-interface-guide)
 - [Workflow Examples](#workflow-examples)
 - [Security Features](#security-features)
@@ -39,38 +39,39 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 ### Features
 
 - ✅ Drag-and-drop file uploads
-- ✅ Image previews
+- ✅ Image previews with scan animations
 - ✅ Native sharing (Web Share API)
 - ✅ Responsive design (mobile-friendly)
 - ✅ Password-protected RSA key downloads
 - ✅ Real-time entropy calculations
 - ✅ Automatic file cleanup
-- ✅ **DCT steganography mode** - Frequency domain embedding
+- ✅ **DCT steganography mode** - Now the default for social media resilience
 - ✅ **Color mode selection** - Preserve carrier colors
 - ✅ **File embedding** - Hide files, not just text
-- ✅ **v3.2.0: No date tracking** - Simplified workflow
+- ✅ **QR code RSA keys** - Scan to import keys
+- ✅ **v3.3.0: Streamlined UI** - Compact mode selection, improved form flow
 
 ---
 
-## What's New in v3.2.0
+## What's New in v3.3.0
 
-Version 3.2.0 simplifies the user experience significantly:
+Version 3.3.0 improves the user interface with a streamlined workflow:
 
-| Change | Before (v3.1) | After (v3.2.0) |
+| Change | Before (v3.2) | After (v3.3.0) |
 |--------|---------------|----------------|
-| Credentials | 7 daily phrases | Single passphrase |
-| Encode form | Date selection required | No date field |
-| Decode form | Date detection/input | No date needed |
-| Default words | 3 words | 4 words |
-| Field label | "Day Phrase" | "Passphrase" |
+| Default mode | LSB | DCT (when available) |
+| Mode selection | Large cards with bullet lists | Compact inline buttons with tooltips |
+| Mode position | Top of form | After image upload, before payload |
+| Mode details | Always visible | Hover tooltip on ⓘ icon |
+| Capacity badges | LSB first | DCT first |
+| Status labels | "Key Source", "Carrier", "RSA KEY" | "Hash Acquired", "Carrier Loaded"/"Stego Loaded", "KEY LOADED" |
 
 **Key benefits:**
-- ✅ No need to remember which day a message was encoded
-- ✅ Simpler forms with fewer fields
-- ✅ True asynchronous communication
-- ✅ Stronger default security (4 words = ~44 bits entropy)
-
-**Breaking Change:** v3.2.0 cannot decode images created with v3.1.x.
+- ✅ DCT mode default - Better for social media sharing
+- ✅ Logical form flow: Load images → Select mode → Enter payload
+- ✅ Cleaner UI with less visual clutter
+- ✅ Mode details available on hover without expanding
+- ✅ Consistent "Loaded" status indicators
 
 ---
 
@@ -232,16 +233,27 @@ For easier sharing, you can also:
 
 Hide a secret message or file inside an image.
 
+#### Form Flow (v3.3.0)
+
+The encode form follows a logical flow:
+
+1. **Load Images** - Reference photo and carrier image
+2. **View Capacity** - Shows available capacity for DCT and LSB modes
+3. **Select Mode** - DCT (default) or LSB with inline tooltips
+4. **Enter Payload** - Text message or file
+5. **Add Security** - Passphrase, PIN, and/or RSA key
+
 #### Input Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | Reference Photo | Image file | ✓ | Your shared secret photo |
 | Carrier Image | Image file | ✓ | Image to hide message in |
+| Embedding Mode | Toggle | ✓ | DCT (default) or LSB |
 | Payload Type | Toggle | ✓ | Text message or file |
 | Secret Message | Text | * | Message to hide (max 50KB) |
 | File to Embed | File | * | File to hide (max 2MB) |
-| Passphrase | Text | ✓ | Your passphrase (v3.2.0) |
+| Passphrase | Text | ✓ | Your passphrase |
 | PIN | Number | ** | Your static PIN |
 | RSA Key | .pem file | ** | Your shared RSA key |
 | RSA Key QR | Image file | ** | QR code containing RSA key |
@@ -250,25 +262,46 @@ Hide a secret message or file inside an image.
 \* One of message or file required.
 \*\* At least one security factor (PIN or RSA Key) required.
 
-#### Advanced Options
+#### Embedding Mode Selection (v3.3.0)
 
-Expand "Advanced Options" to access embedding mode settings:
+The mode selector is now a compact inline toggle:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  ◉ 🔊 DCT · Social Media ⓘ  │  ○ ⊞ LSB · Email & Files ⓘ │
+└────────────────────────────────────────────────────────────┘
+```
+
+- **DCT** - Default, best for social media sharing
+- **LSB** - Higher capacity, for lossless channels
+- **ⓘ** - Hover for details (capacity, output format, etc.)
+
+#### DCT Options
+
+When DCT mode is selected, additional options appear:
 
 | Option | Values | Default | Description |
 |--------|--------|---------|-------------|
-| Embedding Mode | LSB / DCT | LSB | Steganography algorithm |
-| Output Format | PNG / JPEG | PNG | Output image format (DCT only) |
-| Color Mode | Color / Grayscale | Color | Carrier color handling (DCT only) |
-
-See [Embedding Modes](#embedding-modes) for detailed explanations.
+| Output Format | PNG / JPEG | JPEG | Output image format |
+| Color Mode | Color / Grayscale | Color | Carrier color handling |
 
 #### Drag-and-Drop Upload
 
 Both image upload zones support:
 - Click to browse
 - Drag and drop files
-- Instant image preview
-- File name display
+- Instant image preview with scan animation
+- Status indicators ("Hash Acquired", "Carrier Loaded")
+
+#### Capacity Info Panel
+
+After loading a carrier image, a capacity panel appears:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📏 Carrier: 1920 × 1080 (2.1 MP)   DCT: 150 KB  LSB: 750 KB │
+└─────────────────────────────────────────────────────────┘
+```
 
 #### Character Counter
 
@@ -281,11 +314,14 @@ Shows warning at 80% capacity.
 
 #### Encoding Process
 
-1. Fill in all required fields
-2. (Optional) Expand "Advanced Options" for DCT mode
-3. Click "Encode Message"
-4. Wait for processing (shows spinner)
-5. Redirected to result page
+1. Upload reference photo and carrier image
+2. View capacity info panel
+3. Select embedding mode (DCT default)
+4. Choose payload type and enter content
+5. Enter passphrase and security factors
+6. Click "Encode Message"
+7. Wait for processing (shows spinner)
+8. Redirected to result page
 
 #### Result Page
 
@@ -413,8 +449,8 @@ If decryption fails:
 Information about the Stegasoo project, security model, and credits.
 
 Includes:
-- Version information (v3.2.0)
-- v3.2.0 changes explanation
+- Version information (v3.3.0)
+- Recent UI improvements
 - Security model overview
 - Dependency status (Argon2, QR code support)
 
@@ -424,44 +460,29 @@ Includes:
 
 Stegasoo offers two steganography algorithms, each with different trade-offs.
 
-### LSB Mode (Default)
+### DCT Mode (Default)
 
-**Least Significant Bit** embedding modifies the least significant bits of pixel values.
-
-| Aspect | Details |
-|--------|---------|
-| **Capacity** | ~3 bits/pixel (~375 KB for 1920×1080) |
-| **Output Format** | PNG only (lossless required) |
-| **Resilience** | ❌ Destroyed by JPEG compression |
-| **Best For** | Maximum capacity, controlled sharing |
-
-**When to use LSB:**
-- Sharing via lossless channels (email attachment, file transfer)
-- Maximum message capacity needed
-- Recipient won't modify the image
-
-### DCT Mode
-
-**Discrete Cosine Transform** embedding hides data in frequency domain coefficients.
+**Discrete Cosine Transform** embedding hides data in frequency domain coefficients. This is now the default mode when scipy is available.
 
 | Aspect | Details |
 |--------|---------|
-| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080 PNG, ~50 KB JPEG) |
+| **Capacity** | ~0.5 bits/pixel (~75 KB/MP) |
 | **Output Formats** | PNG or JPEG |
-| **Resilience** | ✅ Better resistance to analysis |
-| **Best For** | Stealth requirements, frequency domain hiding |
+| **Resilience** | ✅ Survives JPEG recompression |
+| **Best For** | Social media, messaging apps |
 
 **When to use DCT:**
+- Sharing via social media (Instagram, WhatsApp, Telegram)
+- When image may be recompressed
 - When stealth is important
 - Smaller messages that fit in reduced capacity
-- When you want JPEG output for natural appearance
 
 #### DCT Output Formats
 
 | Format | Pros | Cons |
 |--------|------|------|
+| **JPEG** | Native format, natural, smaller, resilient | Slightly lower capacity |
 | **PNG** | Lossless, predictable | Larger file |
-| **JPEG** | Native format, natural, smaller | Slightly lower capacity |
 
 #### DCT Color Modes
 
@@ -470,15 +491,31 @@ Stegasoo offers two steganography algorithms, each with different trade-offs.
 | **Color** | Embeds in luminance (Y), preserves chrominance | Most images, photos |
 | **Grayscale** | Converts to grayscale before embedding | Black & white images |
 
+### LSB Mode
+
+**Least Significant Bit** embedding modifies the least significant bits of pixel values.
+
+| Aspect | Details |
+|--------|---------|
+| **Capacity** | ~3 bits/pixel (~375 KB/MP) |
+| **Output Format** | PNG only (lossless required) |
+| **Resilience** | ❌ Destroyed by JPEG compression |
+| **Best For** | Maximum capacity, controlled sharing |
+
+**When to use LSB:**
+- Sharing via lossless channels (email attachment, file transfer, cloud storage)
+- Maximum message capacity needed
+- Recipient won't modify/recompress the image
+
 ### Capacity Comparison
 
-For a 1920×1080 image:
+For a 1920×1080 image (~2 MP):
 
 | Mode | Approximate Capacity |
 |------|---------------------|
-| LSB (PNG) | ~375 KB |
-| DCT (PNG, Color) | ~65 KB |
-| DCT (JPEG) | ~50 KB |
+| LSB (PNG) | ~750 KB |
+| DCT (PNG, Color) | ~150 KB |
+| DCT (JPEG) | ~150 KB |
 
 ### Choosing the Right Mode
 
@@ -487,21 +524,22 @@ For a 1920×1080 image:
 │                    Mode Selection Guide                      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Need maximum capacity?                                     │
+│  Sharing via social media / messaging app?                  │
 │              │                                              │
 │      ┌───────┴───────┐                                      │
 │      ▼               ▼                                      │
 │     YES             NO                                      │
 │      │               │                                      │
 │      ▼               ▼                                      │
-│  Use LSB        Need stealth?                               │
+│  Use DCT        Need maximum capacity?                      │
 │  (default)           │                                      │
 │              ┌───────┴───────┐                              │
 │              ▼               ▼                              │
 │             YES             NO                              │
 │              │               │                              │
 │              ▼               ▼                              │
-│          Use DCT        Use LSB                             │
+│          Use LSB        Use DCT                             │
+│                        (default)                            │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```

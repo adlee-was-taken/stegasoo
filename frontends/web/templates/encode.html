@@ -333,17 +333,20 @@
                     
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                          <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
-                          <div class="input-group pin-input-container">
-                            <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
-                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
-                              <i class="bi bi-eye"></i>
-                            </button>
+                          <div class="security-box">
+                            <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
+                            <div class="input-group pin-input-container">
+                              <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9" style="max-width: 180px;">
+                              <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                            <div class="form-text">Static 6-9 digit PIN</div>
                           </div>
-                        <div class="form-text">Static 6-9 digit PIN</div>
                         </div>
                         
                         <div class="col-md-8 mb-3">
+                          <div class="security-box">
                             <label class="form-label">
                                 <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
                             </label>
@@ -400,7 +403,68 @@
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
+                          </div>
                         </div>
+                    </div>
+                    
+                    <!-- ================================================================
+                         CHANNEL KEY (v4.0.0) - Deployment/Group Isolation
+                         ================================================================ -->
+                    <div class="mb-4">
+                      <div class="security-box">
+                        <label class="form-label">
+                            <i class="bi bi-broadcast me-1"></i> Channel
+                            <span class="badge bg-info ms-1">v4.0</span>
+                        </label>
+                        
+                        <div class="d-flex gap-2">
+                            <!-- Auto Mode -->
+                            <label class="mode-btn flex-fill {% if channel_configured %}active{% endif %}" id="channelAutoCard" for="channelAuto">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelAuto" value="auto" checked>
+                                <i class="bi bi-gear-fill {% if channel_configured %}text-success{% else %}text-secondary{% endif %} ms-2"></i>
+                                <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· {% if channel_configured %}Server Key{% else %}Public{% endif %}</span></span>
+                            </label>
+                            
+                            <!-- Public Mode -->
+                            <label class="mode-btn flex-fill" id="channelPublicCard" for="channelPublic">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelPublic" value="none">
+                                <i class="bi bi-globe text-info ms-2"></i>
+                                <span class="ms-2"><strong>Public</strong> <span class="text-muted d-none d-sm-inline">· No key</span></span>
+                            </label>
+                            
+                            <!-- Custom Key -->
+                            <label class="mode-btn flex-fill" id="channelCustomCard" for="channelCustom">
+                                <input class="form-check-input" type="radio" name="channel_key" id="channelCustom" value="custom">
+                                <i class="bi bi-key-fill text-warning ms-2"></i>
+                                <span class="ms-2"><strong>Custom</strong></span>
+                            </label>
+                        </div>
+                        
+                        <!-- Server channel indicator (compact) -->
+                        {% if channel_configured %}
+                        <div class="small text-success mt-2" id="channelServerInfo">
+                            <i class="bi bi-shield-lock me-1"></i>
+                            Server: <code>{{ channel_fingerprint }}</code>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Custom key input -->
+                        <div class="mt-2 d-none" id="channelCustomInput">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                <input type="text" name="channel_key_custom" class="form-control font-monospace" 
+                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" 
+                                       pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}"
+                                       id="channelKeyInput">
+                                <button class="btn btn-outline-secondary" type="button" id="channelKeyGenerate" title="Generate random key">
+                                    <i class="bi bi-shuffle"></i>
+                                </button>
+                            </div>
+                            <div class="invalid-feedback" id="channelKeyError">
+                                Invalid format. Use: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+                            </div>
+                        </div>
+                      </div>
                     </div>
                     
                     <!-- Advanced Options (DCT sub-options only) -->
@@ -411,70 +475,43 @@
                         </a>
                         
                         <div class="collapse" id="advancedOptions">
-                            <div class="card card-body mt-2 bg-dark border-secondary">
+                            <div class="card card-body mt-2 bg-dark border-secondary py-3">
                                 
-                                <div class="alert alert-info small mb-3">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    <strong>DCT defaults:</strong> Color mode + JPEG output for best social media compatibility.
-                                </div>
-                                
-                                <!-- DCT Color Mode -->
+                                <!-- DCT Color Mode - Compact -->
                                 <div class="mb-3">
-                                    <label class="form-label">
-                                        <i class="bi bi-palette me-1"></i> Color Mode
+                                    <label class="form-label small mb-2">
+                                        <i class="bi bi-palette me-1"></i> Color
                                     </label>
-                                    
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center border-success border-2" id="dctColorCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
-                                                <label class="form-check-label w-100" for="dctColorColor">
-                                                    <i class="bi bi-palette-fill text-success fs-5 d-block"></i>
-                                                    <strong>Color</strong>
-                                                    <div class="small text-muted">Recommended</div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center" id="dctGrayscaleCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
-                                                <label class="form-check-label w-100" for="dctColorGrayscale">
-                                                    <i class="bi bi-circle-half text-secondary fs-5 d-block"></i>
-                                                    <strong>Grayscale</strong>
-                                                    <div class="small text-muted">B&W output</div>
-                                                </label>
-                                            </div>
-                                        </div>
+                                    <div class="d-flex gap-2">
+                                        <label class="mode-btn equal-width active" id="dctColorCard" for="dctColorColor">
+                                            <input class="form-check-input" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
+                                            <i class="bi bi-palette-fill text-success"></i>
+                                            <span class="ms-2"><strong>Color</strong> <span class="badge bg-success ms-1">Default</span></span>
+                                        </label>
+                                        <label class="mode-btn equal-width" id="dctGrayscaleCard" for="dctColorGrayscale">
+                                            <input class="form-check-input" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
+                                            <i class="bi bi-circle-half text-secondary"></i>
+                                            <span class="ms-2"><strong>Grayscale</strong></span>
+                                        </label>
                                     </div>
                                 </div>
                                 
-                                <!-- DCT Output Format -->
+                                <!-- DCT Output Format - Compact -->
                                 <div class="mb-0">
-                                    <label class="form-label">
-                                        <i class="bi bi-file-image me-1"></i> Output Format
+                                    <label class="form-label small mb-2">
+                                        <i class="bi bi-file-image me-1"></i> Format
                                     </label>
-                                    
-                                    <div class="row g-2">
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center" id="dctPngCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatPng" value="png">
-                                                <label class="form-check-label w-100" for="dctFormatPng">
-                                                    <i class="bi bi-file-earmark-image text-primary fs-5 d-block"></i>
-                                                    <strong>PNG</strong>
-                                                    <div class="small text-muted">Lossless, larger</div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="form-check card p-2 text-center border-warning border-2" id="dctJpegCard">
-                                                <input class="form-check-input mx-auto" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg" checked>
-                                                <label class="form-check-label w-100" for="dctFormatJpeg">
-                                                    <i class="bi bi-file-earmark-richtext text-warning fs-5 d-block"></i>
-                                                    <strong>JPEG</strong>
-                                                    <div class="small text-muted">Recommended</div>
-                                                </label>
-                                            </div>
-                                        </div>
+                                    <div class="d-flex gap-2">
+                                        <label class="mode-btn equal-width active" id="dctJpegCard" for="dctFormatJpeg">
+                                            <input class="form-check-input" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg" checked>
+                                            <i class="bi bi-file-earmark-richtext text-warning"></i>
+                                            <span class="ms-2"><strong>JPEG</strong> <span class="badge bg-warning text-dark ms-1">Default</span></span>
+                                        </label>
+                                        <label class="mode-btn equal-width" id="dctPngCard" for="dctFormatPng">
+                                            <input class="form-check-input" type="radio" name="dct_output_format" id="dctFormatPng" value="png">
+                                            <i class="bi bi-file-earmark-image text-primary"></i>
+                                            <span class="ms-2"><strong>PNG</strong> <span class="text-muted d-none d-sm-inline">· Lossless</span></span>
+                                        </label>
                                     </div>
                                 </div>
                                 
@@ -520,17 +557,6 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
-// ============================================================================
-// ENCODE PAGE - Initialize shared components
-// ============================================================================
-
-Stegasoo.initPasswordToggles();
-Stegasoo.initRsaMethodToggle();
-Stegasoo.initDropZones();
-Stegasoo.initClipboardPaste(['input[name="carrier"]', 'input[name="reference_photo"]']);
-Stegasoo.initQrCropAnimation('rsaQrInput');
-Stegasoo.initPassphraseFontResize();
-
 // ============================================================================
 // ENCODE PAGE - Payload type switching
 // ============================================================================
@@ -683,22 +709,26 @@ document.querySelectorAll('input[name="embed_mode"]').forEach(radio => {
     });
 });
 
-// DCT format cards
-Stegasoo.initModeCards({
-    radioName: 'dct_output_format',
-    cards: {
-        'png': { id: 'dctPngCard', borderClass: 'border-primary' },
-        'jpeg': { id: 'dctJpegCard', borderClass: 'border-warning' }
-    }
+// DCT color mode button active state toggle
+const colorModeRadios = document.querySelectorAll('input[name="dct_color_mode"]');
+const colorModeBtns = { 'color': document.getElementById('dctColorCard'), 'grayscale': document.getElementById('dctGrayscaleCard') };
+
+colorModeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        Object.values(colorModeBtns).forEach(btn => btn?.classList.remove('active'));
+        colorModeBtns[radio.value]?.classList.add('active');
+    });
 });
 
-// DCT color cards
-Stegasoo.initModeCards({
-    radioName: 'dct_color_mode',
-    cards: {
-        'color': { id: 'dctColorCard', borderClass: 'border-success' },
-        'grayscale': { id: 'dctGrayscaleCard', borderClass: 'border-secondary' }
-    }
+// DCT format button active state toggle
+const formatRadios = document.querySelectorAll('input[name="dct_output_format"]');
+const formatBtns = { 'png': document.getElementById('dctPngCard'), 'jpeg': document.getElementById('dctJpegCard') };
+
+formatRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        Object.values(formatBtns).forEach(btn => btn?.classList.remove('active'));
+        formatBtns[radio.value]?.classList.add('active');
+    });
 });
 
 // Advanced options chevron
@@ -735,17 +765,5 @@ function checkDuplicateFiles() {
 
 document.querySelector('input[name="reference_photo"]')?.addEventListener('change', checkDuplicateFiles);
 document.querySelector('input[name="carrier"]')?.addEventListener('change', checkDuplicateFiles);
-
-// ============================================================================
-// ENCODE PAGE - Form submission
-// ============================================================================
-
-document.getElementById('encodeForm')?.addEventListener('submit', function() {
-    const btn = document.getElementById('encodeBtn');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
-    }
-});
 </script>
 {% endblock %}

@@ -6,9 +6,10 @@ FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
 
 CHANGES in v4.0.0:
-- Updated from v3.2.0 with no functional API changes
-- Internal: JPEG normalization for jpegio compatibility
-- Internal: Python 3.12 recommended
+- Added channel key support for deployment/group isolation
+- New /channel endpoints for key management
+- channel_key parameter on encode/decode endpoints
+- Messages encoded with channel key require same key to decode
 
 CHANGES in v3.2.0:
 - Removed date dependency from all operations
@@ -51,6 +52,17 @@ from stegasoo import (
     compare_modes,
     will_fit_by_mode,
     calculate_capacity_by_mode,
+    # Channel key functions (v4.0.0)
+    generate_channel_key,
+    get_channel_key,
+    set_channel_key,
+    clear_channel_key,
+    has_channel_key,
+    get_channel_status,
+    validate_channel_key,
+    format_channel_key,
+    get_active_channel_key,
+    get_channel_fingerprint,
 )
 from stegasoo.constants import (
     MIN_PIN_LENGTH, MAX_PIN_LENGTH,
@@ -82,8 +94,9 @@ Secure steganography with hybrid authentication. Supports text messages and file
 
 ## Version 4.0.0 Changes
 
-- **Python 3.12 recommended** - jpegio compatibility improvements
-- **JPEG normalization** - Handles quality=100 images automatically
+- **Channel key support** - Deployment/group isolation for messages
+- **New /channel endpoints** - Generate, view, and manage channel keys
+- **channel_key parameter** - Added to encode/decode endpoints
 
 ## Version 3.2.0 Changes
 
@@ -156,12 +169,15 @@ class EncodeRequest(BaseModel):
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
-    # date_str removed in v3.2.0
+    # Channel key (v4.0.0)
+    channel_key: Optional[str] = Field(
+        default=None,
+        description="Channel key for deployment isolation. null=auto (use server config), ''=public mode, 'XXXX-...'=explicit key"
+    )
     embed_mode: EmbedModeType = Field(
         default="lsb",
         description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
     )
-    # NEW in v3.0.1
     dct_output_format: DctOutputFormatType = Field(
         default="png",
         description="DCT output format: 'png' (lossless) or 'jpeg' (smaller). Only applies to DCT mode."
@@ -183,12 +199,15 @@ class EncodeFileRequest(BaseModel):
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
-    # date_str removed in v3.2.0
+    # Channel key (v4.0.0)
+    channel_key: Optional[str] = Field(
+        default=None,
+        description="Channel key for deployment isolation. null=auto (use server config), ''=public mode, 'XXXX-...'=explicit key"
+    )
     embed_mode: EmbedModeType = Field(
         default="lsb",
         description="Embedding mode: 'lsb' (default, color) or 'dct' (requires scipy)"
     )
-    # NEW in v3.0.1
     dct_output_format: DctOutputFormatType = Field(
         default="png",
         description="DCT output format: 'png' (lossless) or 'jpeg' (smaller). Only applies to DCT mode."
@@ -204,7 +223,6 @@ class EncodeResponse(BaseModel):
     filename: str
     capacity_used_percent: float
     embed_mode: str = Field(description="Embedding mode used: 'lsb' or 'dct'")
-    # NEW in v3.0.1
     output_format: str = Field(
         default="png",
         description="Output format: 'png' or 'jpeg' (for DCT mode)"
@@ -212,6 +230,15 @@ class EncodeResponse(BaseModel):
     color_mode: str = Field(
         default="color",
         description="Color mode: 'color' (LSB/DCT color) or 'grayscale' (DCT grayscale)"
+    )
+    # Channel key info (v4.0.0)
+    channel_mode: str = Field(
+        default="public",
+        description="Channel mode: 'public' or 'private'"
+    )
+    channel_fingerprint: Optional[str] = Field(
+        default=None,
+        description="Channel key fingerprint (if private mode)"
     )
     # Legacy fields (v3.2.0: no longer used in crypto)
     date_used: Optional[str] = Field(
@@ -231,6 +258,11 @@ class DecodeRequest(BaseModel):
     pin: str = ""
     rsa_key_base64: Optional[str] = None
     rsa_password: Optional[str] = None
+    # Channel key (v4.0.0)
+    channel_key: Optional[str] = Field(
+        default=None,
+        description="Channel key for decryption. null=auto (use server config), ''=public mode, 'XXXX-...'=explicit key"
+    )
     embed_mode: ExtractModeType = Field(
         default="auto",
         description="Extraction mode: 'auto' (default), 'lsb', or 'dct'"
@@ -260,7 +292,6 @@ class ImageInfoResponse(BaseModel):
     pixels: int
     capacity_bytes: int = Field(description="LSB mode capacity (for backwards compatibility)")
     capacity_kb: int = Field(description="LSB mode capacity in KB")
-    # NEW in v3.0
     modes: Optional[dict[str, ModeCapacity]] = Field(
         default=None,
         description="Capacity by embedding mode (v3.0+)"
@@ -297,10 +328,38 @@ class DctModeInfo(BaseModel):
     requires: str
 
 
+class ChannelStatusResponse(BaseModel):
+    """Response for channel key status (v4.0.0)."""
+    mode: str = Field(description="'public' or 'private'")
+    configured: bool = Field(description="Whether a channel key is configured")
+    fingerprint: Optional[str] = Field(default=None, description="Key fingerprint (partial)")
+    source: Optional[str] = Field(default=None, description="Where the key comes from")
+    key: Optional[str] = Field(default=None, description="Full key (only if reveal=true)")
+
+
+class ChannelGenerateResponse(BaseModel):
+    """Response for channel key generation (v4.0.0)."""
+    key: str = Field(description="Generated channel key")
+    fingerprint: str = Field(description="Key fingerprint")
+    saved: bool = Field(default=False, description="Whether key was saved to config")
+    save_location: Optional[str] = Field(default=None, description="Where key was saved")
+
+
+class ChannelSetRequest(BaseModel):
+    """Request to set channel key (v4.0.0)."""
+    key: str = Field(description="Channel key to set")
+    location: str = Field(default="user", description="'user' or 'project'")
+
+
 class ModesResponse(BaseModel):
     """Response showing available embedding modes."""
     lsb: dict
     dct: DctModeInfo
+    # Channel key status (v4.0.0)
+    channel: Optional[dict] = Field(
+        default=None,
+        description="Channel key status (v4.0.0)"
+    )
 
 
 class StatusResponse(BaseModel):
@@ -310,14 +369,17 @@ class StatusResponse(BaseModel):
     has_dct: bool
     max_payload_kb: int
     available_modes: list[str]
-    # NEW in v3.0.1
     dct_features: Optional[dict] = Field(
         default=None,
         description="DCT mode features (v3.0.1+)"
     )
-    # NEW in v3.2.0
+    # Channel key status (v4.0.0)
+    channel: Optional[dict] = Field(
+        default=None,
+        description="Channel key status (v4.0.0)"
+    )
     breaking_changes: dict = Field(
-        description="v3.2.0 breaking changes"
+        description="v4.0.0 breaking changes"
     )
 
 
@@ -350,6 +412,67 @@ class ErrorResponse(BaseModel):
 
 
 # ============================================================================
+# HELPER: RESOLVE CHANNEL KEY
+# ============================================================================
+
+def _resolve_channel_key(channel_key: Optional[str]) -> Optional[str]:
+    """
+    Resolve channel key from API parameter.
+    
+    Args:
+        channel_key: API parameter value
+            - None: Use server-configured key (auto mode)
+            - "": Public mode (no channel key)
+            - "XXXX-...": Explicit key
+    
+    Returns:
+        Resolved channel key to pass to encode/decode
+    
+    Raises:
+        HTTPException: If key format is invalid
+    """
+    if channel_key is None:
+        # Auto mode - use server config
+        return None
+    
+    if channel_key == "":
+        # Public mode
+        return ""
+    
+    # Explicit key - validate format
+    if not validate_channel_key(channel_key):
+        raise HTTPException(
+            400,
+            f"Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+        )
+    
+    return channel_key
+
+
+def _get_channel_info(channel_key: Optional[str]) -> tuple[str, Optional[str]]:
+    """
+    Get channel mode and fingerprint for response.
+    
+    Returns:
+        (mode, fingerprint) tuple
+    """
+    if channel_key == "":
+        return "public", None
+    
+    if channel_key is not None:
+        # Explicit key
+        fingerprint = f"{channel_key[:4]}-••••-••••-••••-••••-••••-••••-{channel_key[-4:]}"
+        return "private", fingerprint
+    
+    # Auto mode - check server config
+    if has_channel_key():
+        status = get_channel_status()
+        return "private", status.get('fingerprint')
+    
+    return "public", None
+
+
+# ============================================================================
 # ROUTES - STATUS & INFO
 # ============================================================================
 
@@ -368,6 +491,15 @@ async def root():
             "default_color_mode": "grayscale",
         }
     
+    # Channel key status (v4.0.0)
+    channel_status = get_channel_status()
+    channel_info = {
+        "mode": channel_status['mode'],
+        "configured": channel_status['configured'],
+        "fingerprint": channel_status.get('fingerprint'),
+        "source": channel_status.get('source'),
+    }
+    
     return StatusResponse(
         version=__version__,
         has_argon2=has_argon2(),
@@ -376,11 +508,15 @@ async def root():
         max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
         available_modes=available_modes,
         dct_features=dct_features,
+        channel=channel_info,
         breaking_changes={
-            "date_removed": "No date_str parameter needed - encode/decode anytime",
-            "passphrase_renamed": "day_phrase → passphrase (single passphrase, no daily rotation)",
-            "format_version": 4,
+            "v4_channel_key": "Messages encoded with channel key require same key to decode",
+            "format_version": 5,
             "backward_compatible": False,
+            "v3_notes": {
+                "date_removed": "No date_str parameter needed - encode/decode anytime",
+                "passphrase_renamed": "day_phrase → passphrase (single passphrase, no daily rotation)",
+            }
         }
     )
 
@@ -390,9 +526,16 @@ async def api_modes():
     """
     Get available embedding modes and their status.
     
-    NEW in v3.0: Shows LSB and DCT mode availability.
-    NEW in v3.0.1: Shows DCT color modes and output formats.
+    v4.0.0: Also includes channel key status.
     """
+    # Channel status
+    channel_status = get_channel_status()
+    channel_info = {
+        "mode": channel_status['mode'],
+        "configured": channel_status['configured'],
+        "fingerprint": channel_status.get('fingerprint'),
+    }
+    
     return ModesResponse(
         lsb={
             "available": True,
@@ -409,8 +552,129 @@ async def api_modes():
             color_modes=["grayscale", "color"],
             capacity_ratio="~20% of LSB",
             requires="scipy",
-        )
+        ),
+        channel=channel_info,
     )
+
+
+# ============================================================================
+# ROUTES - CHANNEL KEY (v4.0.0)
+# ============================================================================
+
+@app.get("/channel/status", response_model=ChannelStatusResponse)
+async def api_channel_status(
+    reveal: bool = Query(False, description="Include full key in response")
+):
+    """
+    Get current channel key status.
+    
+    v4.0.0: New endpoint for channel key management.
+    
+    Returns mode (public/private), fingerprint, and source.
+    Use reveal=true to include the full key.
+    """
+    status = get_channel_status()
+    
+    return ChannelStatusResponse(
+        mode=status['mode'],
+        configured=status['configured'],
+        fingerprint=status.get('fingerprint'),
+        source=status.get('source'),
+        key=status.get('key') if reveal and status['configured'] else None,
+    )
+
+
+@app.post("/channel/generate", response_model=ChannelGenerateResponse)
+async def api_channel_generate(
+    save: bool = Query(False, description="Save to user config"),
+    save_project: bool = Query(False, description="Save to project config"),
+):
+    """
+    Generate a new channel key.
+    
+    v4.0.0: New endpoint for channel key management.
+    
+    Optionally saves to user config (~/.stegasoo/channel.key) or
+    project config (./config/channel.key).
+    """
+    if save and save_project:
+        raise HTTPException(400, "Cannot use both save and save_project")
+    
+    key = generate_channel_key()
+    fingerprint = f"{key[:4]}-••••-••••-••••-••••-••••-••••-{key[-4:]}"
+    
+    saved = False
+    save_location = None
+    
+    if save:
+        set_channel_key(key, location='user')
+        saved = True
+        save_location = "~/.stegasoo/channel.key"
+    elif save_project:
+        set_channel_key(key, location='project')
+        saved = True
+        save_location = "./config/channel.key"
+    
+    return ChannelGenerateResponse(
+        key=key,
+        fingerprint=fingerprint,
+        saved=saved,
+        save_location=save_location,
+    )
+
+
+@app.post("/channel/set")
+async def api_channel_set(request: ChannelSetRequest):
+    """
+    Set/save a channel key to config.
+    
+    v4.0.0: New endpoint for channel key management.
+    """
+    if not validate_channel_key(request.key):
+        raise HTTPException(
+            400,
+            "Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+        )
+    
+    if request.location not in ('user', 'project'):
+        raise HTTPException(400, "location must be 'user' or 'project'")
+    
+    set_channel_key(request.key, location=request.location)
+    
+    status = get_channel_status()
+    return {
+        "success": True,
+        "location": status.get('source'),
+        "fingerprint": status.get('fingerprint'),
+    }
+
+
+@app.delete("/channel")
+async def api_channel_clear(
+    location: str = Query("user", description="'user', 'project', or 'all'")
+):
+    """
+    Clear/remove channel key from config.
+    
+    v4.0.0: New endpoint for channel key management.
+    
+    Note: Does not affect environment variables.
+    """
+    if location == "all":
+        clear_channel_key(location='user')
+        clear_channel_key(location='project')
+    elif location in ('user', 'project'):
+        clear_channel_key(location=location)
+    else:
+        raise HTTPException(400, "location must be 'user', 'project', or 'all'")
+    
+    status = get_channel_status()
+    return {
+        "success": True,
+        "mode": status['mode'],
+        "still_configured": status['configured'],
+        "remaining_source": status.get('source'),
+    }
 
 
 @app.post("/compare", response_model=CompareModesResponse)
@@ -418,7 +682,7 @@ async def api_compare_modes(request: CompareModesRequest):
     """
     Compare LSB and DCT embedding modes for a carrier image.
     
-    NEW in v3.0: Returns capacity for both modes and recommendation.
+    Returns capacity for both modes and recommendation.
     Optionally checks if a specific payload size would fit.
     """
     try:
@@ -474,7 +738,7 @@ async def api_will_fit(request: WillFitRequest):
     """
     Check if a payload of given size will fit in the carrier image.
     
-    NEW in v3.0: Supports both LSB and DCT modes.
+    Supports both LSB and DCT modes.
     """
     try:
         # Validate mode
@@ -555,17 +819,16 @@ async def api_generate(request: GenerateRequest):
         raise HTTPException(400, f"rsa_bits must be one of {VALID_RSA_SIZES}")
     
     try:
-        # v3.2.0: Call with passphrase_words parameter
         creds = generate_credentials(
             use_pin=request.use_pin,
             use_rsa=request.use_rsa,
             pin_length=request.pin_length,
             rsa_bits=request.rsa_bits,
-            passphrase_words=request.words_per_passphrase,  # Map API field to library parameter
+            passphrase_words=request.words_per_passphrase,
         )
         
         return GenerateResponse(
-            passphrase=creds.passphrase,  # v3.2.0: Single passphrase
+            passphrase=creds.passphrase,
             pin=creds.pin,
             rsa_key_pem=creds.rsa_key_pem,
             entropy={
@@ -626,14 +889,15 @@ async def api_encode(request: EncodeRequest):
     
     Images must be base64-encoded. Returns base64-encoded stego image.
     
+    v4.0.0: Added channel_key parameter for deployment isolation.
     v3.2.0: No date_str parameter needed - encode anytime!
-    
-    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
-    NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
         raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
+    # Resolve channel key
+    resolved_channel_key = _resolve_channel_key(request.channel_key)
     
     try:
         ref_photo = base64.b64decode(request.reference_photo_base64)
@@ -647,17 +911,17 @@ async def api_encode(request: EncodeRequest):
             request.dct_color_mode
         )
         
-        # v3.2.0: No date_str parameter
+        # v4.0.0: Include channel_key
         result = encode(
             message=request.message,
             reference_photo=ref_photo,
             carrier_image=carrier,
-            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=request.passphrase,
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            # date_str removed in v3.2.0
             embed_mode=request.embed_mode,
+            channel_key=resolved_channel_key,
             **dct_params,
         )
         
@@ -669,6 +933,9 @@ async def api_encode(request: EncodeRequest):
             request.dct_color_mode
         )
         
+        # Get channel info for response
+        channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
+        
         return EncodeResponse(
             stego_image_base64=stego_b64,
             filename=result.filename,
@@ -676,8 +943,10 @@ async def api_encode(request: EncodeRequest):
             embed_mode=request.embed_mode,
             output_format=output_format,
             color_mode=color_mode,
-            date_used=None,  # v3.2.0: No longer used
-            day_of_week=None,  # v3.2.0: No longer used
+            channel_mode=channel_mode,
+            channel_fingerprint=channel_fingerprint,
+            date_used=None,
+            day_of_week=None,
         )
         
     except CapacityError as e:
@@ -695,14 +964,15 @@ async def api_encode_file(request: EncodeFileRequest):
     
     File data must be base64-encoded.
     
+    v4.0.0: Added channel_key parameter for deployment isolation.
     v3.2.0: No date_str parameter needed - encode anytime!
-    
-    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
-    NEW in v3.0.1: Supports dct_output_format and dct_color_mode.
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
         raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
+    # Resolve channel key
+    resolved_channel_key = _resolve_channel_key(request.channel_key)
     
     try:
         file_data = base64.b64decode(request.file_data_base64)
@@ -723,17 +993,17 @@ async def api_encode_file(request: EncodeFileRequest):
             request.dct_color_mode
         )
         
-        # v3.2.0: No date_str parameter
+        # v4.0.0: Include channel_key
         result = encode(
             message=payload,
             reference_photo=ref_photo,
             carrier_image=carrier,
-            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=request.passphrase,
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
-            # date_str removed in v3.2.0
             embed_mode=request.embed_mode,
+            channel_key=resolved_channel_key,
             **dct_params,
         )
         
@@ -745,6 +1015,9 @@ async def api_encode_file(request: EncodeFileRequest):
             request.dct_color_mode
         )
         
+        # Get channel info for response
+        channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
+        
         return EncodeResponse(
             stego_image_base64=stego_b64,
             filename=result.filename,
@@ -752,8 +1025,10 @@ async def api_encode_file(request: EncodeFileRequest):
             embed_mode=request.embed_mode,
             output_format=output_format,
             color_mode=color_mode,
-            date_used=None,  # v3.2.0: No longer used
-            day_of_week=None,  # v3.2.0: No longer used
+            channel_mode=channel_mode,
+            channel_fingerprint=channel_fingerprint,
+            date_used=None,
+            day_of_week=None,
         )
         
     except CapacityError as e:
@@ -775,32 +1050,31 @@ async def api_decode(request: DecodeRequest):
     
     Returns payload_type to indicate if result is text or file.
     
+    v4.0.0: Added channel_key parameter - must match encoding key.
     v3.2.0: No date_str parameter needed - decode anytime!
-    
-    NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
-    With 'auto' (default), tries LSB first then DCT.
-    
-    Note: Extraction works regardless of whether the image was created with
-    color mode or grayscale mode - both use the same Y channel for data.
     """
     # Validate mode
     if request.embed_mode == "dct" and not has_dct_support():
         raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
+    # Resolve channel key
+    resolved_channel_key = _resolve_channel_key(request.channel_key)
     
     try:
         stego = base64.b64decode(request.stego_image_base64)
         ref_photo = base64.b64decode(request.reference_photo_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
         
-        # v3.2.0: No date_str parameter
+        # v4.0.0: Include channel_key
         result = decode(
             stego_image=stego,
             reference_photo=ref_photo,
-            passphrase=request.passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=request.passphrase,
             pin=request.pin,
             rsa_key_data=rsa_key,
             rsa_password=request.rsa_password,
             embed_mode=request.embed_mode,
+            channel_key=resolved_channel_key,
         )
         
         if result.is_file:
@@ -817,6 +1091,10 @@ async def api_decode(request: DecodeRequest):
             )
         
     except DecryptionError as e:
+        # Provide helpful error message for channel key issues
+        error_msg = str(e)
+        if 'channel key' in error_msg.lower():
+            raise HTTPException(401, error_msg)
         raise HTTPException(401, "Decryption failed. Check credentials.")
     except StegasooError as e:
         raise HTTPException(400, str(e))
@@ -839,9 +1117,9 @@ async def api_encode_multipart(
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
-    # date_str removed in v3.2.0
+    # Channel key (v4.0.0)
+    channel_key: str = Form("auto", description="Channel key: 'auto'=server config, 'none'=public, 'XXXX-...'=explicit"),
     embed_mode: str = Form("lsb"),
-    # NEW in v3.0.1
     dct_output_format: str = Form("png"),
     dct_color_mode: str = Form("grayscale"),
 ):
@@ -852,10 +1130,9 @@ async def api_encode_multipart(
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns the stego image directly with metadata headers.
     
+    v4.0.0: Added channel_key parameter for deployment isolation.
+            Use 'auto' for server config, 'none' for public mode.
     v3.2.0: No date_str parameter needed - encode anytime!
-    
-    NEW in v3.0: Supports embed_mode parameter ('lsb' or 'dct').
-    NEW in v3.0.1: Supports dct_output_format ('png' or 'jpeg') and dct_color_mode ('grayscale' or 'color').
     """
     # Validate mode
     if embed_mode not in ("lsb", "dct"):
@@ -868,6 +1145,15 @@ async def api_encode_multipart(
         raise HTTPException(400, "dct_output_format must be 'png' or 'jpeg'")
     if dct_color_mode not in ("grayscale", "color"):
         raise HTTPException(400, "dct_color_mode must be 'grayscale' or 'color'")
+    
+    # Resolve channel key (v4.0.0)
+    # Form data: "auto" = use server config, "none" = public, otherwise explicit key
+    if channel_key.lower() == "auto":
+        resolved_channel_key = None  # Auto mode
+    elif channel_key.lower() == "none":
+        resolved_channel_key = ""  # Public mode
+    else:
+        resolved_channel_key = _resolve_channel_key(channel_key)
     
     try:
         ref_data = await reference_photo.read()
@@ -911,17 +1197,17 @@ async def api_encode_multipart(
         # Get DCT parameters
         dct_params = _get_dct_params(embed_mode, dct_output_format, dct_color_mode)
         
-        # v3.2.0: No date_str parameter
+        # v4.0.0: Include channel_key
         result = encode(
             message=payload,
             reference_photo=ref_data,
             carrier_image=carrier_data,
-            passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=passphrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
-            # date_str removed in v3.2.0
             embed_mode=embed_mode,
+            channel_key=resolved_channel_key,
             **dct_params,
         )
         
@@ -929,17 +1215,26 @@ async def api_encode_multipart(
             embed_mode, dct_output_format, dct_color_mode
         )
         
+        # Get channel info for headers
+        channel_mode, channel_fingerprint = _get_channel_info(resolved_channel_key)
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename={result.filename}",
+            "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}",
+            "X-Stegasoo-Embed-Mode": embed_mode,
+            "X-Stegasoo-Output-Format": output_format,
+            "X-Stegasoo-Color-Mode": color_mode,
+            "X-Stegasoo-Channel-Mode": channel_mode,
+            "X-Stegasoo-Version": __version__,
+        }
+        
+        if channel_fingerprint:
+            headers["X-Stegasoo-Channel-Fingerprint"] = channel_fingerprint
+        
         return Response(
             content=result.stego_image,
             media_type=mime_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={result.filename}",
-                "X-Stegasoo-Capacity-Percent": f"{result.capacity_percent:.1f}",
-                "X-Stegasoo-Embed-Mode": embed_mode,
-                "X-Stegasoo-Output-Format": output_format,
-                "X-Stegasoo-Color-Mode": color_mode,
-                "X-Stegasoo-Version": __version__,
-            }
+            headers=headers,
         )
         
     except CapacityError as e:
@@ -961,6 +1256,8 @@ async def api_decode_multipart(
     rsa_key: Optional[UploadFile] = File(None),
     rsa_key_qr: Optional[UploadFile] = File(None),
     rsa_password: str = Form(""),
+    # Channel key (v4.0.0)
+    channel_key: str = Form("auto", description="Channel key: 'auto'=server config, 'none'=public, 'XXXX-...'=explicit"),
     embed_mode: str = Form("auto"),
 ):
     """
@@ -969,17 +1266,23 @@ async def api_decode_multipart(
     RSA key can be provided as 'rsa_key' (.pem file) or 'rsa_key_qr' (QR code image).
     Returns JSON with payload_type indicating text or file.
     
+    v4.0.0: Added channel_key parameter - must match what was used for encoding.
+            Use 'auto' for server config, 'none' for public mode.
     v3.2.0: No date_str parameter needed - decode anytime!
-    
-    NEW in v3.0: Supports embed_mode parameter ('auto', 'lsb', or 'dct').
-    
-    Note: Extraction works the same regardless of color mode used during encoding.
     """
     # Validate mode
     if embed_mode not in ("auto", "lsb", "dct"):
         raise HTTPException(400, "embed_mode must be 'auto', 'lsb', or 'dct'")
     if embed_mode == "dct" and not has_dct_support():
         raise HTTPException(400, "DCT mode requires scipy. Install with: pip install scipy")
+    
+    # Resolve channel key (v4.0.0)
+    if channel_key.lower() == "auto":
+        resolved_channel_key = None  # Auto mode
+    elif channel_key.lower() == "none":
+        resolved_channel_key = ""  # Public mode
+    else:
+        resolved_channel_key = _resolve_channel_key(channel_key)
     
     try:
         ref_data = await reference_photo.read()
@@ -1007,15 +1310,16 @@ async def api_decode_multipart(
         # QR code keys are never password-protected
         effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
         
-        # v3.2.0: No date_str parameter
+        # v4.0.0: Include channel_key
         result = decode(
             stego_image=stego_data,
             reference_photo=ref_data,
-            passphrase=passphrase,  # v3.2.0: Renamed from day_phrase
+            passphrase=passphrase,
             pin=pin,
             rsa_key_data=rsa_key_data,
             rsa_password=effective_password,
             embed_mode=embed_mode,
+            channel_key=resolved_channel_key,
         )
         
         if result.is_file:
@@ -1031,7 +1335,10 @@ async def api_decode_multipart(
                 message=result.message
             )
         
-    except DecryptionError:
+    except DecryptionError as e:
+        error_msg = str(e)
+        if 'channel key' in error_msg.lower():
+            raise HTTPException(401, error_msg)
         raise HTTPException(401, "Decryption failed. Check credentials.")
     except StegasooError as e:
         raise HTTPException(400, str(e))
@@ -1053,7 +1360,7 @@ async def api_image_info(
     """
     Get information about an image's capacity.
     
-    NEW in v3.0: Optionally includes capacity for both LSB and DCT modes.
+    Optionally includes capacity for both LSB and DCT modes.
     """
     try:
         image_data = await image.read()
@@ -1072,7 +1379,6 @@ async def api_image_info(
             capacity_kb=capacity // 1024
         )
         
-        # NEW in v3.0 - include mode comparison
         if include_modes:
             comparison = compare_modes(image_data)
             response.modes = {

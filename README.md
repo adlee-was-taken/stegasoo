@@ -41,8 +41,8 @@ A secure steganography system for hiding encrypted messages in images using hybr
 
 | Mode | Capacity (1080p) | JPEG Resilient | Best For |
 |------|------------------|----------------|----------|
-| **LSB** (default) | ~770 KB | ❌ No | Email, file transfer |
-| **DCT** | ~65 KB | ✅ Yes | Social media, messaging apps |
+| **DCT** (default) | ~150 KB | ✅ Yes | Social media, messaging apps |
+| **LSB** | ~750 KB | ❌ No | Email, file transfer |
 
 ## WebUI Preview
 
@@ -59,24 +59,22 @@ pip install -e ".[all]"
 # Generate credentials (memorize these!)
 stegasoo generate --pin --words 4
 
-# Encode a message (LSB mode - default)
-stegasoo encode \
-  --ref photo.jpg \
-  --carrier meme.png \
-  --passphrase "apple forest thunder mountain" \
-  --pin 123456 \
-  --message "Secret message"
-
-# Encode for social media (DCT mode)
+# Encode a message (DCT mode - default, best for social media)
 stegasoo encode \
   --ref photo.jpg \
   --carrier meme.jpg \
   --passphrase "apple forest thunder mountain" \
   --pin 123456 \
+  --message "Secret message"
+
+# Encode with LSB mode (higher capacity, for email/file transfer)
+stegasoo encode \
+  --ref photo.jpg \
+  --carrier meme.png \
+  --passphrase "apple forest thunder mountain" \
+  --pin 123456 \
   --message "Secret message" \
-  --mode dct \
-  --dct-format jpeg \
-  --dct-color color
+  --mode lsb
 
 # Decode (auto-detects mode)
 stegasoo decode \
@@ -156,12 +154,15 @@ Full-featured CLI with piping support:
 # Generate with RSA key
 stegasoo generate --rsa --rsa-bits 4096 -o mykey.pem -p "password"
 
-# Encode from file
-stegasoo encode -r ref.jpg -c carrier.png -p "passphrase words here" --pin 123456 -f secret.txt
+# Encode (DCT mode is now default)
+stegasoo encode -r ref.jpg -c carrier.jpg -p "passphrase words here" --pin 123456 -m "Message"
 
-# Encode for social media (DCT + JPEG with color preservation)
-stegasoo encode -r ref.jpg -c carrier.jpg -p "passphrase words here" --pin 123456 \
-  -m "Message" --mode dct --dct-format jpeg --dct-color color
+# Encode with LSB mode for higher capacity
+stegasoo encode -r ref.jpg -c carrier.png -p "passphrase words here" --pin 123456 \
+  -m "Message" --mode lsb
+
+# Encode a file
+stegasoo encode -r ref.jpg -c carrier.png -p "passphrase words here" --pin 123456 -f secret.txt
 
 # Decode to stdout (quiet mode)
 stegasoo decode -r ref.jpg -s stego.png -p "passphrase words here" --pin 123456 -q
@@ -187,12 +188,13 @@ python app.py
 ```
 
 Features:
-- Drag-and-drop image uploads
+- Drag-and-drop image uploads with scan animations
 - Real-time entropy calculator
 - Native mobile sharing (Web Share API)
-- DCT mode with advanced options panel
+- DCT mode default with compact mode selector
 - Subprocess isolation for stability
 - Large image support (14MB+ tested)
+- Streamlined form flow (v3.3.0)
 
 📖 Full documentation: **[WEB_UI.md](WEB_UI.md)**
 
@@ -215,17 +217,24 @@ curl -X POST http://localhost:8000/generate \
   -H "Content-Type: application/json" \
   -d '{"use_pin": true, "passphrase_words": 4}'
 
-# Encode with DCT mode
+# Encode (DCT mode is default)
 curl -X POST http://localhost:8000/encode/multipart \
   -F "message=Secret" \
   -F "passphrase=apple forest thunder mountain" \
   -F "pin=123456" \
-  -F "embed_mode=dct" \
-  -F "dct_output_format=jpeg" \
-  -F "dct_color_mode=color" \
   -F "reference_photo=@photo.jpg" \
   -F "carrier=@meme.jpg" \
   --output stego.jpg
+
+# Encode with LSB mode
+curl -X POST http://localhost:8000/encode/multipart \
+  -F "message=Secret" \
+  -F "passphrase=apple forest thunder mountain" \
+  -F "pin=123456" \
+  -F "embed_mode=lsb" \
+  -F "reference_photo=@photo.jpg" \
+  -F "carrier=@meme.png" \
+  --output stego.png
 
 # Decode (auto-detects mode)
 curl -X POST http://localhost:8000/decode/multipart \

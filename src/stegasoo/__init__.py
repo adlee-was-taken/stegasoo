@@ -1,8 +1,13 @@
 """
-Stegasoo - Secure Steganography with Multi-Factor Authentication (v3.2.0)
+Stegasoo - Secure Steganography with Multi-Factor Authentication (v4.0.0)
+
+Changes in v4.0.0:
+- Added channel key support for deployment/group isolation
+- New functions: get_channel_key, get_channel_fingerprint, generate_channel_key, etc.
+- encode() and decode() now accept channel_key parameter
 """
 
-__version__ = "3.2.0"
+__version__ = "4.0.0"
 
 # Core functionality
 from .encode import encode
@@ -28,7 +33,19 @@ from .image_utils import (
 from .utils import generate_filename
 
 # Crypto functions
-from .crypto import has_argon2
+from .crypto import has_argon2, get_active_channel_key, get_channel_fingerprint
+
+# Channel key management (v4.0.0)
+from .channel import (
+    generate_channel_key,
+    get_channel_key,
+    set_channel_key,
+    clear_channel_key,
+    has_channel_key,
+    get_channel_status,
+    validate_channel_key,
+    format_channel_key,
+)
 
 # Steganography functions
 from .steganography import (
@@ -150,6 +167,18 @@ __all__ = [
     "export_rsa_key_pem",
     "load_rsa_key",
     
+    # Channel key management (v4.0.0)
+    "generate_channel_key",
+    "get_channel_key",
+    "set_channel_key",
+    "clear_channel_key",
+    "has_channel_key",
+    "get_channel_status",
+    "validate_channel_key",
+    "format_channel_key",
+    "get_active_channel_key",
+    "get_channel_fingerprint",
+    
     # Image utilities
     "get_image_info",
     "compare_capacity",
@@ -183,6 +212,7 @@ __all__ = [
     "validate_embed_mode",
     "validate_dct_output_format",
     "validate_dct_color_mode",
+    "validate_channel_key",
     
     # Models
     "ImageInfo",

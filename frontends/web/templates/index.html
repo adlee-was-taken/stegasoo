@@ -19,6 +19,20 @@
     </div>
 </div>
 
+<!-- Channel Status Banner (v4.0.0) -->
+{% if channel_configured %}
+<div class="alert alert-success mb-4">
+    <div class="d-flex align-items-center justify-content-between">
+        <div>
+            <i class="bi bi-shield-lock me-2"></i>
+            <strong>Private Channel Active</strong>
+            <span class="text-muted ms-2">Messages are isolated to this deployment</span>
+        </div>
+        <code class="small">{{ channel_fingerprint }}</code>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-4 mb-5">
     <!-- Encode Card -->
     <div class="col-md-4">
@@ -81,22 +95,22 @@
         <div class="row text-center">
             <div class="col-md-6 mb-3 mb-md-0">
                 <div class="p-3 bg-dark rounded h-100">
-                    <i class="bi bi-grid-3x3-gap text-primary fs-2 d-block mb-2"></i>
-                    <strong>LSB Mode</strong>
+                    <i class="bi bi-soundwave text-warning fs-2 d-block mb-2"></i>
+                    <strong>DCT Mode</strong>
                     <span class="badge bg-success ms-1">Default</span>
                     <div class="small text-muted mt-2">
-                        Higher capacity (~375 KB/MP)<br>
-                        Best for email &amp; file transfer
+                        Survives JPEG recompression<br>
+                        Best for social media
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="p-3 bg-dark rounded h-100">
-                    <i class="bi bi-soundwave text-warning fs-2 d-block mb-2"></i>
-                    <strong>DCT Mode</strong>
+                    <i class="bi bi-grid-3x3-gap text-primary fs-2 d-block mb-2"></i>
+                    <strong>LSB Mode</strong>
                     <div class="small text-muted mt-2">
-                        Survives JPEG recompression<br>
-                        Best for social media
+                        Higher capacity (~375 KB/MP)<br>
+                        Best for email &amp; file transfer
                     </div>
                 </div>
             </div>
@@ -116,15 +130,15 @@
                 <ul class="list-unstyled small">
                     <li class="mb-1">
                         <i class="bi bi-image text-info me-2"></i>
-                        <strong>Reference Photo</strong> — shared secret image
+                        <strong>Reference Photo</strong>: shared secret
                     </li>
                     <li class="mb-1">
                         <i class="bi bi-chat-quote text-info me-2"></i>
-                        <strong>Passphrase</strong> — 4+ words
+                        <strong>Passphrase</strong>: 4+ words
                     </li>
                     <li class="mb-1">
                         <i class="bi bi-123 text-info me-2"></i>
-                        <strong>PIN</strong> — 6-9 digits (and/or RSA key)
+                        <strong>PIN</strong>: 6-9 digits (or RSA key)
                     </li>
                 </ul>
             </div>
@@ -142,6 +156,11 @@
                     <li class="mb-1">
                         <i class="bi bi-shuffle text-success me-2"></i>
                         Pseudo-random embedding
+                    </li>
+                    <li class="mb-1">
+                        <i class="bi bi-broadcast text-success me-2"></i>
+                        <strong>Channel keys</strong> for group isolation
+                        <span class="badge bg-info ms-1">v4.0</span>
                     </li>
                 </ul>
             </div>

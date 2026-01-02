@@ -1,17 +1,20 @@
-# Stegasoo REST API Documentation (v3.2.0)
+# Stegasoo REST API Documentation (v4.0.0)
 
 Complete REST API reference for Stegasoo steganography operations.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [What's New in v3.2.0](#whats-new-in-v320)
+- [What's New in v4.0.0](#whats-new-in-v400)
 - [Installation](#installation)
-- [Authentication](#authentication)
 - [Base URL](#base-url)
 - [Endpoints](#endpoints)
   - [GET /](#get--status)
   - [GET /modes](#get-modes)
+  - [GET /channel/status](#get-channelstatus)
+  - [POST /channel/generate](#post-channelgenerate)
+  - [POST /channel/set](#post-channelset)
+  - [DELETE /channel](#delete-channel)
   - [POST /generate](#post-generate)
   - [POST /encode](#post-encode-json)
   - [POST /encode/file](#post-encodefile)
@@ -21,13 +24,10 @@ Complete REST API reference for Stegasoo steganography operations.
   - [POST /compare](#post-compare)
   - [POST /will-fit](#post-will-fit)
   - [POST /image/info](#post-imageinfo)
-  - [POST /extract-key-from-qr](#post-extract-key-from-qr)
-- [Embedding Modes](#embedding-modes)
+- [Channel Keys](#channel-keys)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
 - [Code Examples](#code-examples)
-- [Rate Limiting](#rate-limiting)
-- [Security Considerations](#security-considerations)
 
 ---
 
@@ -38,30 +38,30 @@ The Stegasoo REST API provides programmatic access to all steganography operatio
 - **Generate** credentials (passphrase, PINs, RSA keys)
 - **Encode** messages or files into images (LSB or DCT mode)
 - **Decode** messages or files from images (auto-detects mode)
+- **Channel keys** for deployment/group isolation (v4.0.0)
 - **Analyze** image capacity and compare modes
 
 The API supports both JSON (base64-encoded images) and multipart form data (direct file uploads).
 
 ---
 
-## What's New in v3.2.0
+## What's New in v4.0.0
 
-Version 3.2.0 introduces breaking changes to simplify the API:
+Version 4.0.0 adds **channel key** support for deployment/group isolation:
 
-| Change | Before (v3.1) | After (v3.2.0) |
-|--------|---------------|----------------|
-| Passphrase | Daily rotation (`phrases` dict) | Single `passphrase` string |
-| Date parameter | `date_str` required/optional | Removed entirely |
-| Field name | `day_phrase` | `passphrase` |
-| Default words | 3 words | 4 words |
+| Feature | Description |
+|---------|-------------|
+| Channel keys | 256-bit keys that isolate message groups |
+| New endpoints | `/channel/status`, `/channel/generate`, `/channel/set`, `DELETE /channel` |
+| Encode/decode param | `channel_key` parameter on all encode/decode endpoints |
+| Response headers | `X-Stegasoo-Channel-Mode` and `X-Stegasoo-Channel-Fingerprint` |
 
 **Key benefits:**
-- ✅ No need to track encoding dates
-- ✅ Simpler request/response models
-- ✅ True asynchronous communications
-- ✅ Stronger default security (4 words = ~44 bits)
+- ✅ Isolate messages between teams, deployments, or groups
+- ✅ Same credentials can't decode messages from different channels
+- ✅ Backward compatible (public mode = no channel key)
 
-**Breaking Change:** v3.2.0 cannot decode images created with v3.1.x due to different key derivation.
+**Breaking change:** v4.0.0 messages (with channel key) cannot be decoded by v3.x installations.
 
 ---
 
@@ -71,16 +71,6 @@ Version 3.2.0 introduces breaking changes to simplify the API:
 
 ```bash
 pip install stegasoo[api]
-```
-
-This automatically installs DCT dependencies (scipy) for full functionality.
-
-### From Source
-
-```bash
-git clone https://github.com/example/stegasoo.git
-cd stegasoo
-pip install -e ".[api]"
 ```
 
 ### Running the Server
@@ -93,20 +83,13 @@ python main.py
 
 **Production:**
 ```bash
-cd frontends/api
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-**Docker:**
+**Docker with channel key:**
 ```bash
-docker-compose up api
+STEGASOO_CHANNEL_KEY=XXXX-XXXX-... docker-compose up api
 ```
-
----
-
-## Authentication
-
-The API currently operates without authentication. For production deployments, implement authentication at the reverse proxy level (nginx, Caddy) or add API key middleware.
 
 ---
 
@@ -126,18 +109,11 @@ The API currently operates without authentication. For production deployments, i
 
 Check API status and configuration.
 
-#### Request
-
-```http
-GET / HTTP/1.1
-Host: localhost:8000
-```
-
 #### Response
 
 ```json
 {
-  "version": "3.2.0",
+  "version": "4.0.0",
   "has_argon2": true,
   "has_qrcode_read": true,
   "has_dct": true,
@@ -145,50 +121,27 @@ Host: localhost:8000
   "available_modes": ["lsb", "dct"],
   "dct_features": {
     "output_formats": ["png", "jpeg"],
-    "color_modes": ["grayscale", "color"],
-    "default_output_format": "png",
-    "default_color_mode": "grayscale"
+    "color_modes": ["grayscale", "color"]
+  },
+  "channel": {
+    "mode": "private",
+    "configured": true,
+    "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456",
+    "source": "~/.stegasoo/channel.key"
   },
   "breaking_changes": {
-    "date_removed": "No date_str parameter needed - encode/decode anytime",
-    "passphrase_renamed": "day_phrase → passphrase (single passphrase, no daily rotation)",
-    "format_version": 4,
+    "v4_channel_key": "Messages encoded with channel key require same key to decode",
+    "format_version": 5,
     "backward_compatible": false
   }
 }
-```
-
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | string | Stegasoo library version |
-| `has_argon2` | boolean | Whether Argon2id is available |
-| `has_qrcode_read` | boolean | Whether QR code reading is available |
-| `has_dct` | boolean | Whether DCT mode is available (scipy) |
-| `max_payload_kb` | integer | Maximum payload size in KB |
-| `available_modes` | array | Available embedding modes |
-| `dct_features` | object | DCT mode options (if available) |
-| `breaking_changes` | object | v3.2.0 breaking changes info |
-
-#### cURL Example
-
-```bash
-curl http://localhost:8000/
 ```
 
 ---
 
 ### GET /modes
 
-Get available embedding modes and their status.
-
-#### Request
-
-```http
-GET /modes HTTP/1.1
-Host: localhost:8000
-```
+Get available embedding modes and channel status.
 
 #### Response
 
@@ -204,13 +157,166 @@ Host: localhost:8000
   "dct": {
     "available": true,
     "name": "DCT Domain",
-    "description": "Embed in DCT coefficients, frequency domain steganography",
     "output_formats": ["png", "jpeg"],
     "color_modes": ["grayscale", "color"],
     "capacity_ratio": "~20% of LSB",
     "requires": "scipy"
+  },
+  "channel": {
+    "mode": "private",
+    "configured": true,
+    "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456"
   }
 }
+```
+
+---
+
+### GET /channel/status
+
+Get current channel key status. **New in v4.0.0.**
+
+#### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `reveal` | boolean | `false` | Include full key in response |
+
+#### Response
+
+```json
+{
+  "mode": "private",
+  "configured": true,
+  "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456",
+  "source": "~/.stegasoo/channel.key",
+  "key": null
+}
+```
+
+With `reveal=true`:
+
+```json
+{
+  "mode": "private",
+  "configured": true,
+  "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456",
+  "source": "~/.stegasoo/channel.key",
+  "key": "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
+}
+```
+
+#### cURL Example
+
+```bash
+# Show status
+curl http://localhost:8000/channel/status
+
+# Reveal full key
+curl "http://localhost:8000/channel/status?reveal=true"
+```
+
+---
+
+### POST /channel/generate
+
+Generate a new channel key. **New in v4.0.0.**
+
+#### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `save` | boolean | `false` | Save to user config |
+| `save_project` | boolean | `false` | Save to project config |
+
+#### Response
+
+```json
+{
+  "key": "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456",
+  "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456",
+  "saved": true,
+  "save_location": "~/.stegasoo/channel.key"
+}
+```
+
+#### cURL Examples
+
+```bash
+# Just generate (don't save)
+curl -X POST http://localhost:8000/channel/generate
+
+# Generate and save to user config
+curl -X POST "http://localhost:8000/channel/generate?save=true"
+
+# Generate and save to project config
+curl -X POST "http://localhost:8000/channel/generate?save_project=true"
+```
+
+---
+
+### POST /channel/set
+
+Set/save a channel key to config. **New in v4.0.0.**
+
+#### Request Body
+
+```json
+{
+  "key": "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456",
+  "location": "user"
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `key` | string | required | Channel key |
+| `location` | string | `"user"` | `"user"` or `"project"` |
+
+#### Response
+
+```json
+{
+  "success": true,
+  "location": "~/.stegasoo/channel.key",
+  "fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456"
+}
+```
+
+---
+
+### DELETE /channel
+
+Clear channel key from config. **New in v4.0.0.**
+
+#### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `location` | string | `"user"` | `"user"`, `"project"`, or `"all"` |
+
+#### Response
+
+```json
+{
+  "success": true,
+  "mode": "public",
+  "still_configured": false,
+  "remaining_source": null
+}
+```
+
+#### cURL Example
+
+```bash
+# Clear user config
+curl -X DELETE http://localhost:8000/channel
+
+# Clear project config
+curl -X DELETE "http://localhost:8000/channel?location=project"
+
+# Clear all
+curl -X DELETE "http://localhost:8000/channel?location=all"
 ```
 
 ---
@@ -219,13 +325,9 @@ Host: localhost:8000
 
 Generate credentials for encoding/decoding.
 
-#### Request
+#### Request Body
 
-```http
-POST /generate HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
+```json
 {
   "use_pin": true,
   "use_rsa": false,
@@ -234,16 +336,6 @@ Content-Type: application/json
   "words_per_passphrase": 4
 }
 ```
-
-#### Request Body
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `use_pin` | boolean | `true` | Generate a PIN |
-| `use_rsa` | boolean | `false` | Generate an RSA key |
-| `pin_length` | integer | `6` | PIN length (6-9) |
-| `rsa_bits` | integer | `2048` | RSA key size (2048, 3072, 4096) |
-| `words_per_passphrase` | integer | `4` | Words per passphrase (3-12) |
 
 #### Response
 
@@ -257,66 +349,19 @@ Content-Type: application/json
     "pin": 19,
     "rsa": 0,
     "total": 63
-  },
-  "phrases": null
+  }
 }
-```
-
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `passphrase` | string | Single passphrase (v3.2.0) |
-| `pin` | string\|null | Generated PIN (if requested) |
-| `rsa_key_pem` | string\|null | PEM-encoded RSA key (if requested) |
-| `entropy.passphrase` | integer | Entropy from passphrase (bits) |
-| `entropy.pin` | integer | Entropy from PIN (bits) |
-| `entropy.rsa` | integer | Entropy from RSA key (bits) |
-| `entropy.total` | integer | Combined entropy (bits) |
-| `phrases` | null | Deprecated field (always null in v3.2.0) |
-
-#### cURL Examples
-
-**Default (PIN with 4-word passphrase):**
-```bash
-curl -X POST http://localhost:8000/generate \
-  -H "Content-Type: application/json" \
-  -d '{"use_pin": true}'
-```
-
-**RSA only with 6-word passphrase:**
-```bash
-curl -X POST http://localhost:8000/generate \
-  -H "Content-Type: application/json" \
-  -d '{"use_pin": false, "use_rsa": true, "rsa_bits": 4096, "words_per_passphrase": 6}'
-```
-
-**Both PIN and RSA:**
-```bash
-curl -X POST http://localhost:8000/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "use_pin": true,
-    "use_rsa": true,
-    "pin_length": 9,
-    "rsa_bits": 4096,
-    "words_per_passphrase": 6
-  }'
 ```
 
 ---
 
 ### POST /encode (JSON)
 
-Encode a text message using base64-encoded images.
+Encode a text message into an image.
 
-#### Request
+#### Request Body
 
-```http
-POST /encode HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
+```json
 {
   "message": "Secret message here",
   "reference_photo_base64": "iVBORw0KGgo...",
@@ -325,28 +370,20 @@ Content-Type: application/json
   "pin": "123456",
   "rsa_key_base64": null,
   "rsa_password": null,
+  "channel_key": null,
   "embed_mode": "lsb",
   "dct_output_format": "png",
   "dct_color_mode": "grayscale"
 }
 ```
 
-#### Request Body
+#### Channel Key Parameter (v4.0.0)
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `message` | string | ✓ | | Message to encode |
-| `reference_photo_base64` | string | ✓ | | Base64-encoded reference photo |
-| `carrier_image_base64` | string | ✓ | | Base64-encoded carrier image |
-| `passphrase` | string | ✓ | | Passphrase (v3.2.0) |
-| `pin` | string | * | | Static PIN (6-9 digits) |
-| `rsa_key_base64` | string | * | | Base64-encoded RSA key PEM |
-| `rsa_password` | string | | | Password for RSA key |
-| `embed_mode` | string | | `"lsb"` | `"lsb"` or `"dct"` |
-| `dct_output_format` | string | | `"png"` | `"png"` or `"jpeg"` (DCT only) |
-| `dct_color_mode` | string | | `"grayscale"` | `"grayscale"` or `"color"` (DCT only) |
-
-\* At least one of `pin` or `rsa_key_base64` required.
+| Value | Effect |
+|-------|--------|
+| `null` | Auto mode - use server-configured key |
+| `""` (empty string) | Public mode - no channel isolation |
+| `"XXXX-XXXX-..."` | Explicit key - use this specific key |
 
 #### Response
 
@@ -358,162 +395,82 @@ Content-Type: application/json
   "embed_mode": "lsb",
   "output_format": "png",
   "color_mode": "color",
-  "date_used": null,
-  "day_of_week": null
+  "channel_mode": "private",
+  "channel_fingerprint": "ABCD-••••-••••-••••-••••-••••-••••-3456"
 }
-```
-
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `stego_image_base64` | string | Base64-encoded stego image |
-| `filename` | string | Suggested filename |
-| `capacity_used_percent` | float | Percentage of capacity used |
-| `embed_mode` | string | Mode used: `"lsb"` or `"dct"` |
-| `output_format` | string | Output format: `"png"` or `"jpeg"` |
-| `color_mode` | string | Color mode: `"color"` or `"grayscale"` |
-| `date_used` | null | Deprecated (always null in v3.2.0) |
-| `day_of_week` | null | Deprecated (always null in v3.2.0) |
-
-#### cURL Example (LSB Mode)
-
-```bash
-# Prepare base64-encoded images
-REF_B64=$(base64 -w0 reference.jpg)
-CARRIER_B64=$(base64 -w0 carrier.png)
-
-curl -X POST http://localhost:8000/encode \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"message\": \"Secret message\",
-    \"reference_photo_base64\": \"$REF_B64\",
-    \"carrier_image_base64\": \"$CARRIER_B64\",
-    \"passphrase\": \"apple forest thunder mountain\",
-    \"pin\": \"123456\"
-  }" | jq -r '.stego_image_base64' | base64 -d > stego.png
-```
-
-#### cURL Example (DCT Mode with JPEG)
-
-```bash
-curl -X POST http://localhost:8000/encode \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"message\": \"Secret message\",
-    \"reference_photo_base64\": \"$REF_B64\",
-    \"carrier_image_base64\": \"$CARRIER_B64\",
-    \"passphrase\": \"apple forest thunder mountain\",
-    \"pin\": \"123456\",
-    \"embed_mode\": \"dct\",
-    \"dct_output_format\": \"jpeg\",
-    \"dct_color_mode\": \"color\"
-  }" | jq -r '.stego_image_base64' | base64 -d > stego.jpg
 ```
 
 ---
 
 ### POST /encode/file
 
-Encode a binary file using base64-encoded data.
+Encode a file into an image (JSON with base64).
 
-#### Request
-
-```http
-POST /encode/file HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
-{
-  "file_data_base64": "JVBERi0xLjQK...",
-  "filename": "secret.pdf",
-  "mime_type": "application/pdf",
-  "reference_photo_base64": "iVBORw0KGgo...",
-  "carrier_image_base64": "iVBORw0KGgo...",
-  "passphrase": "apple forest thunder mountain",
-  "pin": "123456",
-  "embed_mode": "lsb"
-}
-```
-
-#### Request Body
+Same parameters as `/encode`, plus:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `file_data_base64` | string | ✓ | Base64-encoded file data |
 | `filename` | string | ✓ | Original filename |
-| `mime_type` | string | | MIME type of file |
-| `reference_photo_base64` | string | ✓ | Base64-encoded reference photo |
-| `carrier_image_base64` | string | ✓ | Base64-encoded carrier image |
-| `passphrase` | string | ✓ | Passphrase |
-| `pin` | string | * | Static PIN |
-| `rsa_key_base64` | string | * | Base64-encoded RSA key |
-| `embed_mode` | string | | `"lsb"` or `"dct"` |
-| `dct_output_format` | string | | `"png"` or `"jpeg"` |
-| `dct_color_mode` | string | | `"grayscale"` or `"color"` |
-
-#### Response
-
-Same as `/encode` endpoint.
+| `mime_type` | string | | MIME type |
 
 ---
 
 ### POST /encode/multipart
 
-Encode using direct file uploads. Returns the stego image directly.
+Encode using multipart form data (file uploads).
 
 #### Form Fields
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `passphrase` | string | ✓ | | Passphrase (v3.2.0) |
-| `reference_photo` | file | ✓ | | Reference photo file |
-| `carrier` | file | ✓ | | Carrier image file |
-| `message` | string | * | | Text message to encode |
-| `payload_file` | file | * | | Binary file to embed |
-| `pin` | string | ** | | Static PIN |
-| `rsa_key` | file | ** | | RSA key file (.pem) |
-| `rsa_key_qr` | file | ** | | RSA key from QR code image |
-| `rsa_password` | string | | | Password for RSA key |
-| `embed_mode` | string | | `"lsb"` | `"lsb"` or `"dct"` |
-| `dct_output_format` | string | | `"png"` | `"png"` or `"jpeg"` |
-| `dct_color_mode` | string | | `"grayscale"` | `"grayscale"` or `"color"` |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `passphrase` | string | ✓ | Passphrase |
+| `reference_photo` | file | ✓ | Reference photo |
+| `carrier` | file | ✓ | Carrier image |
+| `message` | string | * | Text message |
+| `payload_file` | file | * | Binary file to embed |
+| `pin` | string | | Static PIN |
+| `rsa_key` | file | | RSA key (.pem) |
+| `rsa_key_qr` | file | | RSA key (QR code image) |
+| `rsa_password` | string | | RSA key password |
+| `channel_key` | string | | `"auto"` (default), `"none"=public`, or explicit key |
+| `embed_mode` | string | | `"lsb"` or `"dct"` |
+| `dct_output_format` | string | | `"png"` or `"jpeg"` |
+| `dct_color_mode` | string | | `"grayscale"` or `"color"` |
 
-\* At least one of `message` or `payload_file` required.
-\*\* At least one of `pin`, `rsa_key`, or `rsa_key_qr` required.
+\* Provide either `message` or `payload_file`
+
+#### Channel Key in Multipart
+
+For form data, the channel_key field uses strings:
+
+| Value | Effect |
+|-------|--------|
+| `"auto"` | Use server config (default) |
+| `"none"` | Public mode |
+| `"XXXX-XXXX-..."` | Explicit key |
 
 #### Response
 
-Returns the image directly with headers:
+Returns the stego image directly with headers:
 
 ```http
 HTTP/1.1 200 OK
 Content-Type: image/png
-Content-Disposition: attachment; filename="a1b2c3d4.png"
+Content-Disposition: attachment; filename=a1b2c3d4.png
 X-Stegasoo-Capacity-Percent: 12.4
 X-Stegasoo-Embed-Mode: lsb
-X-Stegasoo-Output-Format: png
-X-Stegasoo-Color-Mode: color
-X-Stegasoo-Version: 3.2.0
+X-Stegasoo-Channel-Mode: private
+X-Stegasoo-Channel-Fingerprint: ABCD-••••-...-3456
+X-Stegasoo-Version: 4.0.0
 
 <binary image data>
 ```
 
-#### Response Headers
-
-| Header | Description |
-|--------|-------------|
-| `Content-Type` | `image/png` or `image/jpeg` |
-| `Content-Disposition` | Suggested filename |
-| `X-Stegasoo-Capacity-Percent` | Capacity percentage used |
-| `X-Stegasoo-Embed-Mode` | `lsb` or `dct` |
-| `X-Stegasoo-Output-Format` | `png` or `jpeg` |
-| `X-Stegasoo-Color-Mode` | `color` or `grayscale` |
-| `X-Stegasoo-Version` | API version |
-
-#### cURL Example (LSB)
+#### cURL Examples
 
 ```bash
+# Encode with auto channel key (default)
 curl -X POST http://localhost:8000/encode/multipart \
   -F "passphrase=apple forest thunder mountain" \
   -F "pin=123456" \
@@ -521,30 +478,23 @@ curl -X POST http://localhost:8000/encode/multipart \
   -F "reference_photo=@reference.jpg" \
   -F "carrier=@carrier.png" \
   --output stego.png
-```
 
-#### cURL Example (DCT + JPEG)
-
-```bash
+# Encode with explicit channel key
 curl -X POST http://localhost:8000/encode/multipart \
-  -F "passphrase=apple forest thunder mountain" \
+  -F "passphrase=words here" \
   -F "pin=123456" \
-  -F "message=Secret message for social media" \
-  -F "embed_mode=dct" \
-  -F "dct_output_format=jpeg" \
-  -F "dct_color_mode=color" \
+  -F "message=Team message" \
+  -F "channel_key=ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456" \
   -F "reference_photo=@reference.jpg" \
   -F "carrier=@carrier.png" \
-  --output stego.jpg
-```
+  --output stego.png
 
-#### cURL Example (Embed File)
-
-```bash
+# Encode in public mode (no channel isolation)
 curl -X POST http://localhost:8000/encode/multipart \
-  -F "passphrase=apple forest thunder mountain" \
+  -F "passphrase=words here" \
   -F "pin=123456" \
-  -F "payload_file=@secret.pdf" \
+  -F "message=Public message" \
+  -F "channel_key=none" \
   -F "reference_photo=@reference.jpg" \
   -F "carrier=@carrier.png" \
   --output stego.png
@@ -554,15 +504,11 @@ curl -X POST http://localhost:8000/encode/multipart \
 
 ### POST /decode (JSON)
 
-Decode a message or file using base64-encoded images. Auto-detects embedding mode.
+Decode a message or file from a stego image.
 
-#### Request
+#### Request Body
 
-```http
-POST /decode HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
+```json
 {
   "stego_image_base64": "iVBORw0KGgo...",
   "reference_photo_base64": "iVBORw0KGgo...",
@@ -570,23 +516,10 @@ Content-Type: application/json
   "pin": "123456",
   "rsa_key_base64": null,
   "rsa_password": null,
+  "channel_key": null,
   "embed_mode": "auto"
 }
 ```
-
-#### Request Body
-
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `stego_image_base64` | string | ✓ | | Base64-encoded stego image |
-| `reference_photo_base64` | string | ✓ | | Base64-encoded reference photo |
-| `passphrase` | string | ✓ | | Passphrase |
-| `pin` | string | * | | Static PIN |
-| `rsa_key_base64` | string | * | | Base64-encoded RSA key |
-| `rsa_password` | string | | | Password for RSA key |
-| `embed_mode` | string | | `"auto"` | `"auto"`, `"lsb"`, or `"dct"` |
-
-\* Must match security factors used during encoding.
 
 #### Response (Text)
 
@@ -606,310 +539,122 @@ Content-Type: application/json
 {
   "payload_type": "file",
   "message": null,
-  "file_data_base64": "JVBERi0xLjQK...",
-  "filename": "secret.pdf",
+  "file_data_base64": "UEsDBBQAAAA...",
+  "filename": "document.pdf",
   "mime_type": "application/pdf"
 }
-```
-
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `payload_type` | string | `"text"` or `"file"` |
-| `message` | string\|null | Decoded message (if text) |
-| `file_data_base64` | string\|null | Base64-encoded file (if file) |
-| `filename` | string\|null | Original filename (if file) |
-| `mime_type` | string\|null | MIME type (if file) |
-
-#### cURL Example
-
-```bash
-STEGO_B64=$(base64 -w0 stego.png)
-REF_B64=$(base64 -w0 reference.jpg)
-
-curl -X POST http://localhost:8000/decode \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"stego_image_base64\": \"$STEGO_B64\",
-    \"reference_photo_base64\": \"$REF_B64\",
-    \"passphrase\": \"apple forest thunder mountain\",
-    \"pin\": \"123456\"
-  }"
 ```
 
 ---
 
 ### POST /decode/multipart
 
-Decode using direct file uploads. Auto-detects embedding mode.
+Decode using multipart form data.
 
 #### Form Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `passphrase` | string | ✓ | Passphrase |
-| `reference_photo` | file | ✓ | Reference photo file |
-| `stego_image` | file | ✓ | Stego image file |
-| `pin` | string | * | Static PIN |
-| `rsa_key` | file | * | RSA key file (.pem) |
-| `rsa_key_qr` | file | * | RSA key from QR code image |
-| `rsa_password` | string | | Password for RSA key |
+| `reference_photo` | file | ✓ | Reference photo |
+| `stego_image` | file | ✓ | Stego image to decode |
+| `pin` | string | | Static PIN |
+| `rsa_key` | file | | RSA key (.pem) |
+| `rsa_key_qr` | file | | RSA key (QR code image) |
+| `rsa_password` | string | | RSA key password |
+| `channel_key` | string | | `"auto"` (default), `"none"=public`, or explicit key |
 | `embed_mode` | string | | `"auto"`, `"lsb"`, or `"dct"` |
 
-#### Response
+---
 
-Same JSON format as `/decode` endpoint.
+## Channel Keys
 
-#### cURL Example
+### Overview
+
+Channel keys provide **deployment/group isolation**. Messages encoded with a channel key can only be decoded with the same key.
+
+### Key Format
+
+```
+ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
+└──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘ └──┘
+  8 groups of 4 alphanumeric characters (256 bits)
+```
+
+### Storage Locations
+
+Keys are checked in order:
+
+| Priority | Location | Best For |
+|----------|----------|----------|
+| 1 | `STEGASOO_CHANNEL_KEY` env var | Docker, CI/CD |
+| 2 | `./config/channel.key` | Project-specific |
+| 3 | `~/.stegasoo/channel.key` | User default |
+
+### API Parameter Values
+
+#### JSON Endpoints (`/encode`, `/decode`)
+
+| Value | Effect |
+|-------|--------|
+| `null` | Auto - use server config |
+| `""` | Public mode |
+| `"XXXX-..."` | Explicit key |
+
+#### Multipart Endpoints (`/encode/multipart`, `/decode/multipart`)
+
+| Value | Effect |
+|-------|--------|
+| `"auto"` | Use server config (default) |
+| `"none"` | Public mode |
+| `"XXXX-..."` | Explicit key |
+
+### Workflow Example
 
 ```bash
-curl -X POST http://localhost:8000/decode/multipart \
-  -F "passphrase=apple forest thunder mountain" \
+# 1. Generate a channel key for the team
+KEY=$(curl -s -X POST http://localhost:8000/channel/generate | jq -r '.key')
+echo "Team key: $KEY"
+
+# 2. Distribute to team members (securely!)
+
+# 3. Each deployment sets the key
+export STEGASOO_CHANNEL_KEY=$KEY
+
+# 4. Encode - automatically uses server key
+curl -X POST http://localhost:8000/encode/multipart \
+  -F "passphrase=team passphrase" \
   -F "pin=123456" \
-  -F "reference_photo=@reference.jpg" \
+  -F "message=Team secret" \
+  -F "reference_photo=@ref.jpg" \
+  -F "carrier=@carrier.png" \
+  --output stego.png
+
+# 5. Decode - automatically uses server key
+curl -X POST http://localhost:8000/decode/multipart \
+  -F "passphrase=team passphrase" \
+  -F "pin=123456" \
+  -F "reference_photo=@ref.jpg" \
   -F "stego_image=@stego.png"
 ```
 
 ---
 
-### POST /compare
-
-Compare LSB and DCT embedding modes for a carrier image.
-
-#### Request
-
-```http
-POST /compare HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
-{
-  "carrier_image_base64": "iVBORw0KGgo...",
-  "payload_size": 50000
-}
-```
-
-#### Request Body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `carrier_image_base64` | string | ✓ | Base64-encoded carrier image |
-| `payload_size` | integer | | Optional payload size to check |
-
-#### Response
-
-```json
-{
-  "width": 1920,
-  "height": 1080,
-  "lsb": {
-    "capacity_bytes": 776970,
-    "capacity_kb": 758.8,
-    "available": true,
-    "output_format": "PNG"
-  },
-  "dct": {
-    "capacity_bytes": 64800,
-    "capacity_kb": 63.3,
-    "available": true,
-    "output_formats": ["png", "jpeg"],
-    "color_modes": ["grayscale", "color"],
-    "ratio_vs_lsb_percent": 8.3
-  },
-  "payload_check": {
-    "size_bytes": 50000,
-    "fits_lsb": true,
-    "fits_dct": true
-  },
-  "recommendation": "dct (payload fits, better stealth)"
-}
-```
-
----
-
-### POST /will-fit
-
-Check if a payload of given size will fit in a carrier image.
-
-#### Request
-
-```http
-POST /will-fit HTTP/1.1
-Host: localhost:8000
-Content-Type: application/json
-
-{
-  "carrier_image_base64": "iVBORw0KGgo...",
-  "payload_size": 50000,
-  "embed_mode": "lsb"
-}
-```
-
-#### Response
-
-```json
-{
-  "fits": true,
-  "payload_size": 50000,
-  "capacity": 776970,
-  "usage_percent": 6.4,
-  "headroom": 726970,
-  "mode": "lsb"
-}
-```
-
----
-
-### POST /image/info
-
-Get image information and capacity.
-
-#### Request (Multipart)
-
-```bash
-curl -X POST http://localhost:8000/image/info \
-  -F "image=@carrier.png"
-```
-
-#### Response
-
-```json
-{
-  "width": 1920,
-  "height": 1080,
-  "pixels": 2073600,
-  "capacity_bytes": 776970,
-  "capacity_kb": 758,
-  "modes": {
-    "lsb": {
-      "capacity_bytes": 776970,
-      "capacity_kb": 758.8,
-      "available": true,
-      "output_format": "PNG"
-    },
-    "dct": {
-      "capacity_bytes": 64800,
-      "capacity_kb": 63.3,
-      "available": true,
-      "output_format": "PNG/JPEG (grayscale or color)"
-    }
-  }
-}
-```
-
----
-
-### POST /extract-key-from-qr
-
-Extract RSA key from a QR code image.
-
-#### Request (Multipart)
-
-```bash
-curl -X POST http://localhost:8000/extract-key-from-qr \
-  -F "qr_image=@keyqr.png"
-```
-
-#### Response
-
-```json
-{
-  "success": true,
-  "key_pem": "-----BEGIN PRIVATE KEY-----\n...",
-  "error": null
-}
-```
-
----
-
-## Embedding Modes
-
-### LSB Mode (Default)
-
-**Least Significant Bit** embedding modifies pixel values directly.
-
-| Aspect | Details |
-|--------|---------|
-| **Parameter** | `"embed_mode": "lsb"` |
-| **Capacity** | ~3 bits/pixel (~375 KB for 1920×1080) |
-| **Output** | PNG only (lossless required) |
-| **Resilience** | ❌ Destroyed by JPEG compression |
-| **Best For** | Maximum capacity, controlled channels |
-
-### DCT Mode
-
-**Discrete Cosine Transform** embedding hides data in frequency coefficients.
-
-| Aspect | Details |
-|--------|---------|
-| **Parameter** | `"embed_mode": "dct"` |
-| **Capacity** | ~0.25 bits/pixel (~65 KB for 1920×1080) |
-| **Output** | PNG or JPEG |
-| **Resilience** | ✅ Better resistance to analysis |
-| **Best For** | Stealth requirements |
-
-### DCT Options
-
-| Option | Values | Default | Description |
-|--------|--------|---------|-------------|
-| `dct_output_format` | `"png"`, `"jpeg"` | `"png"` | Output image format |
-| `dct_color_mode` | `"grayscale"`, `"color"` | `"grayscale"` | Color processing mode |
-
-### Capacity Comparison
-
-| Mode | 1920×1080 Capacity |
-|------|-------------------|
-| LSB (PNG) | ~375 KB |
-| DCT (PNG) | ~65 KB |
-| DCT (JPEG) | ~50 KB |
-
----
-
 ## Data Models
 
-### GenerateRequest
+### ChannelStatusResponse
 
 ```json
 {
-  "use_pin": true,
-  "use_rsa": false,
-  "pin_length": 6,
-  "rsa_bits": 2048,
-  "words_per_passphrase": 4
+  "mode": "private",
+  "configured": true,
+  "fingerprint": "ABCD-••••-...-3456",
+  "source": "~/.stegasoo/channel.key",
+  "key": "ABCD-1234-..." 
 }
 ```
 
-### GenerateResponse
-
-```json
-{
-  "passphrase": "word1 word2 word3 word4",
-  "pin": "123456",
-  "rsa_key_pem": null,
-  "entropy": {"passphrase": 44, "pin": 19, "rsa": 0, "total": 63},
-  "phrases": null
-}
-```
-
-### EncodeRequest
-
-```json
-{
-  "message": "string",
-  "reference_photo_base64": "string",
-  "carrier_image_base64": "string",
-  "passphrase": "string",
-  "pin": "string",
-  "rsa_key_base64": "string",
-  "rsa_password": "string",
-  "embed_mode": "lsb",
-  "dct_output_format": "png",
-  "dct_color_mode": "grayscale"
-}
-```
-
-### EncodeResponse
+### EncodeResponse (v4.0.0)
 
 ```json
 {
@@ -919,22 +664,8 @@ curl -X POST http://localhost:8000/extract-key-from-qr \
   "embed_mode": "lsb",
   "output_format": "png",
   "color_mode": "color",
-  "date_used": null,
-  "day_of_week": null
-}
-```
-
-### DecodeRequest
-
-```json
-{
-  "stego_image_base64": "string",
-  "reference_photo_base64": "string",
-  "passphrase": "string",
-  "pin": "string",
-  "rsa_key_base64": "string",
-  "rsa_password": "string",
-  "embed_mode": "auto"
+  "channel_mode": "private",
+  "channel_fingerprint": "ABCD-••••-...-3456"
 }
 ```
 
@@ -950,14 +681,6 @@ curl -X POST http://localhost:8000/extract-key-from-qr \
 }
 ```
 
-### ErrorResponse
-
-```json
-{
-  "detail": "Error message describing the problem"
-}
-```
-
 ---
 
 ## Error Handling
@@ -967,176 +690,141 @@ curl -X POST http://localhost:8000/extract-key-from-qr \
 | Code | Meaning | Use Case |
 |------|---------|----------|
 | 200 | OK | Successful operation |
-| 400 | Bad Request | Invalid input, capacity error |
-| 401 | Unauthorized | Decryption failed (wrong credentials) |
+| 400 | Bad Request | Invalid input, capacity error, invalid channel key |
+| 401 | Unauthorized | Decryption failed, channel key mismatch |
 | 500 | Internal Error | Unexpected server error |
-| 501 | Not Implemented | Feature unavailable (e.g., QR without pyzbar) |
+| 501 | Not Implemented | Feature unavailable |
 
-### Common Errors
+### Channel Key Errors
 
-| Status | Error | Solution |
-|--------|-------|----------|
-| 400 | "Must enable at least one of use_pin or use_rsa" | Set `use_pin` or `use_rsa` to true |
-| 400 | "Carrier image too small" | Use larger carrier image |
-| 400 | "DCT mode requires scipy" | Install scipy |
-| 400 | "embed_mode must be 'lsb' or 'dct'" | Fix embed_mode value |
-| 401 | "Decryption failed. Check credentials." | Verify passphrase, PIN, ref photo |
-| 501 | "QR code reading not available" | Install pyzbar and libzbar |
+| Status | Error | Cause |
+|--------|-------|-------|
+| 400 | "Invalid channel key format" | Key doesn't match `XXXX-XXXX-...` pattern |
+| 401 | "Message encoded with channel key but none configured" | Need to provide channel key |
+| 401 | "Message encoded without channel key" | Use `channel_key=""` or `"none"` |
 
 ---
 
 ## Code Examples
 
-### Python with requests
+### Python
 
 ```python
-import base64
 import requests
 
 BASE_URL = "http://localhost:8000"
 
-# Generate credentials
-response = requests.post(f"{BASE_URL}/generate", json={
-    "use_pin": True,
-    "words_per_passphrase": 4
-})
-creds = response.json()
-print(f"Passphrase: {creds['passphrase']}")
-print(f"PIN: {creds['pin']}")
+# Check channel status
+status = requests.get(f"{BASE_URL}/channel/status").json()
+print(f"Channel mode: {status['mode']}")
+print(f"Fingerprint: {status.get('fingerprint', 'N/A')}")
 
-# Encode using multipart (LSB mode)
-with open("reference.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
+# Generate channel key
+response = requests.post(f"{BASE_URL}/channel/generate?save=true")
+key_info = response.json()
+print(f"Generated: {key_info['fingerprint']}")
+
+# Encode with channel key (auto from server)
+with open("ref.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
     response = requests.post(f"{BASE_URL}/encode/multipart", files={
         "reference_photo": ref,
         "carrier": carrier,
     }, data={
-        "message": "Secret message",
-        "passphrase": "apple forest thunder mountain",
-        "pin": "123456"
+        "message": "Team secret",
+        "passphrase": "apple forest thunder",
+        "pin": "123456",
+        # channel_key defaults to "auto" (use server config)
     })
     
     with open("stego.png", "wb") as f:
         f.write(response.content)
+    
+    print(f"Channel mode: {response.headers.get('X-Stegasoo-Channel-Mode')}")
 
-# Encode with DCT for social media
-with open("reference.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
+# Encode with explicit channel key
+with open("ref.jpg", "rb") as ref, open("carrier.png", "rb") as carrier:
     response = requests.post(f"{BASE_URL}/encode/multipart", files={
         "reference_photo": ref,
         "carrier": carrier,
     }, data={
-        "message": "Secret message for Instagram",
-        "passphrase": "apple forest thunder mountain",
+        "message": "Using explicit key",
+        "passphrase": "words here",
         "pin": "123456",
-        "embed_mode": "dct",
-        "dct_output_format": "jpeg",
-        "dct_color_mode": "color"
+        "channel_key": "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456",
     })
-    
-    with open("stego_social.jpg", "wb") as f:
-        f.write(response.content)
 
-# Decode (auto-detects mode)
-with open("reference.jpg", "rb") as ref, open("stego.png", "rb") as stego:
+# Decode
+with open("ref.jpg", "rb") as ref, open("stego.png", "rb") as stego:
     response = requests.post(f"{BASE_URL}/decode/multipart", files={
         "reference_photo": ref,
         "stego_image": stego,
     }, data={
-        "passphrase": "apple forest thunder mountain",
-        "pin": "123456"
+        "passphrase": "apple forest thunder",
+        "pin": "123456",
+        # channel_key defaults to "auto"
     })
     
     result = response.json()
-    if result['payload_type'] == 'text':
-        print(f"Decoded: {result['message']}")
-    else:
-        # Save decoded file
-        file_data = base64.b64decode(result['file_data_base64'])
-        with open(result['filename'], 'wb') as f:
-            f.write(file_data)
+    print(f"Decoded: {result.get('message')}")
 ```
 
-### JavaScript/Node.js
+### JavaScript
 
 ```javascript
+const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
-const axios = require('axios');
 
 const BASE_URL = 'http://localhost:8000';
 
-async function generate() {
-    const response = await axios.post(`${BASE_URL}/generate`, {
-        use_pin: true,
-        words_per_passphrase: 4
-    });
+async function main() {
+    // Check channel status
+    const status = await axios.get(`${BASE_URL}/channel/status`);
+    console.log('Channel:', status.data.mode);
     
-    console.log('Passphrase:', response.data.passphrase);
-    console.log('PIN:', response.data.pin);
-    return response.data;
-}
-
-async function encode(passphrase, pin) {
+    // Encode with auto channel key
     const form = new FormData();
-    form.append('passphrase', passphrase);
-    form.append('pin', pin);
-    form.append('message', 'Secret message');
-    form.append('reference_photo', fs.createReadStream('reference.jpg'));
+    form.append('passphrase', 'apple forest thunder');
+    form.append('pin', '123456');
+    form.append('message', 'Secret');
+    form.append('reference_photo', fs.createReadStream('ref.jpg'));
     form.append('carrier', fs.createReadStream('carrier.png'));
-
+    // channel_key defaults to "auto" (use server config)
+    
     const response = await axios.post(`${BASE_URL}/encode/multipart`, form, {
         headers: form.getHeaders(),
         responseType: 'arraybuffer'
     });
-
+    
     fs.writeFileSync('stego.png', response.data);
-    console.log('Encoded to stego.png');
+    console.log('Channel mode:', response.headers['x-stegasoo-channel-mode']);
 }
 
-async function decode(passphrase, pin) {
-    const form = new FormData();
-    form.append('passphrase', passphrase);
-    form.append('pin', pin);
-    form.append('reference_photo', fs.createReadStream('reference.jpg'));
-    form.append('stego_image', fs.createReadStream('stego.png'));
-
-    const response = await axios.post(`${BASE_URL}/decode/multipart`, form, {
-        headers: form.getHeaders()
-    });
-
-    console.log('Decoded:', response.data.message);
-}
-
-// Usage
-generate()
-    .then(creds => encode(creds.passphrase, creds.pin))
-    .then(() => decode('apple forest thunder mountain', '123456'));
+main();
 ```
 
-### Shell Script (Bash)
+### cURL / Bash
 
 ```bash
 #!/bin/bash
 
 BASE_URL="http://localhost:8000"
-PASSPHRASE="apple forest thunder mountain"
-PIN="123456"
 
-# Generate credentials
-echo "Generating credentials..."
-CREDS=$(curl -s -X POST "$BASE_URL/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"use_pin": true, "words_per_passphrase": 4}')
+# Check channel status
+echo "Channel status:"
+curl -s "$BASE_URL/channel/status" | jq .
 
-echo "Passphrase: $(echo $CREDS | jq -r '.passphrase')"
-echo "PIN: $(echo $CREDS | jq -r '.pin')"
+# Generate and save channel key
+echo "Generating channel key..."
+curl -s -X POST "$BASE_URL/channel/generate?save=true" | jq .
 
-# Encode
+# Encode (channel_key defaults to "auto")
 echo "Encoding..."
 curl -s -X POST "$BASE_URL/encode/multipart" \
-  -F "passphrase=$PASSPHRASE" \
-  -F "pin=$PIN" \
+  -F "passphrase=apple forest thunder" \
+  -F "pin=123456" \
   -F "message=Secret message" \
-  -F "reference_photo=@reference.jpg" \
+  -F "reference_photo=@ref.jpg" \
   -F "carrier=@carrier.png" \
   --output stego.png
 
@@ -1144,79 +832,46 @@ echo "Encoded to stego.png"
 
 # Decode
 echo "Decoding..."
-RESULT=$(curl -s -X POST "$BASE_URL/decode/multipart" \
-  -F "passphrase=$PASSPHRASE" \
-  -F "pin=$PIN" \
-  -F "reference_photo=@reference.jpg" \
-  -F "stego_image=@stego.png")
-
-echo "Decoded: $(echo $RESULT | jq -r '.message')"
+curl -s -X POST "$BASE_URL/decode/multipart" \
+  -F "passphrase=apple forest thunder" \
+  -F "pin=123456" \
+  -F "reference_photo=@ref.jpg" \
+  -F "stego_image=@stego.png" | jq .
 ```
 
 ---
 
-## Rate Limiting
+## Docker Configuration
 
-The API does not implement rate limiting by default. For production:
+### docker-compose.yml
 
-1. **Reverse Proxy**: Use nginx or Caddy rate limiting
-2. **Application Level**: Add FastAPI middleware
+```yaml
+x-common-env: &common-env
+  STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}
 
-Example nginx rate limiting:
-```nginx
-limit_req_zone $binary_remote_addr zone=stegasoo:10m rate=10r/s;
-
-location /api/ {
-    limit_req zone=stegasoo burst=20 nodelay;
-    proxy_pass http://localhost:8000/;
-}
+services:
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
 ```
 
----
+### .env (gitignored)
 
-## Security Considerations
-
-### In Transit
-
-- Use HTTPS in production
-- Configure TLS at reverse proxy level
-
-### Memory Usage
-
-- Argon2id requires 256MB RAM per operation
-- DCT mode adds ~100MB for scipy operations
-- Concurrent requests can exhaust memory
-- Limit workers based on available RAM
-
-**Worker calculation:**
-```
-workers = (available_RAM - 512MB) / 350MB
+```bash
+STEGASOO_CHANNEL_KEY=ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456
 ```
 
-### Input Validation
+### Generate key for .env
 
-The API validates:
-- PIN format (6-9 digits, no leading zero)
-- Passphrase presence
-- Image size limits
-- RSA key validity
-- Embedding mode values
-- Output format compatibility
-
-### Credential Handling
-
-- Credentials are never logged
-- No persistent storage of secrets
-- Memory cleared after operations
-
----
-
-## Interactive Documentation
-
-When the API is running, visit:
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+```bash
+curl -s -X POST http://localhost:8000/channel/generate | \
+  jq -r '"STEGASOO_CHANNEL_KEY=\(.key)"' >> .env
+```
 
 ---
 
@@ -1224,5 +879,4 @@ When the API is running, visit:
 
 - [CLI Documentation](CLI.md) - Command-line interface
 - [Web UI Documentation](WEB_UI.md) - Browser interface
-- [API Update Summary](api/API_UPDATE_SUMMARY_V3.2.0.md) - Migration guide
 - [README](../README.md) - Project overview

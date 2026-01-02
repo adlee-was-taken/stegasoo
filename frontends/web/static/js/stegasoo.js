@@ -697,6 +697,177 @@ const Stegasoo = {
     },
     
     // ========================================================================
+    // CHANNEL KEY HANDLING (v4.0.0)
+    // ========================================================================
+    
+    /**
+     * Generate a random channel key in format XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+     * @returns {string} Generated key
+     */
+    generateChannelKey() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let key = '';
+        for (let i = 0; i < 8; i++) {
+            if (i > 0) key += '-';
+            for (let j = 0; j < 4; j++) {
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+        }
+        return key;
+    },
+    
+    /**
+     * Validate channel key format
+     * @param {string} key - Key to validate
+     * @returns {boolean} True if valid
+     */
+    validateChannelKey(key) {
+        const pattern = /^[A-Z0-9]{4}(-[A-Z0-9]{4}){7}$/;
+        return pattern.test(key);
+    },
+    
+    /**
+     * Format channel key input (auto-add dashes, uppercase)
+     * @param {HTMLInputElement} input - Input element
+     */
+    formatChannelKeyInput(input) {
+        let value = input.value.toUpperCase();
+        const clean = value.replace(/-/g, '');
+        
+        if (clean.length > 0 && clean.length <= 32) {
+            const formatted = clean.match(/.{1,4}/g)?.join('-') || clean;
+            if (formatted !== value && formatted.length <= 39) {
+                input.value = formatted;
+            } else {
+                input.value = value;
+            }
+        }
+        
+        // Validate and show/hide error state
+        const isValid = this.validateChannelKey(input.value);
+        input.classList.toggle('is-invalid', input.value.length > 0 && !isValid);
+    },
+    
+    /**
+     * Initialize channel key UI for encode/decode pages
+     * @param {Object} config - Configuration object
+     * @param {string} config.radioName - Name of radio buttons (default: 'channel_key')
+     * @param {string} config.customInputId - ID of custom key input container
+     * @param {string} config.keyInputId - ID of key input field
+     * @param {string} config.generateBtnId - ID of generate button (optional)
+     * @param {string} config.customRadioId - ID of custom radio button
+     * @param {string[]} config.cardIds - Array of card/label IDs for active class toggling
+     */
+    initChannelKey(config = {}) {
+        const radioName = config.radioName || 'channel_key';
+        const customInputId = config.customInputId || 'channelCustomInput';
+        const keyInputId = config.keyInputId || 'channelKeyInput';
+        const generateBtnId = config.generateBtnId;
+        const customRadioId = config.customRadioId || 'channelCustom';
+        const cardIds = config.cardIds || [];
+        
+        const radios = document.querySelectorAll(`input[name="${radioName}"]`);
+        const customInput = document.getElementById(customInputId);
+        const keyInput = document.getElementById(keyInputId);
+        const generateBtn = generateBtnId ? document.getElementById(generateBtnId) : null;
+        const customRadio = document.getElementById(customRadioId);
+        
+        // Toggle active class on mode-btn cards
+        const updateActiveState = () => {
+            radios.forEach(radio => {
+                const card = radio.closest('.mode-btn');
+                if (card) {
+                    card.classList.toggle('active', radio.checked);
+                }
+            });
+        };
+        
+        // Show/hide custom input based on selection
+        radios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateActiveState();
+                const isCustom = customRadio?.checked;
+                customInput?.classList.toggle('d-none', !isCustom);
+                if (isCustom && keyInput) {
+                    keyInput.focus();
+                }
+            });
+        });
+        
+        // Initial state
+        updateActiveState();
+        
+        // Format and validate key input
+        keyInput?.addEventListener('input', () => {
+            this.formatChannelKeyInput(keyInput);
+        });
+        
+        // Generate button (if present)
+        generateBtn?.addEventListener('click', () => {
+            if (keyInput) {
+                keyInput.value = this.generateChannelKey();
+                keyInput.classList.remove('is-invalid');
+            }
+        });
+    },
+    
+    /**
+     * Handle form submission with channel key validation
+     * @param {HTMLFormElement} form - Form element
+     * @param {string} customRadioId - ID of custom radio button
+     * @param {string} keyInputId - ID of key input field
+     * @returns {boolean} True if valid, false to prevent submission
+     */
+    validateChannelKeyOnSubmit(form, customRadioId, keyInputId) {
+        const customRadio = document.getElementById(customRadioId);
+        const keyInput = document.getElementById(keyInputId);
+        
+        if (customRadio?.checked && keyInput) {
+            if (!this.validateChannelKey(keyInput.value)) {
+                keyInput.classList.add('is-invalid');
+                keyInput.focus();
+                return false;
+            }
+            // Set the radio value to the actual key for form submission
+            customRadio.value = keyInput.value;
+        }
+        return true;
+    },
+    
+    /**
+     * Initialize standalone channel key generator (for generate page)
+     * @param {string} inputId - ID of generated key input
+     * @param {string} generateBtnId - ID of generate button
+     * @param {string} copyBtnId - ID of copy button
+     */
+    initChannelKeyGenerator(inputId, generateBtnId, copyBtnId) {
+        const input = document.getElementById(inputId);
+        const generateBtn = document.getElementById(generateBtnId);
+        const copyBtn = document.getElementById(copyBtnId);
+        
+        generateBtn?.addEventListener('click', () => {
+            if (input) {
+                input.value = this.generateChannelKey();
+            }
+            if (copyBtn) {
+                copyBtn.disabled = false;
+            }
+        });
+        
+        copyBtn?.addEventListener('click', () => {
+            if (input?.value) {
+                navigator.clipboard.writeText(input.value).then(() => {
+                    const icon = copyBtn.querySelector('i');
+                    if (icon) {
+                        icon.className = 'bi bi-check';
+                        setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+                    }
+                });
+            }
+        });
+    },
+    
+    // ========================================================================
     // INITIALIZATION HELPERS
     // ========================================================================
     
@@ -707,8 +878,30 @@ const Stegasoo = {
         this.initClipboardPaste(['input[name="carrier"]', 'input[name="reference_photo"]']);
         this.initQrCropAnimation('rsaQrInput');
         this.initCollapseChevrons();
-        this.initFormLoading('encodeForm', 'encodeBtn', 'Encoding...');
         this.initPassphraseFontResize();
+        
+        // Channel key (v4.0.0) - uses mode-btn style
+        this.initChannelKey({
+            customInputId: 'channelCustomInput',
+            keyInputId: 'channelKeyInput',
+            generateBtnId: 'channelKeyGenerate',
+            customRadioId: 'channelCustom',
+            cardIds: ['channelAutoCard', 'channelPublicCard', 'channelCustomCard']
+        });
+        
+        // Form submission with channel key validation
+        const form = document.getElementById('encodeForm');
+        const btn = document.getElementById('encodeBtn');
+        form?.addEventListener('submit', (e) => {
+            if (!this.validateChannelKeyOnSubmit(form, 'channelCustom', 'channelKeyInput')) {
+                e.preventDefault();
+                return false;
+            }
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+            }
+        });
     },
     
     initDecodePage() {
@@ -718,13 +911,36 @@ const Stegasoo = {
         this.initClipboardPaste(['input[name="stego_image"]', 'input[name="reference_photo"]']);
         this.initQrCropAnimation('rsaKeyQrInput');
         this.initCollapseChevrons();
-        this.initFormLoading('decodeForm', 'decodeBtn', 'Decoding...');
         this.initPassphraseFontResize();
+        
+        // Channel key (v4.0.0) - uses mode-btn style
+        this.initChannelKey({
+            customInputId: 'channelCustomInputDec',
+            keyInputId: 'channelKeyInputDec',
+            customRadioId: 'channelCustomDec',
+            cardIds: ['channelAutoCardDec', 'channelPublicCardDec', 'channelCustomCardDec']
+        });
+        
+        // Form submission with channel key validation and mode display
+        const form = document.getElementById('decodeForm');
+        const btn = document.getElementById('decodeBtn');
+        form?.addEventListener('submit', (e) => {
+            if (!this.validateChannelKeyOnSubmit(form, 'channelCustomDec', 'channelKeyInputDec')) {
+                e.preventDefault();
+                return false;
+            }
+            const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
+            }
+        });
     },
     
     initGeneratePage() {
         this.initPasswordToggles();
-        // Generate page has mostly unique functionality
+        // Channel key generator (v4.0.0)
+        this.initChannelKeyGenerator('channelKeyGenerated', 'generateChannelKeyBtn', 'copyChannelKeyBtn');
     }
 };
 

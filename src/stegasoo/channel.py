@@ -1,5 +1,5 @@
 """
-Channel Key Management for Stegasoo (v3.2.0)
+Channel Key Management for Stegasoo (v4.0.0)
 
 A channel key ties encode/decode operations to a specific deployment or group.
 Messages encoded with one channel key can only be decoded by systems with the
@@ -16,15 +16,12 @@ Storage priority:
 2. Config file: ~/.stegasoo/channel.key or ./config/channel.key
 3. None (public mode - compatible with any instance without a channel key)
 
-STATUS: This module is IMPLEMENTED but NOT YET INTEGRATED into crypto.py.
-        The get_channel_key_hash() function should be mixed into key derivation
-        in a future release.
-
-TODO (v3.3.0):
-- Integrate get_channel_key_hash() into derive_hybrid_key() in crypto.py
-- Add --channel-key option to CLI
-- Add channel key display to web UI
-- Document channel key feature in README
+INTEGRATION STATUS (v4.0.0):
+- ✅ get_channel_key_hash() integrated into derive_hybrid_key() in crypto.py
+- ✅ get_channel_key_hash() integrated into derive_pixel_key() in crypto.py
+- ✅ channel_key parameter added to encode() and decode() functions
+- ✅ Header flags indicate whether message was encoded with channel key
+- ✅ Helpful error messages for channel key mismatches
 """
 
 import os
@@ -257,11 +254,8 @@ def get_channel_key_hash(key: Optional[str] = None) -> Optional[bytes]:
     """
     Get the channel key as a 32-byte hash suitable for key derivation.
     
-    This hash is designed to be mixed into the Argon2 key derivation to bind
+    This hash is mixed into the Argon2 key derivation to bind
     encryption to a specific channel.
-    
-    NOTE: This function is implemented but not yet integrated into crypto.py.
-          See TODO at top of file for integration plan.
     
     Args:
         key: Channel key (if None, reads from config)

@@ -1,10 +1,14 @@
 """
-Stegasoo Decode Module (v3.2.0)
+Stegasoo Decode Module (v4.0.0)
 
 High-level decoding functions for extracting messages and files from images.
+
+Changes in v4.0.0:
+- Added channel_key parameter for deployment/group isolation
+- Improved error messages for channel key mismatches
 """
 
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
 
 from .models import DecodeInput, DecodeResult
@@ -29,6 +33,7 @@ def decode(
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
     embed_mode: str = EMBED_MODE_AUTO,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> DecodeResult:
     """
     Decode a message or file from a stego image.
@@ -41,6 +46,10 @@ def decode(
         rsa_key_data: Optional RSA key bytes (if used during encoding)
         rsa_password: Optional RSA key password
         embed_mode: 'auto' (default), 'lsb', or 'dct'
+        channel_key: Channel key for deployment/group isolation:
+            - None or "auto": Use server's configured key
+            - str: Use this specific channel key
+            - "" or False: No channel key (public mode)
         
     Returns:
         DecodeResult with message or file data
@@ -57,9 +66,19 @@ def decode(
         ... else:
         ...     with open(result.filename, 'wb') as f:
         ...         f.write(result.file_data)
+        
+    Example with explicit channel key:
+        >>> result = decode(
+        ...     stego_image=stego_bytes,
+        ...     reference_photo=ref_bytes,
+        ...     passphrase="apple forest thunder mountain",
+        ...     pin="123456",
+        ...     channel_key="ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456"
+        ... )
     """
     debug.print(f"decode: passphrase length={len(passphrase.split())} words, "
-                f"mode={embed_mode}")
+                f"mode={embed_mode}, "
+                f"channel_key={'explicit' if isinstance(channel_key, str) and channel_key else 'auto' if channel_key is None else 'none'}")
     
     # Validate inputs
     require_valid_image(stego_image, "Stego image")
@@ -71,10 +90,10 @@ def decode(
     if rsa_key_data:
         require_valid_rsa_key(rsa_key_data, rsa_password)
     
-    # Derive pixel/coefficient selection key
+    # Derive pixel/coefficient selection key (with channel key)
     from .crypto import derive_pixel_key
     pixel_key = derive_pixel_key(
-        reference_photo, passphrase, pin, rsa_key_data
+        reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
     
     # Extract encrypted data
@@ -90,9 +109,9 @@ def decode(
     
     debug.print(f"Extracted {len(encrypted)} bytes from image")
     
-    # Decrypt
+    # Decrypt (with channel key)
     result = decrypt_message(
-        encrypted, reference_photo, passphrase, pin, rsa_key_data
+        encrypted, reference_photo, passphrase, pin, rsa_key_data, channel_key
     )
     
     debug.print(f"Decryption successful: {result.payload_type}")
@@ -108,6 +127,7 @@ def decode_file(
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
     embed_mode: str = EMBED_MODE_AUTO,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> Path:
     """
     Decode a file from a stego image and save it.
@@ -121,6 +141,7 @@ def decode_file(
         rsa_key_data: Optional RSA key bytes
         rsa_password: Optional RSA key password
         embed_mode: 'auto', 'lsb', or 'dct'
+        channel_key: Channel key parameter (see decode())
         
     Returns:
         Path where file was saved
@@ -136,6 +157,7 @@ def decode_file(
         rsa_key_data,
         rsa_password,
         embed_mode,
+        channel_key,
     )
     
     if not result.is_file:
@@ -163,6 +185,7 @@ def decode_text(
     rsa_key_data: Optional[bytes] = None,
     rsa_password: Optional[str] = None,
     embed_mode: str = EMBED_MODE_AUTO,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> str:
     """
     Decode a text message from a stego image.
@@ -177,6 +200,7 @@ def decode_text(
         rsa_key_data: Optional RSA key bytes
         rsa_password: Optional RSA key password
         embed_mode: 'auto', 'lsb', or 'dct'
+        channel_key: Channel key parameter (see decode())
         
     Returns:
         Decoded message string
@@ -192,6 +216,7 @@ def decode_text(
         rsa_key_data,
         rsa_password,
         embed_mode,
+        channel_key,
     )
     
     if result.is_file:

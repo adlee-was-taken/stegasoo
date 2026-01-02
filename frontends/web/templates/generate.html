@@ -3,7 +3,7 @@
 {% block title %}Generate Credentials - Stegasoo{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
+<div class="row justify-content-center" data-page="generate">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
@@ -72,6 +72,32 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Channel Key Generation (v4.0.0) -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-broadcast me-1"></i> Channel Key
+                            <span class="badge bg-info ms-1">v4.0</span>
+                            <a href="{{ url_for('about') }}#channel-keys" class="text-muted ms-2" title="Learn about channel keys">
+                                <i class="bi bi-question-circle"></i>
+                            </a>
+                        </label>
+                        
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-key"></i></span>
+                            <input type="text" class="form-control font-monospace" id="channelKeyGenerated" 
+                                   placeholder="Click Generate" readonly>
+                            <button class="btn btn-outline-primary" type="button" id="generateChannelKeyBtn">
+                                <i class="bi bi-shuffle me-1"></i>Generate
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" id="copyChannelKeyBtn" disabled title="Copy to clipboard">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">For private groups: generate, then use <strong>Custom</strong> mode when encoding/decoding.</div>
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">

@@ -1,15 +1,18 @@
 """
-Stegasoo Cryptographic Functions (v3.2.0 - Date Independent)
+Stegasoo Cryptographic Functions (v4.0.0 - Channel Key Support)
 
 Key derivation, encryption, and decryption using AES-256-GCM.
 Supports both text messages and binary file payloads.
 
+BREAKING CHANGES in v4.0.0:
+- Added channel key support for deployment/group isolation
+- Messages encoded with a channel key require the same key to decode
+- Channel key can be configured via environment, config file, or explicit parameter
+- FORMAT_VERSION bumped to 5
+
 BREAKING CHANGES in v3.2.0:
 - Removed date dependency from key derivation
 - Renamed day_phrase → passphrase (no daily rotation needed)
-- Messages can now be decoded without knowing encoding date
-- Enables true asynchronous communication
-- NOT backward compatible with v3.1.0 and earlier
 """
 
 import io
@@ -46,6 +49,51 @@ except ImportError:
     from cryptography.hazmat.primitives import hashes
 
 
+# =============================================================================
+# CHANNEL KEY RESOLUTION
+# =============================================================================
+
+# Sentinel value for "use auto-detected channel key"
+CHANNEL_KEY_AUTO = "auto"
+
+
+def _resolve_channel_key(channel_key: Optional[Union[str, bool]]) -> Optional[bytes]:
+    """
+    Resolve channel key parameter to actual key hash.
+    
+    Args:
+        channel_key: Channel key parameter with these behaviors:
+            - None or "auto": Use server's configured key (from env/config)
+            - str (valid key): Use this specific key
+            - "" or False: Explicitly use NO channel key (public mode)
+            
+    Returns:
+        32-byte channel key hash, or None for public mode
+    """
+    # Explicit public mode
+    if channel_key == "" or channel_key is False:
+        return None
+    
+    # Auto-detect from environment/config
+    if channel_key is None or channel_key == CHANNEL_KEY_AUTO:
+        from .channel import get_channel_key_hash
+        return get_channel_key_hash()
+    
+    # Explicit key provided - validate and hash it
+    if isinstance(channel_key, str):
+        from .channel import format_channel_key, validate_channel_key
+        if not validate_channel_key(channel_key):
+            raise ValueError(f"Invalid channel key format: {channel_key}")
+        formatted = format_channel_key(channel_key)
+        return hashlib.sha256(formatted.encode('utf-8')).digest()
+    
+    raise ValueError(f"Invalid channel_key type: {type(channel_key)}")
+
+
+# =============================================================================
+# CORE CRYPTO FUNCTIONS
+# =============================================================================
+
 def hash_photo(image_data: bytes) -> bytes:
     """
     Compute deterministic hash of photo pixel content.
@@ -73,7 +121,8 @@ def derive_hybrid_key(
     passphrase: str,
     salt: bytes,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None
+    rsa_key_data: Optional[bytes] = None,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> bytes:
     """
     Derive encryption key from multiple factors.
@@ -83,12 +132,10 @@ def derive_hybrid_key(
     - Passphrase (something you know)
     - PIN (something you know, static)
     - RSA key (something you have)
+    - Channel key (deployment/group binding)
     - Salt (random per message)
     
     Uses Argon2id if available, falls back to PBKDF2.
-    
-    NOTE: v3.2.0 removed date dependency and daily rotation.
-    Use a strong static passphrase instead (recommend 4+ words).
     
     Args:
         photo_data: Reference photo bytes
@@ -96,6 +143,10 @@ def derive_hybrid_key(
         salt: Random salt for this message
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
+        channel_key: Channel key parameter:
+            - None or "auto": Use configured key
+            - str: Use this specific key
+            - "" or False: No channel key (public mode)
         
     Returns:
         32-byte derived key
@@ -106,6 +157,10 @@ def derive_hybrid_key(
     try:
         photo_hash = hash_photo(photo_data)
         
+        # Resolve channel key
+        channel_hash = _resolve_channel_key(channel_key)
+        
+        # Build key material
         key_material = (
             photo_hash +
             passphrase.lower().encode() +
@@ -116,6 +171,10 @@ def derive_hybrid_key(
         # Add RSA key hash if provided
         if rsa_key_data:
             key_material += hashlib.sha256(rsa_key_data).digest()
+        
+        # Add channel key hash if configured (v4.0.0)
+        if channel_hash:
+            key_material += channel_hash
         
         if HAS_ARGON2:
             key = hash_secret_raw(
@@ -147,7 +206,8 @@ def derive_pixel_key(
     photo_data: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None
+    rsa_key_data: Optional[bytes] = None,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> bytes:
     """
     Derive key for pseudo-random pixel selection.
@@ -155,18 +215,20 @@ def derive_pixel_key(
     This key determines which pixels are used for embedding,
     making the message location unpredictable without the correct inputs.
     
-    NOTE: v3.2.0 removed date dependency.
-    
     Args:
         photo_data: Reference photo bytes
         passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
+        channel_key: Channel key parameter (see derive_hybrid_key)
         
     Returns:
         32-byte key for pixel selection
     """
     photo_hash = hash_photo(photo_data)
+    
+    # Resolve channel key
+    channel_hash = _resolve_channel_key(channel_key)
     
     material = (
         photo_hash +
@@ -176,6 +238,10 @@ def derive_pixel_key(
     
     if rsa_key_data:
         material += hashlib.sha256(rsa_key_data).digest()
+    
+    # Add channel key hash if configured (v4.0.0)
+    if channel_hash:
+        material += channel_hash
     
     return hashlib.sha256(material + b"pixel_selection").digest()
 
@@ -284,19 +350,29 @@ def _unpack_payload(data: bytes) -> DecodeResult:
             return DecodeResult(payload_type='file', file_data=data)
 
 
+# =============================================================================
+# HEADER FLAGS (v4.0.0)
+# =============================================================================
+
+# Header flag bits
+FLAG_CHANNEL_KEY = 0x01  # Set if encoded with a channel key
+
+
 def encrypt_message(
     message: Union[str, bytes, FilePayload],
     photo_data: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None
+    rsa_key_data: Optional[bytes] = None,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> bytes:
     """
     Encrypt message or file using AES-256-GCM with hybrid key derivation.
     
-    Message format (v3.2.0 - no date):
+    Message format (v4.0.0 - with channel key support):
     - Magic header (4 bytes)
-    - Version (1 byte) = 4
+    - Version (1 byte) = 5
+    - Flags (1 byte) - indicates if channel key was used
     - Salt (32 bytes)
     - IV (12 bytes)
     - Auth tag (16 bytes)
@@ -308,6 +384,10 @@ def encrypt_message(
         passphrase: Shared passphrase (recommend 4+ words for good entropy)
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
+        channel_key: Channel key parameter:
+            - None or "auto": Use configured key
+            - str: Use this specific key  
+            - "" or False: No channel key (public mode)
         
     Returns:
         Encrypted message bytes
@@ -317,8 +397,14 @@ def encrypt_message(
     """
     try:
         salt = secrets.token_bytes(SALT_SIZE)
-        key = derive_hybrid_key(photo_data, passphrase, salt, pin, rsa_key_data)
+        key = derive_hybrid_key(photo_data, passphrase, salt, pin, rsa_key_data, channel_key)
         iv = secrets.token_bytes(IV_SIZE)
+        
+        # Determine flags
+        flags = 0
+        channel_hash = _resolve_channel_key(channel_key)
+        if channel_hash:
+            flags |= FLAG_CHANNEL_KEY
         
         # Pack payload with type marker
         packed_payload, _ = _pack_payload(message)
@@ -330,16 +416,18 @@ def encrypt_message(
         padding = secrets.token_bytes(padding_needed - 4) + struct.pack('>I', len(packed_payload))
         padded_message = packed_payload + padding
         
+        # Build header for AAD
+        header = MAGIC_HEADER + bytes([FORMAT_VERSION, flags])
+        
         # Encrypt with AES-256-GCM
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
         encryptor = cipher.encryptor()
-        encryptor.authenticate_additional_data(MAGIC_HEADER + bytes([FORMAT_VERSION]))
+        encryptor.authenticate_additional_data(header)
         ciphertext = encryptor.update(padded_message) + encryptor.finalize()
         
-        # v3.2.0: Simplified header without date
+        # v4.0.0: Header with flags byte
         return (
-            MAGIC_HEADER +
-            bytes([FORMAT_VERSION]) +
+            header +
             salt +
             iv +
             encryptor.tag +
@@ -354,16 +442,16 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
     """
     Parse the header from encrypted data.
     
-    v3.2.0: No date field in header.
+    v4.0.0: Includes flags byte for channel key indicator.
     
     Args:
         encrypted_data: Raw encrypted bytes
         
     Returns:
-        Dict with salt, iv, tag, ciphertext or None if invalid
+        Dict with salt, iv, tag, ciphertext, flags or None if invalid
     """
-    # Min size: Magic(4) + Version(1) + Salt(32) + IV(12) + Tag(16) = 65 bytes
-    if len(encrypted_data) < 65 or encrypted_data[:4] != MAGIC_HEADER:
+    # Min size: Magic(4) + Version(1) + Flags(1) + Salt(32) + IV(12) + Tag(16) = 66 bytes
+    if len(encrypted_data) < 66 or encrypted_data[:4] != MAGIC_HEADER:
         return None
     
     try:
@@ -371,7 +459,9 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
         if version != FORMAT_VERSION:
             return None
         
-        offset = 5
+        flags = encrypted_data[5]
+        
+        offset = 6
         salt = encrypted_data[offset:offset + SALT_SIZE]
         offset += SALT_SIZE
         iv = encrypted_data[offset:offset + IV_SIZE]
@@ -381,6 +471,9 @@ def parse_header(encrypted_data: bytes) -> Optional[dict]:
         ciphertext = encrypted_data[offset:]
         
         return {
+            'version': version,
+            'flags': flags,
+            'has_channel_key': bool(flags & FLAG_CHANNEL_KEY),
             'salt': salt,
             'iv': iv,
             'tag': tag,
@@ -395,10 +488,11 @@ def decrypt_message(
     photo_data: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None
+    rsa_key_data: Optional[bytes] = None,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> DecodeResult:
     """
-    Decrypt message (v3.2.0 - no date needed).
+    Decrypt message (v4.0.0 - with channel key support).
     
     Args:
         encrypted_data: Encrypted message bytes
@@ -406,6 +500,7 @@ def decrypt_message(
         passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
+        channel_key: Channel key parameter (see encrypt_message)
         
     Returns:
         DecodeResult with decrypted content
@@ -418,10 +513,18 @@ def decrypt_message(
     if not header:
         raise InvalidHeaderError("Invalid or missing Stegasoo header")
     
+    # Check for channel key mismatch and provide helpful error
+    channel_hash = _resolve_channel_key(channel_key)
+    has_configured_key = channel_hash is not None
+    message_has_key = header['has_channel_key']
+    
     try:
         key = derive_hybrid_key(
-            photo_data, passphrase, header['salt'], pin, rsa_key_data
+            photo_data, passphrase, header['salt'], pin, rsa_key_data, channel_key
         )
+        
+        # Reconstruct header for AAD verification
+        aad_header = MAGIC_HEADER + bytes([FORMAT_VERSION, header['flags']])
         
         cipher = Cipher(
             algorithms.AES(key),
@@ -429,7 +532,7 @@ def decrypt_message(
             backend=default_backend()
         )
         decryptor = cipher.decryptor()
-        decryptor.authenticate_additional_data(MAGIC_HEADER + bytes([FORMAT_VERSION]))
+        decryptor.authenticate_additional_data(aad_header)
         
         padded_plaintext = decryptor.update(header['ciphertext']) + decryptor.finalize()
         original_length = struct.unpack('>I', padded_plaintext[-4:])[0]
@@ -437,14 +540,25 @@ def decrypt_message(
         payload_data = padded_plaintext[:original_length]
         result = _unpack_payload(payload_data)
         
-        # Note: No date_encoded field in v3.2.0
-        
         return result
         
     except Exception as e:
-        raise DecryptionError(
-            "Decryption failed. Check your passphrase, PIN, RSA key, and reference photo."
-        ) from e
+        # Provide more helpful error message for channel key issues
+        if message_has_key and not has_configured_key:
+            raise DecryptionError(
+                "Decryption failed. This message was encoded with a channel key, "
+                "but no channel key is configured. Provide the correct channel key."
+            ) from e
+        elif not message_has_key and has_configured_key:
+            raise DecryptionError(
+                "Decryption failed. This message was encoded without a channel key, "
+                "but you have one configured. Try with channel_key='' for public mode."
+            ) from e
+        else:
+            raise DecryptionError(
+                "Decryption failed. Check your passphrase, PIN, RSA key, "
+                "reference photo, and channel key."
+            ) from e
 
 
 def decrypt_message_text(
@@ -452,7 +566,8 @@ def decrypt_message_text(
     photo_data: bytes,
     passphrase: str,
     pin: str = "",
-    rsa_key_data: Optional[bytes] = None
+    rsa_key_data: Optional[bytes] = None,
+    channel_key: Optional[Union[str, bool]] = None,
 ) -> str:
     """
     Decrypt message and return as text string.
@@ -465,6 +580,7 @@ def decrypt_message_text(
         passphrase: Shared passphrase
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
+        channel_key: Channel key parameter
         
     Returns:
         Decrypted message string
@@ -472,7 +588,7 @@ def decrypt_message_text(
     Raises:
         DecryptionError: If decryption fails or content is a file
     """
-    result = decrypt_message(encrypted_data, photo_data, passphrase, pin, rsa_key_data)
+    result = decrypt_message(encrypted_data, photo_data, passphrase, pin, rsa_key_data, channel_key)
     
     if result.is_file:
         if result.file_data:
@@ -491,3 +607,29 @@ def decrypt_message_text(
 def has_argon2() -> bool:
     """Check if Argon2 is available."""
     return HAS_ARGON2
+
+
+# =============================================================================
+# CHANNEL KEY UTILITIES (exposed for convenience)
+# =============================================================================
+
+def get_active_channel_key() -> Optional[str]:
+    """
+    Get the currently configured channel key (if any).
+    
+    Returns:
+        Formatted channel key string, or None if not configured
+    """
+    from .channel import get_channel_key
+    return get_channel_key()
+
+
+def get_channel_fingerprint() -> Optional[str]:
+    """
+    Get a display-safe fingerprint of the configured channel key.
+    
+    Returns:
+        Masked key like "ABCD-••••-••••-••••-••••-••••-••••-3456" or None
+    """
+    from .channel import get_channel_fingerprint as _get_fingerprint
+    return _get_fingerprint()
