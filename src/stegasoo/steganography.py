@@ -117,7 +117,8 @@ def has_dct_support() -> bool:
     try:
         dct_mod = _get_dct_module()
         return dct_mod.has_dct_support()
-    except ImportError:
+    except (ImportError, ValueError):
+        # ValueError: numpy binary incompatibility (e.g., jpegio built against numpy 2.x)
         return False
 
 
