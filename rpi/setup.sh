@@ -203,43 +203,188 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 echo -e "Stegasoo installed to: ${YELLOW}$INSTALL_DIR${NC}"
 echo ""
-echo -e "${GREEN}Verify installation:${NC}"
-echo "  source $INSTALL_DIR/venv/bin/activate"
-echo "  python -c \"import stegasoo; print(stegasoo.__version__)\""
+
+# =============================================================================
+# Interactive Configuration
+# =============================================================================
+
+echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║${NC}                    ${YELLOW}Configuration${NC}                              ${BLUE}║${NC}"
+echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${GREEN}Start the service:${NC}"
-echo "  sudo systemctl start stegasoo"
+
+# Track configuration choices
+ENABLE_HTTPS="false"
+USE_PORT_443="false"
+CHANNEL_KEY=""
+
+# --- HTTPS Configuration ---
+echo -e "${GREEN}HTTPS Configuration${NC}"
+echo "  HTTPS encrypts traffic with a self-signed certificate."
+echo "  (Browser will show a security warning - this is normal for self-signed certs)"
 echo ""
-echo -e "${GREEN}Check status:${NC}"
-echo "  sudo systemctl status stegasoo"
+read -p "Enable HTTPS? [y/N] " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    ENABLE_HTTPS="true"
+    echo -e "  ${GREEN}✓${NC} HTTPS will be enabled"
+
+    # --- Port 443 Configuration ---
+    echo ""
+    echo -e "${GREEN}Port Configuration${NC}"
+    echo "  Standard HTTPS port is 443 (no port needed in URL)."
+    echo "  This requires iptables to redirect 443 → 5000."
+    echo ""
+    read -p "Use standard port 443? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        USE_PORT_443="true"
+        echo -e "  ${GREEN}✓${NC} Port 443 will be configured"
+    else
+        echo -e "  ${YELLOW}→${NC} Using default port 5000"
+    fi
+else
+    echo -e "  ${YELLOW}→${NC} Using HTTP (unencrypted)"
+fi
+
+# --- Channel Key Configuration ---
 echo ""
-echo -e "${GREEN}View logs:${NC}"
-echo "  journalctl -u stegasoo -f"
+echo -e "${GREEN}Channel Key Configuration${NC}"
+echo "  A channel key creates a private encoding channel."
+echo "  Only users with the same key can decode each other's images."
 echo ""
-echo -e "${GREEN}Access Web UI:${NC}"
+read -p "Generate a private channel key? [y/N] " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # Generate channel key using the CLI
+    CHANNEL_KEY=$($INSTALL_DIR/venv/bin/python -c "from stegasoo.channel import generate_channel_key; print(generate_channel_key())")
+    echo -e "  ${GREEN}✓${NC} Channel key generated: ${YELLOW}$CHANNEL_KEY${NC}"
+    echo ""
+    echo -e "  ${RED}IMPORTANT: Save this key!${NC} You'll need to share it with anyone"
+    echo "  who should be able to decode your images."
+else
+    echo -e "  ${YELLOW}→${NC} Using public mode (no channel isolation)"
+fi
+
+# =============================================================================
+# Apply Configuration
+# =============================================================================
+
+echo ""
+echo -e "${BLUE}Applying configuration...${NC}"
+
+# Update systemd service with configuration
+sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
+[Unit]
+Description=Stegasoo Web UI
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$INSTALL_DIR/frontends/web
+Environment="PATH=$INSTALL_DIR/venv/bin:/usr/bin"
+Environment="STEGASOO_AUTH_ENABLED=true"
+Environment="STEGASOO_HTTPS_ENABLED=$ENABLE_HTTPS"
+Environment="STEGASOO_PORT=5000"
+Environment="STEGASOO_CHANNEL_KEY=$CHANNEL_KEY"
+ExecStart=$INSTALL_DIR/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Setup port 443 redirect if requested
+if [ "$USE_PORT_443" = "true" ]; then
+    echo "  Setting up port 443 redirect..."
+
+    # Install iptables if needed
+    if ! command -v iptables &> /dev/null; then
+        sudo apt-get install -y iptables
+    fi
+
+    # Add redirect rule
+    sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000
+    sudo sh -c 'iptables-save > /etc/iptables.rules'
+
+    # Create systemd service to restore rules on boot
+    sudo tee /etc/systemd/system/iptables-restore.service > /dev/null <<EOF
+[Unit]
+Description=Restore iptables rules
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iptables-restore /etc/iptables.rules
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo systemctl enable iptables-restore.service
+    echo -e "  ${GREEN}✓${NC} Port 443 redirect configured"
+fi
+
+sudo systemctl daemon-reload
+
+# =============================================================================
+# Final Summary
+# =============================================================================
+
+echo ""
+echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║${NC}                    ${GREEN}Setup Complete!${NC}                             ${BLUE}║${NC}"
+echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
 PI_IP=$(hostname -I | awk '{print $1}')
-echo "  http://$PI_IP:5000  (default port, configurable via STEGASOO_PORT)"
+
+echo -e "${GREEN}Your Stegasoo server:${NC}"
+if [ "$ENABLE_HTTPS" = "true" ]; then
+    if [ "$USE_PORT_443" = "true" ]; then
+        echo -e "  ${YELLOW}https://$PI_IP${NC}"
+    else
+        echo -e "  ${YELLOW}https://$PI_IP:5000${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}http://$PI_IP:5000${NC}"
+fi
+
 echo ""
-echo -e "${YELLOW}Note: On first access, you'll be prompted to create an admin account.${NC}"
+if [ -n "$CHANNEL_KEY" ]; then
+    echo -e "${GREEN}Channel Key:${NC}"
+    echo -e "  ${YELLOW}$CHANNEL_KEY${NC}"
+    echo ""
+fi
+
+echo -e "${GREEN}Commands:${NC}"
+echo "  Start:   sudo systemctl start stegasoo"
+echo "  Stop:    sudo systemctl stop stegasoo"
+echo "  Status:  sudo systemctl status stegasoo"
+echo "  Logs:    journalctl -u stegasoo -f"
 echo ""
-echo -e "${GREEN}Enable HTTPS:${NC}"
-echo "  sudo nano /etc/systemd/system/stegasoo.service"
+echo -e "${YELLOW}Note: On first access, you'll create an admin account.${NC}"
 echo ""
-echo "  Change: Environment=\"STEGASOO_HTTPS_ENABLED=false\""
-echo "  To:     Environment=\"STEGASOO_HTTPS_ENABLED=true\""
-echo ""
-echo "  Save (Ctrl+O, Enter, Ctrl+X), then:"
-echo "    sudo systemctl daemon-reload"
-echo "    sudo systemctl restart stegasoo"
-echo ""
-echo -e "${GREEN}Private Channel Key (optional):${NC}"
-echo "  Generate a key:"
-echo "    source $INSTALL_DIR/venv/bin/activate"
-echo "    stegasoo generate --channel-key"
-echo ""
-echo "  Add to the service file (same nano command above):"
-echo "    Environment=\"STEGASOO_CHANNEL_KEY=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX\""
-echo ""
-echo "  This ensures only users with the same key can decode your images."
-echo ""
-echo -e "To start now: ${YELLOW}sudo systemctl start stegasoo${NC}"
+
+# Offer to start now
+read -p "Start Stegasoo now? [Y/n] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    sudo systemctl start stegasoo
+    sleep 2
+    if systemctl is-active --quiet stegasoo; then
+        echo -e "${GREEN}✓ Stegasoo is running!${NC}"
+        if [ "$ENABLE_HTTPS" = "true" ]; then
+            if [ "$USE_PORT_443" = "true" ]; then
+                echo -e "  Visit: ${YELLOW}https://$PI_IP${NC}"
+            else
+                echo -e "  Visit: ${YELLOW}https://$PI_IP:5000${NC}"
+            fi
+        else
+            echo -e "  Visit: ${YELLOW}http://$PI_IP:5000${NC}"
+        fi
+    else
+        echo -e "${RED}✗ Failed to start. Check logs:${NC} journalctl -u stegasoo -f"
+    fi
+fi
