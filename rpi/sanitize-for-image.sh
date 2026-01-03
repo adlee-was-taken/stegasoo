@@ -90,7 +90,22 @@ echo "  Stegasoo instance data cleared"
 echo -e "${GREEN}[5/9]${NC} Setting up first-boot wizard..."
 # Find stegasoo install directory
 STEGASOO_DIR=$(ls -d /home/*/stegasoo 2>/dev/null | head -1)
+echo "  Looking for stegasoo in: $STEGASOO_DIR"
+
+if [ -z "$STEGASOO_DIR" ]; then
+    echo -e "  ${RED}ERROR: Could not find stegasoo directory in /home/*/stegasoo${NC}"
+    echo "  Checking common locations..."
+    for dir in /home/*/stegasoo /root/stegasoo /opt/stegasoo; do
+        if [ -d "$dir" ]; then
+            STEGASOO_DIR="$dir"
+            echo "  Found at: $STEGASOO_DIR"
+            break
+        fi
+    done
+fi
+
 STEGASOO_USER=$(stat -c '%U' "$STEGASOO_DIR" 2>/dev/null || echo "pi")
+echo "  Stegasoo user: $STEGASOO_USER"
 
 if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
     # Install the profile.d hook
@@ -126,8 +141,21 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     echo "  Reset service to defaults"
+
+    # Verify files were created
+    if [ -f /etc/stegasoo-first-boot ] && [ -f /etc/profile.d/stegasoo-wizard.sh ]; then
+        echo -e "  ${GREEN}✓ Wizard setup verified${NC}"
+    else
+        echo -e "  ${RED}✗ Wizard files missing after setup!${NC}"
+    fi
 else
-    echo "  ${YELLOW}Warning: Stegasoo not found, skipping wizard setup${NC}"
+    echo -e "  ${RED}ERROR: Could not set up wizard${NC}"
+    echo "  STEGASOO_DIR: $STEGASOO_DIR"
+    echo "  Wizard script exists: $([ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ] && echo 'yes' || echo 'NO')"
+    echo ""
+    echo "  You may need to manually run:"
+    echo "    sudo touch /etc/stegasoo-first-boot"
+    echo "    sudo cp $STEGASOO_DIR/rpi/stegasoo-wizard.sh /etc/profile.d/"
 fi
 
 echo -e "${GREEN}[6/9]${NC} Clearing logs..."

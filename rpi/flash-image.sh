@@ -3,8 +3,10 @@
 # Flash Stegasoo image to SD card
 # Auto-detects SD card, decompresses and writes with progress
 #
-# Usage: ./flash-image.sh <image.img.xz>
-#        ./flash-image.sh <image.img>
+# Usage: ./flash-image.sh <image.img.xz> [device]
+#        ./flash-image.sh <image.img> [device]
+#
+# If device is specified, skips auto-detection (useful for large drives)
 #
 
 set -e
@@ -32,15 +34,16 @@ fi
 
 # Check for image argument
 if [ -z "$1" ]; then
-    echo -e "${RED}Usage: $0 <image.img.xz|image.img>${NC}"
+    echo -e "${RED}Usage: $0 <image.img.xz|image.img> [device]${NC}"
     echo ""
     echo "Examples:"
-    echo "  $0 stegasoo-rpi-20260103.img.xz"
-    echo "  $0 stegasoo-rpi-20260103.img"
+    echo "  $0 stegasoo-rpi-20260103.img.xz           # auto-detect SD card"
+    echo "  $0 stegasoo-rpi-20260103.img.xz /dev/sdb  # specify device"
     exit 1
 fi
 
 IMAGE="$1"
+MANUAL_DEVICE="$2"
 
 if [ ! -f "$IMAGE" ]; then
     echo -e "${RED}Error: Image file not found: $IMAGE${NC}"
@@ -86,77 +89,86 @@ if [ "$COMPRESSED" = true ]; then
 fi
 echo ""
 
-# Auto-detect SD card candidates
-echo -e "${BOLD}Scanning for SD cards...${NC}"
-echo ""
-
-declare -a CANDIDATES
-declare -a CANDIDATE_INFO
-
-while IFS= read -r line; do
-    DEV=$(echo "$line" | awk '{print $1}')
-    SIZE=$(echo "$line" | awk '{print $2}')
-    TYPE=$(echo "$line" | awk '{print $3}')
-    TRAN=$(echo "$line" | awk '{print $4}')
-    MODEL=$(echo "$line" | awk '{print $5" "$6" "$7}' | xargs)
-
-    # Skip if it's the root filesystem
-    if mount | grep -q "^/dev/${DEV}[0-9]* on / "; then
-        continue
-    fi
-
-    # Skip if any partition is mounted as root
-    ROOT_DEV=$(mount | grep " on / " | awk '{print $1}' | sed 's/[0-9]*$//')
-    if [[ "/dev/$DEV" == "$ROOT_DEV" ]]; then
-        continue
-    fi
-
-    # Parse size to bytes for comparison
-    SIZE_NUM=$(echo "$SIZE" | sed 's/[^0-9.]//g')
-    SIZE_UNIT=$(echo "$SIZE" | sed 's/[0-9.]//g')
-
-    case $SIZE_UNIT in
-        G) SIZE_GB=$SIZE_NUM ;;
-        T) SIZE_GB=$(echo "$SIZE_NUM * 1024" | bc) ;;
-        M) SIZE_GB=$(echo "scale=2; $SIZE_NUM / 1024" | bc) ;;
-        *) SIZE_GB=0 ;;
-    esac
-
-    # Check if size is in SD card range (8GB - 128GB)
-    if (( $(echo "$SIZE_GB >= 8" | bc -l) )) && (( $(echo "$SIZE_GB <= 128" | bc -l) )); then
-        CANDIDATES+=("/dev/$DEV")
-        CANDIDATE_INFO+=("$SIZE $TYPE ${TRAN:-???} $MODEL")
-    fi
-done < <(lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL -n | grep "disk")
-
-if [ ${#CANDIDATES[@]} -eq 0 ]; then
-    echo -e "${RED}No SD card candidates found.${NC}"
-    echo "Looking for USB/removable disks between 8GB and 128GB."
-    echo ""
-    echo "Available disks:"
-    lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL
-    exit 1
-fi
-
-echo -e "${GREEN}Found ${#CANDIDATES[@]} candidate(s):${NC}"
-echo ""
-
-for i in "${!CANDIDATES[@]}"; do
-    echo -e "  ${BOLD}[$((i+1))]${NC} ${CANDIDATES[$i]} - ${CANDIDATE_INFO[$i]}"
-done
-
-echo ""
-
-if [ ${#CANDIDATES[@]} -eq 1 ]; then
-    SELECTED="${CANDIDATES[0]}"
-    echo -e "Auto-selected: ${YELLOW}$SELECTED${NC}"
-else
-    read -p "Select device [1-${#CANDIDATES[@]}]: " -r
-    if [[ ! $REPLY =~ ^[0-9]+$ ]] || [ "$REPLY" -lt 1 ] || [ "$REPLY" -gt ${#CANDIDATES[@]} ]; then
-        echo -e "${RED}Invalid selection.${NC}"
+# Use manual device or auto-detect
+if [ -n "$MANUAL_DEVICE" ]; then
+    # Manual device specified
+    if [ ! -b "$MANUAL_DEVICE" ]; then
+        echo -e "${RED}Error: $MANUAL_DEVICE is not a block device${NC}"
         exit 1
     fi
-    SELECTED="${CANDIDATES[$((REPLY-1))]}"
+    SELECTED="$MANUAL_DEVICE"
+    echo -e "Using specified device: ${YELLOW}$SELECTED${NC}"
+    echo ""
+    lsblk "$SELECTED" -o NAME,SIZE,TYPE,MODEL
+    echo ""
+else
+    # Auto-detect SD card candidates
+    echo -e "${BOLD}Scanning for SD cards...${NC}"
+    echo ""
+
+    declare -a CANDIDATES
+    declare -a CANDIDATE_INFO
+
+    while IFS= read -r line; do
+        DEV=$(echo "$line" | awk '{print $1}')
+        SIZE=$(echo "$line" | awk '{print $2}')
+        TYPE=$(echo "$line" | awk '{print $3}')
+        TRAN=$(echo "$line" | awk '{print $4}')
+        MODEL=$(echo "$line" | awk '{print $5" "$6" "$7}' | xargs)
+
+        # Skip if it's the root filesystem
+        if mount | grep -q "^/dev/${DEV}[0-9]* on / "; then
+            continue
+        fi
+
+        # Skip if any partition is mounted as root
+        ROOT_DEV=$(mount | grep " on / " | awk '{print $1}' | sed 's/[0-9]*$//')
+        if [[ "/dev/$DEV" == "$ROOT_DEV" ]]; then
+            continue
+        fi
+
+        # Get size in bytes for reliable comparison
+        SIZE_BYTES=$(lsblk -b -d -o SIZE -n "/dev/$DEV" 2>/dev/null | tr -d ' ')
+        SIZE_GB_INT=$((SIZE_BYTES / 1073741824))  # 1024^3
+
+        # Check if size is in SD card range (8GB - 128GB)
+        if [ "$SIZE_GB_INT" -ge 8 ] && [ "$SIZE_GB_INT" -le 128 ]; then
+            CANDIDATES+=("/dev/$DEV")
+            CANDIDATE_INFO+=("$SIZE $TYPE ${TRAN:-???} $MODEL")
+        fi
+    done < <(lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL -n | grep "disk")
+
+    if [ ${#CANDIDATES[@]} -eq 0 ]; then
+        echo -e "${RED}No SD card candidates found.${NC}"
+        echo "Looking for USB/removable disks between 8GB and 128GB."
+        echo ""
+        echo "Available disks:"
+        lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL
+        echo ""
+        echo -e "${YELLOW}Tip: Specify device manually: $0 $IMAGE /dev/sdX${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Found ${#CANDIDATES[@]} candidate(s):${NC}"
+    echo ""
+
+    for i in "${!CANDIDATES[@]}"; do
+        echo -e "  ${BOLD}[$((i+1))]${NC} ${CANDIDATES[$i]} - ${CANDIDATE_INFO[$i]}"
+    done
+
+    echo ""
+
+    if [ ${#CANDIDATES[@]} -eq 1 ]; then
+        SELECTED="${CANDIDATES[0]}"
+        echo -e "Auto-selected: ${YELLOW}$SELECTED${NC}"
+    else
+        read -p "Select device [1-${#CANDIDATES[@]}]: " -r
+        if [[ ! $REPLY =~ ^[0-9]+$ ]] || [ "$REPLY" -lt 1 ] || [ "$REPLY" -gt ${#CANDIDATES[@]} ]; then
+            echo -e "${RED}Invalid selection.${NC}"
+            exit 1
+        fi
+        SELECTED="${CANDIDATES[$((REPLY-1))]}"
+    fi
 fi
 
 # Show current partitions

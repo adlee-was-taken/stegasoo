@@ -76,19 +76,12 @@ while IFS= read -r line; do
         continue
     fi
 
-    # Parse size to bytes for comparison
-    SIZE_NUM=$(echo "$SIZE" | sed 's/[^0-9.]//g')
-    SIZE_UNIT=$(echo "$SIZE" | sed 's/[0-9.]//g')
-
-    case $SIZE_UNIT in
-        G) SIZE_GB=$SIZE_NUM ;;
-        T) SIZE_GB=$(echo "$SIZE_NUM * 1024" | bc) ;;
-        M) SIZE_GB=$(echo "scale=2; $SIZE_NUM / 1024" | bc) ;;
-        *) SIZE_GB=0 ;;
-    esac
+    # Get size in bytes for reliable comparison
+    SIZE_BYTES=$(lsblk -b -d -o SIZE -n "/dev/$DEV" 2>/dev/null | tr -d ' ')
+    SIZE_GB_INT=$((SIZE_BYTES / 1073741824))  # 1024^3
 
     # Check if size is in SD card range (8GB - 128GB)
-    if (( $(echo "$SIZE_GB >= 8" | bc -l) )) && (( $(echo "$SIZE_GB <= 128" | bc -l) )); then
+    if [ "$SIZE_GB_INT" -ge 8 ] && [ "$SIZE_GB_INT" -le 128 ]; then
         CANDIDATES+=("/dev/$DEV")
         CANDIDATE_INFO+=("$SIZE $TYPE ${TRAN:-???} $MODEL")
     fi
