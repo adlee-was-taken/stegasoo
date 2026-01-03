@@ -435,24 +435,85 @@ pip install stegasoo[all]
 
 ### Raspberry Pi
 
-Stegasoo works on Raspberry Pi 4 (2GB+ RAM recommended):
+Stegasoo works on Raspberry Pi 4/5 (4GB+ RAM recommended for Web UI).
+
+#### Step 1: Install System Dependencies
 
 ```bash
-# System dependencies
-sudo apt-get install python3-dev libzbar0 libjpeg-dev
-
-# Create venv with Python 3.12 (if available, or 3.11)
-python3 -m venv venv
-source venv/bin/activate
-
-# Install (may take a while to compile)
-pip install stegasoo[cli]
-
-# For web/api, ensure enough RAM
-pip install stegasoo[web]  # Needs ~768MB free
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  git \
+  libssl-dev \
+  zlib1g-dev \
+  libbz2-dev \
+  libreadline-dev \
+  libsqlite3-dev \
+  libncursesw5-dev \
+  xz-utils \
+  tk-dev \
+  libxml2-dev \
+  libxmlsec1-dev \
+  libffi-dev \
+  liblzma-dev \
+  libzbar0 \
+  libjpeg-dev
 ```
 
-**Running the Web UI on Pi:**
+#### Step 2: Install Python 3.12 via pyenv
+
+Raspberry Pi OS ships with Python 3.13, which is **not compatible** with jpegio. Install Python 3.12:
+
+```bash
+# Install pyenv
+curl https://pyenv.run | bash
+
+# Add to ~/.bashrc
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
+source ~/.bashrc
+
+# Install Python 3.12 (takes ~10 minutes on Pi 5)
+pyenv install 3.12
+pyenv global 3.12
+```
+
+#### Step 3: Build jpegio for ARM
+
+The upstream jpegio has x86-specific build flags. Patch and build from source:
+
+```bash
+# Clone jpegio
+git clone https://github.com/dwgoon/jpegio.git
+cd jpegio
+
+# Patch for ARM (removes x86-specific -m64 flag)
+sed -i "s/cargs.append('-m64')/pass  # ARM fix/" setup.py
+
+# Build and install
+pip install .
+cd ..
+```
+
+#### Step 4: Install Stegasoo
+
+```bash
+# Clone Stegasoo
+git clone https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo
+
+# Create venv with Python 3.12
+~/.pyenv/versions/3.12.*/bin/python -m venv venv
+source venv/bin/activate
+
+# Install (jpegio already installed, skip it)
+pip install -e ".[web]" --no-deps
+pip install argon2-cffi cryptography pillow flask gunicorn scipy numpy pyzbar qrcode
+```
+
+#### Step 5: Run the Web UI
+
 ```bash
 cd frontends/web
 
@@ -465,12 +526,30 @@ export STEGASOO_HOSTNAME=raspberrypi.local
 
 # Start server
 python app.py
+# Access at http://<pi-ip>:5000
 ```
 
-**Notes:**
-- Argon2 operations will be slower on Pi due to memory-hardness
-- First run will prompt you to create an admin account
-- HTTPS generates a self-signed certificate (browsers will warn)
+#### Verify Installation
+
+```bash
+python -c "
+import stegasoo
+from stegasoo.dct_steganography import has_jpegio_support
+print(f'Stegasoo: {stegasoo.__version__}')
+print(f'Argon2: {stegasoo.has_argon2()}')
+print(f'DCT: {stegasoo.has_dct_support()}')
+print(f'jpegio: {has_jpegio_support()}')
+"
+# Expected: All True
+```
+
+#### Notes
+
+- **RAM**: Web UI needs ~768MB free for Argon2 + scipy operations
+- **Performance**: Argon2 operations take 3-5 seconds on Pi 5 (vs ~2s on desktop)
+- **Python 3.13**: Not supported due to jpegio C extension incompatibility
+- **First run**: Will prompt you to create an admin account
+- **HTTPS**: Generates self-signed certificate (browsers will warn)
 
 ---
 
