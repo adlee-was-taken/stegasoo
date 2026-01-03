@@ -65,10 +65,7 @@ htmlcov/
 test_data/*.png
 
 # Dev scripts (local convenience scripts)
-build.sh
-rbld_containers.sh
-quick_web.sh
-project_stats.sh
+scripts/
 
 # Web UI auth database and SSL certs
 frontends/web/instance/
