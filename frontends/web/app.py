@@ -144,7 +144,18 @@ subprocess_stego = SubprocessStego(timeout=180)  # 3 minute timeout for large im
 # ============================================================================
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+
+# Persist secret key so sessions survive restarts
+_instance_path = Path(app.instance_path)
+_instance_path.mkdir(parents=True, exist_ok=True)
+_secret_key_file = _instance_path / ".secret_key"
+if _secret_key_file.exists():
+    app.secret_key = _secret_key_file.read_text().strip()
+else:
+    app.secret_key = secrets.token_hex(32)
+    _secret_key_file.write_text(app.secret_key)
+    _secret_key_file.chmod(0o600)
+
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
 
 # Auth configuration from environment
@@ -372,7 +383,7 @@ def api_channel_validate():
 
     Returns JSON with validation result.
     """
-    key = request.form.get("key", "") or request.json.get("key", "") if request.is_json else ""
+    key = request.form.get("key", "") or (request.json.get("key", "") if request.is_json else "")
 
     if not key:
         return jsonify({"valid": False, "error": "No key provided"})

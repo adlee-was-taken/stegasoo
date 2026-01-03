@@ -119,7 +119,11 @@ const Stegasoo = {
                 if (isScanContainer || isPixelContainer) {
                     labelEl.classList.add('d-none');
                 } else {
-                    labelEl.innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>' + file.name;
+                    labelEl.textContent = '';
+                    const icon = document.createElement('i');
+                    icon.className = 'bi bi-check-circle text-success me-1';
+                    labelEl.appendChild(icon);
+                    labelEl.appendChild(document.createTextNode(file.name));
                 }
             }
             
