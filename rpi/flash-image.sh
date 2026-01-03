@@ -49,15 +49,24 @@ fi
 
 # Detect compression
 COMPRESSED=false
+COMP_TYPE=""
 if [[ "$IMAGE" == *.xz ]]; then
     COMPRESSED=true
+    COMP_TYPE="xz"
     if ! command -v xzcat &> /dev/null; then
         echo -e "${RED}Error: xz is required for .xz files but not installed.${NC}"
         exit 1
     fi
+elif [[ "$IMAGE" == *.zst ]]; then
+    COMPRESSED=true
+    COMP_TYPE="zst"
+    if ! command -v zstdcat &> /dev/null; then
+        echo -e "${RED}Error: zstd is required for .zst files but not installed.${NC}"
+        exit 1
+    fi
 elif [[ "$IMAGE" == *.gz ]]; then
     COMPRESSED=true
-    COMP_CMD="zcat"
+    COMP_TYPE="gz"
     if ! command -v zcat &> /dev/null; then
         echo -e "${RED}Error: gzip is required for .gz files but not installed.${NC}"
         exit 1
@@ -182,11 +191,11 @@ echo -e "${GREEN}Flashing image to $SELECTED...${NC}"
 echo ""
 
 if [ "$COMPRESSED" = true ]; then
-    if [[ "$IMAGE" == *.xz ]]; then
-        pv "$IMAGE" | xzcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
-    else
-        pv "$IMAGE" | zcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
-    fi
+    case "$COMP_TYPE" in
+        xz)  pv "$IMAGE" | xzcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+        zst) pv "$IMAGE" | zstdcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+        gz)  pv "$IMAGE" | zcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+    esac
 else
     pv "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
 fi

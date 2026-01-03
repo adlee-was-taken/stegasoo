@@ -4,7 +4,7 @@
 # Auto-detects SD card, copies with progress, shrinks, and compresses
 #
 # Usage: ./pull-image.sh [output-name]
-#        Output will be: stegasoo-rpi-YYYYMMDD.img.xz (or custom name)
+#        Output will be: stegasoo-rpi-YYYYMMDD.img.zst (or custom name)
 #
 
 set -e
@@ -17,7 +17,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # Check for required tools
-for cmd in dd pv xz lsblk; do
+for cmd in dd pv zstd lsblk; do
     if ! command -v $cmd &> /dev/null; then
         echo -e "${RED}Error: $cmd is required but not installed.${NC}"
         exit 1
@@ -34,14 +34,14 @@ fi
 if [ -n "$1" ]; then
     OUTPUT="$1"
 else
-    OUTPUT="stegasoo-rpi-$(date +%Y%m%d).img.xz"
+    OUTPUT="stegasoo-rpi-$(date +%Y%m%d).img.zst"
 fi
 
-# Remove .xz extension for intermediate file
-IMG_FILE="${OUTPUT%.xz}"
+# Remove .zst extension for intermediate file
+IMG_FILE="${OUTPUT%.zst}"
 if [[ "$IMG_FILE" == "$OUTPUT" ]]; then
     IMG_FILE="${OUTPUT}.img"
-    OUTPUT="${OUTPUT}.img.xz"
+    OUTPUT="${OUTPUT}.img.zst"
 fi
 
 echo -e "${BLUE}"
@@ -167,8 +167,8 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}[3/3]${NC} Compressing with xz..."
-pv "$IMG_FILE" | xz -9 -T0 > "$OUTPUT"
+echo -e "${GREEN}[3/3]${NC} Compressing with zstd..."
+pv "$IMG_FILE" | zstd -19 -T0 -q > "$OUTPUT"
 rm -f "$IMG_FILE"
 
 echo ""
