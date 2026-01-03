@@ -24,20 +24,38 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/"><i class="bi bi-house me-1"></i> Home</a>
                     </li>
+                    {% if not auth_enabled or is_authenticated %}
                     <li class="nav-item">
                         <a class="nav-link" href="/encode"><i class="bi bi-lock me-1"></i> Encode</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/decode"><i class="bi bi-unlock me-1"></i> Decode</a>
                     </li>
-
                     <li class="nav-item">
                         <a class="nav-link" href="/generate"><i class="bi bi-key me-1"></i> Generate</a>
                     </li>
-
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="/about"><i class="bi bi-info-circle me-1"></i> About</a>
                     </li>
+                    {% if auth_enabled %}
+                        {% if is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle me-1"></i> {{ username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                                <li><a class="dropdown-item" href="/account"><i class="bi bi-gear me-2"></i>Account</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/logout"><i class="bi bi-box-arrow-left me-2"></i>Logout</a></li>
+                            </ul>
+                        </li>
+                        {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/login"><i class="bi bi-box-arrow-in-right me-1"></i> Login</a>
+                        </li>
+                        {% endif %}
+                    {% endif %}
                 </ul>
             </div>
         </div>

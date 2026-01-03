@@ -724,6 +724,7 @@ footer {
 .scan-data-value {
     color: rgba(0, 255, 170, 1);
     font-weight: 600;
+    font-size: 0.65rem;
 }
 
 .scan-hash-preview {
@@ -744,7 +745,7 @@ footer {
     border: 1px solid rgba(0, 255, 170, 0.4);
     border-radius: 3px;
     padding: 2px 6px;
-    font-size: 0.5rem;
+    font-size: 0.65rem;
     color: rgba(0, 255, 170, 1);
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -1001,6 +1002,7 @@ footer {
 .pixel-data-value {
     color: #d4e157;
     font-weight: 600;
+    font-size: 0.65rem;
 }
 
 .pixel-status-badge {
@@ -1010,7 +1012,7 @@ footer {
     border: 1px solid rgba(212, 225, 87, 0.4);
     border-radius: 3px;
     padding: 2px 6px;
-    font-size: 0.55rem;
+    font-size: 0.65rem;
     color: #d4e157;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -1047,10 +1049,10 @@ footer {
 /* Expand drop zone when showing scanned QR result */
 #rsaQrSection .drop-zone:has(.qr-scan-container:not(.d-none)) {
     width: auto;
-    min-width: 200px;
-    max-width: 280px;
+    min-width: 280px;
+    max-width: 400px;
     height: auto;
-    min-height: 200px;
+    min-height: 280px;
     aspect-ratio: auto;
 }
 
@@ -1070,9 +1072,9 @@ footer {
     overflow: visible;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
-    min-height: 160px;
-    min-width: 160px;
-    padding: 10px;
+    min-height: 220px;
+    min-width: 220px;
+    padding: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1090,10 +1092,10 @@ footer {
 
 /* Cropped image - hidden until loaded, scales UP to fill container */
 .qr-scan-container .qr-cropped {
-    max-height: 180px;
-    max-width: 180px;
-    min-width: 140px;
-    min-height: 140px;
+    max-height: 240px;
+    max-width: 240px;
+    min-width: 180px;
+    min-height: 180px;
     width: auto;
     height: auto;
     object-fit: contain;
@@ -1255,11 +1257,11 @@ footer {
     left: 0;
     right: 0;
     z-index: 10;
-    background: linear-gradient(to top, 
-        rgba(10, 15, 30, 0.95) 0%, 
-        rgba(10, 15, 30, 0.6) 80%, 
+    background: linear-gradient(to top,
+        rgba(10, 15, 30, 0.95) 0%,
+        rgba(10, 15, 30, 0.6) 80%,
         transparent 100%);
-    padding: 4px 6px 3px 6px;
+    padding: 8px 10px 6px 10px;
     opacity: 0;
     transition: opacity 0.3s ease;
     border-radius: 0 0 6px 6px;
@@ -1282,10 +1284,10 @@ footer {
 /* QR Data Panel text styles */
 .qr-data-filename {
     font-family: 'Courier New', monospace;
-    font-size: 0.6rem;
+    font-size: 0.7rem;
     color: #fff;
     text-align: center;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1301,7 +1303,7 @@ footer {
     justify-content: space-between;
     align-items: center;
     font-family: 'Courier New', monospace;
-    font-size: 0.5rem;
+    font-size: 0.6rem;
     white-space: nowrap;
 }
 
@@ -1310,9 +1312,9 @@ footer {
     align-items: center;
     background: rgba(0, 255, 170, 0.15);
     border: 1px solid rgba(0, 255, 170, 0.4);
-    border-radius: 2px;
-    padding: 1px 4px;
-    font-size: 0.45rem;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.65rem;
     color: rgba(0, 255, 170, 1);
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -1321,7 +1323,7 @@ footer {
 .qr-data-value {
     color: rgba(0, 255, 170, 1);
     font-weight: 600;
-    font-size: 0.5rem;
+    font-size: 0.65rem;
 }
 
 /* ----------------------------------------------------------------------------

@@ -18,6 +18,14 @@ services:
     environment:
       <<: *common-env
       FLASK_ENV: production
+      # Authentication (v4.0.2)
+      STEGASOO_AUTH_ENABLED: ${STEGASOO_AUTH_ENABLED:-true}
+      STEGASOO_HTTPS_ENABLED: ${STEGASOO_HTTPS_ENABLED:-false}
+      STEGASOO_HOSTNAME: ${STEGASOO_HOSTNAME:-localhost}
+    volumes:
+      # Persist auth database and SSL certs (v4.0.2)
+      - stegasoo-web-data:/app/frontends/web/instance
+      - stegasoo-web-certs:/app/frontends/web/certs
     restart: unless-stopped
     deploy:
       resources:
@@ -45,3 +53,10 @@ services:
           memory: 768M
         reservations:
           memory: 384M
+
+# Named volumes for persistent data
+volumes:
+  stegasoo-web-data:
+    driver: local
+  stegasoo-web-certs:
+    driver: local

@@ -1,8 +1,13 @@
 """
-Stegasoo Constants and Configuration (v4.0.1 - Channel Key Support)
+Stegasoo Constants and Configuration (v4.0.2 - Web UI Authentication)
 
 Central location for all magic numbers, limits, and crypto parameters.
 All version numbers, limits, and configuration values should be defined here.
+
+CHANGES in v4.0.2:
+- Added Web UI authentication with SQLite3 user storage
+- Added optional HTTPS with auto-generated self-signed certificates
+- UI improvements for QR preview panels and PIN/channel columns
 
 BREAKING CHANGES in v4.0.0:
 - Added channel key support for deployment/group isolation
@@ -20,7 +25,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "4.0.1"
+__version__ = "4.0.2"
 
 # ============================================================================
 # FILE FORMAT

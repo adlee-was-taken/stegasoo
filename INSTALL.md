@@ -227,6 +227,23 @@ docker-compose logs -f
 docker-compose down
 ```
 
+#### Authentication Configuration (v4.0.2)
+
+The Web UI supports optional authentication. Configure via environment variables:
+
+```bash
+# .env file (create in project root)
+STEGASOO_AUTH_ENABLED=true      # Enable login (default: true)
+STEGASOO_HTTPS_ENABLED=false    # Enable HTTPS (default: false)
+STEGASOO_HOSTNAME=localhost     # Hostname for SSL cert
+STEGASOO_CHANNEL_KEY=           # Optional channel key
+
+# Then run
+docker-compose up -d web
+```
+
+On first access, you'll be prompted to create an admin account. The database and SSL certs are persisted in Docker volumes.
+
 #### Services
 
 | Service | URL | Description |
@@ -424,6 +441,10 @@ Stegasoo works on Raspberry Pi 4 (2GB+ RAM recommended):
 # System dependencies
 sudo apt-get install python3-dev libzbar0 libjpeg-dev
 
+# Create venv with Python 3.12 (if available, or 3.11)
+python3 -m venv venv
+source venv/bin/activate
+
 # Install (may take a while to compile)
 pip install stegasoo[cli]
 
@@ -431,7 +452,25 @@ pip install stegasoo[cli]
 pip install stegasoo[web]  # Needs ~768MB free
 ```
 
-**Note:** Argon2 operations will be slower on Pi due to memory-hardness.
+**Running the Web UI on Pi:**
+```bash
+cd frontends/web
+
+# Optional: Enable authentication
+export STEGASOO_AUTH_ENABLED=true
+
+# Optional: Enable HTTPS for local network security
+export STEGASOO_HTTPS_ENABLED=true
+export STEGASOO_HOSTNAME=raspberrypi.local
+
+# Start server
+python app.py
+```
+
+**Notes:**
+- Argon2 operations will be slower on Pi due to memory-hardness
+- First run will prompt you to create an admin account
+- HTTPS generates a self-signed certificate (browsers will warn)
 
 ---
 

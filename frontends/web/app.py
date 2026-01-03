@@ -29,8 +29,31 @@ import sys
 import time
 from pathlib import Path
 
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
+from auth import (
+    change_password,
+    create_user,
+    get_username,
+    is_authenticated,
+    login_required,
+    user_exists,
+    verify_password,
+)
+from auth import (
+    init_app as init_auth,
+)
+from flask import (
+    Flask,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 from PIL import Image
+from ssl_utils import ensure_certs
 
 os.environ["NUMPY_MADVISE_HUGEPAGE"] = "0"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -124,6 +147,13 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
 
+# Auth configuration from environment
+app.config["AUTH_ENABLED"] = os.environ.get("STEGASOO_AUTH_ENABLED", "true").lower() == "true"
+app.config["HTTPS_ENABLED"] = os.environ.get("STEGASOO_HTTPS_ENABLED", "false").lower() == "true"
+
+# Initialize auth module
+init_auth(app)
+
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
 THUMBNAIL_FILES: dict[str, bytes] = {}
@@ -159,6 +189,10 @@ def inject_globals():
         "channel_configured": channel_status["configured"],
         "channel_fingerprint": channel_status.get("fingerprint"),
         "channel_source": channel_status.get("source"),
+        # NEW in v4.0.2 - Auth state
+        "auth_enabled": app.config.get("AUTH_ENABLED", True),
+        "is_authenticated": is_authenticated(),
+        "username": get_username() if is_authenticated() else None,
     }
 
 
@@ -296,6 +330,7 @@ def index():
 
 
 @app.route("/api/channel/status")
+@login_required
 def api_channel_status():
     """
     Get current channel key status (v4.0.0).
@@ -330,6 +365,7 @@ def api_channel_status():
 
 
 @app.route("/api/channel/validate", methods=["POST"])
+@login_required
 def api_channel_validate():
     """
     Validate a channel key format (v4.0.0).
@@ -366,6 +402,7 @@ def api_channel_validate():
 
 
 @app.route("/generate", methods=["GET", "POST"])
+@login_required
 def generate():
     if request.method == "POST":
         # v3.2.0: Changed from words_per_phrase to words_per_passphrase, default increased to 4
@@ -450,6 +487,7 @@ def generate():
 
 
 @app.route("/generate/qr/<token>")
+@login_required
 def generate_qr(token):
     """Generate QR code for RSA key."""
     if not HAS_QRCODE:
@@ -473,6 +511,7 @@ def generate_qr(token):
 
 
 @app.route("/generate/qr-download/<token>")
+@login_required
 def generate_qr_download(token):
     """Download QR code as PNG file."""
     if not HAS_QRCODE:
@@ -501,6 +540,7 @@ def generate_qr_download(token):
 
 
 @app.route("/qr/crop", methods=["POST"])
+@login_required
 def qr_crop():
     """
     Detect and crop QR code from an image.
@@ -538,6 +578,7 @@ def qr_crop():
 
 
 @app.route("/generate/download-key", methods=["POST"])
+@login_required
 def download_key():
     """Download RSA key as password-protected PEM file."""
     key_pem = request.form.get("key_pem", "")
@@ -570,6 +611,7 @@ def download_key():
 
 
 @app.route("/extract-key-from-qr", methods=["POST"])
+@login_required
 def extract_key_from_qr_route():
     """
     Extract RSA key from uploaded QR code image.
@@ -609,6 +651,7 @@ def extract_key_from_qr_route():
 
 
 @app.route("/api/compare-capacity", methods=["POST"])
+@login_required
 def api_compare_capacity():
     """
     Compare LSB and DCT capacity for an uploaded carrier image.
@@ -652,6 +695,7 @@ def api_compare_capacity():
 
 
 @app.route("/api/check-fit", methods=["POST"])
+@login_required
 def api_check_fit():
     """
     Check if a payload will fit in the carrier with selected mode.
@@ -705,6 +749,7 @@ def api_check_fit():
 
 
 @app.route("/encode", methods=["GET", "POST"])
+@login_required
 def encode_page():
     if request.method == "POST":
         try:
@@ -926,6 +971,7 @@ def encode_page():
 
 
 @app.route("/encode/result/<file_id>")
+@login_required
 def encode_result(file_id):
     if file_id not in TEMP_FILES:
         flash("File expired or not found. Please encode again.", "error")
@@ -956,6 +1002,7 @@ def encode_result(file_id):
 
 
 @app.route("/encode/thumbnail/<thumb_id>")
+@login_required
 def encode_thumbnail(thumb_id):
     """Serve thumbnail image."""
     if thumb_id not in THUMBNAIL_FILES:
@@ -967,6 +1014,7 @@ def encode_thumbnail(thumb_id):
 
 
 @app.route("/encode/download/<file_id>")
+@login_required
 def encode_download(file_id):
     if file_id not in TEMP_FILES:
         flash("File expired or not found.", "error")
@@ -984,6 +1032,7 @@ def encode_download(file_id):
 
 
 @app.route("/encode/file/<file_id>")
+@login_required
 def encode_file_route(file_id):
     """Serve file for Web Share API."""
     if file_id not in TEMP_FILES:
@@ -1001,6 +1050,7 @@ def encode_file_route(file_id):
 
 
 @app.route("/encode/cleanup/<file_id>", methods=["POST"])
+@login_required
 def encode_cleanup(file_id):
     """Manually cleanup a file after sharing."""
     TEMP_FILES.pop(file_id, None)
@@ -1018,6 +1068,7 @@ def encode_cleanup(file_id):
 
 
 @app.route("/decode", methods=["GET", "POST"])
+@login_required
 def decode_page():
     if request.method == "POST":
         try:
@@ -1170,6 +1221,7 @@ def decode_page():
 
 
 @app.route("/decode/download/<file_id>")
+@login_required
 def decode_download(file_id):
     """Download decoded file."""
     if file_id not in TEMP_FILES:
@@ -1246,8 +1298,116 @@ def test_capacity_nopil():
 
 
 # ============================================================================
+# AUTHENTICATION ROUTES (v4.0.2)
+# ============================================================================
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Login page."""
+    if not app.config.get("AUTH_ENABLED", True):
+        return redirect(url_for("index"))
+
+    if not user_exists():
+        return redirect(url_for("setup"))
+
+    if is_authenticated():
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if verify_password(password):
+            session["authenticated"] = True
+            session.permanent = True
+            flash("Login successful", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Invalid password", "error")
+
+    return render_template("login.html", username=get_username())
+
+
+@app.route("/logout")
+def logout():
+    """Logout and clear session."""
+    session.clear()
+    flash("Logged out successfully", "success")
+    return redirect(url_for("index"))
+
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    """First-run setup page."""
+    if not app.config.get("AUTH_ENABLED", True):
+        return redirect(url_for("index"))
+
+    if user_exists():
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "admin")
+        password = request.form.get("password", "")
+        password_confirm = request.form.get("password_confirm", "")
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters", "error")
+        elif password != password_confirm:
+            flash("Passwords do not match", "error")
+        else:
+            try:
+                create_user(username, password)
+                session["authenticated"] = True
+                session.permanent = True
+                flash("Admin account created successfully!", "success")
+                return redirect(url_for("index"))
+            except Exception as e:
+                flash(f"Error creating account: {e}", "error")
+
+    return render_template("setup.html")
+
+
+@app.route("/account", methods=["GET", "POST"])
+@login_required
+def account():
+    """Account management page."""
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new = request.form.get("new_password", "")
+        new_confirm = request.form.get("new_password_confirm", "")
+
+        if new != new_confirm:
+            flash("New passwords do not match", "error")
+        else:
+            success, message = change_password(current, new)
+            flash(message, "success" if success else "error")
+
+    return render_template("account.html", username=get_username())
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    base_dir = Path(__file__).parent
+
+    # HTTPS configuration
+    ssl_context = None
+    if app.config.get("HTTPS_ENABLED", False):
+        hostname = os.environ.get("STEGASOO_HOSTNAME", "localhost")
+        cert_path, key_path = ensure_certs(base_dir, hostname)
+        ssl_context = (str(cert_path), str(key_path))
+        print(f"HTTPS enabled with self-signed certificate for {hostname}")
+
+    # Auth status
+    if app.config.get("AUTH_ENABLED", True):
+        print("Authentication enabled")
+    else:
+        print("Authentication disabled")
+
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False,
+        ssl_context=ssl_context,
+    )

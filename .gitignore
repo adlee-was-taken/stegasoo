@@ -69,3 +69,7 @@ build.sh
 rbld_containers.sh
 quick_web.sh
 project_stats.sh
+
+# Web UI auth database and SSL certs
+frontends/web/instance/
+frontends/web/certs/

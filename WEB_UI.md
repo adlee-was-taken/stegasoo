@@ -1,11 +1,12 @@
-# Stegasoo Web UI Documentation (v4.0.1)
+# Stegasoo Web UI Documentation (v4.0.2)
 
 Complete guide for the Stegasoo web-based steganography interface.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [What's New in v4.0.1](#whats-new-in-v401)
+- [What's New in v4.0.2](#whats-new-in-v402)
+- [Authentication & HTTPS](#authentication--https)
 - [Installation & Setup](#installation--setup)
 - [Pages & Features](#pages--features)
   - [Home Page](#home-page)
@@ -53,24 +54,118 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 
 ---
 
-## What's New in v4.0.1
+## What's New in v4.0.2
 
-Version 4.0.1 adds channel key support and UI improvements:
+Version 4.0.2 adds authentication and HTTPS support for secure home network deployment:
 
 | Feature | Description |
 |---------|-------------|
-| Channel keys | 256-bit keys for deployment/group isolation |
-| Channel dropdown | Select channel mode (Auto/Public/Custom) |
-| LED indicators | Visual status indicators for form fields |
-| Key capsule styling | Improved RSA key display |
-| Streamlined layout | PIN + Channel key in same row |
+| **Authentication** | Single-admin login with SQLite3 user storage |
+| **First-run setup** | Wizard to create admin account on first access |
+| **Account management** | Change password page |
+| **Optional HTTPS** | Auto-generated self-signed certificates |
+| **UI improvements** | Larger QR previews, consistent panel styling |
 
 **Key benefits:**
-- ✅ Channel key isolation - Different teams/deployments can't read each other's messages
-- ✅ Dropdown selection for channel mode instead of radio buttons
-- ✅ Visual LED indicators show field status
-- ✅ Cleaner form layout with improved spacing
-- ✅ Backward compatible - public mode works without channel key
+- ✅ Secure your Web UI with username/password
+- ✅ No manual database setup - automatic on first run
+- ✅ HTTPS with auto-generated certs for home networks
+- ✅ Configurable via environment variables
+- ✅ Improved readability of QR preview panels
+
+---
+
+## Authentication & HTTPS
+
+### Overview
+
+v4.0.2 adds optional authentication and HTTPS for secure home network deployment.
+
+### First-Run Setup
+
+On first access, you'll be prompted to create an admin account:
+
+1. Navigate to `http://localhost:5000`
+2. You'll be redirected to `/setup`
+3. Enter a username (e.g., "admin")
+4. Enter a password (minimum 8 characters)
+5. Confirm the password
+6. Click "Create Admin Account"
+
+The admin account is stored in `frontends/web/instance/stegasoo.db` (SQLite).
+
+### Login
+
+After setup, protected pages require login:
+
+- **Protected routes:** `/encode`, `/decode`, `/generate`, `/account`, `/api/*`
+- **Public routes:** `/`, `/about`, `/login`, `/setup`
+
+### Account Management
+
+Access `/account` to:
+- View current username
+- Change your password
+- Logout
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STEGASOO_AUTH_ENABLED` | `true` | Enable/disable authentication |
+| `STEGASOO_HTTPS_ENABLED` | `false` | Enable HTTPS with self-signed certs |
+| `STEGASOO_HOSTNAME` | `localhost` | Hostname for certificate generation |
+
+### Enabling HTTPS
+
+```bash
+# Enable HTTPS
+export STEGASOO_HTTPS_ENABLED=true
+export STEGASOO_HOSTNAME=stegasoo.local  # Optional: your hostname
+
+cd frontends/web
+python app.py
+```
+
+On first run with HTTPS enabled:
+- Generates RSA 2048-bit private key
+- Creates self-signed X.509 certificate (365 days validity)
+- Stores in `frontends/web/certs/`
+- Server starts on https://localhost:5000
+
+**Note:** Browsers will show a security warning for self-signed certificates. This is expected for home network use.
+
+### Disabling Authentication
+
+For development or trusted networks:
+
+```bash
+export STEGASOO_AUTH_ENABLED=false
+cd frontends/web
+python app.py
+```
+
+### Docker Configuration
+
+```yaml
+# docker-compose.yml
+services:
+  web:
+    environment:
+      STEGASOO_AUTH_ENABLED: "true"
+      STEGASOO_HTTPS_ENABLED: "true"
+      STEGASOO_HOSTNAME: "stegasoo.local"
+    volumes:
+      - ./instance:/app/frontends/web/instance  # Persist user database
+      - ./certs:/app/frontends/web/certs        # Persist SSL certs
+```
+
+### Security Notes
+
+- Passwords are hashed with Argon2id (time_cost=3, memory_cost=64MB)
+- Single admin user only (no registration)
+- Session-based authentication using Flask sessions
+- Database stored in `instance/stegasoo.db` (add to `.gitignore`)
 
 ---
 
@@ -752,6 +847,10 @@ Both modes use the same strong encryption (AES-256-GCM with Argon2id key derivat
 |----------|---------|-------------|
 | `FLASK_ENV` | production | Flask environment |
 | `PYTHONPATH` | - | Include `src/` for development |
+| `STEGASOO_AUTH_ENABLED` | `true` | Enable/disable authentication (v4.0.2) |
+| `STEGASOO_HTTPS_ENABLED` | `false` | Enable HTTPS with self-signed certs (v4.0.2) |
+| `STEGASOO_HOSTNAME` | `localhost` | Hostname for certificate CN (v4.0.2) |
+| `STEGASOO_CHANNEL_KEY` | - | Channel key for deployment isolation |
 
 ### Application Limits
 
@@ -808,12 +907,23 @@ services:
       target: web
     ports:
       - "5000:5000"
+    environment:
+      STEGASOO_AUTH_ENABLED: "true"
+      STEGASOO_HTTPS_ENABLED: "false"
+      STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}
+    volumes:
+      - stegasoo-web-data:/app/frontends/web/instance
+      - stegasoo-web-certs:/app/frontends/web/certs
     deploy:
       resources:
         limits:
           memory: 768M
         reservations:
           memory: 384M
+
+volumes:
+  stegasoo-web-data:
+  stegasoo-web-certs:
 ```
 
 ---

@@ -5,6 +5,29 @@ All notable changes to Stegasoo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [4.0.2] - 2026-01-02
+
+### Added
+- **Web UI Authentication**: Single-admin login with SQLite3 user storage
+  - First-run setup wizard for admin account creation
+  - Account management page for password changes
+  - `@login_required` decorator protects encode/decode/generate routes
+  - Argon2id password hashing (lighter 64MB for fast login)
+- **Optional HTTPS**: Auto-generated self-signed certificates for home network deployment
+  - Configurable via `STEGASOO_HTTPS_ENABLED` environment variable
+  - Certificates stored in `frontends/web/certs/`
+- New environment variables: `STEGASOO_AUTH_ENABLED`, `STEGASOO_HTTPS_ENABLED`, `STEGASOO_HOSTNAME`
+
+### Changed
+- PIN entry column widened in encode/decode forms (col-md-4 → col-md-6)
+- Channel options column narrowed (col-md-8 → col-md-6)
+- QR preview panels enlarged for better text readability
+- Consistent font sizing across all preview panel banners (0.7rem filename, 0.6rem data, 0.65rem badges)
+
+### Fixed
+- QR preview text too small to read in encode/decode templates
+- Inconsistent label sizes between reference/carrier/stego panels
+
 ## [4.0.1] - 2025-01-02
 
 ### Fixed
@@ -87,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - CLI interface
 - Basic PIN authentication
 
+[4.0.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.1...v4.0.2
 [4.0.1]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/adlee-was-taken/stegasoo/compare/v3.2.0...v4.0.0
 [3.2.0]: https://github.com/adlee-was-taken/stegasoo/compare/v3.0.2...v3.2.0
