@@ -42,7 +42,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-echo -e "${GREEN}[1/8]${NC} Removing WiFi credentials..."
+echo -e "${GREEN}[1/9]${NC} Removing WiFi credentials..."
 if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
     cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
@@ -60,7 +60,7 @@ else
     echo "  No wpa_supplicant.conf found"
 fi
 
-echo -e "${GREEN}[2/8]${NC} Removing SSH authorized keys..."
+echo -e "${GREEN}[2/9]${NC} Removing SSH authorized keys..."
 for user_home in /home/*; do
     if [ -d "$user_home/.ssh" ]; then
         rm -f "$user_home/.ssh/authorized_keys"
@@ -70,7 +70,7 @@ for user_home in /home/*; do
 done
 rm -f /root/.ssh/authorized_keys /root/.ssh/known_hosts 2>/dev/null || true
 
-echo -e "${GREEN}[3/8]${NC} Clearing bash history..."
+echo -e "${GREEN}[3/9]${NC} Clearing bash history..."
 for user_home in /home/*; do
     rm -f "$user_home/.bash_history"
     rm -f "$user_home/.python_history"
@@ -78,7 +78,7 @@ done
 rm -f /root/.bash_history /root/.python_history 2>/dev/null || true
 history -c
 
-echo -e "${GREEN}[4/8]${NC} Removing Stegasoo user data..."
+echo -e "${GREEN}[4/9]${NC} Removing Stegasoo user data..."
 # Remove auth database (users create their own admin on first run)
 rm -rf /home/*/stegasoo/frontends/web/instance/
 # Remove SSL certs (will be regenerated)
@@ -87,7 +87,50 @@ rm -rf /home/*/stegasoo/frontends/web/certs/
 rm -f /home/*/stegasoo/frontends/web/.env
 echo "  Stegasoo instance data cleared"
 
-echo -e "${GREEN}[5/8]${NC} Clearing logs..."
+echo -e "${GREEN}[5/9]${NC} Setting up first-boot wizard..."
+# Find stegasoo install directory
+STEGASOO_DIR=$(ls -d /home/*/stegasoo 2>/dev/null | head -1)
+STEGASOO_USER=$(stat -c '%U' "$STEGASOO_DIR" 2>/dev/null || echo "pi")
+
+if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
+    # Install the profile.d hook
+    cp "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" /etc/profile.d/stegasoo-wizard.sh
+    chmod 755 /etc/profile.d/stegasoo-wizard.sh
+    echo "  Installed first-boot wizard hook"
+
+    # Create the first-boot flag
+    touch /etc/stegasoo-first-boot
+    echo "  Created first-boot flag"
+
+    # Reset systemd service to defaults (wizard will reconfigure)
+    cat > /etc/systemd/system/stegasoo.service <<EOF
+[Unit]
+Description=Stegasoo Web UI
+After=network.target
+
+[Service]
+Type=simple
+User=$STEGASOO_USER
+WorkingDirectory=$STEGASOO_DIR/frontends/web
+Environment="PATH=$STEGASOO_DIR/venv/bin:/usr/bin"
+Environment="STEGASOO_AUTH_ENABLED=true"
+Environment="STEGASOO_HTTPS_ENABLED=false"
+Environment="STEGASOO_PORT=5000"
+Environment="STEGASOO_CHANNEL_KEY="
+ExecStart=$STEGASOO_DIR/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    echo "  Reset service to defaults"
+else
+    echo "  ${YELLOW}Warning: Stegasoo not found, skipping wizard setup${NC}"
+fi
+
+echo -e "${GREEN}[6/9]${NC} Clearing logs..."
 journalctl --rotate
 journalctl --vacuum-time=1s
 rm -rf /var/log/*.log /var/log/*.gz /var/log/*.[0-9]
@@ -96,17 +139,17 @@ rm -rf /var/log/journal/*
 find /var/log -type f -name "*.log" -delete 2>/dev/null || true
 echo "  Logs cleared"
 
-echo -e "${GREEN}[6/8]${NC} Clearing temporary files..."
+echo -e "${GREEN}[7/9]${NC} Clearing temporary files..."
 rm -rf /tmp/*
 rm -rf /var/tmp/*
 echo "  Temp files cleared"
 
-echo -e "${GREEN}[7/8]${NC} Clearing package cache..."
+echo -e "${GREEN}[8/9]${NC} Clearing package cache..."
 apt-get clean
 rm -rf /var/cache/apt/archives/*
 echo "  Package cache cleared"
 
-echo -e "${GREEN}[8/8]${NC} Final cleanup..."
+echo -e "${GREEN}[9/9]${NC} Final cleanup..."
 # Remove this script's evidence
 rm -f /root/.bash_history
 sync
