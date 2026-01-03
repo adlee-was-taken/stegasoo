@@ -398,16 +398,21 @@ def batch_check(ctx, images, recursive):
 @click.option(
     "--pin-length", default=DEFAULT_PIN_LENGTH, help=f"PIN length (default: {DEFAULT_PIN_LENGTH})"
 )
+@click.option(
+    "--channel-key", is_flag=True, help="Also generate a 256-bit channel key"
+)
 @click.pass_context
-def generate(ctx, words, pin_length):
+def generate(ctx, words, pin_length, channel_key):
     """
-    Generate random credentials (passphrase + PIN).
+    Generate random credentials (passphrase + PIN + optional channel key).
 
     Examples:
 
         stegasoo generate
 
         stegasoo generate --words 6 --pin-length 8
+
+        stegasoo generate --channel-key
     """
     import secrets
 
@@ -451,11 +456,17 @@ def generate(ctx, words, pin_length):
         "pin_length": pin_length,
     }
 
+    # Generate channel key if requested
+    if channel_key:
+        result["channel_key"] = secrets.token_hex(32)
+
     if ctx.obj.get("json"):
         click.echo(json.dumps(result, indent=2))
     else:
-        click.echo(f"Passphrase: {passphrase}")
-        click.echo(f"PIN:        {pin}")
+        click.echo(f"Passphrase:   {passphrase}")
+        click.echo(f"PIN:          {pin}")
+        if channel_key:
+            click.echo(f"Channel Key:  {result['channel_key']}")
         click.echo("\n⚠️  Save these credentials securely - they cannot be recovered!")
 
 
