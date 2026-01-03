@@ -458,7 +458,8 @@ def generate(ctx, words, pin_length, channel_key):
 
     # Generate channel key if requested
     if channel_key:
-        result["channel_key"] = secrets.token_hex(32)
+        from .channel import generate_channel_key
+        result["channel_key"] = generate_channel_key()
 
     if ctx.obj.get("json"):
         click.echo(json.dumps(result, indent=2))
