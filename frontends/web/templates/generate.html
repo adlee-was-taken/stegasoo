@@ -74,36 +74,47 @@
                         </div>
                     </div>
                     
-                    <hr class="my-4">
-                    
-                    <!-- Channel Key Generation (v4.0.0) -->
-                    <div class="mb-4">
-                        <label class="form-label">
-                            <i class="bi bi-broadcast me-1"></i> Channel Key
-                            <span class="badge bg-info ms-1">v4.0</span>
-                            <a href="{{ url_for('about') }}#channel-keys" class="text-muted ms-2" title="Learn about channel keys">
-                                <i class="bi bi-question-circle"></i>
-                            </a>
-                        </label>
-                        
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="bi bi-key"></i></span>
-                            <input type="text" class="form-control font-monospace" id="channelKeyGenerated" 
-                                   placeholder="Click Generate" readonly>
-                            <button class="btn btn-outline-primary" type="button" id="generateChannelKeyBtn">
-                                <i class="bi bi-shuffle me-1"></i>Generate
-                            </button>
-                            <button class="btn btn-outline-secondary" type="button" id="copyChannelKeyBtn" disabled title="Copy to clipboard">
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                        </div>
-                        <div class="form-text">For private groups: generate, then use <strong>Custom</strong> mode when encoding/decoding.</div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-4">
                         <i class="bi bi-shuffle me-2"></i>Generate Credentials
                     </button>
                 </form>
+
+                <!-- Channel Key Accordion (Advanced) -->
+                <div class="accordion mt-4" id="advancedAccordion">
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-dark text-light" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#channelKeyCollapse">
+                                <i class="bi bi-broadcast me-2"></i>Channel Key
+                                <span class="badge bg-info ms-2">Advanced</span>
+                            </button>
+                        </h2>
+                        <div id="channelKeyCollapse" class="accordion-collapse collapse" data-bs-parent="#advancedAccordion">
+                            <div class="accordion-body">
+                                <p class="text-muted small mb-3">
+                                    Channel keys create private encoding channels. Only users with the same key can decode each other's images.
+                                    <a href="{{ url_for('about') }}#channel-keys" class="text-info">Learn more</a>
+                                </p>
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                    <input type="text" class="form-control font-monospace" id="channelKeyGenerated"
+                                           placeholder="Click Generate to create a key" readonly>
+                                    <button class="btn btn-outline-primary" type="button" id="generateChannelKeyBtn">
+                                        <i class="bi bi-shuffle me-1"></i>Generate
+                                    </button>
+                                    <button class="btn btn-outline-secondary" type="button" id="copyChannelKeyBtn" disabled title="Copy to clipboard">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    After generating, configure this key in your server's environment or use <strong>Custom</strong> channel mode when encoding/decoding.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 {% else %}
                 <!-- Generated Credentials Display -->
