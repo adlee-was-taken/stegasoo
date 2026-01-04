@@ -1373,26 +1373,6 @@ def api_tools_strip_metadata():
         return jsonify({"success": False, "error": str(e)}), 400
 
 
-@app.route("/api/tools/peek", methods=["POST"])
-@login_required
-def api_tools_peek():
-    """Check if image contains Stegasoo header."""
-    from stegasoo.steganography import peek_image
-
-    image_file = request.files.get("image")
-    if not image_file:
-        return jsonify({"success": False, "error": "No image provided"}), 400
-
-    try:
-        image_data = image_file.read()
-        result = peek_image(image_data)
-        result["success"] = True
-        result["filename"] = image_file.filename
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 400
-
-
 @app.route("/api/tools/exif", methods=["POST"])
 @login_required
 def api_tools_exif():
