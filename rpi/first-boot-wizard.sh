@@ -141,8 +141,9 @@ if gum confirm "Generate a private channel key?" --default=false; then
     # Generate key to temp file (gum spin doesn't capture stdout well)
     KEY_FILE=$(mktemp)
     ERR_FILE=$(mktemp)
+    VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
     gum spin --spinner dot --title "Generating channel key..." -- \
-        bash -c "source '$INSTALL_DIR/venv/bin/activate' 2>'$ERR_FILE' && python -c 'from stegasoo.channel import generate_channel_key; print(generate_channel_key())' > '$KEY_FILE' 2>>'$ERR_FILE'"
+        bash -c "'$VENV_PYTHON' -c 'from stegasoo.channel import generate_channel_key; print(generate_channel_key())' > '$KEY_FILE' 2>'$ERR_FILE'"
 
     CHANNEL_KEY=$(cat "$KEY_FILE" 2>/dev/null | head -1)
     KEY_ERROR=$(cat "$ERR_FILE" 2>/dev/null)
