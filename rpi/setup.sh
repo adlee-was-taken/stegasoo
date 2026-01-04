@@ -52,7 +52,7 @@ echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
 echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . · . ${CYAN}Raspberry Pi Setup${GRAY} · . · . · ${CYAN}~~~~${GRAY} · . · . ·${NC}"
-echo -e "${GRAY} . · . ${CYAN}tail${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}head${GRAY} · . · . .${NC}"
+echo -e "${GRAY} . · . ${CYAN}~~~~${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}~~~~${GRAY} · . · . .${NC}"
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo ""
 echo "  This will install Stegasoo with full DCT support"

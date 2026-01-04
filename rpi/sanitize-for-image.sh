@@ -58,7 +58,7 @@ if [ "$SOFT_RESET" = true ]; then
 else
     echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . ${CYAN}Sanitize for Imaging${GRAY} · . · . · ${CYAN}~~~~${GRAY} · . · . ·${NC}"
 fi
-echo -e "${GRAY} . · . ${CYAN}tail${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}head${GRAY} · . · . .${NC}"
+echo -e "${GRAY} . · . ${CYAN}~~~~${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}~~~~${GRAY} · . · . .${NC}"
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo ""
 

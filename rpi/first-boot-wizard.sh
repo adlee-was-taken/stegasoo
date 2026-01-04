@@ -45,7 +45,7 @@ echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\\\___|/_/ \\\\_\\\\|___/  \\\
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
 echo -e "${GRAY} · . · ${CYAN}~~~~${NC} ${GRAY}· . · . · .${NC} ${CYAN}First Boot Wizard${NC} ${GRAY}· . · . · ${CYAN}~~~~${NC} ${GRAY}· . · . ·${NC}"
-echo -e "${GRAY} . · . ${CYAN}tail${NC} ${GRAY}· . · . · . · . · . · . · . · . · . · . ${CYAN}head${NC} ${GRAY}· . · . .${NC}"
+echo -e "${GRAY} . · . ${CYAN}~~~~${NC} ${GRAY}· . · . · . · . · . · . · . · . · . · . ${CYAN}~~~~${NC} ${GRAY}· . · . .${NC}"
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo ""
 
