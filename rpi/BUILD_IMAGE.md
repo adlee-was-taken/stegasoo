@@ -16,14 +16,17 @@ Use rpi-imager with these settings:
 
 ```bash
 # Wait for Pi to boot (~60 seconds), then:
-ssh pi@stegasoo.local
+ssh admin@stegasoo.local
 # or use IP from router DHCP list
 ```
 
 ## Step 3: Run Setup Script
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+# Download and run (avoid curl|bash stdin issues)
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
 This takes ~15-20 minutes and installs:
@@ -102,7 +105,7 @@ zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 
 ```bash
 # On Pi:
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh && chmod +x setup.sh && ./setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
 sudo ~/stegasoo/rpi/sanitize-for-image.sh

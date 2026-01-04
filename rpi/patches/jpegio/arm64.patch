@@ -1,0 +1,17 @@
+--- a/setup.py
++++ b/setup.py
+@@ -69,12 +69,12 @@
+     largs.append('-mmacosx-version-min=10.9')
+
+     if arch == 'x64':
+-        cargs.append('-m64')
++        pass  # ARM64: removed x86-specific -m64 flag
+ elif sys.platform == 'linux':
+     cargs.extend(['-w', '-fPIC'])
+
+     if arch == 'x64':
+-        cargs.append('-m64')
++        pass  # ARM64: removed x86-specific -m64 flag
+     dname_libjpeg = 'libjpeg'
+
+ # end of if-else

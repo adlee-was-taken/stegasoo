@@ -4,17 +4,20 @@ Scripts and resources for deploying Stegasoo on Raspberry Pi.
 
 ## Quick Install
 
-On a fresh Raspberry Pi OS (64-bit) installation:
+On a fresh Raspberry Pi OS Lite (64-bit) installation:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+# Download and run (recommended)
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
-Or download and run manually:
+Or clone the repo:
 
 ```bash
-wget https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
-chmod +x setup.sh
+git clone https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo/rpi
 ./setup.sh
 ```
 
@@ -128,10 +131,12 @@ In advanced settings, set:
 
 ```bash
 # SSH into the Pi
-ssh pi@stegasoo.local
+ssh admin@stegasoo.local
 
-# Run the setup script
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+# Download and run setup script
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
 ### 3. Test It Works

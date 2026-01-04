@@ -125,14 +125,23 @@ fi
 
 echo -e "${GREEN}[3/6]${NC} Building jpegio for ARM..."
 
-# Clone and patch jpegio
+# Clone jpegio
 JPEGIO_DIR="/tmp/jpegio-build"
 rm -rf "$JPEGIO_DIR"
 git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
-cd "$JPEGIO_DIR"
 
-# Patch for ARM (remove x86-specific -m64 flag)
-sed -i "s/cargs.append('-m64')/pass  # ARM fix/" setup.py
+# Apply ARM64 patch using robust patching system
+# The patch script tries: 1) patch file, 2) sed, 3) python regex
+if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
+    bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
+else
+    # Fallback if running before stegasoo is cloned (curl install)
+    echo "  Using inline patch fallback..."
+    cd "$JPEGIO_DIR"
+    sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" setup.py
+fi
+
+cd "$JPEGIO_DIR"
 
 # Build jpegio
 pip install --upgrade pip setuptools wheel cython numpy
