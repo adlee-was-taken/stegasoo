@@ -309,13 +309,9 @@ if [ -n "$STEGASOO_DIR" ] && [ -d "$STEGASOO_DIR/venv" ]; then
     fi
 fi
 
-if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
-    # Install the profile.d hook
-    cp "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" /etc/profile.d/stegasoo-wizard.sh
-    chmod 644 /etc/profile.d/stegasoo-wizard.sh
-    echo "  Installed wizard hook to /etc/profile.d/"
-
-    # Add stegasoo to PATH for all users
+# Ensure PATH hook exists for stegasoo CLI and scripts
+if [ ! -f /etc/profile.d/stegasoo-path.sh ]; then
+    echo "  Creating PATH hook..."
     cat > /etc/profile.d/stegasoo-path.sh <<'PATHEOF'
 # Stegasoo CLI and scripts
 if [ -d /opt/stegasoo/venv/bin ]; then
@@ -327,6 +323,15 @@ fi
 PATHEOF
     chmod 644 /etc/profile.d/stegasoo-path.sh
     echo "  Installed PATH hook to /etc/profile.d/"
+else
+    echo "  PATH hook OK"
+fi
+
+if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
+    # Install the profile.d hook
+    cp "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" /etc/profile.d/stegasoo-wizard.sh
+    chmod 644 /etc/profile.d/stegasoo-wizard.sh
+    echo "  Installed wizard hook to /etc/profile.d/"
 
     # Create the first-boot flag
     touch /etc/stegasoo-first-boot
