@@ -82,6 +82,7 @@ echo ""
 echo "  [Y] Enable HTTPS (recommended for home network security)"
 echo "  [n] Use HTTP only (unencrypted, not recommended)"
 echo ""
+read -t 0.1 -n 10000 discard 2>/dev/null || true
 read -p "Enable HTTPS? [Y/n] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -111,6 +112,7 @@ if [ "$ENABLE_HTTPS" = "true" ]; then
   echo "  [Y] Use port 443 (cleaner URLs)"
   echo "  [n] Use port 5000 (default, no extra config)"
   echo ""
+  read -t 0.1 -n 10000 discard 2>/dev/null || true
   read -p "Use standard port 443? [Y/n] " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -140,6 +142,7 @@ echo ""
 echo "  [y] Generate a private channel key"
 echo "  [N] Use public mode (anyone can decode)"
 echo ""
+read -t 0.1 -n 10000 discard 2>/dev/null || true
 read -p "Generate a private channel key? [y/N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -160,6 +163,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "  ${RED}You'll need to share it with anyone who should decode${NC}"
     echo -e "  ${RED}your images. This key won't be shown again.${NC}"
     echo ""
+    # Flush input buffer before waiting
+    read -t 0.1 -n 10000 discard 2>/dev/null || true
+    sleep 0.3
     read -p "Press Enter when you've saved the key..."
   else
     echo -e "  ${RED}✗${NC} Failed to generate key. Using public mode."
