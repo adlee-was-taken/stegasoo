@@ -60,14 +60,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function regeneratePassword() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let password = '';
-    for (let i = 0; i < 8; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    document.getElementById('passwordInput').value = password;
-}
-</script>
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 {% endblock %}

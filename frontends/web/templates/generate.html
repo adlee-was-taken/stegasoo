@@ -509,61 +509,12 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
-<script>
-// ============================================================================
-// GENERATE PAGE - Form Controls
-// ============================================================================
-
-// Words range slider
-const wordsRange = document.getElementById('wordsRange');
-const wordsValue = document.getElementById('wordsValue');
-
-wordsRange?.addEventListener('input', function() {
-    const bits = this.value * 11;
-    wordsValue.textContent = `${this.value} words (~${bits} bits)`;
-});
-
-// Toggle PIN/RSA options visibility
-const usePinCheck = document.getElementById('usePinCheck');
-const useRsaCheck = document.getElementById('useRsaCheck');
-const pinOptions = document.getElementById('pinOptions');
-const rsaOptions = document.getElementById('rsaOptions');
-const rsaQrWarning = document.getElementById('rsaQrWarning');
-const rsaBitsSelect = document.getElementById('rsaBitsSelect');
-
-usePinCheck?.addEventListener('change', function() {
-    pinOptions?.classList.toggle('d-none', !this.checked);
-});
-
-useRsaCheck?.addEventListener('change', function() {
-    rsaOptions?.classList.toggle('d-none', !this.checked);
-});
-
-// RSA key size QR warning (>3072 bits)
-rsaBitsSelect?.addEventListener('change', function() {
-    rsaQrWarning?.classList.toggle('d-none', parseInt(this.value) <= 3072);
-});
-
+<script src="{{ url_for('static', filename='js/generate.js') }}"></script>
 {% if generated %}
-// ============================================================================
-// GENERATE PAGE - Credential Display
-// ============================================================================
+<script>
+// Page-specific data from Jinja
+const passphraseWords = '{{ passphrase|default("", true) }}'.split(' ').filter(w => w.length > 0);
 
-// PIN visibility toggle
-let pinHidden = false;
-function togglePinVisibility() {
-    const pinDigits = document.getElementById('pinDigits');
-    const icon = document.getElementById('pinToggleIcon');
-    const text = document.getElementById('pinToggleText');
-    
-    pinHidden = !pinHidden;
-    pinDigits?.classList.toggle('blurred', pinHidden);
-    
-    if (icon) icon.className = pinHidden ? 'bi bi-eye' : 'bi bi-eye-slash';
-    if (text) text.textContent = pinHidden ? 'Show' : 'Hide';
-}
-
-// Copy PIN
 function copyPin() {
     Stegasoo.copyToClipboard(
         '{{ pin|default("", true) }}',
@@ -572,21 +523,6 @@ function copyPin() {
     );
 }
 
-// Passphrase visibility toggle
-let passphraseHidden = false;
-function togglePassphraseVisibility() {
-    const display = document.getElementById('passphraseDisplay');
-    const icon = document.getElementById('passphraseToggleIcon');
-    const text = document.getElementById('passphraseToggleText');
-    
-    passphraseHidden = !passphraseHidden;
-    display?.classList.toggle('blurred', passphraseHidden);
-    
-    if (icon) icon.className = passphraseHidden ? 'bi bi-eye' : 'bi bi-eye-slash';
-    if (text) text.textContent = passphraseHidden ? 'Show' : 'Hide';
-}
-
-// Copy passphrase
 function copyPassphrase() {
     Stegasoo.copyToClipboard(
         '{{ passphrase|default("", true) }}',
@@ -595,148 +531,13 @@ function copyPassphrase() {
     );
 }
 
-// ============================================================================
-// Memory Aid Story Generation - Templates by word count
-// ============================================================================
-
-const passphrase = '{{ passphrase|default("", true) }}';
-const passphraseWords = passphrase.split(' ').filter(w => w.length > 0);
-let currentStoryTemplate = 0;
-
-// Templates organized by word count (3-12 words supported)
-const storyTemplatesByLength = {
-    3: [
-        w => `The ${hl(w[0])} ${hl(w[1])} ${hl(w[2])}.`,
-        w => `${hl(w[0])} loves ${hl(w[1])} and ${hl(w[2])}.`,
-        w => `A ${hl(w[0])} found a ${hl(w[1])} near the ${hl(w[2])}.`,
-        w => `${hl(w[0])}, ${hl(w[1])}, ${hl(w[2])} — never forget.`,
-        w => `The ${hl(w[0])} hid the ${hl(w[1])} under the ${hl(w[2])}.`,
-    ],
-    4: [
-        w => `${hl(w[0])} and ${hl(w[1])} discovered a ${hl(w[2])} made of ${hl(w[3])}.`,
-        w => `The ${hl(w[0])} ${hl(w[1])} ate ${hl(w[2])} for ${hl(w[3])}.`,
-        w => `In the ${hl(w[0])}, a ${hl(w[1])} met a ${hl(w[2])} carrying ${hl(w[3])}.`,
-        w => `${hl(w[0])} said "${hl(w[1])}" while holding a ${hl(w[2])} ${hl(w[3])}.`,
-        w => `The secret: ${hl(w[0])}, ${hl(w[1])}, ${hl(w[2])}, ${hl(w[3])}.`,
-    ],
-    5: [
-        w => `${hl(w[0])} traveled to ${hl(w[1])} seeking the ${hl(w[2])} of ${hl(w[3])} and ${hl(w[4])}.`,
-        w => `The ${hl(w[0])} ${hl(w[1])} lived in a ${hl(w[2])} house with ${hl(w[3])} ${hl(w[4])}.`,
-        w => `"${hl(w[0])}!" shouted ${hl(w[1])} as the ${hl(w[2])} ${hl(w[3])} flew toward ${hl(w[4])}.`,
-        w => `Captain ${hl(w[0])} sailed the ${hl(w[1])} ${hl(w[2])} searching for ${hl(w[3])} ${hl(w[4])}.`,
-        w => `In ${hl(w[0])} kingdom, ${hl(w[1])} guards protected the ${hl(w[2])} ${hl(w[3])} ${hl(w[4])}.`,
-    ],
-    6: [
-        w => `${hl(w[0])} met ${hl(w[1])} at the ${hl(w[2])}. Together they found ${hl(w[3])}, ${hl(w[4])}, and ${hl(w[5])}.`,
-        w => `The ${hl(w[0])} ${hl(w[1])} wore a ${hl(w[2])} hat while eating ${hl(w[3])} ${hl(w[4])} ${hl(w[5])}.`,
-        w => `Detective ${hl(w[0])} found ${hl(w[1])} ${hl(w[2])} near the ${hl(w[3])} ${hl(w[4])} ${hl(w[5])}.`,
-        w => `In the ${hl(w[0])} ${hl(w[1])}, a ${hl(w[2])} ${hl(w[3])} sang about ${hl(w[4])} ${hl(w[5])}.`,
-        w => `Chef ${hl(w[0])} combined ${hl(w[1])}, ${hl(w[2])}, ${hl(w[3])}, ${hl(w[4])}, and ${hl(w[5])}.`,
-    ],
-    7: [
-        w => `${hl(w[0])} and ${hl(w[1])} walked through the ${hl(w[2])} ${hl(w[3])} to find the ${hl(w[4])} ${hl(w[5])} ${hl(w[6])}.`,
-        w => `The ${hl(w[0])} professor studied ${hl(w[1])} ${hl(w[2])} while drinking ${hl(w[3])} ${hl(w[4])} with ${hl(w[5])} ${hl(w[6])}.`,
-        w => `"${hl(w[0])} ${hl(w[1])}!" yelled ${hl(w[2])} as ${hl(w[3])} ${hl(w[4])} attacked the ${hl(w[5])} ${hl(w[6])}.`,
-        w => `In ${hl(w[0])}, King ${hl(w[1])} decreed that ${hl(w[2])} ${hl(w[3])} must honor ${hl(w[4])} ${hl(w[5])} ${hl(w[6])}.`,
-    ],
-    8: [
-        w => `${hl(w[0])} ${hl(w[1])} and ${hl(w[2])} ${hl(w[3])} met at the ${hl(w[4])} ${hl(w[5])} to discuss ${hl(w[6])} ${hl(w[7])}.`,
-        w => `The ${hl(w[0])} ${hl(w[1])} ${hl(w[2])} traveled from ${hl(w[3])} to ${hl(w[4])} carrying ${hl(w[5])} ${hl(w[6])} ${hl(w[7])}.`,
-        w => `${hl(w[0])} discovered that ${hl(w[1])} ${hl(w[2])} plus ${hl(w[3])} ${hl(w[4])} equals ${hl(w[5])} ${hl(w[6])} ${hl(w[7])}.`,
-    ],
-    9: [
-        w => `${hl(w[0])} ${hl(w[1])} ${hl(w[2])} watched as ${hl(w[3])} ${hl(w[4])} ${hl(w[5])} danced with ${hl(w[6])} ${hl(w[7])} ${hl(w[8])}.`,
-        w => `In the ${hl(w[0])} ${hl(w[1])} ${hl(w[2])}, three friends — ${hl(w[3])}, ${hl(w[4])}, ${hl(w[5])} — found ${hl(w[6])} ${hl(w[7])} ${hl(w[8])}.`,
-        w => `The recipe: ${hl(w[0])}, ${hl(w[1])}, ${hl(w[2])}, ${hl(w[3])}, ${hl(w[4])}, ${hl(w[5])}, ${hl(w[6])}, ${hl(w[7])}, ${hl(w[8])}.`,
-    ],
-    10: [
-        w => `${hl(w[0])} ${hl(w[1])} told ${hl(w[2])} ${hl(w[3])} about the ${hl(w[4])} ${hl(w[5])} ${hl(w[6])} hidden in ${hl(w[7])} ${hl(w[8])} ${hl(w[9])}.`,
-        w => `The ${hl(w[0])} ${hl(w[1])} ${hl(w[2])} ${hl(w[3])} ${hl(w[4])} lived beside ${hl(w[5])} ${hl(w[6])} ${hl(w[7])} ${hl(w[8])} ${hl(w[9])}.`,
-    ],
-    11: [
-        w => `${hl(w[0])} ${hl(w[1])} ${hl(w[2])} and ${hl(w[3])} ${hl(w[4])} ${hl(w[5])} discovered ${hl(w[6])} ${hl(w[7])} ${hl(w[8])} ${hl(w[9])} ${hl(w[10])}.`,
-        w => `In ${hl(w[0])} ${hl(w[1])}, the ${hl(w[2])} ${hl(w[3])} ${hl(w[4])} sang of ${hl(w[5])} ${hl(w[6])} ${hl(w[7])} ${hl(w[8])} ${hl(w[9])} ${hl(w[10])}.`,
-    ],
-    12: [
-        w => `${hl(w[0])} ${hl(w[1])} ${hl(w[2])} met ${hl(w[3])} ${hl(w[4])} ${hl(w[5])} at the ${hl(w[6])} ${hl(w[7])} ${hl(w[8])} ${hl(w[9])} ${hl(w[10])} ${hl(w[11])}.`,
-        w => `The twelve treasures: ${hl(w[0])}, ${hl(w[1])}, ${hl(w[2])}, ${hl(w[3])}, ${hl(w[4])}, ${hl(w[5])}, ${hl(w[6])}, ${hl(w[7])}, ${hl(w[8])}, ${hl(w[9])}, ${hl(w[10])}, ${hl(w[11])}.`,
-    ],
-};
-
-function hl(word) {
-    return `<span class="passphrase-word">${word}</span>`;
-}
-
-function generateStory(idx = null) {
-    const count = passphraseWords.length;
-    if (count === 0) return '';
-    
-    // Clamp to supported range (3-12)
-    const templateKey = Math.max(3, Math.min(12, count));
-    const templates = storyTemplatesByLength[templateKey];
-    
-    if (!templates || templates.length === 0) {
-        // Fallback: just list the words
-        return passphraseWords.map(w => hl(w)).join(' &mdash; ');
-    }
-    
-    const templateIdx = (idx ?? currentStoryTemplate) % templates.length;
-    return templates[templateIdx](passphraseWords);
-}
-
 function toggleMemoryAid() {
-    const container = document.getElementById('memoryAidContainer');
-    const icon = document.getElementById('memoryAidIcon');
-    const text = document.getElementById('memoryAidText');
-    
-    const isHidden = container?.classList.contains('d-none');
-    container?.classList.toggle('d-none', !isHidden);
-    
-    if (icon) icon.className = isHidden ? 'bi bi-lightbulb-fill' : 'bi bi-lightbulb';
-    if (text) text.textContent = isHidden ? 'Hide Aid' : 'Memory Aid';
-    
-    if (isHidden) {
-        document.getElementById('memoryStory').innerHTML = generateStory();
-    }
+    StegasooGenerate.toggleMemoryAid(passphraseWords);
 }
 
 function regenerateStory() {
-    const count = passphraseWords.length;
-    const templateKey = Math.max(3, Math.min(12, count));
-    const templates = storyTemplatesByLength[templateKey] || [];
-    currentStoryTemplate = (currentStoryTemplate + 1) % Math.max(1, templates.length);
-    document.getElementById('memoryStory').innerHTML = generateStory(currentStoryTemplate);
+    StegasooGenerate.regenerateStory(passphraseWords);
 }
-
-// Print QR code
-function printQrCode() {
-    const qrImg = document.getElementById('qrCodeImage');
-    if (!qrImg) return;
-    
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head>
-    <title>Stegasoo RSA Key QR Code</title>
-    <style>
-        body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
-        img { max-width: 400px; }
-        .warning { margin-top: 20px; padding: 10px; border: 2px solid #ff9800; background: #fff3e0; max-width: 400px; text-align: center; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <h2>Stegasoo RSA Private Key</h2>
-    <img src="${qrImg.src}" alt="RSA Key QR Code">
-    <div class="warning">
-        <strong>⚠️ SECURITY WARNING</strong><br>
-        This QR code contains your unencrypted RSA private key.<br>
-        Store securely and destroy after use.
-    </div>
-    <script>window.onload = function() { window.print(); }<\/script>
-</body>
-</html>`);
-    printWindow.document.close();
-}
-{% endif %}
 </script>
+{% endif %}
 {% endblock %}

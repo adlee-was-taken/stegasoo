@@ -56,17 +56,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function copyField(fieldId) {
-    const field = document.getElementById(fieldId);
-    field.select();
-    document.execCommand('copy');
-
-    // Show brief feedback
-    const btn = field.nextElementSibling;
-    const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-check"></i>';
-    setTimeout(() => btn.innerHTML = originalHTML, 1000);
-}
-</script>
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 {% endblock %}
