@@ -132,6 +132,18 @@ EOF
             fi
         done
     fi
+
+    # Remove netplan WiFi configs (Ubuntu-based systems)
+    if [ -d /etc/netplan ]; then
+        for np in /etc/netplan/*.yaml; do
+            if [ -f "$np" ] && grep -q "wifis:" "$np" 2>/dev/null; then
+                rm -f "$np"
+                echo "  Removed netplan: $(basename "$np")"
+            fi
+        done
+        # Also remove NM-generated netplan files (contain WiFi SSIDs)
+        rm -f /etc/netplan/90-NM-*.yaml 2>/dev/null && echo "  Removed netplan NM configs"
+    fi
 fi
 
 # =============================================================================
@@ -345,6 +357,18 @@ if [ "$SOFT_RESET" = false ]; then
             break
         fi
     done
+
+    # Check netplan
+    for np in /etc/netplan/*.yaml; do
+        if [ -f "$np" ] && grep -q "wifis:" "$np" 2>/dev/null; then
+            WIFI_FOUND=true
+            break
+        fi
+    done
+    # Check NM-generated netplan
+    if ls /etc/netplan/90-NM-*.yaml 1>/dev/null 2>&1; then
+        WIFI_FOUND=true
+    fi
 
     if [ "$WIFI_FOUND" = true ]; then
         echo -e "  ${RED}[FAIL]${NC} WiFi credentials still present"
