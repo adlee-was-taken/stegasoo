@@ -104,6 +104,8 @@ fi
 echo ""
 
 if [ "$AUTO_REBOOT" = false ]; then
+    # Flush input buffer before prompt
+    read -t 0.1 -n 10000 discard </dev/tty 2>/dev/null || true
     read -p "Continue? This cannot be undone! [y/N] " -n 1 -r </dev/tty
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -457,6 +459,9 @@ if [ "$SOFT_RESET" = true ]; then
         echo "Rebooting..."
         exec reboot
     fi
+    # Flush input buffer and pause before prompt
+    read -t 0.1 -n 10000 discard </dev/tty 2>/dev/null || true
+    sleep 0.3
     read -p "Reboot now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -476,6 +481,9 @@ else
         echo "Shutting down..."
         exec shutdown -h now
     fi
+    # Flush input buffer and pause before prompt
+    read -t 0.1 -n 10000 discard </dev/tty 2>/dev/null || true
+    sleep 0.3
     read -p "Shut down now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
