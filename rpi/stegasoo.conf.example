@@ -1,0 +1,30 @@
+# Stegasoo Raspberry Pi Configuration
+# Copy this file to /etc/stegasoo.conf or ~/.config/stegasoo/stegasoo.conf
+#
+# You can also override these by exporting environment variables:
+#   export STEGASOO_INSTALL_DIR="/custom/path"
+#   ./setup.sh
+
+# Installation directory (default: /opt/stegasoo)
+#INSTALL_DIR="/opt/stegasoo"
+
+# Python version to install via pyenv (default: 3.12)
+#PYTHON_VERSION="3.12"
+
+# Git repository URL
+#STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
+
+# Git branch to checkout (default: main)
+#STEGASOO_BRANCH="main"
+
+# Web UI port (default: 5000)
+#STEGASOO_PORT="5000"
+
+# Enable HTTPS (default: false, configured via wizard)
+#STEGASOO_HTTPS_ENABLED="false"
+
+# Enable authentication (default: true)
+#STEGASOO_AUTH_ENABLED="true"
+
+# Channel key for private channels (default: none)
+#STEGASOO_CHANNEL_KEY=""

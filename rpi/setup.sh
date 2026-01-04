@@ -29,11 +29,55 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# Configuration
-INSTALL_DIR="/opt/stegasoo"
-PYTHON_VERSION="3.12"
-STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
+# Show help
+show_help() {
+    echo "Stegasoo Raspberry Pi Setup Script"
+    echo ""
+    echo "Usage: $0 [options]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    echo "Configuration:"
+    echo "  Config files are loaded in order (later overrides earlier):"
+    echo "    1. /etc/stegasoo.conf"
+    echo "    2. ~/.config/stegasoo/stegasoo.conf"
+    echo "    3. Environment variables"
+    echo ""
+    echo "  Available variables:"
+    echo "    INSTALL_DIR       Install location (default: /opt/stegasoo)"
+    echo "    PYTHON_VERSION    Python version (default: 3.12)"
+    echo "    STEGASOO_REPO     Git repo URL"
+    echo "    STEGASOO_BRANCH   Git branch (default: main)"
+    echo ""
+    echo "  Example:"
+    echo "    export INSTALL_DIR=\"/home/pi/stegasoo\""
+    echo "    ./setup.sh"
+    echo ""
+    exit 0
+}
+
+# Parse args
+for arg in "$@"; do
+    case $arg in
+        -h|--help) show_help ;;
+    esac
+done
+
+# Default configuration
+INSTALL_DIR="${INSTALL_DIR:-/opt/stegasoo}"
+PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
+STEGASOO_REPO="${STEGASOO_REPO:-https://github.com/adlee-was-taken/stegasoo.git}"
+STEGASOO_BRANCH="${STEGASOO_BRANCH:-main}"
 JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
+
+# Load config files (system, then user - user overrides system)
+for config_file in "/etc/stegasoo.conf" "$HOME/.config/stegasoo/stegasoo.conf"; do
+    if [ -f "$config_file" ]; then
+        # shellcheck source=/dev/null
+        source "$config_file"
+    fi
+done
 
 clear
 echo ""
@@ -183,12 +227,14 @@ rm -rf "$JPEGIO_DIR"
 echo -e "${GREEN}[5/7]${NC} Installing Stegasoo..."
 
 # Clone Stegasoo
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR/.git" ]; then
     echo "Stegasoo directory exists, updating..."
     cd "$INSTALL_DIR"
-    git pull
+    git fetch origin
+    git checkout "$STEGASOO_BRANCH"
+    git pull origin "$STEGASOO_BRANCH"
 else
-    git clone "$STEGASOO_REPO" "$INSTALL_DIR"
+    git clone -b "$STEGASOO_BRANCH" "$STEGASOO_REPO" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 fi
 

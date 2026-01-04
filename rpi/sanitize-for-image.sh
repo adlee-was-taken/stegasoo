@@ -29,10 +29,36 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Show help
+show_help() {
+    echo "Stegasoo Sanitize Script - Prepare Pi for SD Card Imaging"
+    echo ""
+    echo "Usage: sudo $0 [options]"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help     Show this help message"
+    echo "  -s, --soft     Soft reset (keeps WiFi for testing)"
+    echo "  -r, --reboot   Auto-reboot/shutdown when done"
+    echo ""
+    echo "Examples:"
+    echo "  sudo $0                 # Full sanitize, prompts for shutdown"
+    echo "  sudo $0 --soft          # Keep WiFi, reset everything else"
+    echo "  sudo $0 --soft --reboot # Soft reset, auto-reboot"
+    echo "  sudo $0 --reboot        # Full sanitize, auto-shutdown"
+    echo ""
+    echo "Config override:"
+    echo "  Set STEGASOO_DIR to specify a custom install location:"
+    echo "    export STEGASOO_DIR=\"/home/pi/stegasoo\""
+    echo "    sudo -E $0"
+    echo ""
+    exit 0
+}
+
 SOFT_RESET=false
 AUTO_REBOOT=false
 for arg in "$@"; do
     case $arg in
+        -h|--help) show_help ;;
         --soft|-s) SOFT_RESET=true ;;
         --reboot|-r) AUTO_REBOOT=true ;;
     esac
