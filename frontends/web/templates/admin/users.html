@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-people fs-4 me-2"></i>
+                    <span class="fs-5">User Management</span>
+                </div>
+                <div class="text-muted small">
+                    {{ user_count }} / {{ max_users }} users
+                </div>
+            </div>
+            <div class="card-body">
+                {% if can_create %}
+                <div class="mb-4">
+                    <a href="{{ url_for('admin_user_new') }}" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-2"></i>Add User
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-4">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Maximum of {{ max_users }} users reached.
+                </div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>
+                                    <i class="bi bi-person me-2"></i>
+                                    {{ user.username }}
+                                    {% if user.id == current_user.id %}
+                                    <span class="badge bg-info ms-2">You</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_admin %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-shield-check me-1"></i>Admin
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">User</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">
+                                    {{ user.created_at[:10] if user.created_at else 'Unknown' }}
+                                </td>
+                                <td class="text-end">
+                                    {% if user.id != current_user.id %}
+                                    <form method="POST" action="{{ url_for('admin_user_reset_password', user_id=user.id) }}"
+                                          class="d-inline" onsubmit="return confirm('Reset password for {{ user.username }}?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Reset Password">
+                                            <i class="bi bi-key"></i>
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('admin_user_delete', user_id=user.id) }}"
+                                          class="d-inline" onsubmit="return confirm('Delete user {{ user.username }}? This cannot be undone.')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete User">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted small">
+                <i class="bi bi-info-circle me-1"></i>
+                Admins can add up to {{ max_users }} regular users.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}User Created - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle fs-4 me-2"></i>
+                <span class="fs-5">User Created Successfully</span>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Important:</strong> This password will only be shown once.
+                    Make sure to share it with the user securely.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Username</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-lg font-monospace"
+                               value="{{ username }}" readonly id="usernameField">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="copyField('usernameField')" title="Copy username">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-muted small">Password</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control form-control-lg font-monospace"
+                               value="{{ password }}" readonly id="passwordField">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="copyField('passwordField')" title="Copy password">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('admin_user_new') }}" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-2"></i>Add Another User
+                    </a>
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Users
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyField(fieldId) {
+    const field = document.getElementById(fieldId);
+    field.select();
+    document.execCommand('copy');
+
+    // Show brief feedback
+    const btn = field.nextElementSibling;
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i>';
+    setTimeout(() => btn.innerHTML = originalHTML, 1000);
+}
+</script>
+{% endblock %}

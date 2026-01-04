@@ -12,7 +12,20 @@
             <div class="card-body">
                 <p class="text-muted mb-4">
                     Logged in as <strong>{{ username }}</strong>
+                    {% if is_admin %}
+                    <span class="badge bg-warning text-dark ms-2">
+                        <i class="bi bi-shield-check me-1"></i>Admin
+                    </span>
+                    {% endif %}
                 </p>
+
+                {% if is_admin %}
+                <div class="mb-4">
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-people me-2"></i>Manage Users
+                    </a>
+                </div>
+                {% endif %}
 
                 <h6 class="text-muted mb-3">Change Password</h6>
 

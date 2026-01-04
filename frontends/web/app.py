@@ -30,13 +30,27 @@ import time
 from pathlib import Path
 
 from auth import (
+    MAX_USERS,
+    admin_required,
+    can_create_user,
     change_password,
+    create_admin_user,
     create_user,
+    delete_user,
+    generate_temp_password,
+    get_all_users,
+    get_current_user,
+    get_non_admin_count,
+    get_user_by_id,
     get_username,
+    is_admin,
     is_authenticated,
     login_required,
+    login_user,
+    logout_user,
+    reset_user_password,
     user_exists,
-    verify_password,
+    verify_user_password,
 )
 from auth import (
     init_app as init_auth,
@@ -204,6 +218,8 @@ def inject_globals():
         "auth_enabled": app.config.get("AUTH_ENABLED", True),
         "is_authenticated": is_authenticated(),
         "username": get_username() if is_authenticated() else None,
+        # NEW in v4.1.0 - Admin state
+        "is_admin": is_admin(),
     }
 
 
@@ -1217,7 +1233,7 @@ def decode_page():
 
         except DecryptionError:
             flash(
-                "Decryption failed. Check your passphrase, PIN, RSA key, reference photo, and channel key.",
+                "Decryption failed. Check passphrase, PIN, RSA key, reference photo, and channel key.",
                 "error",
             )
             return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
@@ -1326,29 +1342,31 @@ def login():
         return redirect(url_for("index"))
 
     if request.method == "POST":
+        username = request.form.get("username", "")
         password = request.form.get("password", "")
-        if verify_password(password):
-            session["authenticated"] = True
+        user = verify_user_password(username, password)
+        if user:
+            login_user(user)
             session.permanent = True
             flash("Login successful", "success")
             return redirect(url_for("index"))
         else:
-            flash("Invalid password", "error")
+            flash("Invalid username or password", "error")
 
-    return render_template("login.html", username=get_username())
+    return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
     """Logout and clear session."""
-    session.clear()
+    logout_user()
     flash("Logged out successfully", "success")
     return redirect(url_for("index"))
 
 
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
-    """First-run setup page."""
+    """First-run setup page - create admin account."""
     if not app.config.get("AUTH_ENABLED", True):
         return redirect(url_for("index"))
 
@@ -1360,19 +1378,20 @@ def setup():
         password = request.form.get("password", "")
         password_confirm = request.form.get("password_confirm", "")
 
-        if len(password) < 8:
-            flash("Password must be at least 8 characters", "error")
-        elif password != password_confirm:
+        if password != password_confirm:
             flash("Passwords do not match", "error")
         else:
-            try:
-                create_user(username, password)
-                session["authenticated"] = True
-                session.permanent = True
+            success, message = create_admin_user(username, password)
+            if success:
+                # Auto-login the new admin
+                user = verify_user_password(username, password)
+                if user:
+                    login_user(user)
+                    session.permanent = True
                 flash("Admin account created successfully!", "success")
                 return redirect(url_for("index"))
-            except Exception as e:
-                flash(f"Error creating account: {e}", "error")
+            else:
+                flash(message, "error")
 
     return render_template("setup.html")
 
@@ -1381,6 +1400,8 @@ def setup():
 @login_required
 def account():
     """Account management page."""
+    current_user = get_current_user()
+
     if request.method == "POST":
         current = request.form.get("current_password", "")
         new = request.form.get("new_password", "")
@@ -1389,10 +1410,126 @@ def account():
         if new != new_confirm:
             flash("New passwords do not match", "error")
         else:
-            success, message = change_password(current, new)
+            success, message = change_password(current_user.id, current, new)
             flash(message, "success" if success else "error")
 
-    return render_template("account.html", username=get_username())
+    return render_template(
+        "account.html",
+        username=current_user.username,
+        user=current_user,
+        is_admin=current_user.is_admin,
+    )
+
+
+# ============================================================================
+# ADMIN ROUTES (v4.1.0)
+# ============================================================================
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    """User management page (admin only)."""
+    users = get_all_users()
+    current_user = get_current_user()
+    return render_template(
+        "admin/users.html",
+        users=users,
+        current_user=current_user,
+        user_count=get_non_admin_count(),
+        max_users=MAX_USERS,
+        can_create=can_create_user(),
+    )
+
+
+@app.route("/admin/users/new", methods=["GET", "POST"])
+@admin_required
+def admin_user_new():
+    """Create new user (admin only)."""
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+
+        success, message, user = create_user(username, password)
+        if success:
+            flash(f"User '{username}' created successfully", "success")
+            # Store password temporarily for display
+            session["temp_password"] = password
+            session["temp_username"] = username
+            return redirect(url_for("admin_user_created"))
+        else:
+            flash(message, "error")
+
+    # Generate a temp password for the form
+    temp_password = generate_temp_password()
+    return render_template("admin/user_new.html", temp_password=temp_password)
+
+
+@app.route("/admin/users/created")
+@admin_required
+def admin_user_created():
+    """Show created user confirmation with password."""
+    username = session.pop("temp_username", None)
+    password = session.pop("temp_password", None)
+
+    if not username or not password:
+        return redirect(url_for("admin_users"))
+
+    return render_template(
+        "admin/user_created.html",
+        username=username,
+        password=password,
+    )
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_user_delete(user_id):
+    """Delete a user (admin only)."""
+    current_user = get_current_user()
+    success, message = delete_user(user_id, current_user.id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def admin_user_reset_password(user_id):
+    """Reset a user's password (admin only)."""
+    user = get_user_by_id(user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for("admin_users"))
+
+    # Generate new password
+    new_password = generate_temp_password()
+    success, message = reset_user_password(user_id, new_password)
+
+    if success:
+        # Store for display
+        session["temp_password"] = new_password
+        session["temp_username"] = user.username
+        return redirect(url_for("admin_user_password_reset"))
+    else:
+        flash(message, "error")
+        return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/password-reset")
+@admin_required
+def admin_user_password_reset():
+    """Show password reset confirmation."""
+    username = session.pop("temp_username", None)
+    password = session.pop("temp_password", None)
+
+    if not username or not password:
+        return redirect(url_for("admin_users"))
+
+    return render_template(
+        "admin/password_reset.html",
+        username=username,
+        password=password,
+    )
 
 
 # ============================================================================

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Add User - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-person-plus fs-4 me-2"></i>
+                <span class="fs-5">Add New User</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin_user_new') }}">
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-person me-1"></i> Username
+                        </label>
+                        <input type="text" name="username" class="form-control"
+                               placeholder="e.g., john_doe or john@example.com"
+                               pattern="[a-zA-Z0-9][a-zA-Z0-9_\-@.]{2,79}"
+                               title="3-80 characters, letters/numbers/underscore/hyphen/@/."
+                               required autofocus>
+                        <div class="form-text">
+                            Letters, numbers, underscore, hyphen, @ and . allowed.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-key me-1"></i> Password
+                        </label>
+                        <div class="input-group">
+                            <input type="text" name="password" id="passwordInput"
+                                   class="form-control" value="{{ temp_password }}"
+                                   minlength="8" required>
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="regeneratePassword()" title="Generate new password">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Auto-generated password. You can edit or regenerate it.
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            <i class="bi bi-person-check me-2"></i>Create User
+                        </button>
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function regeneratePassword() {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('passwordInput').value = password;
+}
+</script>
+{% endblock %}
