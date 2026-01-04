@@ -6,7 +6,8 @@
 # This script is triggered by /etc/profile.d/stegasoo-wizard.sh
 # After completion, it removes itself to prevent re-running
 #
-# Uses whiptail for reliable TUI dialogs (pre-installed on Pi OS)
+# Uses gum (Charm.sh) for beautiful TUI - install with:
+#   sudo apt install gum  OR  go install github.com/charmbracelet/gum@latest
 #
 
 # Configuration
@@ -14,32 +15,39 @@ INSTALL_DIR="/opt/stegasoo"
 FLAG_FILE="/etc/stegasoo-first-boot"
 PROFILE_HOOK="/etc/profile.d/stegasoo-wizard.sh"
 
-# Terminal dimensions
-TERM_HEIGHT=$(tput lines 2>/dev/null || echo 24)
-TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
-BOX_HEIGHT=$((TERM_HEIGHT - 4))
-BOX_WIDTH=$((TERM_WIDTH - 4))
-[ $BOX_HEIGHT -gt 20 ] && BOX_HEIGHT=20
-[ $BOX_WIDTH -gt 70 ] && BOX_WIDTH=70
-
 # Check if this is first boot
 if [ ! -f "$FLAG_FILE" ]; then
     exit 0
 fi
 
+# Check for gum, fall back to basic prompts if not available
+if ! command -v gum &>/dev/null; then
+    echo "Error: gum not found. Install with: sudo apt install gum"
+    exit 1
+fi
+
+clear
+
 # =============================================================================
 # Welcome
 # =============================================================================
 
-whiptail --title "Stegasoo First Boot Wizard" --msgbox "\
-Welcome to Stegasoo!
+gum style \
+    --border double \
+    --border-foreground 212 \
+    --padding "1 2" \
+    --margin "1" \
+    --align center \
+    "🦕 STEGASOO" \
+    "" \
+    "First Boot Wizard"
 
-This wizard will help you configure your Stegasoo server.
+echo ""
+gum style --foreground 245 "This wizard will help you configure your Stegasoo server."
+gum style --foreground 245 "You can reconfigure later by editing /etc/systemd/system/stegasoo.service"
+echo ""
 
-You can reconfigure later by editing:
-/etc/systemd/system/stegasoo.service
-
-Press OK to begin setup..." $BOX_HEIGHT $BOX_WIDTH
+gum confirm "Ready to begin setup?" || exit 0
 
 # =============================================================================
 # Configuration Variables
@@ -53,88 +61,126 @@ CHANNEL_KEY=""
 # Step 1: HTTPS Configuration
 # =============================================================================
 
-if whiptail --title "Step 1 of 3: HTTPS Configuration" --yesno "\
-HTTPS encrypts all traffic between your browser and this server using a self-signed certificate.
+clear
+gum style \
+    --foreground 212 --bold \
+    "Step 1 of 3: HTTPS Configuration"
+echo ""
 
-NOTE: Your browser will show a security warning because the certificate is self-signed. This is normal for home networks.
+gum style --foreground 245 "\
+HTTPS encrypts all traffic between your browser and this server
+using a self-signed certificate.
 
-Enable HTTPS? (Recommended)" $BOX_HEIGHT $BOX_WIDTH; then
+NOTE: Your browser will show a security warning because the
+certificate is self-signed. This is normal for home networks."
+echo ""
+
+if gum confirm "Enable HTTPS?" --default=true; then
     ENABLE_HTTPS="true"
+    gum style --foreground 82 "✓ HTTPS will be enabled"
+else
+    gum style --foreground 214 "→ Using HTTP (unencrypted)"
 fi
+sleep 0.5
 
 # =============================================================================
 # Step 2: Port Configuration (only if HTTPS)
 # =============================================================================
 
 if [ "$ENABLE_HTTPS" = "true" ]; then
-    if whiptail --title "Step 2 of 3: Port Configuration" --yesno "\
-The standard HTTPS port is 443, which means you can access Stegasoo without specifying a port in the URL.
+    clear
+    gum style \
+        --foreground 212 --bold \
+        "Step 2 of 3: Port Configuration"
+    echo ""
+
+    gum style --foreground 245 "\
+The standard HTTPS port is 443, which means you can access
+Stegasoo without specifying a port in the URL.
 
   Port 443:  https://stegasoo.local
   Port 5000: https://stegasoo.local:5000
 
-NOTE: Port 443 requires an iptables redirect rule.
+NOTE: Port 443 requires an iptables redirect rule."
+    echo ""
 
-Use standard port 443? (Cleaner URLs)" $BOX_HEIGHT $BOX_WIDTH; then
+    if gum confirm "Use standard port 443?" --default=true; then
         USE_PORT_443="true"
+        gum style --foreground 82 "✓ Port 443 will be configured"
+    else
+        gum style --foreground 214 "→ Using port 5000"
     fi
+    sleep 0.5
 fi
 
 # =============================================================================
 # Step 3: Channel Key Configuration
 # =============================================================================
 
-if whiptail --title "Step 3 of 3: Channel Key" --yesno "\
+clear
+gum style \
+    --foreground 212 --bold \
+    "Step 3 of 3: Channel Key Configuration"
+echo ""
+
+gum style --foreground 245 "\
 A channel key creates a private encoding channel.
 
-WITHOUT a key: Anyone with Stegasoo can decode your images
-WITH a key:    Only people with YOUR key can decode
+  WITHOUT a key: Anyone with Stegasoo can decode your images
+  WITH a key:    Only people with YOUR key can decode
 
-This is useful if you want to share encoded images only with specific people (family, team, etc).
+This is useful if you want to share encoded images only with
+specific people (family, team, etc)."
+echo ""
 
-Generate a private channel key?" $BOX_HEIGHT $BOX_WIDTH --defaultno; then
-
-    # Generate key (use temp file to preserve across subshell)
-    KEY_FILE=$(mktemp)
-    {
-        echo 50
-        source "$INSTALL_DIR/venv/bin/activate" 2>/dev/null
-        python -c "from stegasoo.channel import generate_channel_key; print(generate_channel_key())" > "$KEY_FILE" 2>/dev/null
-        echo 100
-    } | whiptail --title "Generating Key" --gauge "Generating channel key..." 6 50 0
-
-    CHANNEL_KEY=$(cat "$KEY_FILE" 2>/dev/null)
-    rm -f "$KEY_FILE"
+if gum confirm "Generate a private channel key?" --default=false; then
+    echo ""
+    CHANNEL_KEY=$(gum spin --spinner dot --title "Generating channel key..." -- \
+        bash -c "source '$INSTALL_DIR/venv/bin/activate' 2>/dev/null && python -c \"from stegasoo.channel import generate_channel_key; print(generate_channel_key())\"")
 
     if [ -n "$CHANNEL_KEY" ]; then
-        whiptail --title "Channel Key Generated" --msgbox "\
-Your private channel key:
-
-    $CHANNEL_KEY
-
-*** IMPORTANT: Write down or copy this key NOW! ***
-
-You'll need to share it with anyone who should decode your images. This key won't be shown again after you press OK." $BOX_HEIGHT $BOX_WIDTH
+        echo ""
+        gum style --foreground 82 "✓ Channel key generated!"
+        echo ""
+        gum style \
+            --border rounded \
+            --border-foreground 226 \
+            --padding "1 2" \
+            --foreground 226 --bold \
+            "$CHANNEL_KEY"
+        echo ""
+        gum style --foreground 196 --bold \
+            "*** IMPORTANT: Write down or copy this key NOW! ***"
+        gum style --foreground 196 \
+            "You'll need to share it with anyone who should decode" \
+            "your images. This key won't be shown again."
+        echo ""
+        gum confirm "I've saved the key" --default=true --affirmative="Continue" --negative=""
     else
-        whiptail --title "Error" --msgbox "Failed to generate channel key. Using public mode." 8 50
+        gum style --foreground 196 "✗ Failed to generate key. Using public mode."
         CHANNEL_KEY=""
+        sleep 1
     fi
+else
+    gum style --foreground 214 "→ Using public mode"
+    sleep 0.5
 fi
 
 # =============================================================================
 # Apply Configuration
 # =============================================================================
 
-{
-    echo 10
-    echo "XXX"
-    echo "Updating systemd service..."
-    echo "XXX"
+clear
+gum style \
+    --foreground 212 --bold \
+    "Applying Configuration..."
+echo ""
 
-    # Find the stegasoo user (whoever owns the install dir)
-    STEGASOO_USER=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null || echo "pi")
+# Find the stegasoo user (whoever owns the install dir)
+STEGASOO_USER=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null || echo "pi")
 
-    sudo tee /etc/systemd/system/stegasoo.service >/dev/null <<EOF
+gum spin --spinner dot --title "Updating systemd service..." -- bash -c "
+sudo tee /etc/systemd/system/stegasoo.service >/dev/null <<EOF
 [Unit]
 Description=Stegasoo Web UI
 After=network.target
@@ -143,11 +189,11 @@ After=network.target
 Type=simple
 User=$STEGASOO_USER
 WorkingDirectory=$INSTALL_DIR/frontends/web
-Environment="PATH=$INSTALL_DIR/venv/bin:/usr/bin"
-Environment="STEGASOO_AUTH_ENABLED=true"
-Environment="STEGASOO_HTTPS_ENABLED=$ENABLE_HTTPS"
-Environment="STEGASOO_PORT=5000"
-Environment="STEGASOO_CHANNEL_KEY=$CHANNEL_KEY"
+Environment=\"PATH=$INSTALL_DIR/venv/bin:/usr/bin\"
+Environment=\"STEGASOO_AUTH_ENABLED=true\"
+Environment=\"STEGASOO_HTTPS_ENABLED=$ENABLE_HTTPS\"
+Environment=\"STEGASOO_PORT=5000\"
+Environment=\"STEGASOO_CHANNEL_KEY=$CHANNEL_KEY\"
 ExecStart=$INSTALL_DIR/venv/bin/python app.py
 Restart=on-failure
 RestartSec=5
@@ -155,24 +201,19 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
+"
+gum style --foreground 82 "✓ Service configured"
 
-    echo 30
-
-    # Setup port 443 if requested
-    if [ "$USE_PORT_443" = "true" ]; then
-        echo "XXX"
-        echo "Setting up port 443 redirect..."
-        echo "XXX"
-
+# Setup port 443 if requested
+if [ "$USE_PORT_443" = "true" ]; then
+    gum spin --spinner dot --title "Setting up port 443 redirect..." -- bash -c "
         if ! command -v iptables &>/dev/null; then
             sudo apt-get install -y iptables >/dev/null 2>&1
         fi
-
         if ! sudo iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000 2>/dev/null; then
             sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000
         fi
         sudo sh -c 'iptables-save > /etc/iptables.rules'
-
         sudo tee /etc/systemd/system/iptables-restore.service >/dev/null <<EOF
 [Unit]
 Description=Restore iptables rules
@@ -186,34 +227,34 @@ ExecStart=/sbin/iptables-restore /etc/iptables.rules
 WantedBy=multi-user.target
 EOF
         sudo systemctl enable iptables-restore.service >/dev/null 2>&1
-    fi
+    "
+    gum style --foreground 82 "✓ Port 443 redirect configured"
+fi
 
-    echo 50
-    echo "XXX"
-    echo "Reloading systemd..."
-    echo "XXX"
-    sudo systemctl daemon-reload
+gum spin --spinner dot --title "Reloading systemd..." -- sudo systemctl daemon-reload
+gum style --foreground 82 "✓ Systemd reloaded"
 
-    echo 70
-    echo "XXX"
-    echo "Starting Stegasoo..."
-    echo "XXX"
-    sudo systemctl restart stegasoo
-    sleep 2
+gum spin --spinner dot --title "Starting Stegasoo..." -- bash -c "sudo systemctl restart stegasoo && sleep 2"
 
-    echo 90
-    echo "XXX"
-    echo "Cleaning up wizard..."
-    echo "XXX"
-    sudo rm -f "$FLAG_FILE"
-    sudo rm -f "$PROFILE_HOOK"
+if systemctl is-active --quiet stegasoo; then
+    gum style --foreground 82 "✓ Stegasoo started successfully"
+else
+    gum style --foreground 196 "✗ Failed to start (check: journalctl -u stegasoo)"
+fi
 
-    echo 100
-} | whiptail --title "Applying Configuration" --gauge "Starting..." 6 50 0
+gum spin --spinner dot --title "Cleaning up wizard..." -- bash -c "
+    sudo rm -f '$FLAG_FILE'
+    sudo rm -f '$PROFILE_HOOK'
+"
+gum style --foreground 82 "✓ Wizard complete"
+
+sleep 1
 
 # =============================================================================
 # Final Summary
 # =============================================================================
+
+clear
 
 PI_IP=$(hostname -I | awk '{print $1}')
 HOSTNAME=$(hostname)
@@ -232,49 +273,42 @@ else
     ACCESS_URL_LOCAL="http://$HOSTNAME.local:5000"
 fi
 
-# Build channel key message
-CHANNEL_MSG=""
-if [ -n "$CHANNEL_KEY" ]; then
-    CHANNEL_MSG="
-Channel Key: $CHANNEL_KEY"
-fi
+gum style \
+    --border double \
+    --border-foreground 82 \
+    --padding "1 2" \
+    --margin "1" \
+    --align center \
+    "🦕 STEGASOO" \
+    "" \
+    "Setup Complete!"
 
-# Check if service started
-if systemctl is-active --quiet stegasoo; then
-    SERVICE_STATUS="Running"
-else
-    SERVICE_STATUS="Failed to start (check: journalctl -u stegasoo)"
-fi
-
-whiptail --title "Setup Complete!" --msgbox "\
-Your Stegasoo server is ready!
-
-Access URL:
-  $ACCESS_URL
-  $ACCESS_URL_LOCAL (if mDNS works)
-
-Service Status: $SERVICE_STATUS
-$CHANNEL_MSG
-
-First Steps:
-  1. Open the URL above in your browser
-  2. Accept the security warning (self-signed cert)
-  3. Create your admin account
-  4. Start encoding secret messages!
-
-Useful Commands:
-  sudo systemctl status stegasoo   # Check status
-  sudo systemctl restart stegasoo  # Restart
-  journalctl -u stegasoo -f        # View logs
-
-Enjoy Stegasoo!" $((BOX_HEIGHT + 4)) $BOX_WIDTH
-
-clear
 echo ""
-echo "Stegasoo setup complete!"
+gum style --foreground 82 --bold "Access URL:"
+gum style --foreground 226 "  $ACCESS_URL"
+gum style --foreground 245 "  $ACCESS_URL_LOCAL (if mDNS works)"
 echo ""
-echo "Access your server at: $ACCESS_URL"
+
 if [ -n "$CHANNEL_KEY" ]; then
-    echo "Channel Key: $CHANNEL_KEY"
+    gum style --foreground 82 --bold "Channel Key:"
+    gum style --foreground 226 "  $CHANNEL_KEY"
+    echo ""
 fi
+
+gum style --foreground 82 --bold "First Steps:"
+gum style --foreground 255 \
+    "  1. Open the URL above in your browser" \
+    "  2. Accept the security warning (self-signed cert)" \
+    "  3. Create your admin account" \
+    "  4. Start encoding secret messages!"
+echo ""
+
+gum style --foreground 82 --bold "Useful Commands:"
+gum style --foreground 245 \
+    "  sudo systemctl status stegasoo   # Check status" \
+    "  sudo systemctl restart stegasoo  # Restart" \
+    "  journalctl -u stegasoo -f        # View logs"
+echo ""
+
+gum style --foreground 212 --bold "Enjoy Stegasoo! 🦕"
 echo ""
