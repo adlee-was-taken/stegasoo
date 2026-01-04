@@ -6,8 +6,8 @@
    CSS Variables
    ---------------------------------------------------------------------------- */
 :root {
-    --gradient-start: #667eea;
-    --gradient-end: #764ba2;
+    --gradient-start: #4a2860;
+    --gradient-end: #5570d4;
     --bg-dark-1: #1a1a2e;
     --bg-dark-2: #16213e;
     --bg-dark-3: #0f3460;
@@ -144,6 +144,45 @@ body {
 .card-header h5 {
     color: var(--header-gold);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.33);
+}
+
+.title-gold {
+    color: var(--header-gold);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+/* Two-choice toggle buttons - gradient-matched colors + equal width */
+.btn-group .btn-outline-primary,
+.btn-group .btn-outline-secondary {
+    flex: 1 1 0;
+    transition: all 0.2s ease;
+}
+.btn-group .btn-outline-primary:hover,
+.btn-group .btn-outline-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+.btn-group .btn-outline-primary:first-of-type,
+.btn-group .btn-outline-secondary:first-of-type {
+    color: #6b4d8a;
+    border-color: #6b4d8a;
+    border-right: 1px dashed rgba(255, 255, 255, 0.2);
+}
+.btn-group .btn-outline-primary:last-of-type,
+.btn-group .btn-outline-secondary:last-of-type {
+    color: #4a62a8;
+    border-color: #4a62a8;
+}
+.btn-group .btn-check:checked + .btn-outline-primary:first-of-type,
+.btn-group .btn-check:checked + .btn-outline-secondary:first-of-type {
+    background-color: #6b4d8a;
+    border-color: #6b4d8a;
+    color: #fff;
+}
+.btn-group .btn-check:checked + .btn-outline-primary:last-of-type,
+.btn-group .btn-check:checked + .btn-outline-secondary:last-of-type {
+    background-color: #4a62a8;
+    border-color: #4a62a8;
+    color: #fff;
 }
 
 /* Override small warning text to use header gold */
