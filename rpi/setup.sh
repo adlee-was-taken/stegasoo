@@ -24,6 +24,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Configuration
@@ -32,14 +33,12 @@ PYTHON_VERSION="3.12"
 STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
 JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
 
-echo -e "${BLUE}"
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           Stegasoo Raspberry Pi Setup Script                  ║"
-echo "║                                                               ║"
-echo "║   This will install Stegasoo with full DCT support            ║"
-echo "║   Estimated time: 15-20 minutes on Pi 5                       ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+echo ""
+echo -e "${BOLD}Stegasoo Raspberry Pi Setup${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
+echo "  This will install Stegasoo with full DCT support"
+echo "  Estimated time: 15-20 minutes on Pi 5"
+echo ""
 
 # Check if running on ARM
 ARCH=$(uname -m)
@@ -206,9 +205,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
 
 echo ""
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}           ${GREEN}Installation Complete!${NC}                              ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Installation Complete!${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 echo -e "Stegasoo installed to: ${YELLOW}$INSTALL_DIR${NC}"
 echo ""
@@ -217,9 +215,8 @@ echo ""
 # Interactive Configuration
 # =============================================================================
 
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}                    ${YELLOW}Configuration${NC}                              ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Configuration${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 
 # Track configuration choices
@@ -342,9 +339,8 @@ sudo systemctl daemon-reload
 # =============================================================================
 
 echo ""
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}                    ${GREEN}Setup Complete!${NC}                             ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Setup Complete!${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 
 PI_IP=$(hostname -I | awk '{print $1}')

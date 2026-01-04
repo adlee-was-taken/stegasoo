@@ -30,14 +30,21 @@ clear
 
 echo -e "${CYAN}"
 cat << 'BANNER'
-   _____ _
-  / ____| |
- | (___ | |_ ___  __ _  __ _ ___  ___   ___
-  \___ \| __/ _ \/ _` |/ _` / __|/ _ \ / _ \
-  ____) | ||  __/ (_| | (_| \__ \ (_) | (_) |
- |_____/ \__\___|\__, |\__,_|___/\___/ \___/
-                  __/ |
-                 |___/   First Boot Wizard
+
+ · . · . · . · . · . · . · . · . · . · . · . · . · . · . · ·
+ . · . · . · . · . · . · . · . · . · . · . · . · . · . · . .
+ · . · . · . · . · /\ · . · /\ · . · /\ · . · /\ · . · . · ·
+ . · . · . · . · ./  \· . ./  \· . ./  \· . ./  \. · . · . .
+ · . · . · . · . · \/ · . · \/ · . · \/ · . · \/ · . · . · ·
+ · . · . · . · . · . · . · . · . · . · . · . · . · . · . · ·
+ .  ___  _____  ___   ___    _    ___   ___    ___  · . · . .
+ · / __||_   _|| __| / __|  /_\  / __| / _ \  / _ \ · . · . ·
+ . \__ \  | |  | _| | (_ | / _ \ \__ \| (_) || (_) |. · . · .
+ · |___/  |_|  |___| \___|/_/ \_\|___/ \___/  \___/ · . · . ·
+ . · . · . · . · . · . · . · . · . · . · . · . · . · . · . .
+ · . · . · . · . · . · . · . · . · . · . · . · . · . · . · ·
+ . · ~~~~ · . · . · First Boot Wizard · . · . · ~~~~ · . · .
+ · . tail · . · . · . · . · . · . · . · . · . · head · . · ·
 BANNER
 echo -e "${NC}"
 
@@ -62,9 +69,8 @@ CHANNEL_KEY=""
 # =============================================================================
 
 clear
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${BOLD}Step 1 of 3: HTTPS Configuration${NC}                            ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Step 1 of 3: HTTPS Configuration${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 echo "HTTPS encrypts all traffic between your browser and this server"
 echo "using a self-signed certificate."
@@ -90,9 +96,8 @@ fi
 
 if [ "$ENABLE_HTTPS" = "true" ]; then
     clear
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}  ${BOLD}Step 2 of 3: Port Configuration${NC}                             ${BLUE}║${NC}"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BOLD}Step 2 of 3: Port Configuration${NC}"
+    echo -e "${BLUE}-------------------------------------------------------${NC}"
     echo ""
     echo "The standard HTTPS port is 443, which means you can access"
     echo "Stegasoo without specifying a port in the URL."
@@ -120,9 +125,8 @@ fi
 # =============================================================================
 
 clear
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${BOLD}Step 3 of 3: Channel Key Configuration${NC}                      ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Step 3 of 3: Channel Key Configuration${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 echo "A channel key creates a private encoding channel."
 echo ""
@@ -151,11 +155,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo ""
         echo -e "  ${BOLD}${YELLOW}$CHANNEL_KEY${NC}"
         echo ""
-        echo -e "  ${RED}╔═══════════════════════════════════════════════════════════╗${NC}"
-        echo -e "  ${RED}║  IMPORTANT: Write down or copy this key NOW!              ║${NC}"
-        echo -e "  ${RED}║  You'll need to share it with anyone who should decode    ║${NC}"
-        echo -e "  ${RED}║  your images. This key won't be shown again.              ║${NC}"
-        echo -e "  ${RED}╚═══════════════════════════════════════════════════════════╝${NC}"
+        echo -e "  ${RED}*** IMPORTANT: Write down or copy this key NOW! ***${NC}"
+        echo -e "  ${RED}You'll need to share it with anyone who should decode${NC}"
+        echo -e "  ${RED}your images. This key won't be shown again.${NC}"
         echo ""
         read -p "Press Enter when you've saved the key..."
     else
@@ -173,9 +175,8 @@ fi
 # =============================================================================
 
 clear
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${BOLD}Applying Configuration...${NC}                                   ${BLUE}║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}Applying Configuration...${NC}"
+echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 
 # Find the stegasoo user (whoever owns the install dir)

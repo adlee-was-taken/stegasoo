@@ -35,24 +35,22 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+BOLD='\033[1m'
+
 if [ "$SOFT_RESET" = true ]; then
-    echo -e "${CYAN}"
-    echo "+-----------------------------------------------------------------+"
-    echo "|              Soft Reset (Factory Defaults)                     |"
-    echo "|                                                                 |"
-    echo "|   WiFi credentials will be KEPT for continued testing.         |"
-    echo "|   Everything else will be reset to first-boot state.           |"
-    echo "+-----------------------------------------------------------------+"
-    echo -e "${NC}"
+    echo ""
+    echo -e "${BOLD}Soft Reset (Factory Defaults)${NC}"
+    echo -e "${CYAN}-------------------------------------------------------${NC}"
+    echo "  WiFi credentials will be KEPT for continued testing."
+    echo "  Everything else will be reset to first-boot state."
+    echo ""
 else
-    echo -e "${YELLOW}"
-    echo "+-----------------------------------------------------------------+"
-    echo "|         Sanitize Pi for Image Distribution                     |"
-    echo "|                                                                 |"
-    echo "|   This will remove ALL personal data for imaging.              |"
-    echo "|   The system will shut down when complete.                     |"
-    echo "+-----------------------------------------------------------------+"
-    echo -e "${NC}"
+    echo ""
+    echo -e "${BOLD}Sanitize Pi for Image Distribution${NC}"
+    echo -e "${YELLOW}-------------------------------------------------------${NC}"
+    echo "  This will remove ALL personal data for imaging."
+    echo "  The system will shut down when complete."
+    echo ""
 fi
 
 read -p "Continue? This cannot be undone! [y/N] " -n 1 -r
@@ -327,15 +325,13 @@ fi
 # =============================================================================
 echo ""
 if [ $VALIDATION_ERRORS -eq 0 ]; then
-    echo -e "${GREEN}+-----------------------------------------------------------------+${NC}"
-    echo -e "${GREEN}|                Sanitization Complete!                          |${NC}"
-    echo -e "${GREEN}|                All validation checks passed.                   |${NC}"
-    echo -e "${GREEN}+-----------------------------------------------------------------+${NC}"
+    echo -e "${BOLD}Sanitization Complete!${NC}"
+    echo -e "${GREEN}-------------------------------------------------------${NC}"
+    echo -e "  ${GREEN}All validation checks passed.${NC}"
 else
-    echo -e "${RED}+-----------------------------------------------------------------+${NC}"
-    echo -e "${RED}|                Sanitization Complete with Errors                |${NC}"
-    echo -e "${RED}|                $VALIDATION_ERRORS validation check(s) failed                    |${NC}"
-    echo -e "${RED}+-----------------------------------------------------------------+${NC}"
+    echo -e "${BOLD}Sanitization Complete with Errors${NC}"
+    echo -e "${RED}-------------------------------------------------------${NC}"
+    echo -e "  ${RED}$VALIDATION_ERRORS validation check(s) failed${NC}"
 fi
 echo ""
 
