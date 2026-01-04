@@ -30,18 +30,23 @@ import time
 from pathlib import Path
 
 from auth import (
+    MAX_CHANNEL_KEYS,
     MAX_USERS,
     admin_required,
     can_create_user,
+    can_save_channel_key,
     change_password,
     create_admin_user,
     create_user,
+    delete_channel_key,
     delete_user,
     generate_temp_password,
     get_all_users,
+    get_channel_key_by_id,
     get_current_user,
     get_non_admin_count,
     get_user_by_id,
+    get_user_channel_keys,
     get_username,
     is_admin,
     is_authenticated,
@@ -49,6 +54,9 @@ from auth import (
     login_user,
     logout_user,
     reset_user_password,
+    save_channel_key,
+    update_channel_key_last_used,
+    update_channel_key_name,
     user_exists,
     verify_user_password,
 )
@@ -195,6 +203,13 @@ def inject_globals():
     # Get channel status (v4.0.0)
     channel_status = get_channel_status()
 
+    # Get saved channel keys for authenticated users (v4.2.0)
+    saved_channel_keys = []
+    if is_authenticated():
+        current_user = get_current_user()
+        if current_user:
+            saved_channel_keys = get_user_channel_keys(current_user.id)
+
     return {
         "version": __version__,
         "max_message_chars": MAX_MESSAGE_CHARS,
@@ -220,6 +235,8 @@ def inject_globals():
         "username": get_username() if is_authenticated() else None,
         # NEW in v4.1.0 - Admin state
         "is_admin": is_admin(),
+        # NEW in v4.2.0 - Saved channel keys
+        "saved_channel_keys": saved_channel_keys,
     }
 
 
@@ -1413,12 +1430,96 @@ def account():
             success, message = change_password(current_user.id, current, new)
             flash(message, "success" if success else "error")
 
+    # Get saved channel keys
+    channel_keys = get_user_channel_keys(current_user.id)
+
     return render_template(
         "account.html",
         username=current_user.username,
         user=current_user,
         is_admin=current_user.is_admin,
+        channel_keys=channel_keys,
+        max_channel_keys=MAX_CHANNEL_KEYS,
+        can_save_key=can_save_channel_key(current_user.id),
     )
+
+
+# ============================================================================
+# CHANNEL KEY MANAGEMENT ROUTES (v4.2.0)
+# ============================================================================
+
+
+@app.route("/account/keys/save", methods=["POST"])
+@login_required
+def account_save_key():
+    """Save a new channel key."""
+    current_user = get_current_user()
+    name = request.form.get("key_name", "").strip()
+    channel_key = request.form.get("channel_key", "").strip()
+
+    # Normalize key format (remove dashes if present)
+    channel_key = channel_key.replace("-", "").lower()
+
+    success, message, key = save_channel_key(current_user.id, name, channel_key)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account"))
+
+
+@app.route("/account/keys/<int:key_id>/delete", methods=["POST"])
+@login_required
+def account_delete_key(key_id):
+    """Delete a saved channel key."""
+    current_user = get_current_user()
+    success, message = delete_channel_key(key_id, current_user.id)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account"))
+
+
+@app.route("/account/keys/<int:key_id>/rename", methods=["POST"])
+@login_required
+def account_rename_key(key_id):
+    """Rename a saved channel key."""
+    current_user = get_current_user()
+    new_name = request.form.get("new_name", "").strip()
+    success, message = update_channel_key_name(key_id, current_user.id, new_name)
+    flash(message, "success" if success else "error")
+    return redirect(url_for("account"))
+
+
+@app.route("/api/channel/keys")
+@login_required
+def api_channel_keys():
+    """Get saved channel keys for current user (JSON API)."""
+    current_user = get_current_user()
+    keys = get_user_channel_keys(current_user.id)
+    return jsonify({
+        "success": True,
+        "keys": [
+            {
+                "id": k.id,
+                "name": k.name,
+                "fingerprint": f"{k.channel_key[:4]}...{k.channel_key[-4:]}",
+                "channel_key": k.channel_key,
+                "last_used_at": k.last_used_at,
+            }
+            for k in keys
+        ],
+        "can_save": can_save_channel_key(current_user.id),
+        "max_keys": MAX_CHANNEL_KEYS,
+    })
+
+
+@app.route("/api/channel/keys/<int:key_id>/use", methods=["POST"])
+@login_required
+def api_channel_key_use(key_id):
+    """Mark a channel key as used (updates last_used_at)."""
+    current_user = get_current_user()
+    key = get_channel_key_by_id(key_id, current_user.id)
+    if not key:
+        return jsonify({"success": False, "error": "Key not found"}), 404
+
+    update_channel_key_last_used(key_id, current_user.id)
+    return jsonify({"success": True})
 
 
 # ============================================================================

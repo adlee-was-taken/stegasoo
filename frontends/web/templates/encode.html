@@ -418,7 +418,14 @@
                             <select class="form-select" name="channel_key" id="channelSelect">
                                 <option value="auto" selected>Auto{% if channel_configured %} (Server Key){% endif %}</option>
                                 <option value="none">Public</option>
-                                <option value="custom">Custom</option>
+                                {% if saved_channel_keys %}
+                                <optgroup label="Saved Keys">
+                                    {% for key in saved_channel_keys %}
+                                    <option value="{{ key.channel_key }}" data-key-id="{{ key.id }}">{{ key.name }} ({{ key.channel_key[:4] }}...)</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                <option value="custom">Custom...</option>
                             </select>
 
                             <!-- Server channel indicator (compact) -->

@@ -819,6 +819,14 @@ const Stegasoo = {
             // Set the select value to the actual key for form submission
             select.value = keyInput.value;
         }
+
+        // Track saved key usage (fire-and-forget)
+        const selectedOption = select?.selectedOptions?.[0];
+        const keyId = selectedOption?.dataset?.keyId;
+        if (keyId) {
+            fetch(`/api/channel/keys/${keyId}/use`, { method: 'POST' }).catch(() => {});
+        }
+
         return true;
     },
     

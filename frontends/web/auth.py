@@ -31,6 +31,7 @@ ph = PasswordHasher(
 
 # Constants
 MAX_USERS = 16  # Plus 1 admin = 17 total
+MAX_CHANNEL_KEYS = 10  # Per user
 ROLE_ADMIN = "admin"
 ROLE_USER = "user"
 
@@ -92,6 +93,9 @@ def init_db():
     elif not has_new_table:
         # Fresh install - create new schema
         _create_schema(db)
+    else:
+        # Existing install - check for new tables (channel_keys migration)
+        _ensure_channel_keys_table(db)
 
 
 def _create_schema(db: sqlite3.Connection):
@@ -108,6 +112,19 @@ def _create_schema(db: sqlite3.Connection):
 
         CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
         CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+        CREATE TABLE IF NOT EXISTS user_channel_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            channel_key TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(user_id, channel_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_channel_keys_user ON user_channel_keys(user_id);
     """)
     db.commit()
 
@@ -135,6 +152,29 @@ def _migrate_from_single_user(db: sqlite3.Connection):
     # Drop old table
     db.execute("DROP TABLE admin_user")
     db.commit()
+
+
+def _ensure_channel_keys_table(db: sqlite3.Connection):
+    """Ensure user_channel_keys table exists (migration for existing installs)."""
+    cursor = db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='user_channel_keys'"
+    )
+    if cursor.fetchone() is None:
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS user_channel_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                channel_key TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_used_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, channel_key)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_channel_keys_user ON user_channel_keys(user_id);
+        """)
+        db.commit()
 
 
 # =============================================================================
@@ -549,6 +589,180 @@ def is_session_valid() -> bool:
         return False
 
     return True
+
+
+# =============================================================================
+# Channel Keys
+# =============================================================================
+
+
+@dataclass
+class ChannelKey:
+    """Saved channel key data class."""
+
+    id: int
+    user_id: int
+    name: str
+    channel_key: str
+    created_at: str
+    last_used_at: str | None
+
+
+def get_user_channel_keys(user_id: int) -> list[ChannelKey]:
+    """Get all saved channel keys for a user, most recently used first."""
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT id, user_id, name, channel_key, created_at, last_used_at
+        FROM user_channel_keys
+        WHERE user_id = ?
+        ORDER BY last_used_at DESC NULLS LAST, created_at DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [
+        ChannelKey(
+            id=row["id"],
+            user_id=row["user_id"],
+            name=row["name"],
+            channel_key=row["channel_key"],
+            created_at=row["created_at"],
+            last_used_at=row["last_used_at"],
+        )
+        for row in rows
+    ]
+
+
+def get_channel_key_by_id(key_id: int, user_id: int) -> ChannelKey | None:
+    """Get a specific channel key (ensures user owns it)."""
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT id, user_id, name, channel_key, created_at, last_used_at
+        FROM user_channel_keys
+        WHERE id = ? AND user_id = ?
+        """,
+        (key_id, user_id),
+    ).fetchone()
+    if row:
+        return ChannelKey(
+            id=row["id"],
+            user_id=row["user_id"],
+            name=row["name"],
+            channel_key=row["channel_key"],
+            created_at=row["created_at"],
+            last_used_at=row["last_used_at"],
+        )
+    return None
+
+
+def get_channel_key_count(user_id: int) -> int:
+    """Get count of saved channel keys for a user."""
+    db = get_db()
+    result = db.execute(
+        "SELECT COUNT(*) FROM user_channel_keys WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    return result[0] if result else 0
+
+
+def can_save_channel_key(user_id: int) -> bool:
+    """Check if user can save more channel keys (within limit)."""
+    return get_channel_key_count(user_id) < MAX_CHANNEL_KEYS
+
+
+def save_channel_key(
+    user_id: int, name: str, channel_key: str
+) -> tuple[bool, str, ChannelKey | None]:
+    """
+    Save a channel key for a user.
+
+    Returns (success, message, key).
+    """
+    # Validate name
+    name = name.strip()
+    if not name:
+        return False, "Key name is required", None
+    if len(name) > 50:
+        return False, "Key name must be at most 50 characters", None
+
+    # Validate channel key format (hex string)
+    channel_key = channel_key.strip().lower()
+    if not channel_key:
+        return False, "Channel key is required", None
+    if not all(c in "0123456789abcdef" for c in channel_key):
+        return False, "Invalid channel key format", None
+
+    # Check limit
+    if not can_save_channel_key(user_id):
+        return False, f"Maximum of {MAX_CHANNEL_KEYS} saved keys reached", None
+
+    db = get_db()
+    try:
+        cursor = db.execute(
+            """
+            INSERT INTO user_channel_keys (user_id, name, channel_key)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, name, channel_key),
+        )
+        db.commit()
+
+        key = get_channel_key_by_id(cursor.lastrowid, user_id)
+        return True, "Channel key saved", key
+    except sqlite3.IntegrityError:
+        return False, "This channel key is already saved", None
+
+
+def update_channel_key_name(
+    key_id: int, user_id: int, new_name: str
+) -> tuple[bool, str]:
+    """Update the name of a saved channel key."""
+    new_name = new_name.strip()
+    if not new_name:
+        return False, "Key name is required"
+    if len(new_name) > 50:
+        return False, "Key name must be at most 50 characters"
+
+    key = get_channel_key_by_id(key_id, user_id)
+    if not key:
+        return False, "Channel key not found"
+
+    db = get_db()
+    db.execute(
+        "UPDATE user_channel_keys SET name = ? WHERE id = ? AND user_id = ?",
+        (new_name, key_id, user_id),
+    )
+    db.commit()
+    return True, "Key name updated"
+
+
+def update_channel_key_last_used(key_id: int, user_id: int):
+    """Update the last_used_at timestamp for a channel key."""
+    db = get_db()
+    db.execute(
+        """
+        UPDATE user_channel_keys
+        SET last_used_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+        """,
+        (key_id, user_id),
+    )
+    db.commit()
+
+
+def delete_channel_key(key_id: int, user_id: int) -> tuple[bool, str]:
+    """Delete a saved channel key."""
+    key = get_channel_key_by_id(key_id, user_id)
+    if not key:
+        return False, "Channel key not found"
+
+    db = get_db()
+    db.execute(
+        "DELETE FROM user_channel_keys WHERE id = ? AND user_id = ?",
+        (key_id, user_id),
+    )
+    db.commit()
+    return True, f"Key '{key.name}' deleted"
 
 
 # =============================================================================
