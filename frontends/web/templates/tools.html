@@ -148,21 +148,43 @@
 .tool-section { display: none; }
 .tool-section.active { display: block; }
 
-/* Lime green tool tabs */
-.tool-tabs .btn-outline-primary {
-    color: #a3e635;
-    border-color: #a3e635;
+/* Green→lime→yellow gradient across tabs */
+.tool-tabs .btn-outline-primary:nth-of-type(1) {
+    color: #55df85;
+    border-color: #55df85;
+}
+.tool-tabs .btn-outline-primary:nth-of-type(2) {
+    color: #c4f26a;
+    border-color: #c4f26a;
+}
+.tool-tabs .btn-outline-primary:nth-of-type(3) {
+    color: #fdde4a;
+    border-color: #fdde4a;
 }
 
-.tool-tabs .btn-outline-primary:hover {
-    background-color: rgba(163, 230, 53, 0.15);
-    border-color: #a3e635;
-    color: #a3e635;
+.tool-tabs .btn-outline-primary:nth-of-type(1):hover {
+    background-color: rgba(85, 223, 133, 0.15);
+}
+.tool-tabs .btn-outline-primary:nth-of-type(2):hover {
+    background-color: rgba(196, 242, 106, 0.15);
+}
+.tool-tabs .btn-outline-primary:nth-of-type(3):hover {
+    background-color: rgba(253, 222, 74, 0.15);
 }
 
-.tool-tabs .btn-check:checked + .btn-outline-primary {
-    background-color: #a3e635;
-    border-color: #a3e635;
+.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(1) {
+    background-color: #55df85;
+    border-color: #55df85;
+    color: #1a1a2e;
+}
+.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(2) {
+    background-color: #c4f26a;
+    border-color: #c4f26a;
+    color: #1a1a2e;
+}
+.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(3) {
+    background-color: #fdde4a;
+    border-color: #fdde4a;
     color: #1a1a2e;
 }
 </style>
