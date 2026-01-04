@@ -82,6 +82,7 @@ echo ""
 echo "  [Y] Enable HTTPS (recommended for home network security)"
 echo "  [n] Use HTTP only (unencrypted, not recommended)"
 echo ""
+# Flush input buffer to prevent stray keystrokes from auto-answering
 read -t 0.1 -n 10000 discard 2>/dev/null || true
 read -p "Enable HTTPS? [Y/n] " -n 1 -r
 echo
@@ -112,6 +113,7 @@ if [ "$ENABLE_HTTPS" = "true" ]; then
   echo "  [Y] Use port 443 (cleaner URLs)"
   echo "  [n] Use port 5000 (default, no extra config)"
   echo ""
+  # Flush input buffer to prevent stray keystrokes from auto-answering
   read -t 0.1 -n 10000 discard 2>/dev/null || true
   read -p "Use standard port 443? [Y/n] " -n 1 -r
   echo
@@ -142,6 +144,7 @@ echo ""
 echo "  [y] Generate a private channel key"
 echo "  [N] Use public mode (anyone can decode)"
 echo ""
+# Flush input buffer to prevent stray keystrokes from auto-answering
 read -t 0.1 -n 10000 discard 2>/dev/null || true
 read -p "Generate a private channel key? [y/N] " -n 1 -r
 echo
