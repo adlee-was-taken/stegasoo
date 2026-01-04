@@ -284,6 +284,26 @@ if [ -n "$STEGASOO_DIR" ] && [ -d "$STEGASOO_DIR/venv" ]; then
         fi
 
         sudo -u "$STEGASOO_USER" "$PYTHON_BIN" -m venv "$STEGASOO_DIR/venv"
+        sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet --upgrade pip setuptools wheel
+
+        # On ARM64, jpegio needs patching before install
+        ARCH=$(uname -m)
+        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+            echo "  Building jpegio for ARM64 (this may take a minute)..."
+            # Install build deps
+            sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet cython numpy
+            JPEGIO_DIR=$(mktemp -d)
+            git clone --quiet https://github.com/dwgoon/jpegio.git "$JPEGIO_DIR"
+            # Apply patch to remove -m64 flag
+            if [ -f "$STEGASOO_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
+                bash "$STEGASOO_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
+            else
+                sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
+            fi
+            sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet "$JPEGIO_DIR"
+            rm -rf "$JPEGIO_DIR"
+        fi
+
         sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet -e "$STEGASOO_DIR[web]"
         echo "  Venv rebuilt and stegasoo installed"
     else
