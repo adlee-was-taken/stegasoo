@@ -309,6 +309,10 @@ document.getElementById('exifClearAll')?.addEventListener('click', async functio
     formData.append('image', exifCurrentFile);
     formData.append('format', 'PNG');
 
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Clearing...';
+
     try {
         const res = await fetch('/api/tools/exif/clear', { method: 'POST', body: formData });
         if (res.ok) {
@@ -317,11 +321,34 @@ document.getElementById('exifClearAll')?.addEventListener('click', async functio
             const a = document.createElement('a');
             a.href = url;
             a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'clean.png';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
+
+            // Clear the current data to show empty state
+            exifCurrentData = {};
+            exifOriginalData = {};
+            renderExifTable();
+        } else {
+            // Try to parse error
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const err = await res.json();
+                alert(err.error || 'Failed to clear metadata');
+            } else if (res.status === 401 || res.status === 302) {
+                alert('Session expired. Please log in again.');
+                window.location.href = '/login';
+            } else {
+                alert(`Failed to clear metadata (${res.status})`);
+            }
         }
     } catch (err) {
         console.error(err);
+        alert('Failed to clear metadata: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-trash me-1"></i>Clear All';
     }
 });
 
@@ -356,6 +383,11 @@ document.getElementById('exifSave')?.addEventListener('click', async function() 
     formData.append('image', exifCurrentFile);
     formData.append('updates', JSON.stringify(updates));
 
+    const btn = this;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
     try {
         const res = await fetch('/api/tools/exif/update', { method: 'POST', body: formData });
         if (res.ok) {
@@ -364,19 +396,33 @@ document.getElementById('exifSave')?.addEventListener('click', async function() 
             const a = document.createElement('a');
             a.href = url;
             a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'updated.jpg';
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
             // Update original to match current
             exifOriginalData = JSON.parse(JSON.stringify(exifCurrentData));
             updateSaveButton();
         } else {
-            const err = await res.json();
-            alert(err.error || 'Failed to save');
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const err = await res.json();
+                alert(err.error || 'Failed to save');
+            } else if (res.status === 401 || res.status === 302) {
+                alert('Session expired. Please log in again.');
+                window.location.href = '/login';
+            } else {
+                alert(`Failed to save (${res.status})`);
+            }
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to save changes');
+        alert('Failed to save changes: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        updateSaveButton();
     }
 });
 
