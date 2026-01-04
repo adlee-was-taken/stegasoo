@@ -1552,9 +1552,17 @@ def admin_user_new():
         password = request.form.get("password", "")
 
         success, message, user = create_user(username, password)
+
+        # Check if AJAX request
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            if success:
+                return jsonify({"success": True, "username": username, "password": password})
+            else:
+                return jsonify({"success": False, "error": message})
+
+        # Regular form submission fallback
         if success:
             flash(f"User '{username}' created successfully", "success")
-            # Store password temporarily for display
             session["temp_password"] = password
             session["temp_username"] = username
             return redirect(url_for("admin_user_created"))

@@ -11,12 +11,12 @@
                 <span class="fs-5">Add New User</span>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('admin_user_new') }}">
+                <form id="createUserForm">
                     <div class="mb-3">
                         <label class="form-label">
                             <i class="bi bi-person me-1"></i> Username
                         </label>
-                        <input type="text" name="username" class="form-control"
+                        <input type="text" name="username" id="usernameInput" class="form-control"
                                placeholder="e.g., john_doe or john@example.com"
                                pattern="[a-zA-Z0-9][a-zA-Z0-9_\-@.]{2,79}"
                                title="3-80 characters, letters/numbers/underscore/hyphen/@/."
@@ -44,8 +44,10 @@
                         </div>
                     </div>
 
+                    <div id="errorAlert" class="alert alert-danger d-none"></div>
+
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary flex-grow-1">
+                        <button type="submit" class="btn btn-primary flex-grow-1" id="createBtn">
                             <i class="bi bi-person-check me-2"></i>Create User
                         </button>
                         <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">
@@ -57,8 +59,108 @@
         </div>
     </div>
 </div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-success">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle me-2"></i>User Created
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-3 py-2">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Password shown once. Copy it now.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label text-muted small mb-1">Username</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace"
+                                   id="createdUsername" readonly>
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="copyField('createdUsername')" title="Copy">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted small mb-1">Password</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control font-monospace"
+                                   id="createdPassword" readonly>
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="copyField('createdPassword')" title="Copy">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-primary" onclick="addAnother()">
+                        <i class="bi bi-person-plus me-1"></i>Add Another
+                    </button>
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">
+                        Done
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script>
+const form = document.getElementById('createUserForm');
+const errorAlert = document.getElementById('errorAlert');
+const createBtn = document.getElementById('createBtn');
+const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+
+form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    errorAlert.classList.add('d-none');
+    createBtn.disabled = true;
+    createBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating...';
+
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('{{ url_for("admin_user_new") }}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            document.getElementById('createdUsername').value = data.username;
+            document.getElementById('createdPassword').value = data.password;
+            successModal.show();
+        } else {
+            errorAlert.textContent = data.error;
+            errorAlert.classList.remove('d-none');
+        }
+    } catch (err) {
+        errorAlert.textContent = 'An error occurred. Please try again.';
+        errorAlert.classList.remove('d-none');
+    }
+
+    createBtn.disabled = false;
+    createBtn.innerHTML = '<i class="bi bi-person-check me-2"></i>Create User';
+});
+
+function addAnother() {
+    successModal.hide();
+    document.getElementById('usernameInput').value = '';
+    regeneratePassword();
+    document.getElementById('usernameInput').focus();
+}
+</script>
 {% endblock %}

@@ -67,16 +67,18 @@
     <main class="container py-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else ('warning' if category == 'warning' else 'success') }} alert-dismissible fade show" role="alert">
-                        <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else ('exclamation-circle' if category == 'warning' else 'check-circle') }} me-2"></i>
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
+                <div class="mx-auto mb-3" style="max-width: 460px;">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else ('warning' if category == 'warning' else 'success') }} alert-dismissible fade show" role="alert">
+                            <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else ('exclamation-circle' if category == 'warning' else 'check-circle') }} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
             {% endif %}
         {% endwith %}
-        
+
         {% block content %}{% endblock %}
     </main>
 
