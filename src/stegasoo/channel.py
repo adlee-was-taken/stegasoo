@@ -372,6 +372,124 @@ def has_channel_key() -> bool:
     return get_channel_key() is not None
 
 
+def resolve_channel_key(
+    value: str | None = None,
+    *,
+    file_path: str | Path | None = None,
+    no_channel: bool = False,
+) -> str | None:
+    """
+    Resolve a channel key from user input (unified for all frontends).
+
+    This consolidates channel key resolution logic used by CLI, API, and WebUI.
+
+    Args:
+        value: Input value:
+            - 'auto' or None: Use server-configured key
+            - 'none' or '': Public mode (no channel key)
+            - explicit key: Validate and use
+        file_path: Path to file containing channel key
+        no_channel: If True, return "" for public mode (overrides value)
+
+    Returns:
+        None: Use server-configured key (auto mode)
+        "": Public mode (no channel key)
+        str: Explicit valid channel key
+
+    Raises:
+        ValueError: If key format is invalid
+        FileNotFoundError: If file_path doesn't exist
+
+    Example:
+        >>> resolve_channel_key("auto")  # -> None
+        >>> resolve_channel_key("none")  # -> ""
+        >>> resolve_channel_key(no_channel=True)  # -> ""
+        >>> resolve_channel_key("ABCD-1234-...")  # -> "ABCD-1234-..."
+        >>> resolve_channel_key(file_path="key.txt")  # reads from file
+    """
+    debug.print(f"resolve_channel_key: value={value}, file_path={file_path}, no_channel={no_channel}")
+
+    # no_channel flag takes precedence
+    if no_channel:
+        debug.print("resolve_channel_key: public mode (no_channel=True)")
+        return ""
+
+    # Read from file if provided
+    if file_path:
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Channel key file not found: {file_path}")
+        key = path.read_text().strip()
+        if not validate_channel_key(key):
+            raise ValueError(f"Invalid channel key format in file: {file_path}")
+        debug.print(f"resolve_channel_key: from file -> {get_channel_fingerprint(key)}")
+        return format_channel_key(key)
+
+    # Handle value string
+    if value is None or value.lower() == "auto":
+        debug.print("resolve_channel_key: auto mode (server config)")
+        return None
+
+    if value == "" or value.lower() == "none":
+        debug.print("resolve_channel_key: public mode (explicit none)")
+        return ""
+
+    # Explicit key - validate
+    if validate_channel_key(value):
+        formatted = format_channel_key(value)
+        debug.print(f"resolve_channel_key: explicit key -> {get_channel_fingerprint(formatted)}")
+        return formatted
+
+    raise ValueError(
+        "Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX\n"
+        "Generate a new key with: stegasoo channel generate"
+    )
+
+
+def get_channel_response_info(channel_key: str | None) -> dict:
+    """
+    Get channel info for API/WebUI responses.
+
+    Args:
+        channel_key: Resolved channel key (None=auto, ""=public, str=explicit)
+
+    Returns:
+        Dict with mode, fingerprint, and display info
+
+    Example:
+        >>> info = get_channel_response_info("ABCD-1234-...")
+        >>> info['mode']
+        'explicit'
+    """
+    if channel_key is None:
+        # Auto mode - check server config
+        server_key = get_channel_key()
+        if server_key:
+            return {
+                "mode": "private",
+                "fingerprint": get_channel_fingerprint(server_key),
+                "source": "server",
+            }
+        return {
+            "mode": "public",
+            "fingerprint": None,
+            "source": "server",
+        }
+
+    if channel_key == "":
+        return {
+            "mode": "public",
+            "fingerprint": None,
+            "source": "explicit",
+        }
+
+    return {
+        "mode": "private",
+        "fingerprint": get_channel_fingerprint(channel_key),
+        "source": "explicit",
+    }
+
+
 # =============================================================================
 # CLI SUPPORT
 # =============================================================================

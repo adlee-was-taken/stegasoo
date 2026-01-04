@@ -429,20 +429,55 @@ Or simpler: detect on startup, update schema automatically (current pattern).
 - [x] Channel Key QR (Web UI) - added QR generator on About page
 - [x] CLI Channel Commands
 - [x] Saved Channel Keys (Web UI) - users can save/manage channel keys
-- [ ] Advanced Tools (in progress)
+- [x] Advanced Tools - Image Security Toolkit
+  - [x] CLI: `stegasoo tools capacity/strip/peek/exif`
+  - [x] API: `/api/tools/capacity`, `/api/tools/peek`, `/api/tools/exif/*`
+  - [x] WebUI: Tools page with tabbed interface
+  - [x] EXIF Editor with inline editing, clear all, save/download
 
 ---
 
-## Action Item: Architectural Review
+## Architectural Improvements (4.1.0)
 
-Review other modules for consistency with the Library → CLI → API → WebUI pattern:
+### Consolidated Channel Key Resolution
 
-| Module | Library | CLI | API | WebUI | Notes |
-|--------|---------|-----|-----|-------|-------|
-| encode | ✓ | ✓ | ✓ | ✓ | Review for consistency |
-| decode | ✓ | ✓ | ✓ | ✓ | Review for consistency |
-| channel | ✓ | ✓ | - | ✓ | Needs API layer? |
-| tools | ✓ | WIP | ✓ | WIP | Building now |
-| generate | ✓ | ? | - | ✓ | CLI for credential gen? |
+Moved `resolve_channel_key()` from 3 duplicate implementations to single source of truth in `src/stegasoo/channel.py`:
+
+```python
+# Library: src/stegasoo/channel.py
+def resolve_channel_key(value, *, file_path=None, no_channel=False) -> str | None:
+    """Unified channel key resolution - returns None (auto), "" (public), or key."""
+
+def get_channel_response_info(channel_key) -> dict:
+    """Get channel info dict for API/WebUI responses."""
+```
+
+Frontends now use thin wrappers that translate exceptions to their context (Click/HTTP).
+
+### DCT Payload Pre-Check
+
+Added `will_fit_by_mode()` pre-check to WebUI encode to fail fast with helpful error message instead of cryptic exception deep in DCT processing.
+
+### EXIF Tools (Library Layer)
+
+Added to `src/stegasoo/utils.py`:
+- `read_image_exif(image_data)` - Read EXIF metadata as dict
+- `write_image_exif(image_data, updates)` - Update EXIF fields (JPEG only)
+
+Dependencies added: `piexif>=1.1.0`
+
+---
+
+## Action Item: Architectural Review ✅ DONE
+
+Reviewed modules for consistency with Library → CLI → API → WebUI pattern:
+
+| Module | Library | CLI | API | WebUI | Status |
+|--------|---------|-----|-----|-------|--------|
+| encode | ✓ | ✓ | ✓ | ✓ | Consistent |
+| decode | ✓ | ✓ | ✓ | ✓ | Consistent |
+| channel | ✓ | ✓ | ✓ | ✓ | Consolidated resolve_channel_key |
+| tools | ✓ | ✓ | ✓ | ✓ | Complete |
+| generate | ✓ | ✓ | - | ✓ | CLI has `stegasoo generate` |
 
 Priority order: Developer/CLI → API integrator → WebUI end-user

@@ -887,6 +887,83 @@ def tools_peek(image, as_json):
         click.echo()
 
 
+@tools.command("exif")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("--clear", is_flag=True, help="Remove all EXIF metadata")
+@click.option("--set", "set_fields", multiple=True, help="Set EXIF field (e.g. --set Artist=John)")
+@click.option("-o", "--output", type=click.Path(), help="Output file (required for modifications)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def tools_exif(image, clear, set_fields, output, as_json):
+    """View or edit EXIF metadata.
+
+    Examples:
+
+        stegasoo tools exif photo.jpg
+
+        stegasoo tools exif photo.jpg --clear -o clean.jpg
+
+        stegasoo tools exif photo.jpg --set Artist="John Doe" -o updated.jpg
+    """
+    from .utils import read_image_exif, strip_image_metadata, write_image_exif
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    # View mode (no modifications)
+    if not clear and not set_fields:
+        exif = read_image_exif(image_data)
+
+        if as_json:
+            click.echo(json.dumps(exif, indent=2, default=str))
+        else:
+            click.echo(f"\n  EXIF Metadata: {Path(image).name}")
+            click.echo(f"  {'─' * 45}")
+            if not exif:
+                click.echo("  No EXIF metadata found")
+            else:
+                for key, value in sorted(exif.items()):
+                    # Skip complex nested structures for display
+                    if isinstance(value, dict):
+                        click.echo(f"  {key}: [complex data]")
+                    elif isinstance(value, list):
+                        click.echo(f"  {key}: {value}")
+                    else:
+                        # Truncate long values
+                        str_val = str(value)
+                        if len(str_val) > 50:
+                            str_val = str_val[:47] + "..."
+                        click.echo(f"  {key}: {str_val}")
+            click.echo()
+        return
+
+    # Modification mode - require output file
+    if not output:
+        raise click.UsageError("Output file required for modifications (use -o/--output)")
+
+    if clear:
+        # Strip all metadata
+        clean_data = strip_image_metadata(image_data, output_format="JPEG")
+        with open(output, "wb") as f:
+            f.write(clean_data)
+        click.echo(f"Cleared EXIF metadata, saved to: {output}")
+    elif set_fields:
+        # Parse field=value pairs
+        updates = {}
+        for field in set_fields:
+            if "=" not in field:
+                raise click.UsageError(f"Invalid format: {field} (use Field=Value)")
+            key, val = field.split("=", 1)
+            updates[key.strip()] = val.strip()
+
+        try:
+            updated_data = write_image_exif(image_data, updates)
+            with open(output, "wb") as f:
+                f.write(updated_data)
+            click.echo(f"Updated {len(updates)} EXIF field(s), saved to: {output}")
+        except ValueError as e:
+            raise click.UsageError(str(e))
+
+
 def main():
     """Entry point for CLI."""
     cli(obj={})

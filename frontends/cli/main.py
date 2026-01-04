@@ -168,37 +168,25 @@ def resolve_channel_key_option(
     """
     Resolve channel key from CLI options.
 
+    Wrapper around library's resolve_channel_key with Click exception handling.
+
     Returns:
         None: Use server-configured key (auto mode)
         "": Public mode (no channel key)
         str: Explicit channel key
     """
-    if no_channel:
-        return ""  # Public mode
+    from stegasoo.channel import resolve_channel_key
 
-    if channel_file:
-        # Load from file
-        path = Path(channel_file)
-        if not path.exists():
-            raise click.ClickException(f"Channel key file not found: {channel_file}")
-        key = path.read_text().strip()
-        if not validate_channel_key(key):
-            raise click.ClickException(f"Invalid channel key format in file: {channel_file}")
-        return key
-
-    if channel:
-        if channel.lower() == "auto":
-            return None  # Use server config
-        # Explicit key provided
-        if not validate_channel_key(channel):
-            raise click.ClickException(
-                "Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX\n"
-                "Generate a new key with: stegasoo channel generate"
-            )
-        return channel
-
-    # Default: use server-configured key (auto mode)
-    return None
+    try:
+        return resolve_channel_key(
+            value=channel,
+            file_path=channel_file,
+            no_channel=no_channel,
+        )
+    except FileNotFoundError as e:
+        raise click.ClickException(str(e))
+    except ValueError as e:
+        raise click.ClickException(str(e))
 
 
 def format_channel_status_line(quiet: bool = False) -> str | None:

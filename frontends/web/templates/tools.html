@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-10">
         <h4 class="mb-4"><i class="bi bi-tools me-2"></i>Image Security Toolkit</h4>
 
         <!-- Tool Tabs -->
@@ -15,8 +15,8 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#strip" type="button">
-                    <i class="bi bi-eraser me-1"></i>Strip EXIF
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#exif" type="button">
+                    <i class="bi bi-card-text me-1"></i>EXIF Editor
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -65,20 +65,65 @@
                 </div>
             </div>
 
-            <!-- Strip EXIF -->
-            <div class="tab-pane fade" id="strip" role="tabpanel">
+            <!-- EXIF Editor -->
+            <div class="tab-pane fade" id="exif" role="tabpanel">
                 <div class="card">
                     <div class="card-body">
-                        <p class="text-muted mb-3">Remove metadata (camera info, GPS, timestamps) from images.</p>
+                        <p class="text-muted mb-3">View, edit, or remove image metadata (EXIF, GPS, camera info).</p>
 
-                        <form id="stripForm" action="{{ url_for('api_tools_strip_metadata') }}" method="POST" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <input type="file" class="form-control" name="image" id="stripFile" accept="image/*" required>
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="exifFile" accept="image/*">
+                        </div>
+
+                        <div id="exifEditor" class="d-none">
+                            <div class="row mb-3">
+                                <!-- Thumbnail -->
+                                <div class="col-auto">
+                                    <img id="exifThumb" class="rounded" style="max-height: 120px; max-width: 120px; object-fit: cover;">
+                                </div>
+                                <!-- File info -->
+                                <div class="col">
+                                    <h6 id="exifFilename" class="mb-1"></h6>
+                                    <small class="text-muted"><span id="exifFieldCount">0</span> metadata fields</small>
+                                    <div id="exifNotEditable" class="text-warning small d-none">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Non-JPEG: read-only
+                                    </div>
+                                </div>
                             </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-eraser me-1"></i>Strip & Download
-                            </button>
-                        </form>
+
+                            <!-- EXIF Fields Table -->
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-sm table-dark table-hover mb-0">
+                                    <thead class="sticky-top bg-dark">
+                                        <tr>
+                                            <th style="width: 35%">Field</th>
+                                            <th>Value</th>
+                                            <th style="width: 40px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="exifTable"></tbody>
+                                </table>
+                            </div>
+
+                            <div id="exifEmpty" class="text-muted text-center py-4 d-none">
+                                <i class="bi bi-inbox"></i> No metadata found
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="d-flex gap-2 mt-3 pt-3 border-top border-secondary">
+                                <button type="button" class="btn btn-outline-danger" id="exifClearAll">
+                                    <i class="bi bi-trash me-1"></i>Clear All
+                                </button>
+                                <div class="ms-auto d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary" id="exifDiscard">
+                                        Discard
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="exifSave" disabled>
+                                        <i class="bi bi-download me-1"></i>Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -139,6 +184,199 @@ document.getElementById('capacityFile')?.addEventListener('change', async functi
         }
     } catch (err) {
         console.error(err);
+    }
+});
+
+// EXIF Editor
+let exifOriginalData = {};
+let exifCurrentData = {};
+let exifEditable = false;
+let exifCurrentFile = null;
+
+document.getElementById('exifFile')?.addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+
+    exifCurrentFile = file;
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const res = await fetch('/api/tools/exif', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            // Show thumbnail
+            const reader = new FileReader();
+            reader.onload = e => document.getElementById('exifThumb').src = e.target.result;
+            reader.readAsDataURL(file);
+
+            // Store data
+            exifOriginalData = JSON.parse(JSON.stringify(data.exif));
+            exifCurrentData = JSON.parse(JSON.stringify(data.exif));
+            exifEditable = data.editable;
+
+            // Update UI
+            document.getElementById('exifFilename').textContent = data.filename;
+            document.getElementById('exifFieldCount').textContent = data.field_count;
+            document.getElementById('exifNotEditable').classList.toggle('d-none', data.editable);
+            document.getElementById('exifEditor').classList.remove('d-none');
+
+            renderExifTable();
+            updateSaveButton();
+        }
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+function renderExifTable() {
+    const tbody = document.getElementById('exifTable');
+    const empty = document.getElementById('exifEmpty');
+    const entries = Object.entries(exifCurrentData).sort((a, b) => a[0].localeCompare(b[0]));
+
+    if (entries.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('d-none');
+        return;
+    }
+
+    empty.classList.add('d-none');
+    tbody.innerHTML = entries.map(([key, value]) => {
+        // Format value for display
+        let displayVal = value;
+        if (typeof value === 'object') {
+            displayVal = JSON.stringify(value);
+        }
+        if (typeof displayVal === 'string' && displayVal.length > 60) {
+            displayVal = displayVal.substring(0, 57) + '...';
+        }
+
+        // Check if field is editable (common string fields)
+        const editableFields = ['Make', 'Model', 'Software', 'Artist', 'Copyright', 'ImageDescription', 'DateTime', 'DateTimeOriginal', 'DateTimeDigitized', 'UserComment', 'LensMake', 'LensModel'];
+        const canEdit = exifEditable && editableFields.includes(key) && typeof value === 'string';
+
+        return `
+            <tr data-field="${key}">
+                <td class="text-muted small">${key}</td>
+                <td class="font-monospace small">
+                    ${canEdit
+                        ? `<input type="text" class="form-control form-control-sm bg-dark text-light border-secondary exif-input"
+                             value="${String(value).replace(/"/g, '&quot;')}" data-field="${key}">`
+                        : `<span title="${String(displayVal)}">${displayVal}</span>`
+                    }
+                </td>
+                <td>
+                    ${canEdit
+                        ? `<button class="btn btn-sm btn-outline-danger border-0 exif-delete" data-field="${key}" title="Remove">
+                             <i class="bi bi-x"></i>
+                           </button>`
+                        : ''
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Add event listeners for edits
+    tbody.querySelectorAll('.exif-input').forEach(input => {
+        input.addEventListener('input', function() {
+            exifCurrentData[this.dataset.field] = this.value;
+            updateSaveButton();
+        });
+    });
+
+    tbody.querySelectorAll('.exif-delete').forEach(btn => {
+        btn.addEventListener('click', function() {
+            delete exifCurrentData[this.dataset.field];
+            renderExifTable();
+            updateSaveButton();
+        });
+    });
+}
+
+function updateSaveButton() {
+    const changed = JSON.stringify(exifCurrentData) !== JSON.stringify(exifOriginalData);
+    document.getElementById('exifSave').disabled = !changed;
+}
+
+// Clear All button
+document.getElementById('exifClearAll')?.addEventListener('click', async function() {
+    if (!exifCurrentFile) return;
+    if (!confirm('Remove all metadata from this image?')) return;
+
+    const formData = new FormData();
+    formData.append('image', exifCurrentFile);
+    formData.append('format', 'PNG');
+
+    try {
+        const res = await fetch('/api/tools/exif/clear', { method: 'POST', body: formData });
+        if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'clean.png';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+// Discard button
+document.getElementById('exifDiscard')?.addEventListener('click', function() {
+    exifCurrentData = JSON.parse(JSON.stringify(exifOriginalData));
+    renderExifTable();
+    updateSaveButton();
+});
+
+// Save button
+document.getElementById('exifSave')?.addEventListener('click', async function() {
+    if (!exifCurrentFile || !exifEditable) return;
+
+    // Find what changed
+    const updates = {};
+    for (const [key, val] of Object.entries(exifCurrentData)) {
+        if (exifOriginalData[key] !== val) {
+            updates[key] = val;
+        }
+    }
+    // Mark deleted fields
+    for (const key of Object.keys(exifOriginalData)) {
+        if (!(key in exifCurrentData)) {
+            updates[key] = null;
+        }
+    }
+
+    if (Object.keys(updates).length === 0) return;
+
+    const formData = new FormData();
+    formData.append('image', exifCurrentFile);
+    formData.append('updates', JSON.stringify(updates));
+
+    try {
+        const res = await fetch('/api/tools/exif/update', { method: 'POST', body: formData });
+        if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'updated.jpg';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // Update original to match current
+            exifOriginalData = JSON.parse(JSON.stringify(exifCurrentData));
+            updateSaveButton();
+        } else {
+            const err = await res.json();
+            alert(err.error || 'Failed to save');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Failed to save changes');
     }
 });
 

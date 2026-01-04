@@ -49,7 +49,6 @@ from stegasoo import (
     generate_credentials,
     get_channel_status,
     has_argon2,
-    has_channel_key,
     has_dct_support,
     set_channel_key,
     validate_channel_key,
@@ -406,11 +405,7 @@ def _resolve_channel_key(channel_key: str | None) -> str | None:
     """
     Resolve channel key from API parameter.
 
-    Args:
-        channel_key: API parameter value
-            - None: Use server-configured key (auto mode)
-            - "": Public mode (no channel key)
-            - "XXXX-...": Explicit key
+    Wrapper around library's resolve_channel_key with HTTP exception handling.
 
     Returns:
         Resolved channel key to pass to encode/decode
@@ -418,44 +413,27 @@ def _resolve_channel_key(channel_key: str | None) -> str | None:
     Raises:
         HTTPException: If key format is invalid
     """
-    if channel_key is None:
-        # Auto mode - use server config
-        return None
+    from stegasoo.channel import resolve_channel_key
 
-    if channel_key == "":
-        # Public mode
-        return ""
-
-    # Explicit key - validate format
-    if not validate_channel_key(channel_key):
-        raise HTTPException(
-            400, "Invalid channel key format. Expected: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-        )
-
-    return channel_key
+    try:
+        return resolve_channel_key(channel_key)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(400, str(e))
 
 
 def _get_channel_info(channel_key: str | None) -> tuple[str, str | None]:
     """
     Get channel mode and fingerprint for response.
 
+    Uses library's get_channel_response_info for consistent formatting.
+
     Returns:
         (mode, fingerprint) tuple
     """
-    if channel_key == "":
-        return "public", None
+    from stegasoo.channel import get_channel_response_info
 
-    if channel_key is not None:
-        # Explicit key
-        fingerprint = f"{channel_key[:4]}-••••-••••-••••-••••-••••-••••-{channel_key[-4:]}"
-        return "private", fingerprint
-
-    # Auto mode - check server config
-    if has_channel_key():
-        status = get_channel_status()
-        return "private", status.get("fingerprint")
-
-    return "public", None
+    info = get_channel_response_info(channel_key)
+    return info["mode"], info.get("fingerprint")
 
 
 # ============================================================================

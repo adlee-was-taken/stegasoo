@@ -277,23 +277,22 @@ def resolve_channel_key_form(channel_key_value: str) -> str:
     """
     Resolve channel key from form input.
 
-    Args:
-        channel_key_value: Form value ('auto', 'none', or explicit key)
-
-    Returns:
-        Value to pass to subprocess_stego ('auto', 'none', or explicit key)
+    Wrapper around library's resolve_channel_key for subprocess compatibility.
+    Returns string values for subprocess_stego ('auto', 'none', or explicit key).
     """
-    if not channel_key_value or channel_key_value == "auto":
-        return "auto"
-    elif channel_key_value == "none":
-        return "none"
-    else:
-        # Explicit key - validate format
-        if validate_channel_key(channel_key_value):
-            return channel_key_value
-        else:
-            # Invalid format, fall back to auto
+    from stegasoo.channel import resolve_channel_key
+
+    try:
+        result = resolve_channel_key(channel_key_value)
+        if result is None:
             return "auto"
+        elif result == "":
+            return "none"
+        else:
+            return result
+    except (ValueError, FileNotFoundError):
+        # Invalid format, fall back to auto
+        return "auto"
 
 
 def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes:
@@ -928,6 +927,25 @@ def encode_page():
                 flash(result.error_message, "error")
                 return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
 
+            # Pre-check payload capacity BEFORE encode (fail fast)
+            from stegasoo.steganography import will_fit_by_mode
+
+            payload_size = len(payload.data) if hasattr(payload, "data") else len(payload.encode("utf-8"))
+            fit_check = will_fit_by_mode(payload_size, carrier_data, embed_mode=embed_mode)
+            if not fit_check.get("fits", True):
+                error_msg = (
+                    f"Payload too large for {embed_mode.upper()} mode. "
+                    f"Payload: {payload_size:,} bytes, "
+                    f"Capacity: {fit_check.get('capacity', 0):,} bytes"
+                )
+                # Suggest alternative mode
+                if embed_mode == "dct":
+                    alt_check = will_fit_by_mode(payload_size, carrier_data, embed_mode="lsb")
+                    if alt_check.get("fits"):
+                        error_msg += " - Try LSB mode instead."
+                flash(error_msg, "error")
+                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+
             # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated encode to prevent crashes
             if payload_type == "file" and payload_file and payload_file.filename:
@@ -1368,6 +1386,109 @@ def api_tools_peek():
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/tools/exif", methods=["POST"])
+@login_required
+def api_tools_exif():
+    """Read EXIF metadata from image."""
+    from stegasoo.utils import read_image_exif
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    try:
+        image_data = image_file.read()
+        exif = read_image_exif(image_data)
+
+        # Check if it's a JPEG (editable) or not
+        is_jpeg = image_data[:2] == b"\xff\xd8"
+
+        return jsonify({
+            "success": True,
+            "filename": image_file.filename,
+            "exif": exif,
+            "editable": is_jpeg,
+            "field_count": len(exif),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/tools/exif/update", methods=["POST"])
+@login_required
+def api_tools_exif_update():
+    """Update EXIF fields in image."""
+    from stegasoo.utils import write_image_exif
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    # Get updates from form data
+    updates_json = request.form.get("updates", "{}")
+    try:
+        import json
+        updates = json.loads(updates_json)
+    except json.JSONDecodeError:
+        return jsonify({"success": False, "error": "Invalid updates JSON"}), 400
+
+    if not updates:
+        return jsonify({"success": False, "error": "No updates provided"}), 400
+
+    try:
+        image_data = image_file.read()
+        updated_data = write_image_exif(image_data, updates)
+
+        # Return as downloadable file
+        buffer = io.BytesIO(updated_data)
+        return send_file(
+            buffer,
+            mimetype="image/jpeg",
+            as_attachment=True,
+            download_name=f"exif_{image_file.filename}",
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tools/exif/clear", methods=["POST"])
+@login_required
+def api_tools_exif_clear():
+    """Remove all EXIF metadata from image."""
+    from stegasoo.utils import strip_image_metadata
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    # Get desired output format (default to PNG for lossless)
+    output_format = request.form.get("format", "PNG").upper()
+    if output_format not in ("PNG", "JPEG", "BMP"):
+        output_format = "PNG"
+
+    try:
+        image_data = image_file.read()
+        clean_data = strip_image_metadata(image_data, output_format=output_format)
+
+        # Determine extension and mimetype
+        ext_map = {"PNG": ("png", "image/png"), "JPEG": ("jpg", "image/jpeg"), "BMP": ("bmp", "image/bmp")}
+        ext, mimetype = ext_map.get(output_format, ("png", "image/png"))
+
+        # Return as downloadable file
+        stem = image_file.filename.rsplit(".", 1)[0] if "." in image_file.filename else image_file.filename
+        buffer = io.BytesIO(clean_data)
+        return send_file(
+            buffer,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f"{stem}_clean.{ext}",
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # Add these two test routes anywhere in app.py after the app = Flask(...) line:
