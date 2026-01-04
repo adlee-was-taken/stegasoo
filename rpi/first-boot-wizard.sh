@@ -18,7 +18,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # Configuration
-INSTALL_DIR="$HOME/stegasoo"
+INSTALL_DIR="/opt/stegasoo"
 FLAG_FILE="/etc/stegasoo-first-boot"
 PROFILE_HOOK="/etc/profile.d/stegasoo-wizard.sh"
 

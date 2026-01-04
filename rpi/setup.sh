@@ -30,7 +30,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="$HOME/stegasoo"
+INSTALL_DIR="/opt/stegasoo"
 PYTHON_VERSION="3.12"
 STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
 JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
@@ -80,7 +80,19 @@ if [ "$TOTAL_MEM" -lt 2000 ]; then
     fi
 fi
 
-echo -e "${GREEN}[1/6]${NC} Installing system dependencies..."
+# Create /opt/stegasoo with proper permissions
+echo -e "${GREEN}[1/7]${NC} Setting up install directory..."
+if [ ! -d "$INSTALL_DIR" ]; then
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo chown "$USER:$USER" "$INSTALL_DIR"
+    echo "  Created $INSTALL_DIR"
+else
+    # Ensure current user owns it
+    sudo chown "$USER:$USER" "$INSTALL_DIR"
+    echo "  $INSTALL_DIR exists, updated ownership"
+fi
+
+echo -e "${GREEN}[2/7]${NC} Installing system dependencies..."
 sudo apt-get update
 sudo apt-get install -y \
     build-essential \
@@ -101,7 +113,7 @@ sudo apt-get install -y \
     libzbar0 \
     libjpeg-dev
 
-echo -e "${GREEN}[2/6]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+echo -e "${GREEN}[3/7]${NC} Installing pyenv and Python $PYTHON_VERSION..."
 
 # Install pyenv if not present
 if [ ! -d "$HOME/.pyenv" ]; then
@@ -141,7 +153,7 @@ if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[3/6]${NC} Building jpegio for ARM..."
+echo -e "${GREEN}[4/7]${NC} Building jpegio for ARM..."
 
 # Clone jpegio
 JPEGIO_DIR="/tmp/jpegio-build"
@@ -168,7 +180,7 @@ pip install .
 cd "$HOME"
 rm -rf "$JPEGIO_DIR"
 
-echo -e "${GREEN}[4/6]${NC} Installing Stegasoo..."
+echo -e "${GREEN}[5/7]${NC} Installing Stegasoo..."
 
 # Clone Stegasoo
 if [ -d "$INSTALL_DIR" ]; then
@@ -194,7 +206,7 @@ pip install -e ".[web]" || {
     pip install argon2-cffi cryptography pillow flask gunicorn scipy numpy pyzbar qrcode
 }
 
-echo -e "${GREEN}[5/6]${NC} Creating systemd service..."
+echo -e "${GREEN}[6/7]${NC} Creating systemd service..."
 
 # Create systemd service file
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
@@ -218,7 +230,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[6/6]${NC} Enabling service..."
+echo -e "${GREEN}[7/7]${NC} Enabling service..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service

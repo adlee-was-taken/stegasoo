@@ -199,10 +199,13 @@ history -c 2>/dev/null || true
 # =============================================================================
 echo -e "${GREEN}[5/10]${NC} Removing Stegasoo user data..."
 # Remove auth database (users create their own admin on first run)
+rm -rf /opt/stegasoo/frontends/web/instance/ 2>/dev/null
 rm -rf /home/*/stegasoo/frontends/web/instance/
 # Remove SSL certs (will be regenerated)
+rm -rf /opt/stegasoo/frontends/web/certs/ 2>/dev/null
 rm -rf /home/*/stegasoo/frontends/web/certs/
 # Remove any .env files with channel keys
+rm -f /opt/stegasoo/frontends/web/.env 2>/dev/null
 rm -f /home/*/stegasoo/frontends/web/.env
 echo "  Stegasoo instance data cleared"
 
@@ -211,16 +214,19 @@ echo "  Stegasoo instance data cleared"
 # =============================================================================
 echo -e "${GREEN}[6/10]${NC} Setting up first-boot wizard..."
 
-# Find stegasoo install directory
-STEGASOO_DIR=$(ls -d /home/*/stegasoo 2>/dev/null | head -1)
+# Find stegasoo install directory (prefer /opt/stegasoo)
+STEGASOO_DIR=""
+if [ -d /opt/stegasoo ]; then
+    STEGASOO_DIR="/opt/stegasoo"
+else
+    STEGASOO_DIR=$(ls -d /home/*/stegasoo 2>/dev/null | head -1)
+fi
 
 if [ -z "$STEGASOO_DIR" ]; then
-    for dir in /root/stegasoo /opt/stegasoo; do
-        if [ -d "$dir" ]; then
-            STEGASOO_DIR="$dir"
-            break
-        fi
-    done
+    # Last resort fallback
+    if [ -d /root/stegasoo ]; then
+        STEGASOO_DIR="/root/stegasoo"
+    fi
 fi
 
 STEGASOO_USER=$(stat -c '%U' "$STEGASOO_DIR" 2>/dev/null || echo "pi")
@@ -334,7 +340,14 @@ else
 fi
 
 # Check Stegasoo instance data removed
+DB_FOUND=false
+if ls /opt/stegasoo/frontends/web/instance/*.db 1>/dev/null 2>&1; then
+    DB_FOUND=true
+fi
 if ls /home/*/stegasoo/frontends/web/instance/*.db 1>/dev/null 2>&1; then
+    DB_FOUND=true
+fi
+if [ "$DB_FOUND" = true ]; then
     echo -e "  ${RED}[FAIL]${NC} Stegasoo database still present"
     VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
 else
