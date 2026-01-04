@@ -4,14 +4,17 @@
 # Run this BEFORE creating an image with dd
 #
 # This script removes:
-#   - WiFi credentials
+#   - WiFi credentials (unless --soft)
+#   - SSH host keys (will regenerate on boot)
 #   - SSH authorized keys
 #   - User-specific data
 #   - Bash history
 #   - Logs
 #   - Stegasoo auth database (users will create their own admin)
 #
-# Usage: sudo ./sanitize-for-image.sh
+# Usage:
+#   sudo ./sanitize-for-image.sh          # Full sanitize for image distribution
+#   sudo ./sanitize-for-image.sh --soft   # Soft reset (keeps WiFi for testing)
 #
 
 set -e
@@ -19,21 +22,38 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
+
+SOFT_RESET=false
+if [ "$1" = "--soft" ] || [ "$1" = "-s" ]; then
+    SOFT_RESET=true
+fi
 
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Error: Must run as root (sudo)${NC}"
     exit 1
 fi
 
-echo -e "${YELLOW}"
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║         Sanitize Pi for Image Distribution                    ║"
-echo "║                                                               ║"
-echo "║   This will remove personal data and prepare for imaging.     ║"
-echo "║   The system will shut down when complete.                    ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
+if [ "$SOFT_RESET" = true ]; then
+    echo -e "${CYAN}"
+    echo "+-----------------------------------------------------------------+"
+    echo "|              Soft Reset (Factory Defaults)                     |"
+    echo "|                                                                 |"
+    echo "|   WiFi credentials will be KEPT for continued testing.         |"
+    echo "|   Everything else will be reset to first-boot state.           |"
+    echo "+-----------------------------------------------------------------+"
+    echo -e "${NC}"
+else
+    echo -e "${YELLOW}"
+    echo "+-----------------------------------------------------------------+"
+    echo "|         Sanitize Pi for Image Distribution                     |"
+    echo "|                                                                 |"
+    echo "|   This will remove ALL personal data for imaging.              |"
+    echo "|   The system will shut down when complete.                     |"
+    echo "+-----------------------------------------------------------------+"
+    echo -e "${NC}"
+fi
 
 read -p "Continue? This cannot be undone! [y/N] " -n 1 -r
 echo
@@ -42,9 +62,21 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-echo -e "${GREEN}[1/9]${NC} Removing WiFi credentials..."
-if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
-    cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
+# Track validation results
+VALIDATION_ERRORS=0
+
+# =============================================================================
+# Step 1: WiFi Credentials
+# =============================================================================
+if [ "$SOFT_RESET" = true ]; then
+    echo -e "${GREEN}[1/10]${NC} Keeping WiFi credentials (soft reset)..."
+    echo "  WiFi config preserved"
+else
+    echo -e "${GREEN}[1/10]${NC} Removing WiFi credentials..."
+
+    # Remove from rootfs
+    if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+        cat > /etc/wpa_supplicant/wpa_supplicant.conf << 'EOF'
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=US
@@ -55,12 +87,22 @@ country=US
 #     psk="YourPassword"
 # }
 EOF
-    echo "  WiFi credentials cleared"
-else
-    echo "  No wpa_supplicant.conf found"
+        echo "  Cleared /etc/wpa_supplicant/wpa_supplicant.conf"
+    fi
+
+    # Remove from boot partition (headless setup file)
+    BOOT_PART=$(findmnt -n -o SOURCE /boot/firmware 2>/dev/null || findmnt -n -o SOURCE /boot 2>/dev/null || echo "")
+    if [ -n "$BOOT_PART" ]; then
+        BOOT_MOUNT=$(findmnt -n -o TARGET "$BOOT_PART" 2>/dev/null || echo "/boot")
+        rm -f "$BOOT_MOUNT/wpa_supplicant.conf" 2>/dev/null || true
+        echo "  Removed boot partition WiFi config"
+    fi
 fi
 
-echo -e "${GREEN}[2/9]${NC} Removing SSH authorized keys..."
+# =============================================================================
+# Step 2: SSH Authorized Keys
+# =============================================================================
+echo -e "${GREEN}[2/10]${NC} Removing SSH authorized keys..."
 for user_home in /home/*; do
     if [ -d "$user_home/.ssh" ]; then
         rm -f "$user_home/.ssh/authorized_keys"
@@ -70,15 +112,28 @@ for user_home in /home/*; do
 done
 rm -f /root/.ssh/authorized_keys /root/.ssh/known_hosts 2>/dev/null || true
 
-echo -e "${GREEN}[3/9]${NC} Clearing bash history..."
+# =============================================================================
+# Step 3: SSH Host Keys
+# =============================================================================
+echo -e "${GREEN}[3/10]${NC} Removing SSH host keys (will regenerate on first boot)..."
+rm -f /etc/ssh/ssh_host_*
+echo "  SSH host keys removed"
+
+# =============================================================================
+# Step 4: Bash History
+# =============================================================================
+echo -e "${GREEN}[4/10]${NC} Clearing bash history..."
 for user_home in /home/*; do
     rm -f "$user_home/.bash_history"
     rm -f "$user_home/.python_history"
 done
 rm -f /root/.bash_history /root/.python_history 2>/dev/null || true
-history -c
+history -c 2>/dev/null || true
 
-echo -e "${GREEN}[4/9]${NC} Removing Stegasoo user data..."
+# =============================================================================
+# Step 5: Stegasoo User Data
+# =============================================================================
+echo -e "${GREEN}[5/10]${NC} Removing Stegasoo user data..."
 # Remove auth database (users create their own admin on first run)
 rm -rf /home/*/stegasoo/frontends/web/instance/
 # Remove SSL certs (will be regenerated)
@@ -87,35 +142,36 @@ rm -rf /home/*/stegasoo/frontends/web/certs/
 rm -f /home/*/stegasoo/frontends/web/.env
 echo "  Stegasoo instance data cleared"
 
-echo -e "${GREEN}[5/9]${NC} Setting up first-boot wizard..."
+# =============================================================================
+# Step 6: First-Boot Wizard Setup
+# =============================================================================
+echo -e "${GREEN}[6/10]${NC} Setting up first-boot wizard..."
+
 # Find stegasoo install directory
 STEGASOO_DIR=$(ls -d /home/*/stegasoo 2>/dev/null | head -1)
-echo "  Looking for stegasoo in: $STEGASOO_DIR"
 
 if [ -z "$STEGASOO_DIR" ]; then
-    echo -e "  ${RED}ERROR: Could not find stegasoo directory in /home/*/stegasoo${NC}"
-    echo "  Checking common locations..."
-    for dir in /home/*/stegasoo /root/stegasoo /opt/stegasoo; do
+    for dir in /root/stegasoo /opt/stegasoo; do
         if [ -d "$dir" ]; then
             STEGASOO_DIR="$dir"
-            echo "  Found at: $STEGASOO_DIR"
             break
         fi
     done
 fi
 
 STEGASOO_USER=$(stat -c '%U' "$STEGASOO_DIR" 2>/dev/null || echo "pi")
+echo "  Stegasoo directory: $STEGASOO_DIR"
 echo "  Stegasoo user: $STEGASOO_USER"
 
 if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
     # Install the profile.d hook
     cp "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" /etc/profile.d/stegasoo-wizard.sh
-    chmod 755 /etc/profile.d/stegasoo-wizard.sh
-    echo "  Installed first-boot wizard hook"
+    chmod 644 /etc/profile.d/stegasoo-wizard.sh
+    echo "  Installed wizard hook to /etc/profile.d/"
 
     # Create the first-boot flag
     touch /etc/stegasoo-first-boot
-    echo "  Created first-boot flag"
+    echo "  Created /etc/stegasoo-first-boot flag"
 
     # Reset systemd service to defaults (wizard will reconfigure)
     cat > /etc/systemd/system/stegasoo.service <<EOF
@@ -140,64 +196,153 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
-    echo "  Reset service to defaults"
-
-    # Verify files were created
-    if [ -f /etc/stegasoo-first-boot ] && [ -f /etc/profile.d/stegasoo-wizard.sh ]; then
-        echo -e "  ${GREEN}✓ Wizard setup verified${NC}"
-    else
-        echo -e "  ${RED}✗ Wizard files missing after setup!${NC}"
-    fi
+    echo "  Reset systemd service to defaults"
 else
-    echo -e "  ${RED}ERROR: Could not set up wizard${NC}"
+    echo -e "  ${RED}ERROR: Could not find wizard script${NC}"
     echo "  STEGASOO_DIR: $STEGASOO_DIR"
-    echo "  Wizard script exists: $([ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ] && echo 'yes' || echo 'NO')"
-    echo ""
-    echo "  You may need to manually run:"
-    echo "    sudo touch /etc/stegasoo-first-boot"
-    echo "    sudo cp $STEGASOO_DIR/rpi/stegasoo-wizard.sh /etc/profile.d/"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
 fi
 
-echo -e "${GREEN}[6/9]${NC} Clearing logs..."
-journalctl --rotate
-journalctl --vacuum-time=1s
-rm -rf /var/log/*.log /var/log/*.gz /var/log/*.[0-9]
-rm -rf /var/log/apt/*
-rm -rf /var/log/journal/*
+# =============================================================================
+# Step 7: Logs
+# =============================================================================
+echo -e "${GREEN}[7/10]${NC} Clearing logs..."
+journalctl --rotate 2>/dev/null || true
+journalctl --vacuum-time=1s 2>/dev/null || true
+rm -rf /var/log/*.log /var/log/*.gz /var/log/*.[0-9] 2>/dev/null || true
+rm -rf /var/log/apt/* 2>/dev/null || true
+rm -rf /var/log/journal/* 2>/dev/null || true
 find /var/log -type f -name "*.log" -delete 2>/dev/null || true
 echo "  Logs cleared"
 
-echo -e "${GREEN}[7/9]${NC} Clearing temporary files..."
-rm -rf /tmp/*
-rm -rf /var/tmp/*
+# =============================================================================
+# Step 8: Temporary Files
+# =============================================================================
+echo -e "${GREEN}[8/10]${NC} Clearing temporary files..."
+rm -rf /tmp/* 2>/dev/null || true
+rm -rf /var/tmp/* 2>/dev/null || true
 echo "  Temp files cleared"
 
-echo -e "${GREEN}[8/9]${NC} Clearing package cache..."
-apt-get clean
-rm -rf /var/cache/apt/archives/*
+# =============================================================================
+# Step 9: Package Cache
+# =============================================================================
+echo -e "${GREEN}[9/10]${NC} Clearing package cache..."
+apt-get clean 2>/dev/null || true
+rm -rf /var/cache/apt/archives/* 2>/dev/null || true
 echo "  Package cache cleared"
 
-echo -e "${GREEN}[9/9]${NC} Final cleanup..."
-# Remove this script's evidence
-rm -f /root/.bash_history
+# =============================================================================
+# Step 10: Final Sync
+# =============================================================================
+echo -e "${GREEN}[10/10]${NC} Final sync..."
+rm -f /root/.bash_history 2>/dev/null || true
 sync
+echo "  Filesystem synced"
 
+# =============================================================================
+# Validation
+# =============================================================================
 echo ""
-echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║                    Sanitization Complete!                     ║${NC}"
-echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}Validating sanitization...${NC}"
+
+# Check first-boot flag
+if [ -f /etc/stegasoo-first-boot ]; then
+    echo -e "  ${GREEN}[PASS]${NC} First-boot flag exists"
+else
+    echo -e "  ${RED}[FAIL]${NC} First-boot flag missing"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+fi
+
+# Check profile.d hook
+if [ -f /etc/profile.d/stegasoo-wizard.sh ]; then
+    echo -e "  ${GREEN}[PASS]${NC} Wizard hook installed"
+else
+    echo -e "  ${RED}[FAIL]${NC} Wizard hook missing"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+fi
+
+# Check SSH host keys removed
+if ls /etc/ssh/ssh_host_* 1>/dev/null 2>&1; then
+    echo -e "  ${RED}[FAIL]${NC} SSH host keys still present"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+else
+    echo -e "  ${GREEN}[PASS]${NC} SSH host keys removed"
+fi
+
+# Check Stegasoo instance data removed
+if ls /home/*/stegasoo/frontends/web/instance/*.db 1>/dev/null 2>&1; then
+    echo -e "  ${RED}[FAIL]${NC} Stegasoo database still present"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+else
+    echo -e "  ${GREEN}[PASS]${NC} Stegasoo database removed"
+fi
+
+# Check WiFi (only for full sanitize)
+if [ "$SOFT_RESET" = false ]; then
+    if grep -q "psk=" /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null; then
+        echo -e "  ${RED}[FAIL]${NC} WiFi credentials still present"
+        VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    else
+        echo -e "  ${GREEN}[PASS]${NC} WiFi credentials cleared"
+    fi
+else
+    echo -e "  ${YELLOW}[SKIP]${NC} WiFi check (soft reset mode)"
+fi
+
+# Check authorized_keys removed
+AUTH_KEYS_FOUND=false
+for user_home in /home/*; do
+    if [ -f "$user_home/.ssh/authorized_keys" ]; then
+        AUTH_KEYS_FOUND=true
+        break
+    fi
+done
+if [ "$AUTH_KEYS_FOUND" = true ]; then
+    echo -e "  ${RED}[FAIL]${NC} SSH authorized_keys still present"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+else
+    echo -e "  ${GREEN}[PASS]${NC} SSH authorized_keys removed"
+fi
+
+# =============================================================================
+# Summary
+# =============================================================================
 echo ""
-echo "The system is ready for imaging."
+if [ $VALIDATION_ERRORS -eq 0 ]; then
+    echo -e "${GREEN}+-----------------------------------------------------------------+${NC}"
+    echo -e "${GREEN}|                Sanitization Complete!                          |${NC}"
+    echo -e "${GREEN}|                All validation checks passed.                   |${NC}"
+    echo -e "${GREEN}+-----------------------------------------------------------------+${NC}"
+else
+    echo -e "${RED}+-----------------------------------------------------------------+${NC}"
+    echo -e "${RED}|                Sanitization Complete with Errors                |${NC}"
+    echo -e "${RED}|                $VALIDATION_ERRORS validation check(s) failed                    |${NC}"
+    echo -e "${RED}+-----------------------------------------------------------------+${NC}"
+fi
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "  1. Shut down: sudo shutdown -h now"
-echo "  2. Remove SD card"
-echo "  3. On another machine, copy with:"
-echo "     sudo dd if=/dev/sdX of=stegasoo-rpi.img bs=4M status=progress"
-echo "  4. Compress: xz -9 stegasoo-rpi.img"
-echo ""
-read -p "Shut down now? [y/N] " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    shutdown -h now
+
+if [ "$SOFT_RESET" = true ]; then
+    echo -e "${CYAN}Soft reset complete.${NC}"
+    echo "You can now reboot to test the first-boot wizard."
+    echo ""
+    read -p "Reboot now? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        reboot
+    fi
+else
+    echo "The system is ready for imaging."
+    echo ""
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo "  1. Shut down: sudo shutdown -h now"
+    echo "  2. Remove SD card"
+    echo "  3. On another machine, copy with:"
+    echo "     sudo dd if=/dev/sdX of=stegasoo-rpi.img bs=4M status=progress"
+    echo "  4. Compress: zstd -19 stegasoo-rpi.img"
+    echo ""
+    read -p "Shut down now? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        shutdown -h now
+    fi
 fi

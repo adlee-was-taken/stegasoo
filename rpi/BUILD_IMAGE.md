@@ -5,12 +5,12 @@ Quick reference for building a distributable SD card image.
 ## Step 1: Flash Fresh Raspbian
 
 Use rpi-imager with these settings:
-- **OS**: Raspberry Pi OS (64-bit)
+- **OS**: Raspberry Pi OS Lite (64-bit)
 - **Hostname**: `stegasoo`
 - **Enable SSH**: Yes (password auth)
-- **Username**: `pi` (or any)
-- **Password**: `raspberry` (temporary)
-- **WiFi**: Skip (use ethernet for clean image)
+- **Username**: `admin`
+- **Password**: `stegasoo`
+- **WiFi**: Configure for your network (sanitize script removes it later)
 
 ## Step 2: Boot & SSH In
 
@@ -43,17 +43,22 @@ curl -k https://localhost:5000
 ## Step 5: Sanitize for Distribution
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/sanitize-for-image.sh | sudo bash
+# Full sanitize (for final image - removes WiFi, shuts down)
+sudo ~/stegasoo/rpi/sanitize-for-image.sh
+
+# Or soft reset (for testing - keeps WiFi, reboots)
+sudo ~/stegasoo/rpi/sanitize-for-image.sh --soft
 ```
 
 This removes:
-- WiFi credentials
+- WiFi credentials (unless `--soft`)
+- SSH host keys (regenerate on boot)
 - SSH authorized keys
 - Bash history
 - Stegasoo auth database
 - Logs and temp files
 
-The Pi will shut down when complete.
+The script validates all cleanup steps before finishing.
 
 ## Step 6: Copy the Image
 
@@ -75,18 +80,18 @@ wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
 chmod +x pishrink.sh
 sudo ./pishrink.sh stegasoo-rpi-*.img
 
-# Compress
-xz -9 -T0 stegasoo-rpi-*.img
+# Compress (zstd is faster than xz with similar ratio)
+zstd -19 -T0 stegasoo-rpi-*.img
 ```
 
 ## Step 8: Distribute
 
-Upload `.img.xz` to GitHub Releases.
+Upload `.img.zst` to GitHub Releases.
 
 Users can flash with:
 ```bash
 # Linux
-xzcat stegasoo-rpi-*.img.xz | sudo dd of=/dev/sdX bs=4M status=progress
+zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 
 # Or use rpi-imager "Use custom" option
 ```
@@ -100,9 +105,9 @@ xzcat stegasoo-rpi-*.img.xz | sudo dd of=/dev/sdX bs=4M status=progress
 curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/sanitize-for-image.sh | sudo bash
+sudo ~/stegasoo/rpi/sanitize-for-image.sh
 
 # On your machine:
 sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
-xz -9 -T0 stegasoo-rpi-*.img
+zstd -19 -T0 stegasoo-rpi-*.img
 ```

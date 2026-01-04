@@ -70,3 +70,10 @@ scripts/
 # Web UI auth database and SSL certs
 frontends/web/instance/
 frontends/web/certs/
+rpi/inject-wifi.sh
+
+# RPi image build artifacts
+*.img
+*.img.xz
+*.img.zst
+pishrink.sh

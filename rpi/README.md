@@ -30,10 +30,20 @@ chmod +x setup.sh
 ## Requirements
 
 - Raspberry Pi 4 or 5
-- Raspberry Pi OS (64-bit) - Bookworm or later
+- Raspberry Pi OS Lite (64-bit) - Bookworm or later
 - 4GB+ RAM recommended (2GB minimum)
 - ~2GB free disk space
 - Internet connection
+
+## Pre-built Image Defaults
+
+If using a pre-built image from GitHub Releases:
+
+- **Default login**: `admin` / `stegasoo`
+- **Hostname**: `stegasoo.local`
+- **First boot**: A setup wizard runs on first SSH login
+
+> **Security note**: Change the default password after setup with `passwd`
 
 ## After Installation
 
@@ -134,16 +144,22 @@ curl -k https://localhost:5000  # Should return HTML
 ### 4. Sanitize for Distribution
 
 ```bash
-# Download and run sanitize script
-curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/sanitize-for-image.sh | sudo bash
+# Full sanitize (removes WiFi, shuts down for imaging)
+sudo ~/stegasoo/rpi/sanitize-for-image.sh
+
+# Or soft reset (keeps WiFi for testing, reboots)
+sudo ~/stegasoo/rpi/sanitize-for-image.sh --soft
 ```
 
 This removes:
-- WiFi credentials
+- WiFi credentials (unless `--soft`)
+- SSH host keys (regenerate on boot)
 - SSH authorized keys
 - Bash history
 - Stegasoo auth database (users create their own admin)
 - Logs and temp files
+
+The script validates cleanup and reports any issues.
 
 ### 5. Create the Image
 
@@ -161,17 +177,17 @@ wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
 chmod +x pishrink.sh
 sudo ./pishrink.sh stegasoo-rpi-*.img
 
-# Compress
-xz -9 -T0 stegasoo-rpi-*.img
+# Compress (zstd is faster than xz with similar compression)
+zstd -19 -T0 stegasoo-rpi-*.img
 ```
 
 ### 6. Distribute
 
-Upload the `.img.xz` file to GitHub Releases.
+Upload the `.img.zst` file to GitHub Releases.
 
 Users flash with:
 ```bash
-xzcat stegasoo-rpi-*.img.xz | sudo dd of=/dev/sdX bs=4M status=progress
+zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 ```
 
 Or use rpi-imager's "Use custom" option.
