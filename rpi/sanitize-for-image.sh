@@ -117,7 +117,25 @@ rm -f /root/.ssh/authorized_keys /root/.ssh/known_hosts 2>/dev/null || true
 # =============================================================================
 echo -e "${GREEN}[3/10]${NC} Removing SSH host keys (will regenerate on first boot)..."
 rm -f /etc/ssh/ssh_host_*
-echo "  SSH host keys removed"
+
+# Create a first-boot service to regenerate SSH keys
+cat > /etc/systemd/system/regenerate-ssh-keys.service <<'SSHEOF'
+[Unit]
+Description=Regenerate SSH host keys on first boot
+Before=ssh.service
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+ExecStartPost=/bin/systemctl restart ssh
+
+[Install]
+WantedBy=multi-user.target
+SSHEOF
+
+systemctl enable regenerate-ssh-keys.service 2>/dev/null || true
+echo "  SSH host keys removed (will regenerate on first boot)"
 
 # =============================================================================
 # Step 4: Bash History
