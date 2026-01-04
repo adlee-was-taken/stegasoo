@@ -501,6 +501,287 @@ def info(ctx):
         click.echo(f"  • Max file payload: {MAX_FILE_PAYLOAD_SIZE:,} bytes")
 
 
+# =============================================================================
+# CHANNEL KEY COMMANDS
+# =============================================================================
+
+
+@cli.group()
+@click.pass_context
+def channel(ctx):
+    """
+    Manage channel keys for deployment isolation.
+
+    Channel keys bind encode/decode operations to a specific group or deployment.
+    Messages encoded with one channel key can only be decoded by systems with
+    the same channel key.
+
+    Examples:
+
+        stegasoo channel generate
+
+        stegasoo channel show
+
+        stegasoo channel qr
+
+        stegasoo channel qr -o channel-key.png
+    """
+    pass
+
+
+@channel.command("generate")
+@click.option("--save", is_flag=True, help="Save to project config file")
+@click.option("--save-user", is_flag=True, help="Save to user config (~/.stegasoo/)")
+@click.pass_context
+def channel_generate(ctx, save, save_user):
+    """
+    Generate a new random channel key.
+
+    Examples:
+
+        stegasoo channel generate
+
+        stegasoo channel generate --save
+
+        stegasoo channel generate --save-user
+    """
+    from .channel import generate_channel_key, set_channel_key
+
+    key = generate_channel_key()
+
+    if ctx.obj.get("json"):
+        result = {"channel_key": key}
+        if save or save_user:
+            location = "user" if save_user else "project"
+            path = set_channel_key(key, location)
+            result["saved_to"] = str(path)
+        click.echo(json.dumps(result, indent=2))
+    else:
+        click.echo("Generated channel key:")
+        click.echo(f"  {key}")
+        click.echo()
+
+        if save or save_user:
+            location = "user" if save_user else "project"
+            path = set_channel_key(key, location)
+            click.echo(f"Saved to: {path}")
+        else:
+            click.echo("To use this key:")
+            click.echo(f'  export STEGASOO_CHANNEL_KEY="{key}"')
+            click.echo()
+            click.echo("Or save to config:")
+            click.echo("  stegasoo channel generate --save")
+
+
+@channel.command("show")
+@click.option("--key", "explicit_key", help="Show this key instead of configured one")
+@click.pass_context
+def channel_show(ctx, explicit_key):
+    """
+    Show the current channel key.
+
+    Examples:
+
+        stegasoo channel show
+
+        stegasoo channel show --key "ABCD-1234-..."
+    """
+    from .channel import format_channel_key, get_channel_status, validate_channel_key
+
+    if explicit_key:
+        if not validate_channel_key(explicit_key):
+            click.echo("Error: Invalid channel key format", err=True)
+            raise SystemExit(1)
+        key = format_channel_key(explicit_key)
+        source = "command line"
+    else:
+        status = get_channel_status()
+        if not status["configured"]:
+            if ctx.obj.get("json"):
+                click.echo(json.dumps({"configured": False, "mode": "public"}))
+            else:
+                click.echo("No channel key configured (public mode)")
+            return
+        key = status["key"]
+        source = status["source"]
+
+    if ctx.obj.get("json"):
+        click.echo(json.dumps({"channel_key": key, "source": source}))
+    else:
+        click.echo(f"Channel key: {key}")
+        click.echo(f"Source: {source}")
+
+
+@channel.command("status")
+@click.pass_context
+def channel_status(ctx):
+    """
+    Show channel key status and configuration.
+
+    Examples:
+
+        stegasoo channel status
+
+        stegasoo --json channel status
+    """
+    from .channel import get_channel_status
+
+    status = get_channel_status()
+
+    if ctx.obj.get("json"):
+        click.echo(json.dumps(status, indent=2))
+    else:
+        click.echo(f"Mode: {status['mode'].upper()}")
+        if status["configured"]:
+            click.echo(f"Fingerprint: {status['fingerprint']}")
+            click.echo(f"Source: {status['source']}")
+        else:
+            click.echo("No channel key configured")
+            click.echo()
+            click.echo("To set up a channel key:")
+            click.echo("  stegasoo channel generate --save")
+
+
+@channel.command("qr")
+@click.option("--key", "explicit_key", help="Generate QR for this key instead of configured one")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["ascii", "png"]),
+    default="ascii",
+    help="Output format (default: ascii)",
+)
+@click.option("-o", "--output", type=click.Path(), help="Output file (PNG format, or - for stdout)")
+@click.pass_context
+def channel_qr(ctx, explicit_key, output_format, output):
+    """
+    Display channel key as QR code.
+
+    Examples:
+
+        stegasoo channel qr
+
+        stegasoo channel qr -o channel-key.png
+
+        stegasoo channel qr --format png -o - > key.png
+    """
+    import sys
+
+    from .channel import format_channel_key, get_channel_key, validate_channel_key
+
+    # Get the key to display
+    if explicit_key:
+        if not validate_channel_key(explicit_key):
+            click.echo("Error: Invalid channel key format", err=True)
+            raise SystemExit(1)
+        key = format_channel_key(explicit_key)
+    else:
+        key = get_channel_key()
+        if not key:
+            click.echo("Error: No channel key configured", err=True)
+            click.echo("Generate one with: stegasoo channel generate", err=True)
+            raise SystemExit(1)
+
+    # Import qrcode
+    try:
+        import qrcode
+    except ImportError:
+        click.echo("Error: qrcode library not installed", err=True)
+        click.echo("Install with: pip install qrcode[pil]", err=True)
+        raise SystemExit(1)
+
+    # Determine output mode
+    if output:
+        output_format = "png"  # Force PNG when output file specified
+
+    if output_format == "png":
+        # Generate PNG QR code (requires Pillow)
+        try:
+            import PIL  # noqa: F401 - check Pillow is available
+        except ImportError:
+            click.echo("Error: PIL/Pillow not installed for PNG output", err=True)
+            click.echo("Install with: pip install Pillow", err=True)
+            raise SystemExit(1)
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(key)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        if output == "-":
+            # Write to stdout
+            img.save(sys.stdout.buffer, format="PNG")
+        elif output:
+            # Write to file
+            img.save(output)
+            click.echo(f"Saved QR code to: {output}", err=True)
+        else:
+            # No output specified but PNG format requested - error
+            click.echo("Error: PNG format requires -o/--output", err=True)
+            raise SystemExit(1)
+
+    else:
+        # ASCII output to terminal
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=1,
+            border=2,
+        )
+        qr.add_data(key)
+        qr.make(fit=True)
+
+        click.echo()
+        click.echo(f"Channel Key: {key}")
+        click.echo()
+        qr.print_ascii(invert=True)
+        click.echo()
+        click.echo("Scan this QR code to share the channel key.")
+
+
+@channel.command("clear")
+@click.option("--project", is_flag=True, help="Only clear project config")
+@click.option("--user", is_flag=True, help="Only clear user config")
+@click.pass_context
+def channel_clear(ctx, project, user):
+    """
+    Remove channel key configuration.
+
+    Examples:
+
+        stegasoo channel clear
+
+        stegasoo channel clear --project
+
+        stegasoo channel clear --user
+    """
+    from .channel import clear_channel_key
+
+    if project and user:
+        location = "all"
+    elif project:
+        location = "project"
+    elif user:
+        location = "user"
+    else:
+        location = "all"
+
+    deleted = clear_channel_key(location)
+
+    if ctx.obj.get("json"):
+        click.echo(json.dumps({"deleted": [str(p) for p in deleted]}))
+    else:
+        if deleted:
+            click.echo(f"Removed channel key from: {', '.join(str(p) for p in deleted)}")
+        else:
+            click.echo("No channel key files found")
+
+
 def main():
     """Entry point for CLI."""
     cli(obj={})

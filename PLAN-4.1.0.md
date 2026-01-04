@@ -8,7 +8,7 @@ Version 4.1.0 is a feature release focusing on small-group deployment improvemen
 
 1. ~~**Multi-User Support** - Admin can create up to 16 users for shared deployments~~ ✅ DONE
 2. **Channel Key QR** - Easy visual sharing of channel keys via QR codes
-3. **CLI Channel Commands** - Manage channel keys from command line
+3. ~~**CLI Channel Commands** - Manage channel keys from command line~~ ✅ DONE
 4. **Advanced Tools** - Image/stego utilities (TBD)
 
 ---
@@ -426,6 +426,6 @@ Or simpler: detect on startup, update schema automatically (current pattern).
 ## Progress
 
 - [x] Multi-User Support (commit 7b33501)
-- [ ] Channel Key QR
-- [ ] CLI Channel Commands
+- [ ] Channel Key QR (Web UI)
+- [x] CLI Channel Commands
 - [ ] Advanced Tools
