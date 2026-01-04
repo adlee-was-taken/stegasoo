@@ -25,6 +25,45 @@
                         <i class="bi bi-people me-2"></i>Manage Users
                     </a>
                 </div>
+
+                <!-- Recovery Key Management (Admin only) -->
+                <div class="card bg-dark mb-4">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-shield-lock me-2"></i>
+                                <strong>Recovery Key</strong>
+                                {% if has_recovery %}
+                                <span class="badge bg-success ms-2">Configured</span>
+                                {% else %}
+                                <span class="badge bg-secondary ms-2">Not Set</span>
+                                {% endif %}
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('regenerate_recovery') }}" class="btn btn-outline-warning"
+                                   onclick="return confirm('Generate a new recovery key? This will invalidate any existing key.')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>
+                                    {{ 'Regenerate' if has_recovery else 'Generate' }}
+                                </a>
+                                {% if has_recovery %}
+                                <form method="POST" action="{{ url_for('disable_recovery') }}" style="display:inline;">
+                                    <button type="submit" class="btn btn-outline-danger"
+                                            onclick="return confirm('Disable recovery? If you forget your password, you will NOT be able to recover your account.')">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            {% if has_recovery %}
+                            Allows password reset if you're locked out.
+                            {% else %}
+                            No recovery option - most secure, but no password reset possible.
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
                 {% endif %}
 
                 <h6 class="text-muted mb-3">Change Password</h6>

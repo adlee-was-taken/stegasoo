@@ -5,6 +5,38 @@ All notable changes to Stegasoo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [4.1.0] - 2026-01-04
+
+### Added
+- **Admin Recovery System**: Password reset for locked-out admins
+  - Recovery key generated during setup (32-char alphanumeric)
+  - Multiple backup options: text file, QR code, stego image
+  - QR codes obfuscated (XOR'd with magic header hash)
+  - Stego backups hide key in an image using Stegasoo itself
+  - CLI: `stegasoo admin recover --db path/to/db`
+- **EXIF Editor**: Full metadata editing in Tools page
+  - View all EXIF fields from uploaded image
+  - Inline editing of individual fields
+  - Clear all metadata with one click
+  - Download cleaned image
+  - CLI: `stegasoo tools exif image.jpg [--clear] [--set Field=Value]`
+- **Multi-User Support**: Admin can create up to 16 additional users
+  - Role-based access control (admin/user)
+  - Admin user management page
+  - Temp password generation for new users
+- **Saved Channel Keys**: Users can save/manage channel keys in account page
+
+### Changed
+- **Architecture**: Consolidated `resolve_channel_key()` to library layer
+  - Single source of truth in `src/stegasoo/channel.py`
+  - CLI, API, WebUI now use thin wrappers
+- **DCT Pre-Check**: Fail fast with helpful error before expensive encoding
+- **Toast Notifications**: Auto-dismiss after 20 seconds with fade animation
+- `RECOVERY_OBFUSCATION_KEY` constant added to `constants.py`
+
+### Fixed
+- DCT payload size error now caught early with clear message
+
 ## [4.0.2] - 2026-01-02
 
 ### Added

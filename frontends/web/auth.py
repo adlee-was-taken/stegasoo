@@ -94,8 +94,9 @@ def init_db():
         # Fresh install - create new schema
         _create_schema(db)
     else:
-        # Existing install - check for new tables (channel_keys migration)
+        # Existing install - check for new tables (migrations)
         _ensure_channel_keys_table(db)
+        _ensure_app_settings_table(db)
 
 
 def _create_schema(db: sqlite3.Connection):
@@ -125,6 +126,15 @@ def _create_schema(db: sqlite3.Connection):
         );
 
         CREATE INDEX IF NOT EXISTS idx_channel_keys_user ON user_channel_keys(user_id);
+
+        -- App-level settings (v4.1.0)
+        -- Stores recovery key hash and other instance-wide settings
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     db.commit()
 
@@ -175,6 +185,131 @@ def _ensure_channel_keys_table(db: sqlite3.Connection):
             CREATE INDEX IF NOT EXISTS idx_channel_keys_user ON user_channel_keys(user_id);
         """)
         db.commit()
+
+
+def _ensure_app_settings_table(db: sqlite3.Connection):
+    """Ensure app_settings table exists (v4.1.0 migration)."""
+    cursor = db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+    )
+    if cursor.fetchone() is None:
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        db.commit()
+
+
+# =============================================================================
+# App Settings (v4.1.0)
+# =============================================================================
+
+
+def get_app_setting(key: str) -> str | None:
+    """Get an app-level setting value."""
+    db = get_db()
+    row = db.execute(
+        "SELECT value FROM app_settings WHERE key = ?", (key,)
+    ).fetchone()
+    return row["value"] if row else None
+
+
+def set_app_setting(key: str, value: str) -> None:
+    """Set an app-level setting value."""
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
+        """,
+        (key, value, value),
+    )
+    db.commit()
+
+
+def delete_app_setting(key: str) -> bool:
+    """Delete an app-level setting. Returns True if deleted."""
+    db = get_db()
+    cursor = db.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+    db.commit()
+    return cursor.rowcount > 0
+
+
+# =============================================================================
+# Recovery Key Management (v4.1.0)
+# =============================================================================
+
+
+# Setting key for recovery hash
+RECOVERY_KEY_SETTING = "recovery_key_hash"
+
+
+def has_recovery_key() -> bool:
+    """Check if a recovery key has been configured."""
+    return get_app_setting(RECOVERY_KEY_SETTING) is not None
+
+
+def get_recovery_key_hash() -> str | None:
+    """Get the stored recovery key hash."""
+    return get_app_setting(RECOVERY_KEY_SETTING)
+
+
+def set_recovery_key_hash(key_hash: str) -> None:
+    """Store a recovery key hash."""
+    set_app_setting(RECOVERY_KEY_SETTING, key_hash)
+
+
+def clear_recovery_key() -> bool:
+    """Remove the recovery key. Returns True if removed."""
+    return delete_app_setting(RECOVERY_KEY_SETTING)
+
+
+def verify_and_reset_admin_password(recovery_key: str, new_password: str) -> tuple[bool, str]:
+    """
+    Verify recovery key and reset the first admin's password.
+
+    Args:
+        recovery_key: User-provided recovery key
+        new_password: New password to set
+
+    Returns:
+        (success, message) tuple
+    """
+    from stegasoo.recovery import verify_recovery_key
+
+    stored_hash = get_recovery_key_hash()
+    if not stored_hash:
+        return False, "No recovery key configured for this instance"
+
+    if not verify_recovery_key(recovery_key, stored_hash):
+        return False, "Invalid recovery key"
+
+    # Find first admin user
+    db = get_db()
+    admin = db.execute(
+        "SELECT id, username FROM users WHERE role = 'admin' ORDER BY id LIMIT 1"
+    ).fetchone()
+
+    if not admin:
+        return False, "No admin user found"
+
+    # Reset password
+    new_hash = ph.hash(new_password)
+    db.execute(
+        "UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_hash, admin["id"]),
+    )
+    db.commit()
+
+    # Invalidate all sessions for this user
+    invalidate_user_sessions(admin["id"])
+
+    return True, f"Password reset for '{admin['username']}'"
 
 
 # =============================================================================

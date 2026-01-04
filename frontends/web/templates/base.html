@@ -72,7 +72,7 @@
         <div class="toast-container position-fixed end-0 p-3" style="z-index: 1100; top: 70px;">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% for category, message in messages %}
-                    <div class="toast show align-items-center text-bg-{{ 'danger' if category == 'error' else ('warning' if category == 'warning' else 'success') }} border-0" role="alert" data-bs-autohide="true" data-bs-delay="4000">
+                    <div class="toast show align-items-center text-bg-{{ 'danger' if category == 'error' else ('warning' if category == 'warning' else 'success') }} border-0 fade" role="alert" data-bs-autohide="true" data-bs-delay="20000">
                         <div class="d-flex">
                             <div class="toast-body">
                                 <i class="bi bi-{{ 'exclamation-triangle' if category == 'error' else ('exclamation-circle' if category == 'warning' else 'check-circle') }} me-2"></i>

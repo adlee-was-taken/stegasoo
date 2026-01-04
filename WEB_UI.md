@@ -1,18 +1,22 @@
-# Stegasoo Web UI Documentation (v4.0.2)
+# Stegasoo Web UI Documentation (v4.1.0)
 
 Complete guide for the Stegasoo web-based steganography interface.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [What's New in v4.0.2](#whats-new-in-v402)
+- [What's New in v4.1.0](#whats-new-in-v410)
 - [Authentication & HTTPS](#authentication--https)
+- [Admin Recovery](#admin-recovery)
+- [Multi-User Support](#multi-user-support)
 - [Installation & Setup](#installation--setup)
 - [Pages & Features](#pages--features)
   - [Home Page](#home-page)
   - [Generate Credentials](#generate-credentials)
   - [Encode Message](#encode-message)
   - [Decode Message](#decode-message)
+  - [Tools Page](#tools-page)
+  - [Account Page](#account-page)
   - [About Page](#about-page)
 - [Embedding Modes](#embedding-modes)
   - [DCT Mode (Default)](#dct-mode-default)
@@ -54,9 +58,29 @@ Built with Flask, Bootstrap 5, and a modern dark theme.
 
 ---
 
+## What's New in v4.1.0
+
+Version 4.1.0 adds admin recovery, multi-user support, and new tools:
+
+| Feature | Description |
+|---------|-------------|
+| **Admin Recovery** | Password reset using secure recovery key |
+| **Multi-User Support** | Up to 16 users with role-based access |
+| **EXIF Editor** | View, edit, and strip image metadata |
+| **Saved Channel Keys** | Users can save/manage channel keys in account |
+| **Toast Improvements** | Auto-dismiss after 20 seconds with fade |
+
+**Key benefits:**
+- ✅ Never get locked out - recovery key backup options
+- ✅ Share access with team members (admin/user roles)
+- ✅ Full EXIF metadata control in Tools page
+- ✅ Persistent channel key storage per user
+
+---
+
 ## What's New in v4.0.2
 
-Version 4.0.2 adds authentication and HTTPS support for secure home network deployment:
+Version 4.0.2 added authentication and HTTPS support:
 
 | Feature | Description |
 |---------|-------------|
@@ -64,14 +88,6 @@ Version 4.0.2 adds authentication and HTTPS support for secure home network depl
 | **First-run setup** | Wizard to create admin account on first access |
 | **Account management** | Change password page |
 | **Optional HTTPS** | Auto-generated self-signed certificates |
-| **UI improvements** | Larger QR previews, consistent panel styling |
-
-**Key benefits:**
-- ✅ Secure your Web UI with username/password
-- ✅ No manual database setup - automatic on first run
-- ✅ HTTPS with auto-generated certs for home networks
-- ✅ Configurable via environment variables
-- ✅ Improved readability of QR preview panels
 
 ---
 
@@ -179,6 +195,133 @@ services:
 - Single admin user only (no registration)
 - Session-based authentication using Flask sessions
 - Database stored in `instance/stegasoo.db` (add to `.gitignore`)
+
+---
+
+## Admin Recovery
+
+### Overview
+
+If you forget your admin password, the recovery key is the ONLY way to reset it. Generate and save your recovery key immediately after setup.
+
+### Recovery Key Format
+
+```
+XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+└──────────────────────────────────────┘
+  32 alphanumeric characters (8 groups of 4)
+```
+
+### Backup Options
+
+The recovery key can be saved in multiple ways:
+
+| Method | Description | Security Level |
+|--------|-------------|----------------|
+| **Text file** | Plain text download | Low - store securely |
+| **QR code** | Obfuscated PNG image | Medium - XOR'd with magic hash |
+| **Stego image** | Hidden in carrier image | High - requires original image |
+
+### Generating a Recovery Key
+
+**During first-run setup:**
+1. Complete the admin account wizard
+2. You'll be prompted to save your recovery key
+3. Choose backup method(s)
+4. Confirm you've saved the key
+
+**From Account page (admin only):**
+1. Navigate to `/account`
+2. Click "Generate Recovery Key" (or "Regenerate" if one exists)
+3. Save using your preferred method
+4. Check the confirmation box
+5. Click "Save New Key"
+
+### QR Code Obfuscation
+
+QR codes are not plain text - they're XOR'd with a fixed obfuscation key derived from Stegasoo's magic headers. This prevents casual scanning from revealing the key.
+
+### Stego Backup
+
+Hide your recovery key inside an image using Stegasoo itself:
+
+1. Upload a carrier image (JPG/PNG, 50KB-2MB)
+2. Click the "Stego" button
+3. Download the stego image
+4. **Important:** Keep the original carrier image - you'll need it for extraction
+
+### Recovering Your Password
+
+**URL:** `/recover`
+
+1. Navigate to the login page
+2. Click "Forgot password?"
+3. **Option A:** Enter recovery key directly
+4. **Option B:** Extract from stego backup:
+   - Expand "Extract from stego backup"
+   - Upload your stego backup image
+   - Upload the original carrier/reference image
+   - Click "Extract Key"
+5. Enter and confirm your new password
+6. Click "Reset Password"
+
+### CLI Recovery
+
+For locked-out scenarios where you can't access the web UI:
+
+```bash
+stegasoo admin recover --db frontends/web/instance/stegasoo.db
+```
+
+You'll be prompted for your recovery key and new password.
+
+### Important Notes
+
+- Recovery keys are instance-bound (tied to the specific database)
+- Regenerating a key invalidates the previous one
+- Store backups in a secure, separate location
+- Without a recovery key, the only option is to delete the database and reconfigure
+
+---
+
+## Multi-User Support
+
+### Overview
+
+Admins can create up to 16 additional users with role-based access control.
+
+### Roles
+
+| Role | Permissions |
+|------|-------------|
+| **Admin** | Full access: encode, decode, generate, tools, user management, recovery |
+| **User** | Standard access: encode, decode, generate, account settings |
+
+### User Management
+
+**URL:** `/admin/users` (admin only)
+
+#### Creating Users
+
+1. Click "Add User"
+2. Enter username
+3. Select role (admin/user)
+4. A temporary password is generated
+5. Share the temporary password securely with the new user
+6. User must change password on first login
+
+#### Managing Users
+
+- View all users and their roles
+- Reset user passwords (generates new temp password)
+- Change user roles
+- Delete users (except yourself)
+
+### User Limits
+
+- Maximum 16 users total (including admin)
+- At least one admin must exist
+- Users can't delete or demote the last admin
 
 ---
 
@@ -549,6 +692,83 @@ If decryption fails:
 
 ---
 
+### Tools Page
+
+**URL:** `/tools`
+
+The Tools page provides utilities for image analysis and manipulation.
+
+#### EXIF Editor
+
+View and edit image metadata (EXIF data).
+
+**Features:**
+- View all EXIF fields from uploaded image
+- Inline editing of individual fields
+- Clear all metadata with one click
+- Download cleaned image
+
+**Usage:**
+1. Upload an image (JPG recommended - richest EXIF data)
+2. View all metadata fields in a table
+3. Click any field to edit its value
+4. Click "Save" to apply changes
+5. Use "Clear All" to strip all metadata
+6. Download the modified image
+
+**Common EXIF fields:**
+| Field | Description |
+|-------|-------------|
+| Make/Model | Camera manufacturer and model |
+| DateTime | When the photo was taken |
+| GPSLatitude/GPSLongitude | Location coordinates |
+| Software | Editing software used |
+| Artist | Photographer name |
+
+**Privacy tip:** Always strip EXIF data before sharing images publicly to remove location and device information.
+
+#### Peek (Stego Detection)
+
+Quickly check if an image contains hidden data.
+
+#### Strip Metadata
+
+Remove all metadata from an image in one click.
+
+---
+
+### Account Page
+
+**URL:** `/account`
+
+Manage your account settings and preferences.
+
+#### Password Change
+
+1. Enter current password
+2. Enter new password (minimum 8 characters)
+3. Confirm new password
+4. Click "Change Password"
+
+#### Saved Channel Keys (v4.1.0)
+
+Users can save frequently-used channel keys for quick access:
+
+1. Click "Add Channel Key"
+2. Enter a name/label for the key
+3. Paste the channel key
+4. Click "Save"
+
+Saved keys appear in a dropdown during encode/decode operations.
+
+#### Recovery Key Management (Admin only)
+
+- View recovery key status (configured/not configured)
+- Generate or regenerate recovery key
+- Download backup options (text, QR, stego)
+
+---
+
 ### About Page
 
 **URL:** `/about`
@@ -556,10 +776,10 @@ If decryption fails:
 Information about the Stegasoo project, security model, and credits.
 
 Includes:
-- Version information (v3.3.0)
-- Recent UI improvements
+- Version information (v4.1.0)
+- Feature highlights
 - Security model overview
-- Dependency status (Argon2, QR code support)
+- Dependency status (Argon2, scipy/DCT, QR code support)
 
 ---
 

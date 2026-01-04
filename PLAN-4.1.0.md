@@ -481,3 +481,58 @@ Reviewed modules for consistency with Library → CLI → API → WebUI pattern:
 | generate | ✓ | ✓ | - | ✓ | CLI has `stegasoo generate` |
 
 Priority order: Developer/CLI → API integrator → WebUI end-user
+
+---
+
+## Admin Recovery System (4.1.0) ✅ DONE
+
+Password reset capability for locked-out admins with multiple backup options.
+
+### Library Layer (`src/stegasoo/recovery.py`)
+
+```python
+# Key generation and validation
+generate_recovery_key() -> str       # XXXX-XXXX-XXXX-... (32 chars)
+hash_recovery_key(key) -> str        # SHA-256 for storage
+verify_recovery_key(key, hash) -> bool
+
+# QR code (obfuscated - scans as gibberish)
+obfuscate_key(key) -> str            # XOR with RECOVERY_OBFUSCATION_KEY
+deobfuscate_key(data) -> str | None
+generate_recovery_qr(key) -> bytes   # PNG with obfuscated data
+extract_key_from_qr(image) -> str | None
+
+# Stego backup (hide key in an image)
+create_stego_backup(key, carrier_image) -> bytes
+extract_stego_backup(stego_image, reference) -> str | None
+```
+
+### Database (`app_settings` table)
+
+- `recovery_key_hash` - SHA-256 of recovery key (or null if disabled)
+
+### Web Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/setup/recovery` | GET, POST | Step 2 of initial setup |
+| `/recover` | GET, POST | Password reset page |
+| `/recover/stego` | POST | Extract key from stego backup |
+| `/account/recovery/regenerate` | GET, POST | Generate new key |
+| `/account/recovery/disable` | POST | Remove recovery option |
+| `/account/recovery/stego-backup` | POST | Create stego backup |
+
+### CLI Commands
+
+```bash
+stegasoo admin recover --db path/to/stegasoo.db  # Reset password
+stegasoo admin generate-key [--qr]               # Generate key (reference)
+```
+
+### Security Model
+
+1. Recovery key shown once during setup - only hash stored
+2. QR codes XOR'd with `RECOVERY_OBFUSCATION_KEY` (fixed in constants.py)
+3. Stego backups use fixed internal passphrase/PIN - security is obscurity
+4. Instance-bound: recovery key hash must match in target database
+5. Options: text file, QR image, stego image, or no recovery (most secure)

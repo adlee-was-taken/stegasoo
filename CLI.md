@@ -1,11 +1,11 @@
-# Stegasoo CLI Documentation (v4.0.2)
+# Stegasoo CLI Documentation (v4.1.0)
 
 Complete command-line interface reference for Stegasoo steganography operations.
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [What's New in v4.0.0](#whats-new-in-v400)
+- [What's New in v4.1.0](#whats-new-in-v410)
 - [Quick Start](#quick-start)
 - [Commands](#commands)
   - [generate](#generate-command)
@@ -13,10 +13,11 @@ Complete command-line interface reference for Stegasoo steganography operations.
   - [decode](#decode-command)
   - [verify](#verify-command)
   - [channel](#channel-command)
+  - [admin](#admin-command)
+  - [tools](#tools-command)
   - [info](#info-command)
   - [compare](#compare-command)
   - [modes](#modes-command)
-  - [strip-metadata](#strip-metadata-command)
 - [Channel Keys](#channel-keys)
 - [Embedding Modes](#embedding-modes)
 - [Security Factors](#security-factors)
@@ -65,9 +66,28 @@ stegasoo channel show
 
 ---
 
+## What's New in v4.1.0
+
+Version 4.1.0 adds **admin recovery** and **tools** commands:
+
+| Feature | Description |
+|---------|-------------|
+| Admin recovery | Reset admin password using recovery key |
+| EXIF tools | View, edit, and strip image metadata |
+| Peek tool | Quick stego detection check |
+| Strip tool | Remove hidden data from images |
+
+**New commands:**
+- `stegasoo admin recover` - Reset admin password with recovery key
+- `stegasoo tools exif` - View/edit EXIF metadata
+- `stegasoo tools peek` - Check for hidden data
+- `stegasoo tools strip` - Remove stego data from image
+
+---
+
 ## What's New in v4.0.0
 
-Version 4.0.0 adds **channel key** support for deployment/group isolation:
+Version 4.0.0 added **channel key** support for deployment/group isolation:
 
 | Feature | Description |
 |---------|-------------|
@@ -75,14 +95,6 @@ Version 4.0.0 adds **channel key** support for deployment/group isolation:
 | Deployment isolation | Different deployments can't read each other's messages |
 | CLI management | New `stegasoo channel` command group |
 | Flexible override | Use server config, explicit key, or public mode |
-
-**Key benefits:**
-- ✅ Isolate messages between teams, deployments, or groups
-- ✅ Same credentials can't decode messages from different channels
-- ✅ Backward compatible (public mode = no channel key)
-- ✅ Easy key distribution via environment variables or config files
-
-**Breaking change:** v4.0.0 messages (with channel key) cannot be decoded by v3.x installations.
 
 ---
 
@@ -495,12 +507,150 @@ Now also displays channel key status.
 
 ---
 
-### Strip-Metadata Command
+### Admin Command
 
-Remove all metadata from an image.
+Manage Web UI admin accounts and recovery.
+
+#### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `recover` | Reset admin password using recovery key |
+
+#### admin recover
+
+Reset the admin password for a Web UI database.
 
 ```bash
-stegasoo strip-metadata IMAGE [OPTIONS]
+stegasoo admin recover --db PATH [OPTIONS]
+```
+
+| Option | Short | Type | Required | Description |
+|--------|-------|------|----------|-------------|
+| `--db` | `-d` | path | ✓ | Path to stegasoo.db file |
+| `--key` | `-k` | string | | Recovery key (prompted if not provided) |
+| `--password` | `-p` | string | | New password (prompted if not provided) |
+
+**Examples:**
+
+```bash
+# Interactive mode (prompts for key and password)
+stegasoo admin recover --db frontends/web/instance/stegasoo.db
+
+# Non-interactive mode
+stegasoo admin recover \
+  --db /path/to/stegasoo.db \
+  --key "XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" \
+  --password "NewSecurePassword123"
+```
+
+**Recovery process:**
+1. The recovery key is verified against the database hash
+2. If valid, the admin password is reset
+3. User can now log in with the new password
+
+**Note:** Recovery keys are instance-bound. A key from one database won't work on another.
+
+---
+
+### Tools Command
+
+Image utilities and analysis tools.
+
+#### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `exif` | View/edit EXIF metadata |
+| `peek` | Check for hidden data |
+| `strip` | Remove stego data from image |
+
+#### tools exif
+
+View and edit EXIF metadata in images.
+
+```bash
+stegasoo tools exif IMAGE [OPTIONS]
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--clear` | flag | Remove all EXIF metadata |
+| `--set FIELD=VALUE` | string | Set a specific EXIF field |
+| `--output` / `-o` | path | Output filename (default: overwrites input) |
+| `--json` | flag | Output as JSON |
+
+**Examples:**
+
+```bash
+# View all EXIF data
+stegasoo tools exif photo.jpg
+
+# View as JSON
+stegasoo tools exif photo.jpg --json
+
+# Clear all metadata
+stegasoo tools exif photo.jpg --clear -o clean.jpg
+
+# Set specific fields
+stegasoo tools exif photo.jpg \
+  --set "Artist=John Doe" \
+  --set "Copyright=2026" \
+  -o tagged.jpg
+
+# Remove GPS data only
+stegasoo tools exif photo.jpg \
+  --set "GPSLatitude=" \
+  --set "GPSLongitude=" \
+  -o no-gps.jpg
+```
+
+#### tools peek
+
+Check if an image contains hidden Stegasoo data.
+
+```bash
+stegasoo tools peek IMAGE [OPTIONS]
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--json` | flag | Output as JSON |
+| `--quiet` / `-q` | flag | Exit code only (0=found, 1=not found) |
+
+**Examples:**
+
+```bash
+# Check for hidden data
+stegasoo tools peek suspicious.png
+
+# Script-friendly check
+if stegasoo tools peek image.png -q; then
+  echo "Contains hidden data"
+fi
+```
+
+#### tools strip
+
+Remove hidden stego data from an image (destructive).
+
+```bash
+stegasoo tools strip IMAGE [OPTIONS]
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `--output` / `-o` | path | Output filename |
+| `--force` / `-f` | flag | Overwrite without confirmation |
+
+**Examples:**
+
+```bash
+# Strip and save to new file
+stegasoo tools strip stego.png -o clean.png
+
+# Strip in place (with confirmation)
+stegasoo tools strip stego.png
 ```
 
 ---

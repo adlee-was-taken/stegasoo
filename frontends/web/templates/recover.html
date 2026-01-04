@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Password Recovery - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header text-center">
+                <i class="bi bi-shield-lock fs-1 d-block mb-2"></i>
+                <h5 class="mb-0">Password Recovery</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted text-center mb-4">
+                    Enter your recovery key to reset your admin password.
+                </p>
+
+                <!-- Extract from Stego Backup -->
+                <div class="accordion mb-3" id="stegoAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#stegoExtract">
+                                <i class="bi bi-incognito me-2"></i>
+                                <small>Extract from stego backup</small>
+                            </button>
+                        </h2>
+                        <div id="stegoExtract" class="accordion-collapse collapse"
+                             data-bs-parent="#stegoAccordion">
+                            <div class="accordion-body py-2">
+                                <form method="POST" action="{{ url_for('recover_from_stego') }}"
+                                      enctype="multipart/form-data">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Stego Image</label>
+                                        <input type="file" name="stego_image"
+                                               class="form-control form-control-sm"
+                                               accept="image/*" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Original Reference</label>
+                                        <input type="file" name="reference_image"
+                                               class="form-control form-control-sm"
+                                               accept="image/*" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="bi bi-unlock me-1"></i> Extract Key
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('recover') }}" id="recoverForm">
+                    <!-- Recovery Key Input -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-key-fill me-1"></i> Recovery Key
+                        </label>
+                        <textarea name="recovery_key" class="form-control font-monospace"
+                                  rows="2" required
+                                  placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                                  style="font-size: 0.9em;">{{ prefilled_key or '' }}</textarea>
+                        <div class="form-text">
+                            Paste your full recovery key (with or without dashes)
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- New Password -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-lock me-1"></i> New Password
+                        </label>
+                        <div class="input-group">
+                            <input type="password" name="new_password" class="form-control"
+                                   id="passwordInput" required minlength="8">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="togglePassword('passwordInput', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">Minimum 8 characters</div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-lock-fill me-1"></i> Confirm Password
+                        </label>
+                        <div class="input-group">
+                            <input type="password" name="new_password_confirm" class="form-control"
+                                   id="passwordConfirmInput" required minlength="8">
+                            <button class="btn btn-outline-secondary" type="button"
+                                    onclick="togglePassword('passwordConfirmInput', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg me-2"></i>Reset Password
+                    </button>
+                </form>
+
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('login') }}" class="text-muted small">
+                        <i class="bi bi-arrow-left me-1"></i> Back to Login
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-warning mt-4 small">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Note:</strong> This will reset the admin password. If you don't have a valid recovery key,
+            you'll need to delete the database and reconfigure Stegasoo.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script>
+StegasooAuth.initPasswordConfirmation('recoverForm', 'passwordInput', 'passwordConfirmInput');
+</script>
+{% endblock %}

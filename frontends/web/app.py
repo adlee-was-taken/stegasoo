@@ -48,6 +48,9 @@ from auth import (
     get_user_by_id,
     get_user_channel_keys,
     get_username,
+    has_recovery_key,
+    get_recovery_key_hash,
+    clear_recovery_key,
     is_admin,
     is_authenticated,
     login_required,
@@ -55,6 +58,8 @@ from auth import (
     logout_user,
     reset_user_password,
     save_channel_key,
+    set_recovery_key_hash,
+    verify_and_reset_admin_password,
     update_channel_key_last_used,
     update_channel_key_name,
     user_exists,
@@ -1586,7 +1591,7 @@ def logout():
 
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
-    """First-run setup page - create admin account."""
+    """First-run setup page - create admin account (Step 1)."""
     if not app.config.get("AUTH_ENABLED", True):
         return redirect(url_for("index"))
 
@@ -1608,12 +1613,217 @@ def setup():
                 if user:
                     login_user(user)
                     session.permanent = True
-                flash("Admin account created successfully!", "success")
-                return redirect(url_for("index"))
+                # Redirect to recovery key setup (Step 2)
+                return redirect(url_for("setup_recovery"))
             else:
                 flash(message, "error")
 
     return render_template("setup.html")
+
+
+@app.route("/setup/recovery", methods=["GET", "POST"])
+@login_required
+def setup_recovery():
+    """Recovery key setup page (Step 2 of initial setup)."""
+    from stegasoo.recovery import generate_recovery_key, hash_recovery_key, generate_recovery_qr
+    import base64
+
+    # Only allow during initial setup (no recovery key yet, first admin)
+    if has_recovery_key():
+        return redirect(url_for("index"))
+
+    current_user = get_current_user()
+    if current_user.role != "admin":
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "skip":
+            # No recovery key - most secure but no way to recover
+            flash("Setup complete. No recovery key configured.", "warning")
+            return redirect(url_for("index"))
+
+        elif action == "save":
+            # User confirmed they saved the key
+            recovery_key = request.form.get("recovery_key")
+            if recovery_key:
+                key_hash = hash_recovery_key(recovery_key)
+                set_recovery_key_hash(key_hash)
+                flash("Setup complete. Recovery key saved.", "success")
+                return redirect(url_for("index"))
+
+    # Generate a new key to show
+    recovery_key = generate_recovery_key()
+
+    # Generate QR code as base64
+    try:
+        qr_bytes = generate_recovery_qr(recovery_key)
+        qr_base64 = base64.b64encode(qr_bytes).decode("utf-8")
+    except ImportError:
+        qr_base64 = None
+
+    return render_template(
+        "setup_recovery.html",
+        recovery_key=recovery_key,
+        qr_base64=qr_base64,
+    )
+
+
+@app.route("/recover", methods=["GET", "POST"])
+def recover():
+    """Password recovery page - reset password using recovery key."""
+    # Don't show if no recovery key configured
+    if not get_recovery_key_hash():
+        flash("No recovery key configured for this instance", "error")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        recovery_key = request.form.get("recovery_key", "").strip()
+        new_password = request.form.get("new_password", "")
+        new_password_confirm = request.form.get("new_password_confirm", "")
+
+        if not recovery_key:
+            flash("Please enter your recovery key", "error")
+        elif new_password != new_password_confirm:
+            flash("Passwords do not match", "error")
+        elif len(new_password) < 8:
+            flash("Password must be at least 8 characters", "error")
+        else:
+            success, message = verify_and_reset_admin_password(recovery_key, new_password)
+            if success:
+                flash("Password reset successfully. Please login.", "success")
+                return redirect(url_for("login"))
+            else:
+                flash(message, "error")
+
+    return render_template("recover.html")
+
+
+@app.route("/account/recovery/regenerate", methods=["GET", "POST"])
+@login_required
+@admin_required
+def regenerate_recovery():
+    """Generate a new recovery key (replaces existing one)."""
+    from stegasoo.recovery import generate_recovery_key, hash_recovery_key, generate_recovery_qr
+    import base64
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "cancel":
+            flash("Recovery key generation cancelled", "warning")
+            return redirect(url_for("account"))
+
+        elif action == "save":
+            # User confirmed they saved the key
+            recovery_key = request.form.get("recovery_key")
+            if recovery_key:
+                key_hash = hash_recovery_key(recovery_key)
+                set_recovery_key_hash(key_hash)
+                flash("New recovery key saved successfully", "success")
+                return redirect(url_for("account"))
+
+    # Generate a new key to show
+    recovery_key = generate_recovery_key()
+
+    # Generate QR code as base64
+    try:
+        qr_bytes = generate_recovery_qr(recovery_key)
+        qr_base64 = base64.b64encode(qr_bytes).decode("utf-8")
+    except ImportError:
+        qr_base64 = None
+
+    return render_template(
+        "regenerate_recovery.html",
+        recovery_key=recovery_key,
+        qr_base64=qr_base64,
+        has_existing=has_recovery_key(),
+    )
+
+
+@app.route("/account/recovery/disable", methods=["POST"])
+@login_required
+@admin_required
+def disable_recovery():
+    """Disable recovery key (no password reset possible)."""
+    if clear_recovery_key():
+        flash("Recovery key disabled. Password reset is no longer possible.", "warning")
+    else:
+        flash("No recovery key was configured", "error")
+    return redirect(url_for("account"))
+
+
+@app.route("/account/recovery/stego-backup", methods=["POST"])
+@login_required
+@admin_required
+def create_stego_backup():
+    """Create stego backup - hide recovery key in an image."""
+    from stegasoo.recovery import create_stego_backup as make_backup
+
+    recovery_key = request.form.get("recovery_key", "")
+    if not recovery_key:
+        flash("No recovery key provided", "error")
+        return redirect(url_for("regenerate_recovery"))
+
+    if "carrier_image" not in request.files:
+        flash("No image uploaded", "error")
+        return redirect(url_for("regenerate_recovery"))
+
+    carrier_file = request.files["carrier_image"]
+    if not carrier_file.filename:
+        flash("No image selected", "error")
+        return redirect(url_for("regenerate_recovery"))
+
+    try:
+        carrier_data = carrier_file.read()
+        stego_data = make_backup(recovery_key, carrier_data)
+
+        # Return as downloadable PNG
+        buffer = io.BytesIO(stego_data)
+        return send_file(
+            buffer,
+            mimetype="image/png",
+            as_attachment=True,
+            download_name="stegasoo-recovery-backup.png",
+        )
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(url_for("regenerate_recovery"))
+
+
+@app.route("/recover/stego", methods=["POST"])
+def recover_from_stego():
+    """Extract recovery key from stego backup image."""
+    from stegasoo.recovery import extract_stego_backup
+
+    if "stego_image" not in request.files or "reference_image" not in request.files:
+        flash("Both stego image and reference image are required", "error")
+        return redirect(url_for("recover"))
+
+    stego_file = request.files["stego_image"]
+    reference_file = request.files["reference_image"]
+
+    if not stego_file.filename or not reference_file.filename:
+        flash("Both images must be selected", "error")
+        return redirect(url_for("recover"))
+
+    try:
+        stego_data = stego_file.read()
+        reference_data = reference_file.read()
+
+        extracted_key = extract_stego_backup(stego_data, reference_data)
+
+        if extracted_key:
+            # Return the key to pre-fill the recovery form
+            return render_template("recover.html", prefilled_key=extracted_key)
+        else:
+            flash("Could not extract recovery key. Check images are correct.", "error")
+            return redirect(url_for("recover"))
+
+    except Exception as e:
+        flash(f"Extraction failed: {e}", "error")
+        return redirect(url_for("recover"))
 
 
 @app.route("/account", methods=["GET", "POST"])
@@ -1641,6 +1851,7 @@ def account():
         username=current_user.username,
         user=current_user,
         is_admin=current_user.is_admin,
+        has_recovery=has_recovery_key(),
         channel_keys=channel_keys,
         max_channel_keys=MAX_CHANNEL_KEYS,
         can_save_key=can_save_channel_key(current_user.id),

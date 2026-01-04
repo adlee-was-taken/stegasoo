@@ -25,7 +25,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "4.0.2"
+__version__ = "4.1.0"
 
 # ============================================================================
 # FILE FORMAT
@@ -233,6 +233,14 @@ EMBED_MODE_AUTO = "auto"  # Auto-detect on decode
 DCT_MAGIC_HEADER = b"\x89DCT"  # Magic header for DCT mode
 DCT_FORMAT_VERSION = 1
 DCT_STEP_SIZE = 8  # QIM quantization step
+
+# Recovery key obfuscation - FIXED value for admin recovery QR codes
+# SHA256("\x89ST3\x89DCT") - hardcoded so it never changes even if headers are added
+# Used to XOR recovery keys in QR codes so they scan as gibberish
+RECOVERY_OBFUSCATION_KEY = bytes.fromhex(
+    "d6c70bce27780db942562550e9fe1459"
+    "9dfdb8421f5acc79696b05db4e7afbd2"
+)  # 32 bytes
 
 # Valid embedding modes
 VALID_EMBED_MODES = {EMBED_MODE_LSB, EMBED_MODE_DCT}

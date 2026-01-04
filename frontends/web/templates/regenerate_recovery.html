@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Regenerate Recovery Key - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header text-center">
+                <i class="bi bi-arrow-repeat fs-1 d-block mb-2"></i>
+                <h5 class="mb-0">{{ 'Regenerate' if has_existing else 'Generate' }} Recovery Key</h5>
+            </div>
+            <div class="card-body">
+                {% if has_existing %}
+                <!-- Warning for existing key -->
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> Your existing recovery key will be invalidated.
+                    Make sure to save this new key before continuing.
+                </div>
+                {% else %}
+                <!-- Info for first-time setup -->
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>What is a recovery key?</strong><br>
+                    If you forget your admin password, this key is the ONLY way to reset it.
+                </div>
+                {% endif %}
+
+                <!-- Recovery Key Display -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="bi bi-key-fill me-1"></i> Your New Recovery Key
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control font-monospace text-center"
+                               id="recoveryKey" value="{{ recovery_key }}" readonly
+                               style="font-size: 1.1em; letter-spacing: 0.5px;">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="copyToClipboard()" title="Copy to clipboard">
+                            <i class="bi bi-clipboard" id="copyIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- QR Code (if available) -->
+                {% if qr_base64 %}
+                <div class="mb-4 text-center">
+                    <label class="form-label d-block">
+                        <i class="bi bi-qr-code me-1"></i> QR Code
+                    </label>
+                    <img src="data:image/png;base64,{{ qr_base64 }}"
+                         alt="Recovery Key QR Code" class="img-fluid border rounded"
+                         style="max-width: 200px;" id="qrImage">
+                </div>
+                {% endif %}
+
+                <!-- Download Options -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="bi bi-download me-1"></i> Download Options
+                    </label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-outline-primary btn-sm" onclick="downloadTextFile()">
+                            <i class="bi bi-file-text me-1"></i> Text File
+                        </button>
+                        {% if qr_base64 %}
+                        <button class="btn btn-outline-primary btn-sm" onclick="downloadQRImage()">
+                            <i class="bi bi-image me-1"></i> QR Image
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Stego Backup Option -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="bi bi-incognito me-1"></i> Hide in Image
+                    </label>
+                    <form method="POST" action="{{ url_for('create_stego_backup') }}"
+                          enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
+                        <input type="hidden" name="recovery_key" value="{{ recovery_key }}">
+                        <div class="flex-grow-1">
+                            <input type="file" name="carrier_image" class="form-control form-control-sm"
+                                   accept="image/jpeg,image/png" required>
+                            <div class="form-text">JPG/PNG, 50KB-2MB</div>
+                        </div>
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-download me-1"></i> Stego
+                        </button>
+                    </form>
+                </div>
+
+                <hr>
+
+                <!-- Confirmation Form -->
+                <form method="POST" id="recoveryForm">
+                    <input type="hidden" name="recovery_key" value="{{ recovery_key }}">
+
+                    <!-- Confirm checkbox -->
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="confirmSaved"
+                               onchange="updateButtons()">
+                        <label class="form-check-label" for="confirmSaved">
+                            I have saved my recovery key in a secure location
+                        </label>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-between">
+                        <!-- Cancel button -->
+                        <button type="submit" name="action" value="cancel"
+                                class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i> Cancel
+                        </button>
+
+                        <!-- Save button -->
+                        <button type="submit" name="action" value="save"
+                                class="btn btn-primary" id="saveBtn" disabled>
+                            <i class="bi bi-check-lg me-1"></i> Save New Key
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Copy recovery key to clipboard
+function copyToClipboard() {
+    const keyInput = document.getElementById('recoveryKey');
+    navigator.clipboard.writeText(keyInput.value).then(() => {
+        const icon = document.getElementById('copyIcon');
+        icon.className = 'bi bi-clipboard-check';
+        setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 2000);
+    });
+}
+
+// Download as text file
+function downloadTextFile() {
+    const key = document.getElementById('recoveryKey').value;
+    const content = `Stegasoo Recovery Key
+=====================
+
+${key}
+
+IMPORTANT:
+- Keep this file in a secure location
+- Anyone with this key can reset admin passwords
+- Do not store with your password
+
+Generated: ${new Date().toISOString()}
+`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stegasoo-recovery-key.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Download QR as image
+function downloadQRImage() {
+    const img = document.getElementById('qrImage');
+    if (!img) return;
+
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = 'stegasoo-recovery-qr.png';
+    a.click();
+}
+
+// Enable save button when checkbox is checked
+function updateButtons() {
+    const checkbox = document.getElementById('confirmSaved');
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = !checkbox.checked;
+}
+</script>
+{% endblock %}

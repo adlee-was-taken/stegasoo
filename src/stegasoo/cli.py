@@ -964,6 +964,162 @@ def tools_exif(image, clear, set_fields, output, as_json):
             raise click.UsageError(str(e))
 
 
+# =============================================================================
+# ADMIN COMMANDS (Web UI administration)
+# =============================================================================
+
+
+@cli.group()
+@click.pass_context
+def admin(ctx):
+    """Web UI administration commands."""
+    pass
+
+
+@admin.command("recover")
+@click.option(
+    "--db", "db_path",
+    type=click.Path(exists=True),
+    help="Path to stegasoo.db (default: frontends/web/instance/stegasoo.db)"
+)
+@click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True,
+              help="New admin password")
+def admin_recover(db_path, password):
+    """Reset admin password using recovery key.
+
+    Allows password reset for Web UI admin account when locked out.
+    Requires the recovery key that was saved during setup.
+
+    Example:
+
+        stegasoo admin recover --db /path/to/stegasoo.db
+    """
+    import sqlite3
+    from argon2 import PasswordHasher
+    from .recovery import verify_recovery_key
+
+    # Try default paths if not specified
+    if not db_path:
+        candidates = [
+            Path("frontends/web/instance/stegasoo.db"),
+            Path("instance/stegasoo.db"),
+            Path("/app/instance/stegasoo.db"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                db_path = str(candidate)
+                break
+
+    if not db_path or not Path(db_path).exists():
+        raise click.UsageError(
+            "Database not found. Use --db to specify path to stegasoo.db"
+        )
+
+    click.echo(f"Database: {db_path}")
+
+    # Connect and check for recovery key
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+
+    # Get recovery key hash from app_settings
+    cursor = db.execute(
+        "SELECT value FROM app_settings WHERE key = 'recovery_key_hash'"
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        db.close()
+        raise click.ClickException(
+            "No recovery key configured for this instance. "
+            "Password reset is not possible."
+        )
+
+    stored_hash = row["value"]
+
+    # Prompt for recovery key
+    recovery_key = click.prompt(
+        "Enter your recovery key",
+        hide_input=False,  # Recovery keys are meant to be visible
+    )
+
+    # Verify recovery key
+    if not verify_recovery_key(recovery_key, stored_hash):
+        db.close()
+        raise click.ClickException("Invalid recovery key")
+
+    # Validate password
+    if len(password) < 8:
+        db.close()
+        raise click.UsageError("Password must be at least 8 characters")
+
+    # Hash new password with same settings as web UI
+    ph = PasswordHasher(
+        time_cost=3,
+        memory_cost=65536,  # 64MB
+        parallelism=4,
+        hash_len=32,
+        salt_len=16,
+    )
+    new_hash = ph.hash(password)
+
+    # Find and update admin user
+    admin = db.execute(
+        "SELECT id, username FROM users WHERE role = 'admin' ORDER BY id LIMIT 1"
+    ).fetchone()
+
+    if not admin:
+        db.close()
+        raise click.ClickException("No admin user found in database")
+
+    db.execute(
+        "UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_hash, admin["id"]),
+    )
+    db.commit()
+    db.close()
+
+    click.echo(f"\nPassword reset successfully for admin '{admin['username']}'")
+    click.echo("You can now login to the Web UI with your new password.")
+
+
+@admin.command("generate-key")
+@click.option("--qr", "show_qr", is_flag=True, help="Show QR code in terminal (if supported)")
+def admin_generate_key(show_qr):
+    """Generate a new recovery key (for reference only).
+
+    This generates a new random recovery key and displays it.
+    To actually set the recovery key, use the Web UI.
+
+    Example:
+
+        stegasoo admin generate-key
+        stegasoo admin generate-key --qr
+    """
+    from .recovery import generate_recovery_key, get_recovery_fingerprint
+
+    key = generate_recovery_key()
+
+    click.echo("\nNew Recovery Key:")
+    click.echo("─" * 50)
+    click.echo(f"  {key}")
+    click.echo("─" * 50)
+    click.echo(f"Fingerprint: {get_recovery_fingerprint(key)}")
+
+    if show_qr:
+        try:
+            import qrcode
+            qr = qrcode.QRCode(box_size=1, border=1)
+            qr.add_data(key)
+            qr.make()
+            click.echo("\nQR Code:")
+            qr.print_ascii(invert=True)
+        except ImportError:
+            click.echo("\n(qrcode library not installed for terminal QR)")
+
+    click.echo("\nNote: Save this key securely. To set it in the Web UI,")
+    click.echo("go to Account > Recovery Key > Regenerate")
+
+
 def main():
     """Entry point for CLI."""
     cli(obj={})
