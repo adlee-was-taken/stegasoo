@@ -71,27 +71,18 @@ fi
 
 clear
 echo ""
-echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
-echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
-echo -e "${GRAY} . · . · . · . · . · . ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · . · . .${NC}"
-echo -e "${GRAY} · . · . · . · . · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · . · . ·${NC}"
-echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
-echo -e "${GRAY} · .   ${CYAN}___  _____  ___    ___    _    ___    ___    ___${GRAY}    . · . ·${NC}"
-echo -e "${GRAY} . ·  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   · . · ·${NC}"
-echo -e "${GRAY} · .  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   . · . ·${NC}"
-echo -e "${GRAY} . ·  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  · . · ·${NC}"
-echo -e "${GRAY} · .  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  . · . ·${NC}"
-echo -e "${GRAY} . ·  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   · . · ·${NC}"
-echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   . · . ·${NC}"
-echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
-echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} .  *  .   .    *    .   *   .  *   .    *   .${NC}"
+echo -e "${CYAN}   ___  _____  ___    ___    _    ___    ___    ___${NC}"
+echo -e "${CYAN}  / __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${NC}"
+echo -e "${CYAN}  \\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${NC}"
+echo -e "${CYAN}  |___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${NC}"
+echo -e "${GRAY} *    .   *   .    *    .   *   .    *   .   *${NC}"
+echo ""
 if [ "$SOFT_RESET" = true ]; then
-    echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . · ${CYAN}Soft Reset (Factory)${GRAY} · . · . ${CYAN}~~~~${GRAY} · . · . ·${NC}"
+    echo -e "${CYAN}         Soft Reset (Factory)${NC}"
 else
-    echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . ${CYAN}Sanitize for Imaging${GRAY} · . · . · ${CYAN}~~~~${GRAY} · . · . ·${NC}"
+    echo -e "${CYAN}         Sanitize for Imaging${NC}"
 fi
-echo -e "${GRAY} . · . ${CYAN}~~~~${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}~~~~${GRAY} · . · . .${NC}"
-echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo ""
 
 if [ "$SOFT_RESET" = true ]; then
