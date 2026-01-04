@@ -13,8 +13,10 @@
 #   - Stegasoo auth database (users will create their own admin)
 #
 # Usage:
-#   sudo ./sanitize-for-image.sh          # Full sanitize for image distribution
-#   sudo ./sanitize-for-image.sh --soft   # Soft reset (keeps WiFi for testing)
+#   sudo ./sanitize-for-image.sh                 # Full sanitize for image distribution
+#   sudo ./sanitize-for-image.sh --soft          # Soft reset (keeps WiFi for testing)
+#   sudo ./sanitize-for-image.sh --soft --reboot # Soft reset and auto-reboot
+#   sudo ./sanitize-for-image.sh --reboot        # Full sanitize and auto-shutdown
 #
 
 set -e
@@ -28,9 +30,13 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 SOFT_RESET=false
-if [ "$1" = "--soft" ] || [ "$1" = "-s" ]; then
-    SOFT_RESET=true
-fi
+AUTO_REBOOT=false
+for arg in "$@"; do
+    case $arg in
+        --soft|-s) SOFT_RESET=true ;;
+        --reboot|-r) AUTO_REBOOT=true ;;
+    esac
+done
 
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Error: Must run as root (sudo)${NC}"
@@ -71,11 +77,13 @@ else
 fi
 echo ""
 
-read -p "Continue? This cannot be undone! [y/N] " -n 1 -r </dev/tty
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 1
+if [ "$AUTO_REBOOT" = false ]; then
+    read -p "Continue? This cannot be undone! [y/N] " -n 1 -r </dev/tty
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 1
+    fi
 fi
 
 # Track validation results
@@ -356,6 +364,10 @@ if [ "$SOFT_RESET" = true ]; then
     echo -e "${CYAN}Soft reset complete.${NC}"
     echo "You can now reboot to test the first-boot wizard."
     echo ""
+    if [ "$AUTO_REBOOT" = true ]; then
+        echo "Rebooting..."
+        exec reboot
+    fi
     read -p "Reboot now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -371,6 +383,10 @@ else
     echo "     sudo dd if=/dev/sdX of=stegasoo-rpi.img bs=4M status=progress"
     echo "  4. Compress: zstd -19 stegasoo-rpi.img"
     echo ""
+    if [ "$AUTO_REBOOT" = true ]; then
+        echo "Shutting down..."
+        exec shutdown -h now
+    fi
     read -p "Shut down now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
