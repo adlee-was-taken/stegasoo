@@ -765,18 +765,43 @@ const Stegasoo = {
         const customInputId = config.customInputId || 'channelCustomInput';
         const keyInputId = config.keyInputId || 'channelKeyInput';
         const generateBtnId = config.generateBtnId;
+        const serverInfoId = config.serverInfoId || 'channelServerInfo';
 
         const select = document.getElementById(selectId);
         const customInput = document.getElementById(customInputId);
         const keyInput = document.getElementById(keyInputId);
         const generateBtn = generateBtnId ? document.getElementById(generateBtnId) : null;
+        const serverInfo = document.getElementById(serverInfoId);
 
-        // Show/hide custom input based on selection
+        // Show/hide custom input and server info based on selection
         const updateVisibility = () => {
-            const isCustom = select?.value === 'custom';
+            const value = select?.value;
+            const isCustom = value === 'custom';
+            const isPublic = value === 'none';
+            const isAuto = value === 'auto';
+
+            // Custom input visibility
             customInput?.classList.toggle('d-none', !isCustom);
             if (isCustom && keyInput) {
                 keyInput.focus();
+                // Pulse highlight effect
+                customInput?.classList.add('channel-highlight');
+                setTimeout(() => customInput?.classList.remove('channel-highlight'), 400);
+            }
+
+            // Server info: show for auto, hide for custom, show "no key" for public
+            if (serverInfo) {
+                if (isAuto) {
+                    serverInfo.innerHTML = '<i class="bi bi-shield-lock me-1"></i>Server: <code>' + (serverInfo.dataset.fingerprint || '••••-••••-···-••••-••••') + '</code>';
+                    serverInfo.className = 'small text-success mt-2';
+                    serverInfo.classList.remove('d-none');
+                } else if (isPublic) {
+                    serverInfo.innerHTML = '<i class="bi bi-globe me-1"></i>No channel key will be used';
+                    serverInfo.className = 'small text-muted mt-2';
+                    serverInfo.classList.remove('d-none');
+                } else {
+                    serverInfo.classList.add('d-none');
+                }
             }
         };
 
@@ -912,7 +937,8 @@ const Stegasoo = {
         this.initChannelKey({
             selectId: 'channelSelectDec',
             customInputId: 'channelCustomInputDec',
-            keyInputId: 'channelKeyInputDec'
+            keyInputId: 'channelKeyInputDec',
+            serverInfoId: 'channelServerInfoDec'
         });
 
         // Form submission with channel key validation and mode display
