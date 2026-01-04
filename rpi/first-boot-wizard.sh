@@ -138,10 +138,17 @@ echo ""
 
 if gum confirm "Generate a private channel key?" --default=false; then
     echo ""
-    CHANNEL_KEY=$(gum spin --spinner dot --title "Generating channel key..." -- \
-        bash -c "source '$INSTALL_DIR/venv/bin/activate' 2>/dev/null && python -c \"from stegasoo.channel import generate_channel_key; print(generate_channel_key())\"")
+    # Generate key to temp file (gum spin doesn't capture stdout well)
+    KEY_FILE=$(mktemp)
+    ERR_FILE=$(mktemp)
+    gum spin --spinner dot --title "Generating channel key..." -- \
+        bash -c "source '$INSTALL_DIR/venv/bin/activate' 2>'$ERR_FILE' && python -c 'from stegasoo.channel import generate_channel_key; print(generate_channel_key())' > '$KEY_FILE' 2>>'$ERR_FILE'"
 
-    if [ -n "$CHANNEL_KEY" ]; then
+    CHANNEL_KEY=$(cat "$KEY_FILE" 2>/dev/null | head -1)
+    KEY_ERROR=$(cat "$ERR_FILE" 2>/dev/null)
+    rm -f "$KEY_FILE" "$ERR_FILE"
+
+    if [ -n "$CHANNEL_KEY" ] && [[ "$CHANNEL_KEY" =~ ^[A-Za-z0-9] ]]; then
         echo ""
         gum style --foreground 82 "✓ Channel key generated!"
         echo ""
@@ -160,9 +167,15 @@ if gum confirm "Generate a private channel key?" --default=false; then
         echo ""
         gum confirm "I've saved the key" --default=true --affirmative="Continue" --negative=""
     else
-        gum style --foreground 196 "✗ Failed to generate key. Using public mode."
+        gum style --foreground 196 "Failed to generate key. Using public mode."
+        if [ -n "$KEY_ERROR" ]; then
+            echo ""
+            gum style --foreground 245 "Error details:"
+            echo "$KEY_ERROR"
+        fi
         CHANNEL_KEY=""
-        sleep 1
+        echo ""
+        gum confirm "Continue" --default=true --affirmative="OK" --negative=""
     fi
 else
     gum style --foreground 214 "→ Using public mode"
