@@ -261,6 +261,21 @@ STEGASOO_USER=$(stat -c '%U' "$STEGASOO_DIR" 2>/dev/null || echo "pi")
 echo "  Stegasoo directory: $STEGASOO_DIR"
 echo "  Stegasoo user: $STEGASOO_USER"
 
+# Check and repair venv if needed (paths break when moving directories)
+if [ -n "$STEGASOO_DIR" ] && [ -d "$STEGASOO_DIR/venv" ]; then
+    VENV_PYTHON="$STEGASOO_DIR/venv/bin/python"
+    # Check if venv python works and has stegasoo installed
+    if ! "$VENV_PYTHON" -c "import stegasoo" 2>/dev/null; then
+        echo "  Venv broken or stegasoo not installed, rebuilding..."
+        rm -rf "$STEGASOO_DIR/venv"
+        sudo -u "$STEGASOO_USER" python3 -m venv "$STEGASOO_DIR/venv"
+        sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet -e "$STEGASOO_DIR[web]"
+        echo "  Venv rebuilt and stegasoo installed"
+    else
+        echo "  Venv OK"
+    fi
+fi
+
 if [ -n "$STEGASOO_DIR" ] && [ -f "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" ]; then
     # Install the profile.d hook
     cp "$STEGASOO_DIR/rpi/stegasoo-wizard.sh" /etc/profile.d/stegasoo-wizard.sh
