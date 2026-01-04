@@ -38,7 +38,10 @@ gum style \
     --padding "1 2" \
     --margin "1" \
     --align center \
-    "🦕 STEGASOO" \
+    "  ___  _____  ___    ___    _    ___    ___    ___  " \
+    " / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\ " \
+    " \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |" \
+    " |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/ " \
     "" \
     "First Boot Wizard"
 
@@ -279,7 +282,10 @@ gum style \
     --padding "1 2" \
     --margin "1" \
     --align center \
-    "🦕 STEGASOO" \
+    "  ___  _____  ___    ___    _    ___    ___    ___  " \
+    " / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\ " \
+    " \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |" \
+    " |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/ " \
     "" \
     "Setup Complete!"
 
@@ -310,5 +316,5 @@ gum style --foreground 245 \
     "  journalctl -u stegasoo -f        # View logs"
 echo ""
 
-gum style --foreground 212 --bold "Enjoy Stegasoo! 🦕"
+gum style --foreground 212 --bold "Enjoy Stegasoo!"
 echo ""
