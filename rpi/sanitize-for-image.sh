@@ -23,6 +23,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+GRAY='\033[0;90m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 SOFT_RESET=false
@@ -35,23 +37,39 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-BOLD='\033[1m'
+clear
+echo ""
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · . · . .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} · .   ${CYAN}___  _____  ___    ___    _    ___    ___    ___${GRAY}    . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   . · . ·${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+if [ "$SOFT_RESET" = true ]; then
+    echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . · ${CYAN}Soft Reset (Factory)${GRAY} · . · . ${CYAN}~~~~${GRAY} · . · . ·${NC}"
+else
+    echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . ${CYAN}Sanitize for Imaging${GRAY} · . · . · ${CYAN}~~~~${GRAY} · . · . ·${NC}"
+fi
+echo -e "${GRAY} . · . ${CYAN}tail${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}head${GRAY} · . · . .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo ""
 
 if [ "$SOFT_RESET" = true ]; then
-    echo ""
-    echo -e "${BOLD}Soft Reset (Factory Defaults)${NC}"
-    echo -e "${CYAN}-------------------------------------------------------${NC}"
     echo "  WiFi credentials will be KEPT for continued testing."
     echo "  Everything else will be reset to first-boot state."
-    echo ""
 else
-    echo ""
-    echo -e "${BOLD}Sanitize Pi for Image Distribution${NC}"
-    echo -e "${YELLOW}-------------------------------------------------------${NC}"
     echo "  This will remove ALL personal data for imaging."
     echo "  The system will shut down when complete."
-    echo ""
 fi
+echo ""
 
 read -p "Continue? This cannot be undone! [y/N] " -n 1 -r
 echo

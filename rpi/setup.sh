@@ -24,6 +24,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
@@ -33,9 +35,26 @@ PYTHON_VERSION="3.12"
 STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
 JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
 
+clear
 echo ""
-echo -e "${BOLD}Stegasoo Raspberry Pi Setup${NC}"
-echo -e "${BLUE}-------------------------------------------------------${NC}"
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · ${CYAN}/\\\\${GRAY} · . · . · . .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} · .   ${CYAN}___  _____  ___    ___    _    ___    ___    ___${GRAY}    . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   . · . ·${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
+echo -e "${GRAY} · . · ${CYAN}~~~~${GRAY} · . · . · . ${CYAN}Raspberry Pi Setup${GRAY} · . · . · ${CYAN}~~~~${GRAY} · . · . ·${NC}"
+echo -e "${GRAY} . · . ${CYAN}tail${GRAY} · . · . · . · . · . · . · . · . · . · . ${CYAN}head${GRAY} · . · . .${NC}"
+echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
+echo ""
 echo "  This will install Stegasoo with full DCT support"
 echo "  Estimated time: 15-20 minutes on Pi 5"
 echo ""
