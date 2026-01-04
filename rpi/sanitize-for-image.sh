@@ -71,7 +71,7 @@ else
 fi
 echo ""
 
-read -p "Continue? This cannot be undone! [y/N] " -n 1 -r
+read -p "Continue? This cannot be undone! [y/N] " -n 1 -r </dev/tty
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Aborted."
@@ -356,10 +356,10 @@ if [ "$SOFT_RESET" = true ]; then
     echo -e "${CYAN}Soft reset complete.${NC}"
     echo "You can now reboot to test the first-boot wizard."
     echo ""
-    read -p "Reboot now? [y/N] " -n 1 -r
+    read -p "Reboot now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        reboot
+        exec reboot
     fi
 else
     echo "The system is ready for imaging."
@@ -371,9 +371,9 @@ else
     echo "     sudo dd if=/dev/sdX of=stegasoo-rpi.img bs=4M status=progress"
     echo "  4. Compress: zstd -19 stegasoo-rpi.img"
     echo ""
-    read -p "Shut down now? [y/N] " -n 1 -r
+    read -p "Shut down now? [y/N] " -n 1 -r </dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        shutdown -h now
+        exec shutdown -h now
     fi
 fi
