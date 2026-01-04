@@ -26,11 +26,11 @@ if ! command -v gum &>/dev/null; then
     exit 1
 fi
 
-# Gum styling - lime green buttons
+# Gum styling - lime green buttons with white text
 export GUM_CONFIRM_SELECTED_BACKGROUND="82"
-export GUM_CONFIRM_SELECTED_FOREGROUND="0"
-export GUM_CONFIRM_UNSELECTED_BACKGROUND=""
-export GUM_CONFIRM_UNSELECTED_FOREGROUND="245"
+export GUM_CONFIRM_SELECTED_FOREGROUND="232"
+export GUM_CONFIRM_UNSELECTED_BACKGROUND="238"
+export GUM_CONFIRM_UNSELECTED_FOREGROUND="255"
 
 clear
 
