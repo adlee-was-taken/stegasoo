@@ -5,6 +5,7 @@
 #
 # Usage: ./pull-image.sh [output-name] [device]
 #        Output will be: stegasoo-rpi-YYYYMMDD.img.zst (or custom name)
+#        Use .img extension to skip compression: ./pull-image.sh foo.img
 #
 # If device is specified, skips auto-detection (useful for large drives)
 #
@@ -40,9 +41,15 @@ else
 fi
 MANUAL_DEVICE="$2"
 
-# Remove .zst extension for intermediate file
-IMG_FILE="${OUTPUT%.zst}"
-if [[ "$IMG_FILE" == "$OUTPUT" ]]; then
+# Check if output ends in .img (skip compression) or .zst (compress)
+SKIP_COMPRESS=false
+if [[ "$OUTPUT" == *.img ]]; then
+    IMG_FILE="$OUTPUT"
+    SKIP_COMPRESS=true
+elif [[ "$OUTPUT" == *.zst ]]; then
+    IMG_FILE="${OUTPUT%.zst}"
+else
+    # No recognized extension, add .img.zst
     IMG_FILE="${OUTPUT}.img"
     OUTPUT="${OUTPUT}.img.zst"
 fi
@@ -179,12 +186,18 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}[3/3]${NC} Compressing with zstd..."
-pv "$IMG_FILE" | zstd -19 -T0 -q > "$OUTPUT"
-rm -f "$IMG_FILE"
+if [ "$SKIP_COMPRESS" = true ]; then
+    echo -e "${GREEN}[3/3]${NC} Skipping compression (.img output)"
+    FINAL_SIZE=$(du -h "$IMG_FILE" | awk '{print $1}')
+    OUTPUT="$IMG_FILE"
+else
+    echo -e "${GREEN}[3/3]${NC} Compressing with zstd..."
+    pv "$IMG_FILE" | zstd -19 -T0 -q > "$OUTPUT"
+    rm -f "$IMG_FILE"
+    FINAL_SIZE=$(du -h "$OUTPUT" | awk '{print $1}')
+fi
 
 echo ""
-FINAL_SIZE=$(du -h "$OUTPUT" | awk '{print $1}')
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║                    Image Complete!                            ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
