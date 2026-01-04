@@ -121,6 +121,17 @@ EOF
         rm -f "$BOOT_MOUNT/wpa_supplicant.conf" 2>/dev/null || true
         echo "  Removed boot partition WiFi config"
     fi
+
+    # Remove NetworkManager connections (RPi OS Bookworm+)
+    if [ -d /etc/NetworkManager/system-connections ]; then
+        # Remove all WiFi connections (files containing type=wifi)
+        for conn in /etc/NetworkManager/system-connections/*; do
+            if [ -f "$conn" ] && grep -q "type=wifi" "$conn" 2>/dev/null; then
+                rm -f "$conn"
+                echo "  Removed NetworkManager: $(basename "$conn")"
+            fi
+        done
+    fi
 fi
 
 # =============================================================================
@@ -320,7 +331,22 @@ fi
 
 # Check WiFi (only for full sanitize)
 if [ "$SOFT_RESET" = false ]; then
+    WIFI_FOUND=false
+
+    # Check wpa_supplicant
     if grep -q "psk=" /etc/wpa_supplicant/wpa_supplicant.conf 2>/dev/null; then
+        WIFI_FOUND=true
+    fi
+
+    # Check NetworkManager
+    for conn in /etc/NetworkManager/system-connections/*; do
+        if [ -f "$conn" ] && grep -q "type=wifi" "$conn" 2>/dev/null; then
+            WIFI_FOUND=true
+            break
+        fi
+    done
+
+    if [ "$WIFI_FOUND" = true ]; then
         echo -e "  ${RED}[FAIL]${NC} WiFi credentials still present"
         VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
     else
