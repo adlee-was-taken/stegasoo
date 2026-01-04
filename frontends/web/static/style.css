@@ -504,11 +504,11 @@ footer {
 
 /* Enhance the gradient on hover for dramatic effect */
 .card-link:hover .card-header.text-center {
-    background: linear-gradient(135deg, 
-        var(--gradient-start) 0%, 
-        #5a67d8 20%, 
-        var(--gradient-end) 80%, 
-        #8a2be2 100%);
+    background: linear-gradient(135deg,
+        #3d2050 0%,
+        var(--gradient-start) 30%,
+        var(--gradient-end) 70%,
+        #6680e0 100%);
     box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.1);
 }
 
@@ -551,7 +551,7 @@ footer {
 
 .card-link:hover .feature-card {
     transform: translateY(-5px);
-    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 10px 40px rgba(74, 40, 96, 0.4);
 }
 
 /* ----------------------------------------------------------------------------
