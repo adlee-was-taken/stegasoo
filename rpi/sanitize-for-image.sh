@@ -268,7 +268,22 @@ if [ -n "$STEGASOO_DIR" ] && [ -d "$STEGASOO_DIR/venv" ]; then
     if ! "$VENV_PYTHON" -c "import stegasoo" 2>/dev/null; then
         echo "  Venv broken or stegasoo not installed, rebuilding..."
         rm -rf "$STEGASOO_DIR/venv"
-        sudo -u "$STEGASOO_USER" python3 -m venv "$STEGASOO_DIR/venv"
+
+        # Find Python 3.12 (prefer pyenv, fall back to system)
+        USER_HOME=$(eval echo "~$STEGASOO_USER")
+        PYENV_PYTHON="$USER_HOME/.pyenv/versions/3.12*/bin/python"
+        if compgen -G "$PYENV_PYTHON" > /dev/null 2>&1; then
+            PYTHON_BIN=$(ls $PYENV_PYTHON 2>/dev/null | head -1)
+            echo "  Using pyenv Python: $PYTHON_BIN"
+        elif command -v python3.12 &>/dev/null; then
+            PYTHON_BIN="python3.12"
+            echo "  Using system Python 3.12"
+        else
+            PYTHON_BIN="python3"
+            echo "  Warning: Python 3.12 not found, using $($PYTHON_BIN --version)"
+        fi
+
+        sudo -u "$STEGASOO_USER" "$PYTHON_BIN" -m venv "$STEGASOO_DIR/venv"
         sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet -e "$STEGASOO_DIR[web]"
         echo "  Venv rebuilt and stegasoo installed"
     else
