@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Tools - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h4 class="mb-4"><i class="bi bi-tools me-2"></i>Image Security Toolkit</h4>
+
+        <!-- Tool Tabs -->
+        <ul class="nav nav-pills mb-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#capacity" type="button">
+                    <i class="bi bi-rulers me-1"></i>Capacity
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#strip" type="button">
+                    <i class="bi bi-eraser me-1"></i>Strip EXIF
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#peek" type="button">
+                    <i class="bi bi-search me-1"></i>Peek
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+
+            <!-- Capacity Calculator -->
+            <div class="tab-pane fade show active" id="capacity" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Check how much data can be hidden in an image.</p>
+
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="capacityFile" accept="image/*">
+                        </div>
+
+                        <div id="capacityResult" class="d-none">
+                            <table class="table table-sm table-dark mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted">Image</td>
+                                        <td id="capFilename" class="font-monospace"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Dimensions</td>
+                                        <td><span id="capDimensions"></span> (<span id="capMegapixels"></span> MP)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">LSB Capacity</td>
+                                        <td id="capLsb" class="text-success font-monospace"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">DCT Capacity</td>
+                                        <td id="capDct" class="font-monospace"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strip EXIF -->
+            <div class="tab-pane fade" id="strip" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Remove metadata (camera info, GPS, timestamps) from images.</p>
+
+                        <form id="stripForm" action="{{ url_for('api_tools_strip_metadata') }}" method="POST" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <input type="file" class="form-control" name="image" id="stripFile" accept="image/*" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-eraser me-1"></i>Strip & Download
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peek (Header Detection) -->
+            <div class="tab-pane fade" id="peek" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Check if an image contains Stegasoo hidden data (without decrypting).</p>
+
+                        <div class="mb-3">
+                            <input type="file" class="form-control" id="peekFile" accept="image/*">
+                        </div>
+
+                        <div id="peekResult" class="d-none">
+                            <div id="peekFound" class="alert alert-success d-none">
+                                <i class="bi bi-check-circle me-2"></i>
+                                <strong>Stegasoo data detected!</strong>
+                                <br><span class="text-muted">Mode: <span id="peekMode" class="font-monospace"></span></span>
+                            </div>
+                            <div id="peekNotFound" class="alert alert-secondary d-none">
+                                <i class="bi bi-x-circle me-2"></i>
+                                No Stegasoo header detected in this image.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Capacity Calculator
+document.getElementById('capacityFile')?.addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const res = await fetch('/api/tools/capacity', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            document.getElementById('capFilename').textContent = data.filename;
+            document.getElementById('capDimensions').textContent = `${data.width} x ${data.height}`;
+            document.getElementById('capMegapixels').textContent = data.megapixels;
+            document.getElementById('capLsb').textContent = `${data.lsb.capacity_kb.toFixed(1)} KB`;
+            document.getElementById('capDct').textContent = data.dct.available
+                ? `${data.dct.capacity_kb.toFixed(1)} KB`
+                : 'N/A (scipy required)';
+            document.getElementById('capacityResult').classList.remove('d-none');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+// Peek (Header Detection)
+document.getElementById('peekFile')?.addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const res = await fetch('/api/tools/peek', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        document.getElementById('peekResult').classList.remove('d-none');
+
+        if (data.has_stegasoo) {
+            document.getElementById('peekFound').classList.remove('d-none');
+            document.getElementById('peekNotFound').classList.add('d-none');
+            document.getElementById('peekMode').textContent = data.mode?.toUpperCase() || 'Unknown';
+        } else {
+            document.getElementById('peekFound').classList.add('d-none');
+            document.getElementById('peekNotFound').classList.remove('d-none');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+});
+</script>
+{% endblock %}

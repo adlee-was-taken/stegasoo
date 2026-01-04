@@ -426,6 +426,23 @@ Or simpler: detect on startup, update schema automatically (current pattern).
 ## Progress
 
 - [x] Multi-User Support (commit 7b33501)
-- [ ] Channel Key QR (Web UI)
+- [x] Channel Key QR (Web UI) - added QR generator on About page
 - [x] CLI Channel Commands
-- [ ] Advanced Tools
+- [x] Saved Channel Keys (Web UI) - users can save/manage channel keys
+- [ ] Advanced Tools (in progress)
+
+---
+
+## Action Item: Architectural Review
+
+Review other modules for consistency with the Library → CLI → API → WebUI pattern:
+
+| Module | Library | CLI | API | WebUI | Notes |
+|--------|---------|-----|-----|-------|-------|
+| encode | ✓ | ✓ | ✓ | ✓ | Review for consistency |
+| decode | ✓ | ✓ | ✓ | ✓ | Review for consistency |
+| channel | ✓ | ✓ | - | ✓ | Needs API layer? |
+| tools | ✓ | WIP | ✓ | WIP | Building now |
+| generate | ✓ | ? | - | ✓ | CLI for credential gen? |
+
+Priority order: Developer/CLI → API integrator → WebUI end-user

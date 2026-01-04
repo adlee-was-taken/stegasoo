@@ -930,3 +930,82 @@ def is_lossless_format(image_data: bytes) -> bool:
     is_lossless = fmt is not None and fmt.upper() in LOSSLESS_FORMATS
     debug.print(f"Image is lossless: {is_lossless} (format: {fmt})")
     return is_lossless
+
+
+def peek_image(image_data: bytes) -> dict:
+    """
+    Check if an image contains Stegasoo hidden data without decrypting.
+
+    Attempts to detect LSB and DCT headers by extracting the first few bytes
+    and looking for Stegasoo magic markers.
+
+    Args:
+        image_data: Raw image bytes
+
+    Returns:
+        dict with:
+            - has_stegasoo: bool - True if header detected
+            - mode: str or None - 'lsb', 'dct', or None
+            - confidence: str - 'high', 'low', or None
+
+    Example:
+        >>> result = peek_image(suspicious_image_bytes)
+        >>> if result['has_stegasoo']:
+        ...     print(f"Found {result['mode']} data!")
+    """
+    from .constants import EMBED_MODE_DCT, EMBED_MODE_LSB
+
+    result = {"has_stegasoo": False, "mode": None, "confidence": None}
+
+    # Try LSB extraction (look for header bytes)
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        pixels = list(img.getdata())
+        img.close()
+
+        # Extract first 32 bits (4 bytes) from LSB
+        extracted = []
+        for i in range(32):
+            if i < len(pixels):
+                pixel = pixels[i]
+                if isinstance(pixel, tuple):
+                    extracted.append(pixel[0] & 1)
+                else:
+                    extracted.append(pixel & 1)
+
+        # Convert bits to bytes
+        header_bytes = bytearray()
+        for i in range(0, len(extracted), 8):
+            byte = 0
+            for j in range(8):
+                if i + j < len(extracted):
+                    byte = (byte << 1) | extracted[i + j]
+            header_bytes.append(byte)
+
+        # Check for LSB magic: \x89ST3
+        if bytes(header_bytes[:4]) == b"\x89ST3":
+            result["has_stegasoo"] = True
+            result["mode"] = EMBED_MODE_LSB
+            result["confidence"] = "high"
+            return result
+    except Exception:
+        pass
+
+    # Try DCT extraction (requires scipy/jpegio)
+    try:
+        from .dct_steganography import HAS_JPEGIO, HAS_SCIPY
+
+        if HAS_SCIPY or HAS_JPEGIO:
+            from .dct_steganography import extract_from_dct
+
+            # Extract first few bytes to check header
+            extracted = extract_from_dct(image_data, seed=b"\x00" * 32, length=4)
+            if extracted == b"\x89DCT":
+                result["has_stegasoo"] = True
+                result["mode"] = EMBED_MODE_DCT
+                result["confidence"] = "high"
+                return result
+    except Exception:
+        pass
+
+    return result

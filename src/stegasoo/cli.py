@@ -782,6 +782,111 @@ def channel_clear(ctx, project, user):
             click.echo("No channel key files found")
 
 
+# =============================================================================
+# TOOLS COMMANDS
+# =============================================================================
+
+
+@cli.group()
+@click.pass_context
+def tools(ctx):
+    """Image security tools."""
+    pass
+
+
+@tools.command("capacity")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def tools_capacity(image, as_json):
+    """Show steganography capacity for an image.
+
+    Example:
+
+        stegasoo tools capacity photo.jpg
+    """
+    from .dct_steganography import estimate_capacity_comparison
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    result = estimate_capacity_comparison(image_data)
+    result["filename"] = Path(image).name
+    result["megapixels"] = round((result["width"] * result["height"]) / 1_000_000, 2)
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+    else:
+        click.echo(f"\n  {result['filename']}")
+        click.echo(f"  {'─' * 40}")
+        click.echo(f"  Dimensions:   {result['width']} × {result['height']}")
+        click.echo(f"  Megapixels:   {result['megapixels']} MP")
+        click.echo(f"  {'─' * 40}")
+        click.echo(f"  LSB Capacity: {result['lsb']['capacity_kb']:.1f} KB")
+        if result['dct']['available']:
+            click.echo(f"  DCT Capacity: {result['dct']['capacity_kb']:.1f} KB")
+        else:
+            click.echo("  DCT Capacity: N/A (scipy required)")
+        click.echo()
+
+
+@tools.command("strip")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("-o", "--output", type=click.Path(), help="Output file (default: <name>_clean.png)")
+@click.option("--format", "fmt", type=click.Choice(["png", "bmp"]), default="png", help="Output format")
+def tools_strip(image, output, fmt):
+    """Strip EXIF/metadata from an image.
+
+    Example:
+
+        stegasoo tools strip photo.jpg
+        stegasoo tools strip photo.jpg -o clean.png
+    """
+    from .utils import strip_image_metadata
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    clean_data = strip_image_metadata(image_data, output_format=fmt.upper())
+
+    if not output:
+        stem = Path(image).stem
+        output = f"{stem}_clean.{fmt}"
+
+    with open(output, "wb") as f:
+        f.write(clean_data)
+
+    click.echo(f"Saved clean image to: {output}")
+
+
+@tools.command("peek")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def tools_peek(image, as_json):
+    """Check if image contains Stegasoo hidden data.
+
+    Example:
+
+        stegasoo tools peek suspicious.jpg
+    """
+    from .steganography import peek_image
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    result = peek_image(image_data)
+    result["filename"] = Path(image).name
+
+    if as_json:
+        click.echo(json.dumps(result))
+    else:
+        if result["has_stegasoo"]:
+            click.echo(f"\n  ✓ Stegasoo data detected in {result['filename']}")
+            click.echo(f"    Mode: {result['mode'].upper()}")
+        else:
+            click.echo(f"\n  ✗ No Stegasoo header found in {result['filename']}")
+        click.echo()
+
+
 def main():
     """Entry point for CLI."""
     cli(obj={})

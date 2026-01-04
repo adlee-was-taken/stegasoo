@@ -1288,6 +1288,88 @@ def about():
     return render_template("about.html", has_argon2=has_argon2(), has_qrcode_read=HAS_QRCODE_READ)
 
 
+# ============================================================================
+# TOOLS ROUTES (v4.1.0)
+# ============================================================================
+
+
+@app.route("/tools")
+@login_required
+def tools():
+    """Advanced tools page."""
+    return render_template("tools.html", has_dct=has_dct_support())
+
+
+@app.route("/api/tools/capacity", methods=["POST"])
+@login_required
+def api_tools_capacity():
+    """Calculate image capacity for steganography."""
+    from stegasoo.dct_steganography import estimate_capacity_comparison
+
+    carrier = request.files.get("image")
+    if not carrier:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    try:
+        image_data = carrier.read()
+        result = estimate_capacity_comparison(image_data)
+        result["success"] = True
+        result["filename"] = carrier.filename
+        result["megapixels"] = round((result["width"] * result["height"]) / 1_000_000, 2)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/tools/strip-metadata", methods=["POST"])
+@login_required
+def api_tools_strip_metadata():
+    """Strip EXIF/metadata from image."""
+    import io
+
+    from stegasoo.utils import strip_image_metadata
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    try:
+        image_data = image_file.read()
+        clean_data = strip_image_metadata(image_data, output_format="PNG")
+
+        buffer = io.BytesIO(clean_data)
+        filename = image_file.filename.rsplit(".", 1)[0] + "_clean.png"
+
+        return send_file(
+            buffer,
+            mimetype="image/png",
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/api/tools/peek", methods=["POST"])
+@login_required
+def api_tools_peek():
+    """Check if image contains Stegasoo header."""
+    from stegasoo.steganography import peek_image
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    try:
+        image_data = image_file.read()
+        result = peek_image(image_data)
+        result["success"] = True
+        result["filename"] = image_file.filename
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
 # Add these two test routes anywhere in app.py after the app = Flask(...) line:
 
 
