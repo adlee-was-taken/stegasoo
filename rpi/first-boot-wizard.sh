@@ -24,7 +24,7 @@ PROFILE_HOOK="/etc/profile.d/stegasoo-wizard.sh"
 
 # Check if this is first boot
 if [ ! -f "$FLAG_FILE" ]; then
-    exit 0
+  exit 0
 fi
 
 clear
@@ -36,12 +36,12 @@ echo -e "${GRAY} . · . · . · . · . · . ${CYAN}/\\\\${GRAY} · . · ${CYAN}/
 echo -e "${GRAY} · . · . · . · . · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · ${CYAN}\\\\/${GRAY} · . · . · . ·${NC}"
 echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
 echo -e "${GRAY} · .  ${CYAN} ___  _____  ___    ___    _    ___    ___    ___  ${GRAY}  . · . ·${NC}"
-echo -e "${GRAY} . ·  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}  · . · ·${NC}"
-echo -e "${GRAY} · .  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}  . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}/ __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${GRAY}   . · . ·${NC}"
 echo -e "${GRAY} . ·  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  · . · ·${NC}"
 echo -e "${GRAY} · .  ${CYAN}\\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${GRAY}  . · . ·${NC}"
-echo -e "${GRAY} . ·  ${CYAN}|___/  |_|  |___|  \\\\___|/_/ \\\\_\\\\|___/  \\\\___/  \\\\___/${GRAY}  · . · ·${NC}"
-echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\\\___|/_/ \\\\_\\\\|___/  \\\\___/  \\\\___/${GRAY}  . · . ·${NC}"
+echo -e "${GRAY} . ·  ${CYAN}|___/  |_|  |___|  \\\\___|/_/ \\\\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   · . · ·${NC}"
+echo -e "${GRAY} · .  ${CYAN}|___/  |_|  |___|  \\\\___|/_/ \\\\_\\\\|___/  \\\\___/  \\\\___/${GRAY}   . · . ·${NC}"
 echo -e "${GRAY} · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . ·${NC}"
 echo -e "${GRAY} . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · . · .${NC}"
 echo -e "${GRAY} · . · ${CYAN}~~~~${NC} ${GRAY}· . · . · .${NC} ${CYAN}First Boot Wizard${NC} ${GRAY}· . · . · ${CYAN}~~~~${NC} ${GRAY}· . · . ·${NC}"
@@ -85,10 +85,10 @@ echo ""
 read -p "Enable HTTPS? [Y/n] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    ENABLE_HTTPS="true"
-    echo ""
-    echo -e "  ${GREEN}✓${NC} HTTPS will be enabled"
-    sleep 1
+  ENABLE_HTTPS="true"
+  echo ""
+  echo -e "  ${GREEN}✓${NC} HTTPS will be enabled"
+  sleep 1
 fi
 
 # =============================================================================
@@ -96,29 +96,29 @@ fi
 # =============================================================================
 
 if [ "$ENABLE_HTTPS" = "true" ]; then
-    clear
-    echo -e "${BOLD}Step 2 of 3: Port Configuration${NC}"
-    echo -e "${BLUE}-------------------------------------------------------${NC}"
+  clear
+  echo -e "${BOLD}Step 2 of 3: Port Configuration${NC}"
+  echo -e "${BLUE}-------------------------------------------------------${NC}"
+  echo ""
+  echo "The standard HTTPS port is 443, which means you can access"
+  echo "Stegasoo without specifying a port in the URL."
+  echo ""
+  echo "  Port 443:  https://stegasoo.local"
+  echo "  Port 5000: https://stegasoo.local:5000"
+  echo ""
+  echo -e "${YELLOW}Note:${NC} Port 443 requires an iptables redirect rule."
+  echo ""
+  echo "  [Y] Use port 443 (cleaner URLs)"
+  echo "  [n] Use port 5000 (default, no extra config)"
+  echo ""
+  read -p "Use standard port 443? [Y/n] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    USE_PORT_443="true"
     echo ""
-    echo "The standard HTTPS port is 443, which means you can access"
-    echo "Stegasoo without specifying a port in the URL."
-    echo ""
-    echo "  Port 443:  https://stegasoo.local"
-    echo "  Port 5000: https://stegasoo.local:5000"
-    echo ""
-    echo -e "${YELLOW}Note:${NC} Port 443 requires an iptables redirect rule."
-    echo ""
-    echo "  [Y] Use port 443 (cleaner URLs)"
-    echo "  [n] Use port 5000 (default, no extra config)"
-    echo ""
-    read -p "Use standard port 443? [Y/n] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        USE_PORT_443="true"
-        echo ""
-        echo -e "  ${GREEN}✓${NC} Port 443 will be configured"
-        sleep 1
-    fi
+    echo -e "  ${GREEN}✓${NC} Port 443 will be configured"
+    sleep 1
+  fi
 fi
 
 # =============================================================================
@@ -143,32 +143,32 @@ echo ""
 read -p "Generate a private channel key? [y/N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo ""
+  echo "Generating channel key..."
+
+  # Source the venv and generate key
+  source "$INSTALL_DIR/venv/bin/activate" 2>/dev/null
+  CHANNEL_KEY=$(python -c "from stegasoo.channel import generate_channel_key; print(generate_channel_key())" 2>/dev/null)
+
+  if [ -n "$CHANNEL_KEY" ]; then
     echo ""
-    echo "Generating channel key..."
-
-    # Source the venv and generate key
-    source "$INSTALL_DIR/venv/bin/activate" 2>/dev/null
-    CHANNEL_KEY=$(python -c "from stegasoo.channel import generate_channel_key; print(generate_channel_key())" 2>/dev/null)
-
-    if [ -n "$CHANNEL_KEY" ]; then
-        echo ""
-        echo -e "  ${GREEN}✓${NC} Channel key generated!"
-        echo ""
-        echo -e "  ${BOLD}${YELLOW}$CHANNEL_KEY${NC}"
-        echo ""
-        echo -e "  ${RED}*** IMPORTANT: Write down or copy this key NOW! ***${NC}"
-        echo -e "  ${RED}You'll need to share it with anyone who should decode${NC}"
-        echo -e "  ${RED}your images. This key won't be shown again.${NC}"
-        echo ""
-        read -p "Press Enter when you've saved the key..."
-    else
-        echo -e "  ${RED}✗${NC} Failed to generate key. Using public mode."
-        CHANNEL_KEY=""
-    fi
+    echo -e "  ${GREEN}✓${NC} Channel key generated!"
+    echo ""
+    echo -e "  ${BOLD}${YELLOW}$CHANNEL_KEY${NC}"
+    echo ""
+    echo -e "  ${RED}*** IMPORTANT: Write down or copy this key NOW! ***${NC}"
+    echo -e "  ${RED}You'll need to share it with anyone who should decode${NC}"
+    echo -e "  ${RED}your images. This key won't be shown again.${NC}"
+    echo ""
+    read -p "Press Enter when you've saved the key..."
+  else
+    echo -e "  ${RED}✗${NC} Failed to generate key. Using public mode."
+    CHANNEL_KEY=""
+  fi
 else
-    echo ""
-    echo -e "  ${YELLOW}→${NC} Using public mode"
-    sleep 1
+  echo ""
+  echo -e "  ${YELLOW}→${NC} Using public mode"
+  sleep 1
 fi
 
 # =============================================================================
@@ -185,7 +185,7 @@ STEGASOO_USER=$(stat -c '%U' "$INSTALL_DIR" 2>/dev/null || echo "pi")
 
 echo "  Updating systemd service..."
 
-sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
+sudo tee /etc/systemd/system/stegasoo.service >/dev/null <<EOF
 [Unit]
 Description=Stegasoo Web UI
 After=network.target
@@ -211,21 +211,21 @@ echo -e "  ${GREEN}✓${NC} Service configured"
 
 # Setup port 443 if requested
 if [ "$USE_PORT_443" = "true" ]; then
-    echo "  Setting up port 443 redirect..."
+  echo "  Setting up port 443 redirect..."
 
-    # Install iptables if needed
-    if ! command -v iptables &> /dev/null; then
-        sudo apt-get install -y iptables > /dev/null 2>&1
-    fi
+  # Install iptables if needed
+  if ! command -v iptables &>/dev/null; then
+    sudo apt-get install -y iptables >/dev/null 2>&1
+  fi
 
-    # Add redirect rule (check if it already exists)
-    if ! sudo iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000 2>/dev/null; then
-        sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000
-    fi
-    sudo sh -c 'iptables-save > /etc/iptables.rules'
+  # Add redirect rule (check if it already exists)
+  if ! sudo iptables -t nat -C PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000 2>/dev/null; then
+    sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 5000
+  fi
+  sudo sh -c 'iptables-save > /etc/iptables.rules'
 
-    # Create/update persistence service
-    sudo tee /etc/systemd/system/iptables-restore.service > /dev/null <<EOF
+  # Create/update persistence service
+  sudo tee /etc/systemd/system/iptables-restore.service >/dev/null <<EOF
 [Unit]
 Description=Restore iptables rules
 Before=network-pre.target
@@ -237,8 +237,8 @@ ExecStart=/sbin/iptables-restore /etc/iptables.rules
 [Install]
 WantedBy=multi-user.target
 EOF
-    sudo systemctl enable iptables-restore.service > /dev/null 2>&1
-    echo -e "  ${GREEN}✓${NC} Port 443 redirect configured"
+  sudo systemctl enable iptables-restore.service >/dev/null 2>&1
+  echo -e "  ${GREEN}✓${NC} Port 443 redirect configured"
 fi
 
 echo "  Reloading systemd..."
@@ -250,9 +250,9 @@ sudo systemctl restart stegasoo
 sleep 2
 
 if systemctl is-active --quiet stegasoo; then
-    echo -e "  ${GREEN}✓${NC} Stegasoo started successfully"
+  echo -e "  ${GREEN}✓${NC} Stegasoo started successfully"
 else
-    echo -e "  ${RED}✗${NC} Failed to start (check: journalctl -u stegasoo)"
+  echo -e "  ${RED}✗${NC} Failed to start (check: journalctl -u stegasoo)"
 fi
 
 # Remove first-boot flag and profile hook
@@ -270,7 +270,7 @@ PI_IP=$(hostname -I | awk '{print $1}')
 HOSTNAME=$(hostname)
 
 echo -e "${GREEN}"
-cat << 'BANNER'
+cat <<'BANNER'
    _____ _
   / ____| |
  | (___ | |_ ___  __ _  __ _ ___  ___   ___
@@ -287,22 +287,22 @@ echo ""
 
 echo -e "${GREEN}Access URL:${NC}"
 if [ "$ENABLE_HTTPS" = "true" ]; then
-    if [ "$USE_PORT_443" = "true" ]; then
-        echo -e "  ${BOLD}${YELLOW}https://$PI_IP${NC}"
-        echo -e "  ${BOLD}${YELLOW}https://$HOSTNAME.local${NC} (if mDNS works)"
-    else
-        echo -e "  ${BOLD}${YELLOW}https://$PI_IP:5000${NC}"
-        echo -e "  ${BOLD}${YELLOW}https://$HOSTNAME.local:5000${NC} (if mDNS works)"
-    fi
+  if [ "$USE_PORT_443" = "true" ]; then
+    echo -e "  ${BOLD}${YELLOW}https://$PI_IP${NC}"
+    echo -e "  ${BOLD}${YELLOW}https://$HOSTNAME.local${NC} (if mDNS works)"
+  else
+    echo -e "  ${BOLD}${YELLOW}https://$PI_IP:5000${NC}"
+    echo -e "  ${BOLD}${YELLOW}https://$HOSTNAME.local:5000${NC} (if mDNS works)"
+  fi
 else
-    echo -e "  ${BOLD}${YELLOW}http://$PI_IP:5000${NC}"
+  echo -e "  ${BOLD}${YELLOW}http://$PI_IP:5000${NC}"
 fi
 echo ""
 
 if [ -n "$CHANNEL_KEY" ]; then
-    echo -e "${GREEN}Channel Key:${NC}"
-    echo -e "  ${YELLOW}$CHANNEL_KEY${NC}"
-    echo ""
+  echo -e "${GREEN}Channel Key:${NC}"
+  echo -e "  ${YELLOW}$CHANNEL_KEY${NC}"
+  echo ""
 fi
 
 echo -e "${GREEN}First Steps:${NC}"

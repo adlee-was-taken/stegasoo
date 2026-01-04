@@ -135,6 +135,19 @@ On first run with HTTPS enabled:
 
 **Note:** Browsers will show a security warning for self-signed certificates. This is expected for home network use.
 
+**Tip:** To avoid browser warnings, use [mkcert](https://github.com/FiloSottile/mkcert) to generate locally-trusted certificates:
+
+```bash
+# Install mkcert and create local CA (one-time)
+mkcert -install
+
+# Generate trusted certs for your Pi
+mkcert -key-file key.pem -cert-file cert.pem stegasoo.local localhost 127.0.0.1 YOUR_PI_IP
+
+# Copy to certs directory
+mv key.pem cert.pem frontends/web/certs/
+```
+
 ### Disabling Authentication
 
 For development or trusted networks:
