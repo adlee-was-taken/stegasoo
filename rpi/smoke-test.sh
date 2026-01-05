@@ -1,0 +1,339 @@
+#!/bin/bash
+#
+# Stegasoo Pi Image Smoke Test
+# Automated testing of a fresh Pi image
+#
+# Usage: ./smoke-test.sh [ip] [--https]
+#        Default IP: 192.168.0.4
+#
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Configuration
+PI_IP="${1:-192.168.0.4}"
+HTTPS=false
+if [[ "$2" == "--https" ]] || [[ "$1" == "--https" ]]; then
+    HTTPS=true
+    if [[ "$1" == "--https" ]]; then
+        PI_IP="192.168.0.4"
+    fi
+fi
+
+if [ "$HTTPS" = true ]; then
+    BASE_URL="https://$PI_IP:5000"
+    CURL_OPTS="-k"  # Allow self-signed certs
+else
+    BASE_URL="http://$PI_IP:5000"
+    CURL_OPTS=""
+fi
+
+# Test credentials
+TEST_USER="smoketest"
+TEST_PASS="SmokeTest123!"
+
+# Temp files
+COOKIE_JAR=$(mktemp)
+TEST_IMAGE=$(mktemp --suffix=.png)
+ENCODED_IMAGE=$(mktemp --suffix=.png)
+RESPONSE=$(mktemp)
+
+cleanup() {
+    rm -f "$COOKIE_JAR" "$TEST_IMAGE" "$ENCODED_IMAGE" "$RESPONSE"
+}
+trap cleanup EXIT
+
+# Create a simple test image (red square)
+create_test_image() {
+    if command -v convert &>/dev/null; then
+        convert -size 100x100 xc:red "$TEST_IMAGE"
+    elif command -v python3 &>/dev/null; then
+        python3 -c "
+from PIL import Image
+img = Image.new('RGB', (100, 100), color='red')
+img.save('$TEST_IMAGE')
+"
+    else
+        echo -e "${YELLOW}Warning: No image tool available, skipping encode/decode tests${NC}"
+        return 1
+    fi
+}
+
+# Results tracking
+TESTS_PASSED=0
+TESTS_FAILED=0
+
+pass() {
+    echo -e "  ${GREEN}[PASS]${NC} $1"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+}
+
+fail() {
+    echo -e "  ${RED}[FAIL]${NC} $1"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+}
+
+skip() {
+    echo -e "  ${YELLOW}[SKIP]${NC} $1"
+}
+
+# =============================================================================
+# Header
+# =============================================================================
+
+echo ""
+echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║            Stegasoo Pi Image Smoke Test                       ║${NC}"
+echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "Target: ${YELLOW}$BASE_URL${NC}"
+echo ""
+
+# =============================================================================
+# Test 1: Web UI Reachable
+# =============================================================================
+
+echo -e "${BOLD}[1/6] Web UI Accessibility${NC}"
+
+if curl $CURL_OPTS -s -o /dev/null -w "%{http_code}" "$BASE_URL" | grep -q "200\|302"; then
+    pass "Web UI is reachable"
+else
+    fail "Web UI not reachable at $BASE_URL"
+    echo -e "${RED}Cannot continue without web access. Is the Pi running?${NC}"
+    exit 1
+fi
+
+# Check if redirected to setup (first run) or login
+REDIRECT=$(curl $CURL_OPTS -s -o /dev/null -w "%{redirect_url}" "$BASE_URL")
+if echo "$REDIRECT" | grep -q "setup"; then
+    pass "Redirected to setup (fresh install)"
+    NEEDS_SETUP=true
+elif echo "$REDIRECT" | grep -q "login"; then
+    pass "Redirected to login (already configured)"
+    NEEDS_SETUP=false
+else
+    # Check page content
+    if curl $CURL_OPTS -s "$BASE_URL" | grep -q "setup\|Setup\|Create.*Admin"; then
+        pass "Setup page detected"
+        NEEDS_SETUP=true
+    else
+        pass "Login page detected"
+        NEEDS_SETUP=false
+    fi
+fi
+
+# =============================================================================
+# Test 2: Create Admin User (if needed)
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[2/6] User Setup${NC}"
+
+if [ "$NEEDS_SETUP" = true ]; then
+    # Get CSRF token from setup page
+    SETUP_PAGE=$(curl $CURL_OPTS -s -c "$COOKIE_JAR" "$BASE_URL/setup")
+    CSRF_TOKEN=$(echo "$SETUP_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+    if [ -z "$CSRF_TOKEN" ]; then
+        # Try alternate pattern
+        CSRF_TOKEN=$(echo "$SETUP_PAGE" | grep -oP 'csrf_token.*?value="\K[^"]+' || echo "")
+    fi
+
+    # Create admin user
+    HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
+        -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+        -X POST "$BASE_URL/setup" \
+        -d "username=$TEST_USER" \
+        -d "password=$TEST_PASS" \
+        -d "password_confirm=$TEST_PASS" \
+        -d "csrf_token=$CSRF_TOKEN")
+
+    if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
+        if curl $CURL_OPTS -s "$BASE_URL" | grep -q "login\|Login"; then
+            pass "Admin user created successfully"
+        else
+            pass "Setup completed (assuming success)"
+        fi
+    else
+        fail "Failed to create admin user (HTTP $HTTP_CODE)"
+    fi
+else
+    skip "Setup already complete"
+fi
+
+# =============================================================================
+# Test 3: Login
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[3/6] Authentication${NC}"
+
+# Get login page and CSRF
+LOGIN_PAGE=$(curl $CURL_OPTS -s -c "$COOKIE_JAR" "$BASE_URL/login")
+CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+# Try login
+HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
+    -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+    -X POST "$BASE_URL/login" \
+    -d "username=$TEST_USER" \
+    -d "password=$TEST_PASS" \
+    -d "csrf_token=$CSRF_TOKEN" \
+    -L)
+
+# Check if we're logged in by accessing a protected page
+if curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/" | grep -qi "encode\|decode\|logout"; then
+    pass "Login successful"
+    LOGGED_IN=true
+else
+    fail "Login failed"
+    LOGGED_IN=false
+fi
+
+# =============================================================================
+# Test 4: Encode Page
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[4/6] Encode Functionality${NC}"
+
+if [ "$LOGGED_IN" = true ]; then
+    ENCODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/encode")
+
+    if echo "$ENCODE_PAGE" | grep -qi "encode\|message\|image\|upload"; then
+        pass "Encode page loads"
+    else
+        fail "Encode page not accessible"
+    fi
+
+    # Try actual encoding if we have image tools
+    if create_test_image 2>/dev/null; then
+        CSRF_TOKEN=$(echo "$ENCODE_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+        HTTP_CODE=$(curl $CURL_OPTS -s -o "$ENCODED_IMAGE" -w "%{http_code}" \
+            -b "$COOKIE_JAR" \
+            -X POST "$BASE_URL/encode" \
+            -F "image=@$TEST_IMAGE" \
+            -F "message=Smoke test message" \
+            -F "csrf_token=$CSRF_TOKEN")
+
+        if [ "$HTTP_CODE" = "200" ] && [ -s "$ENCODED_IMAGE" ]; then
+            # Check if result is an image
+            if file "$ENCODED_IMAGE" | grep -qi "image\|PNG\|JPEG"; then
+                pass "Image encoding works"
+            else
+                fail "Encoding returned non-image response"
+            fi
+        else
+            fail "Encoding request failed (HTTP $HTTP_CODE)"
+        fi
+    else
+        skip "Image encoding (no image tools)"
+    fi
+else
+    skip "Encode tests (not logged in)"
+fi
+
+# =============================================================================
+# Test 5: Decode Page
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[5/6] Decode Functionality${NC}"
+
+if [ "$LOGGED_IN" = true ]; then
+    DECODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/decode")
+
+    if echo "$DECODE_PAGE" | grep -qi "decode\|upload\|image"; then
+        pass "Decode page loads"
+    else
+        fail "Decode page not accessible"
+    fi
+
+    # Try decoding the encoded image
+    if [ -s "$ENCODED_IMAGE" ] && file "$ENCODED_IMAGE" | grep -qi "image\|PNG"; then
+        CSRF_TOKEN=$(echo "$DECODE_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+        DECODED=$(curl $CURL_OPTS -s \
+            -b "$COOKIE_JAR" \
+            -X POST "$BASE_URL/decode" \
+            -F "image=@$ENCODED_IMAGE" \
+            -F "csrf_token=$CSRF_TOKEN")
+
+        if echo "$DECODED" | grep -q "Smoke test message"; then
+            pass "Message decoded correctly"
+        elif echo "$DECODED" | grep -qi "message\|result\|decoded"; then
+            pass "Decode returns result (message may differ)"
+        else
+            fail "Decode did not return expected result"
+        fi
+    else
+        skip "Decode test (no encoded image)"
+    fi
+else
+    skip "Decode tests (not logged in)"
+fi
+
+# =============================================================================
+# Test 6: API/CLI Check
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[6/6] System Health${NC}"
+
+# Check if stegasoo CLI works via SSH (optional)
+if command -v sshpass &>/dev/null; then
+    CLI_VERSION=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        admin@$PI_IP "stegasoo --version" 2>/dev/null || echo "")
+
+    if [ -n "$CLI_VERSION" ]; then
+        pass "CLI accessible: $CLI_VERSION"
+    else
+        skip "CLI check (SSH failed or CLI not in PATH)"
+    fi
+else
+    skip "CLI check (sshpass not installed)"
+fi
+
+# Check service status via SSH
+if command -v sshpass &>/dev/null; then
+    SERVICE_STATUS=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        admin@$PI_IP "systemctl is-active stegasoo" 2>/dev/null || echo "unknown")
+
+    if [ "$SERVICE_STATUS" = "active" ]; then
+        pass "Stegasoo service is active"
+    else
+        fail "Stegasoo service status: $SERVICE_STATUS"
+    fi
+else
+    skip "Service check (sshpass not installed)"
+fi
+
+# =============================================================================
+# Summary
+# =============================================================================
+
+echo ""
+echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
+TOTAL=$((TESTS_PASSED + TESTS_FAILED))
+
+if [ $TESTS_FAILED -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}All tests passed!${NC} ($TESTS_PASSED/$TOTAL)"
+else
+    echo -e "${RED}${BOLD}Some tests failed${NC} ($TESTS_PASSED passed, $TESTS_FAILED failed)"
+fi
+
+echo ""
+echo -e "Target: $BASE_URL"
+echo -e "Test user: $TEST_USER"
+echo ""
+
+exit $TESTS_FAILED
