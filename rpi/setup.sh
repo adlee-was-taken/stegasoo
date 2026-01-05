@@ -117,7 +117,7 @@ if [ "$TOTAL_MEM" -lt 2000 ]; then
 fi
 
 # Create /opt/stegasoo with proper permissions
-echo -e "${GREEN}[1/11]${NC} Setting up install directory..."
+echo -e "${GREEN}[1/12]${NC} Setting up install directory..."
 if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER:$USER" "$INSTALL_DIR"
@@ -128,7 +128,7 @@ else
     echo "  $INSTALL_DIR exists, updated ownership"
 fi
 
-echo -e "${GREEN}[2/11]${NC} Installing system dependencies..."
+echo -e "${GREEN}[2/12]${NC} Installing system dependencies..."
 sudo apt-get update
 sudo apt-get install -y \
     build-essential \
@@ -151,7 +151,7 @@ sudo apt-get install -y \
     python3-dev \
     btop
 
-echo -e "${GREEN}[3/11]${NC} Installing gum (TUI toolkit)..."
+echo -e "${GREEN}[3/12]${NC} Installing gum (TUI toolkit)..."
 # Add Charm repo for gum
 if ! command -v gum &>/dev/null; then
     sudo mkdir -p /etc/apt/keyrings
@@ -163,7 +163,7 @@ else
     echo "  gum already installed"
 fi
 
-echo -e "${GREEN}[4/11]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+echo -e "${GREEN}[4/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
 
 # Install pyenv if not present
 if [ ! -d "$HOME/.pyenv" ]; then
@@ -203,7 +203,7 @@ if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[5/11]${NC} Cloning Stegasoo..."
+echo -e "${GREEN}[5/12]${NC} Cloning Stegasoo..."
 
 # Clone Stegasoo first (needed for jpegio patch script)
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -217,7 +217,7 @@ else
     cd "$INSTALL_DIR"
 fi
 
-echo -e "${GREEN}[6/11]${NC} Creating Python virtual environment..."
+echo -e "${GREEN}[6/12]${NC} Creating Python virtual environment..."
 
 # Create venv with pyenv Python (not system Python)
 # Use pyenv which to get actual path (handles 3.12 -> 3.12.12 mapping)
@@ -232,7 +232,7 @@ source venv/bin/activate
 VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo "  venv Python: $VENV_PY"
 
-echo -e "${GREEN}[7/11]${NC} Building jpegio for ARM..."
+echo -e "${GREEN}[7/12]${NC} Building jpegio for ARM..."
 
 # Clone jpegio
 JPEGIO_DIR="/tmp/jpegio-build"
@@ -256,12 +256,12 @@ pip install .
 cd "$INSTALL_DIR"
 rm -rf "$JPEGIO_DIR"
 
-echo -e "${GREEN}[8/11]${NC} Installing Stegasoo..."
+echo -e "${GREEN}[8/12]${NC} Installing Stegasoo..."
 
 # Install dependencies (jpegio already in venv, won't re-download)
 pip install -e ".[web]"
 
-echo -e "${GREEN}[9/11]${NC} Creating systemd service..."
+echo -e "${GREEN}[9/12]${NC} Creating systemd service..."
 
 # Create systemd service file
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
@@ -285,12 +285,12 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[10/11]${NC} Enabling service..."
+echo -e "${GREEN}[10/12]${NC} Enabling service..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
 
-echo -e "${GREEN}[11/11]${NC} Adding stegasoo to PATH..."
+echo -e "${GREEN}[11/12]${NC} Adding stegasoo to PATH..."
 
 # Add stegasoo venv and rpi scripts to PATH for all users
 sudo tee /etc/profile.d/stegasoo-path.sh > /dev/null <<'PATHEOF'
@@ -304,6 +304,42 @@ fi
 PATHEOF
 sudo chmod 644 /etc/profile.d/stegasoo-path.sh
 echo "  Added /opt/stegasoo/venv/bin and /opt/stegasoo/rpi to PATH"
+
+echo -e "${GREEN}[12/12]${NC} Setting up login banner..."
+
+# Create dynamic MOTD script
+sudo tee /etc/profile.d/stegasoo-motd.sh > /dev/null <<'MOTDEOF'
+# Stegasoo login banner
+if systemctl is-active --quiet stegasoo 2>/dev/null; then
+    PI_IP=$(hostname -I | awk '{print $1}')
+    # Check if HTTPS and port 443 are configured
+    if systemctl show stegasoo -p Environment 2>/dev/null | grep -q "STEGASOO_HTTPS_ENABLED=true"; then
+        if iptables -t nat -L PREROUTING 2>/dev/null | grep -q "dpt:https.*5000"; then
+            STEGASOO_URL="https://$PI_IP"
+        else
+            STEGASOO_URL="https://$PI_IP:5000"
+        fi
+    else
+        STEGASOO_URL="http://$PI_IP:5000"
+    fi
+    echo ""
+    echo -e "\033[0;36m  ___  _____  ___    ___    _    ___    ___    ___\033[0m"
+    echo -e "\033[0;36m / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\\\\033[0m"
+    echo -e "\033[0;36m \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |\033[0m"
+    echo -e "\033[0;36m |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/\033[0m"
+    echo ""
+    echo -e " \033[0;32m●\033[0m Stegasoo is running"
+    echo -e "   \033[0;33m$STEGASOO_URL\033[0m"
+    echo ""
+else
+    echo ""
+    echo -e " \033[0;31m●\033[0m Stegasoo is not running"
+    echo -e "   Start with: sudo systemctl start stegasoo"
+    echo ""
+fi
+MOTDEOF
+sudo chmod 644 /etc/profile.d/stegasoo-motd.sh
+echo "  Created login banner"
 
 echo ""
 echo -e "${BOLD}Installation Complete!${NC}"
