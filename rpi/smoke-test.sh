@@ -35,17 +35,23 @@ else
 fi
 
 # Test credentials
-TEST_USER="smoketest"
-TEST_PASS="SmokeTest123!"
+ADMIN_USER="smokeadmin"
+ADMIN_PASS="SmokeAdmin123!"
+REGULAR_USER="smokeuser"
+REGULAR_PASS="SmokeUser123!"
 
 # Temp files
 COOKIE_JAR=$(mktemp)
+COOKIE_JAR_USER=$(mktemp)
 TEST_IMAGE=$(mktemp --suffix=.png)
 ENCODED_IMAGE=$(mktemp --suffix=.png)
 RESPONSE=$(mktemp)
 
+ENCODED_IMAGE_USER=$(mktemp --suffix=.png)
+QR_IMAGE=$(mktemp --suffix=.png)
+
 cleanup() {
-    rm -f "$COOKIE_JAR" "$TEST_IMAGE" "$ENCODED_IMAGE" "$RESPONSE"
+    rm -f "$COOKIE_JAR" "$COOKIE_JAR_USER" "$TEST_IMAGE" "$ENCODED_IMAGE" "$ENCODED_IMAGE_USER" "$QR_IMAGE" "$RESPONSE"
 }
 trap cleanup EXIT
 
@@ -99,7 +105,7 @@ echo ""
 # Test 1: Web UI Reachable
 # =============================================================================
 
-echo -e "${BOLD}[1/6] Web UI Accessibility${NC}"
+echo -e "${BOLD}[1/9] Web UI Accessibility${NC}"
 
 if curl $CURL_OPTS -s -o /dev/null -w "%{http_code}" "$BASE_URL" | grep -q "200\|302"; then
     pass "Web UI is reachable"
@@ -133,7 +139,7 @@ fi
 # =============================================================================
 
 echo ""
-echo -e "${BOLD}[2/6] User Setup${NC}"
+echo -e "${BOLD}[2/9] Admin Setup${NC}"
 
 if [ "$NEEDS_SETUP" = true ]; then
     # Get CSRF token from setup page
@@ -149,9 +155,9 @@ if [ "$NEEDS_SETUP" = true ]; then
     HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
         -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
         -X POST "$BASE_URL/setup" \
-        -d "username=$TEST_USER" \
-        -d "password=$TEST_PASS" \
-        -d "password_confirm=$TEST_PASS" \
+        -d "username=$ADMIN_USER" \
+        -d "password=$ADMIN_PASS" \
+        -d "password_confirm=$ADMIN_PASS" \
         -d "csrf_token=$CSRF_TOKEN")
 
     if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
@@ -168,42 +174,42 @@ else
 fi
 
 # =============================================================================
-# Test 3: Login
+# Test 3: Admin Login
 # =============================================================================
 
 echo ""
-echo -e "${BOLD}[3/6] Authentication${NC}"
+echo -e "${BOLD}[3/9] Admin Authentication${NC}"
 
 # Get login page and CSRF
 LOGIN_PAGE=$(curl $CURL_OPTS -s -c "$COOKIE_JAR" "$BASE_URL/login")
 CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
 
-# Try login
+# Try login as admin
 HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
     -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
     -X POST "$BASE_URL/login" \
-    -d "username=$TEST_USER" \
-    -d "password=$TEST_PASS" \
+    -d "username=$ADMIN_USER" \
+    -d "password=$ADMIN_PASS" \
     -d "csrf_token=$CSRF_TOKEN" \
     -L)
 
 # Check if we're logged in by accessing a protected page
 if curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/" | grep -qi "encode\|decode\|logout"; then
-    pass "Login successful"
-    LOGGED_IN=true
+    pass "Admin login successful"
+    ADMIN_LOGGED_IN=true
 else
-    fail "Login failed"
-    LOGGED_IN=false
+    fail "Admin login failed"
+    ADMIN_LOGGED_IN=false
 fi
 
 # =============================================================================
-# Test 4: Encode Page
+# Test 4: Admin Encode/Decode
 # =============================================================================
 
 echo ""
-echo -e "${BOLD}[4/6] Encode Functionality${NC}"
+echo -e "${BOLD}[4/9] Admin Encode/Decode${NC}"
 
-if [ "$LOGGED_IN" = true ]; then
+if [ "$ADMIN_LOGGED_IN" = true ]; then
     ENCODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/encode")
 
     if echo "$ENCODE_PAGE" | grep -qi "encode\|message\|image\|upload"; then
@@ -220,13 +226,28 @@ if [ "$LOGGED_IN" = true ]; then
             -b "$COOKIE_JAR" \
             -X POST "$BASE_URL/encode" \
             -F "image=@$TEST_IMAGE" \
-            -F "message=Smoke test message" \
+            -F "message=Admin smoke test" \
             -F "csrf_token=$CSRF_TOKEN")
 
         if [ "$HTTP_CODE" = "200" ] && [ -s "$ENCODED_IMAGE" ]; then
-            # Check if result is an image
             if file "$ENCODED_IMAGE" | grep -qi "image\|PNG\|JPEG"; then
-                pass "Image encoding works"
+                pass "Admin encoding works"
+
+                # Now decode it
+                DECODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/decode")
+                CSRF_TOKEN=$(echo "$DECODE_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+                DECODED=$(curl $CURL_OPTS -s \
+                    -b "$COOKIE_JAR" \
+                    -X POST "$BASE_URL/decode" \
+                    -F "image=@$ENCODED_IMAGE" \
+                    -F "csrf_token=$CSRF_TOKEN")
+
+                if echo "$DECODED" | grep -q "Admin smoke test"; then
+                    pass "Admin decoding works"
+                else
+                    fail "Admin decode failed"
+                fi
             else
                 fail "Encoding returned non-image response"
             fi
@@ -234,58 +255,174 @@ if [ "$LOGGED_IN" = true ]; then
             fail "Encoding request failed (HTTP $HTTP_CODE)"
         fi
     else
-        skip "Image encoding (no image tools)"
+        skip "Encode/Decode (no image tools)"
     fi
 else
-    skip "Encode tests (not logged in)"
+    skip "Admin encode/decode (not logged in)"
 fi
 
 # =============================================================================
-# Test 5: Decode Page
+# Test 5: Create Regular User
 # =============================================================================
 
 echo ""
-echo -e "${BOLD}[5/6] Decode Functionality${NC}"
+echo -e "${BOLD}[5/9] Create Regular User${NC}"
 
-if [ "$LOGGED_IN" = true ]; then
-    DECODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/decode")
+if [ "$ADMIN_LOGGED_IN" = true ]; then
+    # Check if there's a user management page
+    USERS_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/users" 2>/dev/null || echo "")
 
-    if echo "$DECODE_PAGE" | grep -qi "decode\|upload\|image"; then
-        pass "Decode page loads"
-    else
-        fail "Decode page not accessible"
-    fi
+    if echo "$USERS_PAGE" | grep -qi "user\|create\|add"; then
+        CSRF_TOKEN=$(echo "$USERS_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
 
-    # Try decoding the encoded image
-    if [ -s "$ENCODED_IMAGE" ] && file "$ENCODED_IMAGE" | grep -qi "image\|PNG"; then
-        CSRF_TOKEN=$(echo "$DECODE_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
-
-        DECODED=$(curl $CURL_OPTS -s \
+        HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
             -b "$COOKIE_JAR" \
-            -X POST "$BASE_URL/decode" \
-            -F "image=@$ENCODED_IMAGE" \
-            -F "csrf_token=$CSRF_TOKEN")
+            -X POST "$BASE_URL/users/create" \
+            -d "username=$REGULAR_USER" \
+            -d "password=$REGULAR_PASS" \
+            -d "password_confirm=$REGULAR_PASS" \
+            -d "csrf_token=$CSRF_TOKEN")
 
-        if echo "$DECODED" | grep -q "Smoke test message"; then
-            pass "Message decoded correctly"
-        elif echo "$DECODED" | grep -qi "message\|result\|decoded"; then
-            pass "Decode returns result (message may differ)"
+        if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
+            pass "Regular user created"
+            USER_CREATED=true
         else
-            fail "Decode did not return expected result"
+            # Try alternate endpoint
+            HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
+                -b "$COOKIE_JAR" \
+                -X POST "$BASE_URL/register" \
+                -d "username=$REGULAR_USER" \
+                -d "password=$REGULAR_PASS" \
+                -d "password_confirm=$REGULAR_PASS" \
+                -d "csrf_token=$CSRF_TOKEN")
+
+            if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "200" ]; then
+                pass "Regular user created (via register)"
+                USER_CREATED=true
+            else
+                fail "Failed to create regular user"
+                USER_CREATED=false
+            fi
         fi
     else
-        skip "Decode test (no encoded image)"
+        skip "User creation (no user management page)"
+        USER_CREATED=false
     fi
 else
-    skip "Decode tests (not logged in)"
+    skip "User creation (admin not logged in)"
+    USER_CREATED=false
 fi
 
 # =============================================================================
-# Test 6: API/CLI Check
+# Test 6: Regular User Login & Encode/Decode
 # =============================================================================
 
 echo ""
-echo -e "${BOLD}[6/6] System Health${NC}"
+echo -e "${BOLD}[6/9] Regular User Workflow${NC}"
+
+if [ "$USER_CREATED" = true ]; then
+    # Logout admin first (get fresh session)
+    curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/logout" > /dev/null
+
+    # Login as regular user
+    LOGIN_PAGE=$(curl $CURL_OPTS -s -c "$COOKIE_JAR_USER" "$BASE_URL/login")
+    CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+    HTTP_CODE=$(curl $CURL_OPTS -s -o "$RESPONSE" -w "%{http_code}" \
+        -b "$COOKIE_JAR_USER" -c "$COOKIE_JAR_USER" \
+        -X POST "$BASE_URL/login" \
+        -d "username=$REGULAR_USER" \
+        -d "password=$REGULAR_PASS" \
+        -d "csrf_token=$CSRF_TOKEN" \
+        -L)
+
+    if curl $CURL_OPTS -s -b "$COOKIE_JAR_USER" "$BASE_URL/" | grep -qi "encode\|decode\|logout"; then
+        pass "Regular user login successful"
+
+        # Try encode/decode as regular user
+        if [ -f "$TEST_IMAGE" ]; then
+            ENCODE_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR_USER" "$BASE_URL/encode")
+            CSRF_TOKEN=$(echo "$ENCODE_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+            HTTP_CODE=$(curl $CURL_OPTS -s -o "$ENCODED_IMAGE_USER" -w "%{http_code}" \
+                -b "$COOKIE_JAR_USER" \
+                -X POST "$BASE_URL/encode" \
+                -F "image=@$TEST_IMAGE" \
+                -F "message=User smoke test" \
+                -F "csrf_token=$CSRF_TOKEN")
+
+            if [ "$HTTP_CODE" = "200" ] && [ -s "$ENCODED_IMAGE_USER" ]; then
+                pass "Regular user encoding works"
+            else
+                fail "Regular user encoding failed"
+            fi
+        fi
+    else
+        fail "Regular user login failed"
+    fi
+else
+    skip "Regular user workflow (user not created)"
+fi
+
+# =============================================================================
+# Test 7: Password Recovery QR
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[7/9] Password Recovery QR${NC}"
+
+# Re-login as admin
+LOGIN_PAGE=$(curl $CURL_OPTS -s -c "$COOKIE_JAR" "$BASE_URL/login")
+CSRF_TOKEN=$(echo "$LOGIN_PAGE" | grep -oP 'name="csrf_token"[^>]*value="\K[^"]+' || echo "")
+
+curl $CURL_OPTS -s -o /dev/null \
+    -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+    -X POST "$BASE_URL/login" \
+    -d "username=$ADMIN_USER" \
+    -d "password=$ADMIN_PASS" \
+    -d "csrf_token=$CSRF_TOKEN" \
+    -L
+
+# Check for recovery QR endpoint
+RECOVERY_PAGE=$(curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/recovery" 2>/dev/null || \
+                curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/settings" 2>/dev/null || \
+                curl $CURL_OPTS -s -b "$COOKIE_JAR" "$BASE_URL/account" 2>/dev/null || echo "")
+
+if echo "$RECOVERY_PAGE" | grep -qi "recovery\|qr\|backup"; then
+    pass "Recovery page accessible"
+
+    # Try to get QR image
+    QR_URL=$(echo "$RECOVERY_PAGE" | grep -oP 'src="[^"]*qr[^"]*"' | head -1 | sed 's/src="//;s/"$//' || echo "")
+
+    if [ -n "$QR_URL" ]; then
+        if [[ "$QR_URL" != http* ]]; then
+            QR_URL="$BASE_URL$QR_URL"
+        fi
+
+        HTTP_CODE=$(curl $CURL_OPTS -s -o "$QR_IMAGE" -w "%{http_code}" -b "$COOKIE_JAR" "$QR_URL")
+
+        if [ "$HTTP_CODE" = "200" ] && [ -s "$QR_IMAGE" ]; then
+            if file "$QR_IMAGE" | grep -qi "image\|PNG"; then
+                pass "Recovery QR code generated"
+            else
+                fail "QR endpoint returned non-image"
+            fi
+        else
+            fail "Failed to fetch QR code"
+        fi
+    else
+        skip "QR code URL not found in page"
+    fi
+else
+    skip "Password recovery (no recovery page found)"
+fi
+
+# =============================================================================
+# Test 8: System Health
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[8/9] System Health${NC}"
 
 # Check if stegasoo CLI works via SSH (optional)
 if command -v sshpass &>/dev/null; then
@@ -316,6 +453,20 @@ else
 fi
 
 # =============================================================================
+# Test 9: Cleanup
+# =============================================================================
+
+echo ""
+echo -e "${BOLD}[9/9] Cleanup${NC}"
+
+# Just verify we can still access the site
+if curl $CURL_OPTS -s -o /dev/null -w "%{http_code}" "$BASE_URL" | grep -q "200\|302"; then
+    pass "Site still accessible after tests"
+else
+    fail "Site not accessible after tests"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 
@@ -333,7 +484,8 @@ fi
 
 echo ""
 echo -e "Target: $BASE_URL"
-echo -e "Test user: $TEST_USER"
+echo -e "Admin user: $ADMIN_USER"
+echo -e "Regular user: $REGULAR_USER"
 echo ""
 
 exit $TESTS_FAILED
