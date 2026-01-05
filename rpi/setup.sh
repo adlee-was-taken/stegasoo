@@ -117,7 +117,7 @@ if [ "$TOTAL_MEM" -lt 2000 ]; then
 fi
 
 # Create /opt/stegasoo with proper permissions
-echo -e "${GREEN}[1/9]${NC} Setting up install directory..."
+echo -e "${GREEN}[1/11]${NC} Setting up install directory..."
 if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER:$USER" "$INSTALL_DIR"
@@ -128,7 +128,7 @@ else
     echo "  $INSTALL_DIR exists, updated ownership"
 fi
 
-echo -e "${GREEN}[2/9]${NC} Installing system dependencies..."
+echo -e "${GREEN}[2/11]${NC} Installing system dependencies..."
 sudo apt-get update
 sudo apt-get install -y \
     build-essential \
@@ -147,9 +147,10 @@ sudo apt-get install -y \
     libffi-dev \
     liblzma-dev \
     libzbar0 \
-    libjpeg-dev
+    libjpeg-dev \
+    python3-dev
 
-echo -e "${GREEN}[3/9]${NC} Installing gum (TUI toolkit)..."
+echo -e "${GREEN}[3/11]${NC} Installing gum (TUI toolkit)..."
 # Add Charm repo for gum
 if ! command -v gum &>/dev/null; then
     sudo mkdir -p /etc/apt/keyrings
@@ -161,7 +162,7 @@ else
     echo "  gum already installed"
 fi
 
-echo -e "${GREEN}[4/9]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+echo -e "${GREEN}[4/11]${NC} Installing pyenv and Python $PYTHON_VERSION..."
 
 # Install pyenv if not present
 if [ ! -d "$HOME/.pyenv" ]; then
@@ -201,38 +202,11 @@ if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[5/9]${NC} Building jpegio for ARM..."
+echo -e "${GREEN}[5/11]${NC} Cloning Stegasoo..."
 
-# Clone jpegio
-JPEGIO_DIR="/tmp/jpegio-build"
-rm -rf "$JPEGIO_DIR"
-git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
-
-# Apply ARM64 patch using robust patching system
-# The patch script tries: 1) patch file, 2) sed, 3) python regex
-if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
-    bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
-else
-    # Fallback if running before stegasoo is cloned (curl install)
-    echo "  Using inline patch fallback..."
-    cd "$JPEGIO_DIR"
-    sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" setup.py
-fi
-
-cd "$JPEGIO_DIR"
-
-# Build jpegio
-pip install --upgrade pip setuptools wheel cython numpy
-pip install .
-
-cd "$HOME"
-rm -rf "$JPEGIO_DIR"
-
-echo -e "${GREEN}[6/9]${NC} Installing Stegasoo..."
-
-# Clone Stegasoo
+# Clone Stegasoo first (needed for jpegio patch script)
 if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "Stegasoo directory exists, updating..."
+    echo "  Stegasoo directory exists, updating..."
     cd "$INSTALL_DIR"
     git fetch origin
     git checkout "$STEGASOO_BRANCH"
@@ -242,21 +216,49 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Create venv if needed
+echo -e "${GREEN}[6/11]${NC} Creating Python virtual environment..."
+
+# Create venv with pyenv Python (not system Python)
+PYENV_PYTHON="$HOME/.pyenv/versions/$PYTHON_VERSION/bin/python"
 if [ ! -d "venv" ]; then
-    python -m venv venv
+    "$PYENV_PYTHON" -m venv venv
 fi
 source venv/bin/activate
 
-# Install dependencies (jpegio already installed globally, will be available)
-pip install --upgrade pip
-pip install -e ".[web]" || {
-    # If full install fails (jpegio conflict), install deps manually
-    pip install -e . --no-deps
-    pip install argon2-cffi cryptography pillow flask gunicorn scipy numpy pyzbar qrcode
-}
+# Verify we're using the right Python
+VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+echo "  venv Python: $VENV_PY"
 
-echo -e "${GREEN}[7/9]${NC} Creating systemd service..."
+echo -e "${GREEN}[7/11]${NC} Building jpegio for ARM..."
+
+# Clone jpegio
+JPEGIO_DIR="/tmp/jpegio-build"
+rm -rf "$JPEGIO_DIR"
+git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
+
+# Apply ARM64 patch
+if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
+    bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
+else
+    echo "  Applying inline ARM64 patch..."
+    sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
+fi
+
+cd "$JPEGIO_DIR"
+
+# Build jpegio into venv
+pip install --upgrade pip setuptools wheel cython numpy
+pip install .
+
+cd "$INSTALL_DIR"
+rm -rf "$JPEGIO_DIR"
+
+echo -e "${GREEN}[8/11]${NC} Installing Stegasoo..."
+
+# Install dependencies (jpegio already in venv, won't re-download)
+pip install -e ".[web]"
+
+echo -e "${GREEN}[9/11]${NC} Creating systemd service..."
 
 # Create systemd service file
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
@@ -280,12 +282,12 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[8/9]${NC} Enabling service..."
+echo -e "${GREEN}[10/11]${NC} Enabling service..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
 
-echo -e "${GREEN}[9/9]${NC} Adding stegasoo to PATH..."
+echo -e "${GREEN}[11/11]${NC} Adding stegasoo to PATH..."
 
 # Add stegasoo venv and rpi scripts to PATH for all users
 sudo tee /etc/profile.d/stegasoo-path.sh > /dev/null <<'PATHEOF'
