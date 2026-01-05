@@ -429,8 +429,8 @@
                             </select>
 
                             <!-- Server channel indicator (compact) -->
-                            <div class="small text-success mt-2 {% if not channel_configured %}d-none{% endif %}" id="channelServerInfo" data-fingerprint="{{ channel_fingerprint[:4] }}-••••-···-••••-{{ channel_fingerprint[-4:] if channel_fingerprint else '' }}">
-                                {% if channel_configured %}
+                            <div class="small text-success mt-2 {% if not channel_configured %}d-none{% endif %}" id="channelServerInfo" data-fingerprint="{{ (channel_fingerprint[:4] if channel_fingerprint else '') }}-••••-···-••••-{{ channel_fingerprint[-4:] if channel_fingerprint else '' }}">
+                                {% if channel_configured and channel_fingerprint %}
                                 <i class="bi bi-shield-lock me-1"></i>
                                 Server: <code>{{ channel_fingerprint[:4] }}-••••-···-••••-{{ channel_fingerprint[-4:] }}</code>
                                 {% endif %}
