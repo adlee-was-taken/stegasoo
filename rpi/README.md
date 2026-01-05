@@ -34,6 +34,10 @@ cd /opt/stegasoo
 - ~2GB free disk space
 - Internet connection
 
+### Performance
+
+On a Pi 4 at 2GHz with USB 3.0 NVMe, expect ~60 seconds to encode/decode a 10MB JPEG with full encryption (passphrase + PIN + reference photo).
+
 ## Pre-built Image Defaults
 
 If using a pre-built image from GitHub Releases:
