@@ -227,6 +227,14 @@ rm -rf /home/*/stegasoo/frontends/web/certs/
 # Remove any .env files with channel keys
 rm -f /opt/stegasoo/frontends/web/.env 2>/dev/null
 rm -f /home/*/stegasoo/frontends/web/.env
+# Reset port 443 redirect (user reconfigures in wizard)
+if systemctl is-enabled --quiet iptables-restore 2>/dev/null; then
+    systemctl disable iptables-restore 2>/dev/null || true
+    rm -f /etc/systemd/system/iptables-restore.service
+    rm -f /etc/iptables.rules
+    iptables -t nat -F PREROUTING 2>/dev/null || true
+    echo "  Port 443 redirect cleared"
+fi
 echo "  Stegasoo instance data cleared"
 
 # =============================================================================
