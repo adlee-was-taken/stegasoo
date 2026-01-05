@@ -113,10 +113,10 @@ VALIDATION_ERRORS=0
 # Step 1: WiFi Credentials
 # =============================================================================
 if [ "$SOFT_RESET" = true ]; then
-    echo -e "${GREEN}[1/10]${NC} Keeping WiFi credentials (soft reset)..."
+    echo -e "${GREEN}[1/11]${NC} Keeping WiFi credentials (soft reset)..."
     echo "  WiFi config preserved"
 else
-    echo -e "${GREEN}[1/10]${NC} Removing WiFi credentials..."
+    echo -e "${GREEN}[1/11]${NC} Removing WiFi credentials..."
 
     # Remove from rootfs
     if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
@@ -169,7 +169,7 @@ fi
 # =============================================================================
 # Step 2: SSH Authorized Keys
 # =============================================================================
-echo -e "${GREEN}[2/10]${NC} Removing SSH authorized keys..."
+echo -e "${GREEN}[2/11]${NC} Removing SSH authorized keys..."
 for user_home in /home/*; do
     if [ -d "$user_home/.ssh" ]; then
         rm -f "$user_home/.ssh/authorized_keys"
@@ -182,7 +182,7 @@ rm -f /root/.ssh/authorized_keys /root/.ssh/known_hosts 2>/dev/null || true
 # =============================================================================
 # Step 3: SSH Host Keys
 # =============================================================================
-echo -e "${GREEN}[3/10]${NC} Removing SSH host keys (will regenerate on first boot)..."
+echo -e "${GREEN}[3/11]${NC} Removing SSH host keys (will regenerate on first boot)..."
 rm -f /etc/ssh/ssh_host_*
 
 # Create a first-boot service to regenerate SSH keys
@@ -206,7 +206,7 @@ echo "  SSH host keys removed (will regenerate on first boot)"
 # =============================================================================
 # Step 4: Bash History
 # =============================================================================
-echo -e "${GREEN}[4/10]${NC} Clearing bash history..."
+echo -e "${GREEN}[4/11]${NC} Clearing bash history..."
 for user_home in /home/*; do
     rm -f "$user_home/.bash_history"
     rm -f "$user_home/.python_history"
@@ -217,7 +217,7 @@ history -c 2>/dev/null || true
 # =============================================================================
 # Step 5: Stegasoo User Data
 # =============================================================================
-echo -e "${GREEN}[5/10]${NC} Removing Stegasoo user data..."
+echo -e "${GREEN}[5/11]${NC} Removing Stegasoo user data..."
 # Remove auth database (users create their own admin on first run)
 rm -rf /opt/stegasoo/frontends/web/instance/ 2>/dev/null
 rm -rf /home/*/stegasoo/frontends/web/instance/
@@ -232,7 +232,7 @@ echo "  Stegasoo instance data cleared"
 # =============================================================================
 # Step 6: First-Boot Wizard Setup
 # =============================================================================
-echo -e "${GREEN}[6/10]${NC} Setting up first-boot wizard..."
+echo -e "${GREEN}[6/11]${NC} Setting up first-boot wizard..."
 
 # Find stegasoo install directory (prefer /opt/stegasoo)
 STEGASOO_DIR=""
@@ -370,7 +370,7 @@ fi
 # =============================================================================
 # Step 7: Logs
 # =============================================================================
-echo -e "${GREEN}[7/10]${NC} Clearing logs..."
+echo -e "${GREEN}[7/11]${NC} Clearing logs..."
 journalctl --rotate 2>/dev/null || true
 journalctl --vacuum-time=1s 2>/dev/null || true
 rm -rf /var/log/*.log /var/log/*.gz /var/log/*.[0-9] 2>/dev/null || true
@@ -382,7 +382,7 @@ echo "  Logs cleared"
 # =============================================================================
 # Step 8: Temporary Files
 # =============================================================================
-echo -e "${GREEN}[8/10]${NC} Clearing temporary files..."
+echo -e "${GREEN}[8/11]${NC} Clearing temporary files..."
 rm -rf /tmp/* 2>/dev/null || true
 rm -rf /var/tmp/* 2>/dev/null || true
 echo "  Temp files cleared"
@@ -390,15 +390,43 @@ echo "  Temp files cleared"
 # =============================================================================
 # Step 9: Package Cache
 # =============================================================================
-echo -e "${GREEN}[9/10]${NC} Clearing package cache..."
+echo -e "${GREEN}[9/11]${NC} Clearing package cache..."
 apt-get clean 2>/dev/null || true
 rm -rf /var/cache/apt/archives/* 2>/dev/null || true
 echo "  Package cache cleared"
 
 # =============================================================================
-# Step 10: Final Sync
+# Step 10: Remove Overclock Settings
 # =============================================================================
-echo -e "${GREEN}[10/10]${NC} Final sync..."
+if [ "$SOFT_RESET" = true ]; then
+    echo -e "${GREEN}[10/11]${NC} Keeping overclock settings (soft reset)..."
+    echo "  Overclock config preserved"
+else
+    echo -e "${GREEN}[10/11]${NC} Removing overclock settings..."
+    CONFIG_FILE="/boot/firmware/config.txt"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        CONFIG_FILE="/boot/config.txt"
+    fi
+
+    if [ -f "$CONFIG_FILE" ]; then
+        # Remove overclock-related lines
+        if grep -q "over_voltage\|arm_freq\|gpu_freq" "$CONFIG_FILE" 2>/dev/null; then
+            # Create temp file without overclock lines
+            grep -v "^over_voltage=\|^arm_freq=\|^gpu_freq=\|^# Overclock" "$CONFIG_FILE" > "${CONFIG_FILE}.tmp"
+            mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+            echo "  Removed overclock settings from $CONFIG_FILE"
+        else
+            echo "  No overclock settings found"
+        fi
+    else
+        echo "  Config file not found, skipping"
+    fi
+fi
+
+# =============================================================================
+# Step 11: Final Sync
+# =============================================================================
+echo -e "${GREEN}[11/11]${NC} Final sync..."
 rm -f /root/.bash_history 2>/dev/null || true
 sync
 echo "  Filesystem synced"
