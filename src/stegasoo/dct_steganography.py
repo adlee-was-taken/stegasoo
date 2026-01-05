@@ -54,6 +54,9 @@ except ImportError:
     HAS_JPEGIO = False
     jio = None
 
+# Import custom exceptions
+from .exceptions import InvalidMagicBytesError, ReedSolomonError as StegasooRSError
+
 
 # ============================================================================
 # CONSTANTS
@@ -214,7 +217,7 @@ def _rs_decode(data: bytes) -> bytes:
             pass  # Errors were corrected
         return bytes(decoded)
     except ReedSolomonError as e:
-        raise ValueError(f"Reed-Solomon decoding failed: {e}") from e
+        raise StegasooRSError(f"Image corrupted beyond repair: {e}") from e
 
 
 # ============================================================================
@@ -410,7 +413,7 @@ def _parse_header(header_bits: list) -> tuple[int, int, int]:
     magic, version, flags, length = struct.unpack(">4sBBI", header_bytes)
 
     if magic != DCT_MAGIC:
-        raise ValueError("Invalid DCT stego magic bytes")
+        raise InvalidMagicBytesError("Not a Stegasoo image or wrong mode (try LSB instead of DCT)")
 
     return version, flags, length
 
@@ -461,7 +464,7 @@ def _jpegio_parse_header(header_bytes: bytes) -> tuple[int, int, int]:
         raise ValueError("Insufficient header data")
     magic, version, flags, length = struct.unpack(">4sBBI", header_bytes[:HEADER_SIZE])
     if magic != JPEGIO_MAGIC:
-        raise ValueError(f"Invalid JPEG stego magic: {magic}")
+        raise InvalidMagicBytesError("Not a Stegasoo JPEG or wrong mode")
     return version, flags, length
 
 

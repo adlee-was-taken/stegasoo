@@ -50,63 +50,27 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 2. Granular Decode Error Messages
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Decode failures show generic "Decryption failed" - users don't know if it's wrong photo, wrong passphrase, wrong PIN, corrupted image, or format mismatch.
 
 **Solution:** Bubble up specific error types from library to UI
 
-### Library Level (`src/stegasoo/`)
+### Implementation
+- Added new exceptions: InvalidMagicBytesError, ReedSolomonError, NoDataFoundError, ModeMismatchError
+- DCT decode now raises InvalidMagicBytesError for wrong magic bytes
+- DCT decode now raises ReedSolomonError (renamed from reedsolo's) for corruption
+- app.py catches specific exceptions with user-friendly messages:
+  - Invalid magic → "Try a different mode (LSB/DCT)"
+  - RS error → "Image too corrupted, may have been re-saved"
+  - Invalid header → "Image may have been modified"
+  - Decryption error → "Wrong credentials"
 
-1. **Custom exception classes:**
-   ```python
-   class StegasooError(Exception): pass
-   class InvalidMagicBytesError(StegasooError): pass
-   class DecryptionError(StegasooError): pass
-   class ReedSolomonError(StegasooError): pass
-   class PayloadTooLargeError(StegasooError): pass
-   class InvalidHeaderError(StegasooError): pass
-   class NoDataFoundError(StegasooError): pass
-   ```
-
-2. **Raise specific exceptions** in decode paths:
-   - Magic bytes mismatch → "Not a Stegasoo image or wrong mode (LSB/DCT)"
-   - RS decode failure → "Image corrupted beyond repair"
-   - AES-GCM auth fail → "Wrong credentials (photo/passphrase/PIN)"
-   - Header parse fail → "Invalid or corrupted header"
-   - No stego data → "No hidden data found in image"
-
-3. **Error codes** for programmatic handling:
-   ```python
-   class ErrorCode(Enum):
-       INVALID_MAGIC = "invalid_magic"
-       DECRYPTION_FAILED = "decryption_failed"
-       RS_FAILED = "rs_failed"
-       # etc.
-   ```
-
-### Web UI Level (`frontends/web/`)
-
-1. **app.py** - Catch specific exceptions, return error type:
-   ```python
-   except InvalidMagicBytesError:
-       flash("This doesn't appear to be a Stegasoo image, or mode mismatch", "danger")
-   except DecryptionError:
-       flash("Wrong credentials - check reference photo, passphrase, and PIN", "warning")
-   ```
-
-2. **decode.html** - Error-specific help text:
-   - Wrong credentials → "Double-check your reference photo matches exactly"
-   - Corrupted → "Image may have been re-saved or compressed"
-   - Mode mismatch → "Try switching between Auto/DCT/LSB"
-
-### Files to Modify
-- `src/stegasoo/__init__.py` (export exceptions)
-- `src/stegasoo/exceptions.py` (new file)
-- `src/stegasoo/dct_steganography.py`
-- `src/stegasoo/steganography.py` (LSB)
-- `frontends/web/app.py`
-- `frontends/web/templates/decode.html`
+### Files Modified
+- `src/stegasoo/exceptions.py` (new exceptions)
+- `src/stegasoo/__init__.py` (exports)
+- `src/stegasoo/dct_steganography.py` (raise specific exceptions)
+- `frontends/web/app.py` (catch and display)
 
 ---
 
@@ -280,6 +244,6 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## Notes
 
-- Keep 4.1.2 focused - 9 features (4 done)
+- Keep 4.1.2 focused - 9 features (5 done)
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release

@@ -133,6 +133,30 @@ class InvalidHeaderError(SteganographyError):
     pass
 
 
+class InvalidMagicBytesError(SteganographyError):
+    """Magic bytes don't match - not a Stegasoo image or wrong mode."""
+
+    pass
+
+
+class ReedSolomonError(SteganographyError):
+    """Reed-Solomon error correction failed - image too corrupted."""
+
+    pass
+
+
+class NoDataFoundError(SteganographyError):
+    """No hidden data found in image."""
+
+    pass
+
+
+class ModeMismatchError(SteganographyError):
+    """Wrong steganography mode (LSB vs DCT)."""
+
+    pass
+
+
 # ============================================================================
 # FILE ERRORS
 # ============================================================================

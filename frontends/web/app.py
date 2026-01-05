@@ -93,6 +93,9 @@ from stegasoo import (
     CapacityError,
     DecryptionError,
     FilePayload,
+    InvalidHeaderError,
+    InvalidMagicBytesError,
+    ReedSolomonError,
     StegasooError,
     export_rsa_key_pem,
     generate_credentials,
@@ -1289,10 +1292,28 @@ def decode_page():
                     has_qrcode_read=HAS_QRCODE_READ,
                 )
 
+        except InvalidMagicBytesError:
+            flash(
+                "This doesn't appear to be a Stegasoo image. Try a different mode (LSB/DCT).",
+                "warning",
+            )
+            return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
+        except ReedSolomonError:
+            flash(
+                "Image too corrupted to decode. It may have been re-saved or compressed.",
+                "error",
+            )
+            return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
+        except InvalidHeaderError:
+            flash(
+                "Invalid or corrupted header. The image may have been modified.",
+                "error",
+            )
+            return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
         except DecryptionError:
             flash(
-                "Decryption failed. Check passphrase, PIN, RSA key, reference photo, and channel key.",
-                "error",
+                "Wrong credentials. Double-check your reference photo, passphrase, PIN, and channel key.",
+                "warning",
             )
             return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
         except StegasooError as e:
