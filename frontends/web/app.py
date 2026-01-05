@@ -886,6 +886,14 @@ def encode_page():
             ref_data = ref_photo.read()
             carrier_data = carrier.read()
 
+            # DEBUG: Log file hashes to verify bytes match between encode/decode
+            import hashlib
+            ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
+            carrier_hash = hashlib.md5(carrier_data).hexdigest()[:8]
+            print(f"[ENCODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}")
+            print(f"[ENCODE DEBUG] carrier: {len(carrier_data)} bytes, md5: {carrier_hash}")
+            print(f"[ENCODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'")
+
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get("rsa_key_qr")
@@ -1176,6 +1184,14 @@ def decode_page():
             # Read files
             ref_data = ref_photo.read()
             stego_data = stego_image.read()
+
+            # DEBUG: Log file hashes to verify bytes match between encode/decode
+            import hashlib
+            ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
+            stego_hash = hashlib.md5(stego_data).hexdigest()[:8]
+            print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}")
+            print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}")
+            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'")
 
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
