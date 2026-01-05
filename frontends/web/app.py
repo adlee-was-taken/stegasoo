@@ -888,11 +888,12 @@ def encode_page():
 
             # DEBUG: Log file hashes to verify bytes match between encode/decode
             import hashlib
+            import sys
             ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
             carrier_hash = hashlib.md5(carrier_data).hexdigest()[:8]
-            print(f"[ENCODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}")
-            print(f"[ENCODE DEBUG] carrier: {len(carrier_data)} bytes, md5: {carrier_hash}")
-            print(f"[ENCODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'")
+            print(f"[ENCODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
+            print(f"[ENCODE DEBUG] carrier: {len(carrier_data)} bytes, md5: {carrier_hash}", file=sys.stderr)
+            print(f"[ENCODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
 
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
@@ -1189,9 +1190,9 @@ def decode_page():
             import hashlib
             ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
             stego_hash = hashlib.md5(stego_data).hexdigest()[:8]
-            print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}")
-            print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}")
-            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'")
+            print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
+            print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
+            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
 
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
