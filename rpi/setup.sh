@@ -314,7 +314,8 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     PI_IP=$(hostname -I | awk '{print $1}')
     # Check if HTTPS and port 443 are configured
     if systemctl show stegasoo -p Environment 2>/dev/null | grep -q "STEGASOO_HTTPS_ENABLED=true"; then
-        if iptables -t nat -L PREROUTING 2>/dev/null | grep -q "dpt:https.*5000"; then
+        # Check for port 443 redirect (iptables-restore service means 443 is configured)
+        if systemctl is-enabled --quiet iptables-restore 2>/dev/null; then
             STEGASOO_URL="https://$PI_IP"
         else
             STEGASOO_URL="https://$PI_IP:5000"
