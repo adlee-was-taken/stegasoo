@@ -179,7 +179,23 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ---
 
-## 5. Smoke Test Benchmarking
+## 5. Dropzone UX Fixes
+
+**Status:** Planned
+
+**Problem:** Dropzone has some interaction bugs:
+- Dropzone doesn't clear properly if first QR image fails
+- Can't click on image preview to replace file (have to click surrounding border)
+
+**Solution:** Fix JS event handling and state management
+
+### Files to Modify
+- `frontends/web/static/js/stegasoo.js`
+- `frontends/web/static/css/style.css` (clickable preview)
+
+---
+
+## 6. Smoke Test Benchmarking
 
 **Status:** Planned
 
@@ -200,6 +216,6 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## Notes
 
-- Keep 4.1.2 focused - 5 small features
+- Keep 4.1.2 focused - 6 small features
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
