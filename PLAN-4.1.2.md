@@ -216,14 +216,15 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 7. Docker Cleanup
 
-**Status:** Planned
+**Status:** Done (4.1.1)
 
 **Problem:** Docker build context is larger than needed (includes test images, rpi scripts, etc.)
 
-**Solution:** Update `.dockerignore` to exclude unnecessary files
+**Solution:** Added `.dockerignore` and fixed volume permissions in Dockerfile
 
-### Files to Modify
-- `.dockerignore`
+### Files Modified
+- `.dockerignore` (created)
+- `Dockerfile` (instance dir permissions)
 
 ---
 
@@ -246,8 +247,26 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ---
 
+## 9. Smoke Test Docker Support
+
+**Status:** Planned
+
+**Problem:** Smoke test expects systemd service, doesn't auto-create admin for Docker.
+
+**Solution:** Make smoke test Docker-aware
+
+### Features
+- Skip systemd checks if not on Pi/Linux with systemd
+- Auto-detect fresh Docker (no users) and create admin via /setup
+- Add `--docker` flag to skip Pi-specific checks
+
+### Files to Modify
+- `rpi/smoke-test.sh`
+
+---
+
 ## Notes
 
-- Keep 4.1.2 focused - 8 small features
+- Keep 4.1.2 focused - 9 features (1 done)
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
