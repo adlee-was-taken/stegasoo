@@ -220,7 +220,9 @@ fi
 echo -e "${GREEN}[6/11]${NC} Creating Python virtual environment..."
 
 # Create venv with pyenv Python (not system Python)
-PYENV_PYTHON="$HOME/.pyenv/versions/$PYTHON_VERSION/bin/python"
+# Use pyenv which to get actual path (handles 3.12 -> 3.12.12 mapping)
+PYENV_PYTHON=$(pyenv which python)
+echo "  Using Python: $PYENV_PYTHON"
 if [ ! -d "venv" ]; then
     "$PYENV_PYTHON" -m venv venv
 fi
