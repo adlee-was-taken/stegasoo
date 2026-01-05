@@ -214,8 +214,40 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ---
 
+## 7. Docker Cleanup
+
+**Status:** Planned
+
+**Problem:** Docker build context is larger than needed (includes test images, rpi scripts, etc.)
+
+**Solution:** Update `.dockerignore` to exclude unnecessary files
+
+### Files to Modify
+- `.dockerignore`
+
+---
+
+## 8. Release Validation Script
+
+**Status:** Planned
+
+**Problem:** Manual release checklist is error-prone. Need automated validation.
+
+**Solution:** Script that runs through testable checklist items
+
+### Features
+- Run pytest
+- Build and test Docker image
+- SSH to Pi and run smoke test (optional, if PI_IP provided)
+- Report pass/fail summary
+
+### Files to Create
+- `scripts/validate-release.sh`
+
+---
+
 ## Notes
 
-- Keep 4.1.2 focused - 6 small features
+- Keep 4.1.2 focused - 8 small features
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
