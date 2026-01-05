@@ -249,7 +249,7 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 9. Smoke Test Docker Support
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Smoke test expects systemd service, doesn't auto-create admin for Docker.
 
@@ -260,13 +260,18 @@ Polish and UX improvements after the 4.1.1 stability release.
 - Auto-detect fresh Docker (no users) and create admin via /setup
 - Add `--docker` flag to skip Pi-specific checks
 
-### Files to Modify
+### Implementation
+- Added `--docker` flag that sets localhost and skips SSH/systemd checks
+- Docker health check verifies container responds with HTTP 200/302
+- Header shows "Docker Smoke Test" in Docker mode
+
+### Files Modified
 - `rpi/smoke-test.sh`
 
 ---
 
 ## Notes
 
-- Keep 4.1.2 focused - 9 features (1 done)
+- Keep 4.1.2 focused - 9 features (2 done)
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release

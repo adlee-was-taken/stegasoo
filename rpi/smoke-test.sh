@@ -3,11 +3,12 @@
 # Stegasoo Pi Image Smoke Test
 # Automated testing of a fresh Pi image
 #
-# Usage: ./smoke-test.sh [ip] [--https] [--443] [--port=PORT]
-#        Default IP: 192.168.0.4
+# Usage: ./smoke-test.sh [ip] [--https] [--443] [--port=PORT] [--docker]
+#        Default IP: 192.168.0.4 (or localhost for --docker)
 #        --https    Use HTTPS (port 5000)
 #        --443      Use HTTPS on port 443
 #        --port=N   Specify custom port
+#        --docker   Docker mode: skip systemd/SSH checks, use localhost
 #
 
 set -e
@@ -23,6 +24,7 @@ NC='\033[0m'
 PI_IP="192.168.0.4"
 HTTPS=false
 PORT=5000
+DOCKER_MODE=false
 
 # Parse arguments
 for arg in "$@"; do
@@ -30,6 +32,7 @@ for arg in "$@"; do
     --https) HTTPS=true ;;
     --443) HTTPS=true; PORT=443 ;;
     --port=*) PORT="${arg#*=}" ;;
+    --docker) DOCKER_MODE=true; PI_IP="localhost" ;;
     --*) ;; # Ignore other flags
     *)
       # If it looks like an IP, use it
@@ -113,10 +116,17 @@ skip() {
 
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+if [ "$DOCKER_MODE" = true ]; then
+echo -e "${CYAN}║            Stegasoo Docker Smoke Test                         ║${NC}"
+else
 echo -e "${CYAN}║            Stegasoo Pi Image Smoke Test                       ║${NC}"
+fi
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "Target: ${YELLOW}$BASE_URL${NC}"
+if [ "$DOCKER_MODE" = true ]; then
+  echo -e "Mode:   ${YELLOW}Docker${NC}"
+fi
 echo ""
 
 # =============================================================================
@@ -483,32 +493,45 @@ fi
 echo ""
 echo -e "${BOLD}[8/9] System Health${NC}"
 
-# Check if stegasoo CLI works via SSH (optional)
-if command -v sshpass &>/dev/null; then
-  CLI_VERSION=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    admin@$PI_IP "stegasoo --version" 2>/dev/null || echo "")
-
-  if [ -n "$CLI_VERSION" ]; then
-    pass "CLI accessible: $CLI_VERSION"
+if [ "$DOCKER_MODE" = true ]; then
+  # Docker mode: skip SSH/systemd checks, just verify container is responding
+  HEALTH_CHECK=$(curl $CURL_OPTS -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null || echo "000")
+  if [ "$HEALTH_CHECK" = "200" ] || [ "$HEALTH_CHECK" = "302" ]; then
+    pass "Docker container healthy (HTTP $HEALTH_CHECK)"
   else
-    skip "CLI check (SSH failed or CLI not in PATH)"
+    fail "Docker container not responding (HTTP $HEALTH_CHECK)"
   fi
+  skip "CLI check (Docker mode)"
+  skip "Service check (Docker mode)"
 else
-  skip "CLI check (sshpass not installed)"
-fi
+  # Pi mode: check via SSH
+  # Check if stegasoo CLI works via SSH (optional)
+  if command -v sshpass &>/dev/null; then
+    CLI_VERSION=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      admin@$PI_IP "stegasoo --version" 2>/dev/null || echo "")
 
-# Check service status via SSH
-if command -v sshpass &>/dev/null; then
-  SERVICE_STATUS=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    admin@$PI_IP "systemctl is-active stegasoo" 2>/dev/null || echo "unknown")
-
-  if [ "$SERVICE_STATUS" = "active" ]; then
-    pass "Stegasoo service is active"
+    if [ -n "$CLI_VERSION" ]; then
+      pass "CLI accessible: $CLI_VERSION"
+    else
+      skip "CLI check (SSH failed or CLI not in PATH)"
+    fi
   else
-    fail "Stegasoo service status: $SERVICE_STATUS"
+    skip "CLI check (sshpass not installed)"
   fi
-else
-  skip "Service check (sshpass not installed)"
+
+  # Check service status via SSH
+  if command -v sshpass &>/dev/null; then
+    SERVICE_STATUS=$(sshpass -p 'stegasoo' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      admin@$PI_IP "systemctl is-active stegasoo" 2>/dev/null || echo "unknown")
+
+    if [ "$SERVICE_STATUS" = "active" ]; then
+      pass "Stegasoo service is active"
+    else
+      fail "Stegasoo service status: $SERVICE_STATUS"
+    fi
+  else
+    skip "Service check (sshpass not installed)"
+  fi
 fi
 
 # =============================================================================
