@@ -919,7 +919,16 @@ const Stegasoo = {
             }
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding...';
+                const startTime = Date.now();
+                const updateTimer = () => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const mins = Math.floor(elapsed / 60);
+                    const secs = elapsed % 60;
+                    const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Encoding... ${timeStr}`;
+                };
+                updateTimer();
+                setInterval(updateTimer, 1000);
             }
         });
     },
@@ -952,7 +961,16 @@ const Stegasoo = {
             const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})...`;
+                const startTime = Date.now();
+                const updateTimer = () => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const mins = Math.floor(elapsed / 60);
+                    const secs = elapsed % 60;
+                    const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})... ${timeStr}`;
+                };
+                updateTimer();
+                setInterval(updateTimer, 1000);
             }
         });
     },
