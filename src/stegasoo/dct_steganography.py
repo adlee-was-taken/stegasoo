@@ -851,9 +851,12 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
     del channel
     gc.collect()
 
-    h, w = padded.shape
-    blocks_x = w // BLOCK_SIZE
-    num_blocks = (h // BLOCK_SIZE) * blocks_x
+    # Use ORIGINAL image dimensions for block calculations (must match embed)
+    # Embed uses width // BLOCK_SIZE, not padded width
+    h, w = padded.shape  # Padded dimensions for bounds checking
+    blocks_x = width // BLOCK_SIZE
+    blocks_y = height // BLOCK_SIZE
+    num_blocks = blocks_y * blocks_x
 
     block_order = _generate_block_order(num_blocks, seed)
 

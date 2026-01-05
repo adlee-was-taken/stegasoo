@@ -98,16 +98,6 @@ def encode_operation(params: dict) -> dict:
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
 
-    # DEBUG: Log what channel key the worker is using
-    import sys, os
-    from stegasoo.channel import get_channel_key, get_channel_key_hash
-    worker_channel_key = get_channel_key()
-    worker_channel_hash = get_channel_key_hash()
-    print(f"[WORKER ENCODE] cwd={os.getcwd()}", file=sys.stderr)
-    print(f"[WORKER ENCODE] channel_key param='{params.get('channel_key')}' -> resolved='{resolved_channel_key}'", file=sys.stderr)
-    print(f"[WORKER ENCODE] get_channel_key()={worker_channel_key}", file=sys.stderr)
-    print(f"[WORKER ENCODE] get_channel_key_hash()={worker_channel_hash[:8].hex() if worker_channel_hash else None}", file=sys.stderr)
-
     # Call encode with correct parameter names
     result = encode(
         message=payload,
@@ -160,16 +150,6 @@ def decode_operation(params: dict) -> dict:
 
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
-
-    # DEBUG: Log what channel key the worker is using
-    import sys, os
-    from stegasoo.channel import get_channel_key, get_channel_key_hash
-    worker_channel_key = get_channel_key()
-    worker_channel_hash = get_channel_key_hash()
-    print(f"[WORKER DECODE] cwd={os.getcwd()}", file=sys.stderr)
-    print(f"[WORKER DECODE] channel_key param='{params.get('channel_key')}' -> resolved='{resolved_channel_key}'", file=sys.stderr)
-    print(f"[WORKER DECODE] get_channel_key()={worker_channel_key}", file=sys.stderr)
-    print(f"[WORKER DECODE] get_channel_key_hash()={worker_channel_hash[:8].hex() if worker_channel_hash else None}", file=sys.stderr)
 
     # Call decode with correct parameter names
     result = decode(

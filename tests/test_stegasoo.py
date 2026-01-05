@@ -50,8 +50,17 @@ def png_image():
 
 @pytest.fixture
 def large_png_image():
-    """Create a larger test PNG image for DCT mode."""
-    img = Image.new("RGB", (400, 400), color="blue")
+    """Create a larger test PNG image for DCT mode.
+
+    Uses noise instead of solid color to ensure DCT color mode works.
+    Solid colors cause coefficient drift during RGB conversion that
+    can exceed the quantization step and corrupt embedded data.
+    """
+    import numpy as np
+    # Create random noise image (ensures varied Y channel values)
+    np.random.seed(42)  # Reproducible
+    data = np.random.randint(0, 256, (400, 400, 3), dtype=np.uint8)
+    img = Image.fromarray(data, 'RGB')
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)

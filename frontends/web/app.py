@@ -886,16 +886,6 @@ def encode_page():
             ref_data = ref_photo.read()
             carrier_data = carrier.read()
 
-            # DEBUG: Log file hashes to verify bytes match between encode/decode
-            import hashlib
-            import sys
-            ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
-            carrier_hash = hashlib.md5(carrier_data).hexdigest()[:8]
-            print(f"[ENCODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
-            print(f"[ENCODE DEBUG] carrier: {len(carrier_data)} bytes, md5: {carrier_hash}", file=sys.stderr)
-            print(f"[ENCODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
-            print(f"[ENCODE DEBUG] channel_key: '{channel_key}', embed_mode: '{embed_mode}'", file=sys.stderr)
-
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get("rsa_key_qr")
@@ -1019,8 +1009,6 @@ def encode_page():
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
-            stego_hash = hashlib.md5(encode_result.stego_data).hexdigest()[:8]
-            print(f"[ENCODE RESULT] stego: {len(encode_result.stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
             TEMP_FILES[file_id] = {
                 "data": encode_result.stego_data,
                 "filename": filename,
@@ -1101,10 +1089,6 @@ def encode_download(file_id):
 
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "image/png")
-
-    import hashlib
-    download_hash = hashlib.md5(file_info["data"]).hexdigest()[:8]
-    print(f"[DOWNLOAD] stego: {len(file_info['data'])} bytes, md5: {download_hash}", file=sys.stderr)
 
     return send_file(
         io.BytesIO(file_info["data"]),
@@ -1193,15 +1177,6 @@ def decode_page():
             ref_data = ref_photo.read()
             stego_data = stego_image.read()
 
-            # DEBUG: Log file hashes to verify bytes match between encode/decode
-            import hashlib
-            ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
-            stego_hash = hashlib.md5(stego_data).hexdigest()[:8]
-            print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
-            print(f"[DECODE DEBUG] channel_key: '{channel_key}'", file=sys.stderr)
-            print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
-            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}', embed_mode: '{embed_mode}'", file=sys.stderr)
-
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
             rsa_key_qr = request.files.get("rsa_key_qr")
@@ -1256,7 +1231,6 @@ def decode_page():
             )
 
             # Check for subprocess errors
-            print(f"[DECODE RESULT] success={decode_result.success}, error={decode_result.error}", file=sys.stderr)
             if not decode_result.success:
                 error_msg = decode_result.error or "Decoding failed"
                 # Check for channel key related errors

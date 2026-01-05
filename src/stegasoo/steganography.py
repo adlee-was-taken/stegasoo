@@ -525,7 +525,7 @@ def embed_in_image(
     output_format: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = DCT_OUTPUT_PNG,
-    dct_color_mode: str = "grayscale",
+    dct_color_mode: str = "color",
 ) -> tuple[bytes, Union[EmbedStats, "DCTEmbedStats"], str]:
     """
     Embed data into an image using specified mode.
@@ -567,8 +567,8 @@ def embed_in_image(
 
         # Validate DCT color mode (v3.0.1)
         if dct_color_mode not in ("grayscale", "color"):
-            debug.print(f"Invalid dct_color_mode '{dct_color_mode}', defaulting to grayscale")
-            dct_color_mode = "grayscale"
+            debug.print(f"Invalid dct_color_mode '{dct_color_mode}', defaulting to color")
+            dct_color_mode = "color"
 
         dct_mod = _get_dct_module()
 

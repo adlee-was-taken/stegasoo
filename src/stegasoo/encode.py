@@ -35,7 +35,7 @@ def encode(
     output_format: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
-    dct_color_mode: str = "grayscale",
+    dct_color_mode: str = "color",
     channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
@@ -158,7 +158,7 @@ def encode_file(
     filename_override: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
-    dct_color_mode: str = "grayscale",
+    dct_color_mode: str = "color",
     channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
@@ -215,7 +215,7 @@ def encode_bytes(
     mime_type: str | None = None,
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = "png",
-    dct_color_mode: str = "grayscale",
+    dct_color_mode: str = "color",
     channel_key: str | bool | None = None,
 ) -> EncodeResult:
     """
