@@ -71,8 +71,8 @@ scripts/
 frontends/web/instance/
 frontends/web/certs/
 
-# Integration/smoke tests (local tools)
-tests/smoke-test.sh
+# Tests (private)
+tests/
 
 # RPi image build artifacts
 *.img
