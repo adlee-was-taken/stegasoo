@@ -4,9 +4,9 @@
 # Tested on: Raspberry Pi 4/5 with Raspberry Pi OS (64-bit)
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh | bash
 #   # or
-#   wget -qO- https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh | bash
 #
 # What this script does:
 #   1. Installs system dependencies
@@ -48,7 +48,7 @@ show_help() {
     echo "    INSTALL_DIR       Install location (default: /opt/stegasoo)"
     echo "    PYTHON_VERSION    Python version (default: 3.12)"
     echo "    STEGASOO_REPO     Git repo URL"
-    echo "    STEGASOO_BRANCH   Git branch (default: main)"
+    echo "    STEGASOO_BRANCH   Git branch (default: 4.1)"
     echo ""
     echo "  Example:"
     echo "    export INSTALL_DIR=\"/home/pi/stegasoo\""
@@ -68,7 +68,7 @@ done
 INSTALL_DIR="${INSTALL_DIR:-/opt/stegasoo}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 STEGASOO_REPO="${STEGASOO_REPO:-https://github.com/adlee-was-taken/stegasoo.git}"
-STEGASOO_BRANCH="${STEGASOO_BRANCH:-main}"
+STEGASOO_BRANCH="${STEGASOO_BRANCH:-4.1}"
 JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
 
 # Load config files (system, then user - user overrides system)

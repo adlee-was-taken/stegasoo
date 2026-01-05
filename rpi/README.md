@@ -8,7 +8,7 @@ On a fresh Raspberry Pi OS Lite (64-bit) installation:
 
 ```bash
 # Download and run (recommended)
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -16,7 +16,7 @@ chmod +x setup.sh
 Or clone the repo:
 
 ```bash
-git clone https://github.com/adlee-was-taken/stegasoo.git
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
 cd stegasoo/rpi
 ./setup.sh
 ```
@@ -134,7 +134,7 @@ In advanced settings, set:
 ssh admin@stegasoo.local
 
 # Download and run setup script
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
 chmod +x setup.sh
 ./setup.sh
 ```

@@ -14,8 +14,8 @@
 # Git repository URL
 #STEGASOO_REPO="https://github.com/adlee-was-taken/stegasoo.git"
 
-# Git branch to checkout (default: main)
-#STEGASOO_BRANCH="main"
+# Git branch to checkout (default: 4.1)
+#STEGASOO_BRANCH="4.1"
 
 # Web UI port (default: 5000)
 #STEGASOO_PORT="5000"

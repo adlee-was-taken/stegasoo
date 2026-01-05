@@ -24,7 +24,7 @@ ssh admin@stegasoo.local
 
 ```bash
 # Download and run (avoid curl|bash stdin issues)
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
 chmod +x setup.sh
 ./setup.sh
 ```
@@ -105,7 +105,7 @@ zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 
 ```bash
 # On Pi:
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/main/rpi/setup.sh && chmod +x setup.sh && ./setup.sh
+wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh && chmod +x setup.sh && ./setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
 sudo ~/stegasoo/rpi/sanitize-for-image.sh
