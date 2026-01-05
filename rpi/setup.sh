@@ -117,7 +117,7 @@ if [ "$TOTAL_MEM" -lt 2000 ]; then
 fi
 
 # Create /opt/stegasoo with proper permissions
-echo -e "${GREEN}[1/8]${NC} Setting up install directory..."
+echo -e "${GREEN}[1/9]${NC} Setting up install directory..."
 if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER:$USER" "$INSTALL_DIR"
@@ -128,7 +128,7 @@ else
     echo "  $INSTALL_DIR exists, updated ownership"
 fi
 
-echo -e "${GREEN}[2/8]${NC} Installing system dependencies..."
+echo -e "${GREEN}[2/9]${NC} Installing system dependencies..."
 sudo apt-get update
 sudo apt-get install -y \
     build-essential \
@@ -149,7 +149,19 @@ sudo apt-get install -y \
     libzbar0 \
     libjpeg-dev
 
-echo -e "${GREEN}[3/8]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+echo -e "${GREEN}[3/9]${NC} Installing gum (TUI toolkit)..."
+# Add Charm repo for gum
+if ! command -v gum &>/dev/null; then
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+    sudo apt-get update
+    sudo apt-get install -y gum
+else
+    echo "  gum already installed"
+fi
+
+echo -e "${GREEN}[4/9]${NC} Installing pyenv and Python $PYTHON_VERSION..."
 
 # Install pyenv if not present
 if [ ! -d "$HOME/.pyenv" ]; then
@@ -189,7 +201,7 @@ if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[4/8]${NC} Building jpegio for ARM..."
+echo -e "${GREEN}[5/9]${NC} Building jpegio for ARM..."
 
 # Clone jpegio
 JPEGIO_DIR="/tmp/jpegio-build"
@@ -216,7 +228,7 @@ pip install .
 cd "$HOME"
 rm -rf "$JPEGIO_DIR"
 
-echo -e "${GREEN}[5/8]${NC} Installing Stegasoo..."
+echo -e "${GREEN}[6/9]${NC} Installing Stegasoo..."
 
 # Clone Stegasoo
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -244,7 +256,7 @@ pip install -e ".[web]" || {
     pip install argon2-cffi cryptography pillow flask gunicorn scipy numpy pyzbar qrcode
 }
 
-echo -e "${GREEN}[6/8]${NC} Creating systemd service..."
+echo -e "${GREEN}[7/9]${NC} Creating systemd service..."
 
 # Create systemd service file
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
@@ -268,12 +280,12 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[7/8]${NC} Enabling service..."
+echo -e "${GREEN}[8/9]${NC} Enabling service..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
 
-echo -e "${GREEN}[8/8]${NC} Adding stegasoo to PATH..."
+echo -e "${GREEN}[9/9]${NC} Adding stegasoo to PATH..."
 
 # Add stegasoo venv and rpi scripts to PATH for all users
 sudo tee /etc/profile.d/stegasoo-path.sh > /dev/null <<'PATHEOF'
