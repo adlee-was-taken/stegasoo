@@ -100,6 +100,7 @@
                                     <li><strong>Output:</strong> JPEG or PNG</li>
                                     <li><strong>Color:</strong> Color or grayscale</li>
                                     <li><strong>Speed:</strong> ~2s</li>
+                                    <li><strong>Error Correction:</strong> Reed-Solomon <span class="badge bg-info ms-1">v4.1</span></li>
                                 </ul>
                                 <hr>
                                 <div class="small">
@@ -384,10 +385,17 @@
                         </thead>
                         <tbody>
                             <tr>
+                                <td><strong>4.1.0</strong></td>
+                                <td>
+                                    <strong>Reed-Solomon error correction</strong> for DCT mode (corrects up to 16 byte errors per 223-byte chunk),
+                                    majority voting on length headers, improved robustness with problematic carrier images
+                                </td>
+                            </tr>
+                            <tr>
                                 <td><strong>4.0.0</strong></td>
                                 <td>
                                     <strong>Channel keys</strong> for group/deployment isolation,
-                                    DCT default, simplified auth, passphrase replaces day_phrase, 
+                                    DCT default, simplified auth, passphrase replaces day_phrase,
                                     4-word default, JPEG fix, large image support, subprocess isolation, Python 3.10-3.12
                                 </td>
                             </tr>

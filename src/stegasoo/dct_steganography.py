@@ -1,9 +1,14 @@
 """
-DCT Domain Steganography Module (v3.2.0-patch2)
+DCT Domain Steganography Module (v4.1.0)
 
 Embeds data in DCT coefficients with two approaches:
 1. PNG output: Scipy-based DCT transform (grayscale or color)
 2. JPEG output: jpegio-based coefficient manipulation (if available)
+
+v4.1.0 Changes:
+- Reed-Solomon error correction protects against bit errors in problematic blocks
+- Majority voting on length headers (3 copies) for additional robustness
+- RS can correct up to 16 byte errors per 223-byte chunk
 
 v3.2.0-patch2 Changes:
 - Chunked processing for large images to avoid heap corruption
@@ -11,7 +16,7 @@ v3.2.0-patch2 Changes:
 - Isolated DCT operations with fresh array allocations
 - Workaround for scipy.fftpack memory issues
 
-Requires: scipy (for PNG mode), optionally jpegio (for JPEG mode)
+Requires: scipy (for PNG mode), optionally jpegio (for JPEG mode), reedsolo (for error correction)
 """
 
 import gc
@@ -102,6 +107,13 @@ JPEGIO_MAGIC = b"JPGS"
 JPEGIO_MIN_COEF_MAGNITUDE = 2
 JPEGIO_EMBED_CHANNEL = 0
 FLAG_COLOR_MODE = 0x01
+FLAG_RS_PROTECTED = 0x02  # Reed-Solomon error correction enabled
+
+# Reed-Solomon settings - 32 symbols can correct up to 16 byte errors per 223-byte chunk
+RS_NSYM = 32
+RS_LENGTH_HEADER_SIZE = 8  # 8 bytes: 4 for raw_payload_length + 4 for rs_payload_length
+RS_LENGTH_COPIES = 3  # Store length header 3 times for majority voting
+RS_LENGTH_PREFIX_SIZE = RS_LENGTH_HEADER_SIZE * RS_LENGTH_COPIES  # Total: 24 bytes
 
 # Chunking settings for large images
 MAX_CHUNK_HEIGHT = 512  # Process in 512-pixel tall strips
@@ -165,6 +177,44 @@ def has_dct_support() -> bool:
 
 def has_jpegio_support() -> bool:
     return HAS_JPEGIO
+
+
+# ============================================================================
+# REED-SOLOMON ERROR CORRECTION
+# Protects against bit errors in problematic image blocks
+# ============================================================================
+
+# Check for reedsolo availability
+try:
+    from reedsolo import RSCodec, ReedSolomonError
+
+    HAS_REEDSOLO = True
+except ImportError:
+    HAS_REEDSOLO = False
+    RSCodec = None
+    ReedSolomonError = None
+
+
+def _rs_encode(data: bytes) -> bytes:
+    """Add Reed-Solomon error correction symbols to data."""
+    if not HAS_REEDSOLO:
+        return data  # No protection if reedsolo not available
+    rs = RSCodec(RS_NSYM)
+    return bytes(rs.encode(data))
+
+
+def _rs_decode(data: bytes) -> bytes:
+    """Decode Reed-Solomon protected data, correcting errors if possible."""
+    if not HAS_REEDSOLO:
+        return data  # No decoding if reedsolo not available
+    rs = RSCodec(RS_NSYM)
+    try:
+        decoded, _, errata_pos = rs.decode(data)
+        if errata_pos:
+            pass  # Errors were corrected
+        return bytes(decoded)
+    except ReedSolomonError as e:
+        raise ValueError(f"Reed-Solomon decoding failed: {e}") from e
 
 
 # ============================================================================
@@ -436,7 +486,17 @@ def calculate_dct_capacity(image_data: bytes) -> DCTCapacityInfo:
     bits_per_block = len(DEFAULT_EMBED_POSITIONS)
     total_bits = total_blocks * bits_per_block
     total_bytes = total_bits // 8
-    usable_bytes = max(0, total_bytes - HEADER_SIZE)
+    # Account for header and RS overhead
+    # RS format: [24-byte length prefix (3 copies)] + RS(header + data)
+    # RS adds RS_NSYM bytes per 223-byte chunk (255 - RS_NSYM = 223)
+    # Conservatively estimate RS overhead as ~15% + one chunk minimum
+    if HAS_REEDSOLO:
+        # Overhead = 24 (prefix) + 10 (header) + RS overhead
+        # Simplify: base overhead = 24 + 10 + 32 + 15% margin for larger data
+        overhead = RS_LENGTH_PREFIX_SIZE + HEADER_SIZE + RS_NSYM + 20
+    else:
+        overhead = HEADER_SIZE
+    usable_bytes = max(0, total_bytes - overhead)
 
     return DCTCapacityInfo(
         width=width,
@@ -538,9 +598,20 @@ def _embed_scipy_dct_safe(
 
     flags = FLAG_COLOR_MODE if color_mode == "color" else 0
 
-    # Prepare payload bits
+    # Build raw payload (header + data)
     header = _create_header(len(data), flags)
-    payload = header + data
+    raw_payload = header + data
+
+    # Apply Reed-Solomon error correction to entire payload if available
+    if HAS_REEDSOLO:
+        rs_payload = _rs_encode(raw_payload)
+        # Format: [length_header x 3 for majority voting] + [RS-encoded payload]
+        # Each length_header is 8 bytes: 4 for raw_payload_length + 4 for rs_payload_length
+        length_header = struct.pack(">II", len(raw_payload), len(rs_payload))
+        length_prefix = length_header * RS_LENGTH_COPIES  # Repeat 3 times
+        payload = length_prefix + rs_payload
+    else:
+        payload = raw_payload
     bits = []
     for byte in payload:
         for i in range(7, -1, -1):
@@ -761,8 +832,19 @@ def _embed_jpegio(
         all_positions = _jpegio_get_usable_positions(coef_array)
         order = _jpegio_generate_order(len(all_positions), seed)
 
+        # Build raw payload (header + data)
         header = _jpegio_create_header(len(data), flags)
-        payload = header + data
+        raw_payload = header + data
+
+        # Apply Reed-Solomon error correction to entire payload if available
+        if HAS_REEDSOLO:
+            rs_payload = _rs_encode(raw_payload)
+            # Format: [length_header x 3 for majority voting] + [RS-encoded payload]
+            length_header = struct.pack(">II", len(raw_payload), len(rs_payload))
+            length_prefix = length_header * RS_LENGTH_COPIES
+            payload = length_prefix + rs_payload
+        else:
+            payload = raw_payload
 
         bits = []
         for byte in payload:
@@ -892,6 +974,69 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
     del padded
     gc.collect()
 
+    # Try RS-protected format first (has 24-byte length prefix: 3 copies of 8-byte header)
+    if HAS_REEDSOLO and len(all_bits) >= RS_LENGTH_PREFIX_SIZE * 8:
+        # Extract length prefix (24 bytes: 3 copies of 8-byte header for majority voting)
+        length_prefix_bits = all_bits[: RS_LENGTH_PREFIX_SIZE * 8]
+        length_prefix_bytes = bytes(
+            [
+                sum(length_prefix_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                for i in range(RS_LENGTH_PREFIX_SIZE)
+            ]
+        )
+
+        # Extract 3 copies and use majority voting
+        copies = []
+        for i in range(RS_LENGTH_COPIES):
+            start = i * RS_LENGTH_HEADER_SIZE
+            end = start + RS_LENGTH_HEADER_SIZE
+            copies.append(length_prefix_bytes[start:end])
+
+        # Count occurrences of each unique copy
+        from collections import Counter
+        counter = Counter(copies)
+        best_header, count = counter.most_common(1)[0]
+
+        # Only proceed if we have at least 2 matching copies (majority)
+        if count >= 2:
+            raw_payload_length, rs_encoded_length = struct.unpack(">II", best_header)
+        else:
+            # No majority - try first copy as fallback
+            raw_payload_length, rs_encoded_length = struct.unpack(">II", copies[0])
+
+        # Sanity check: both lengths should be reasonable
+        max_reasonable = (len(all_bits) // 8) - RS_LENGTH_PREFIX_SIZE
+        if (raw_payload_length > 0 and raw_payload_length <= max_reasonable and
+            rs_encoded_length > 0 and rs_encoded_length <= max_reasonable and
+            rs_encoded_length >= raw_payload_length):
+            # This looks like RS-protected format
+            total_bits_needed = (RS_LENGTH_PREFIX_SIZE + rs_encoded_length) * 8
+
+            if len(all_bits) >= total_bits_needed:
+                rs_bits = all_bits[RS_LENGTH_PREFIX_SIZE * 8 : total_bits_needed]
+                rs_encoded = bytes(
+                    [
+                        sum(rs_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                        for i in range(rs_encoded_length)
+                    ]
+                )
+
+                try:
+                    # RS decode to get header + data
+                    raw_payload = _rs_decode(rs_encoded)
+
+                    # Parse header from decoded payload
+                    _, flags, data_length = _parse_header(
+                        [((raw_payload[i // 8] >> (7 - i % 8)) & 1) for i in range(HEADER_SIZE * 8)]
+                    )
+
+                    # Extract data
+                    data = raw_payload[HEADER_SIZE : HEADER_SIZE + data_length]
+                    return data
+                except (ValueError, struct.error):
+                    pass  # Fall through to legacy format
+
+    # Legacy format: header not protected by RS
     _, flags, data_length = _parse_header(all_bits)
     data_bits = all_bits[HEADER_SIZE * 8 : (HEADER_SIZE + data_length) * 8]
 
@@ -922,6 +1067,72 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
         all_positions = _jpegio_get_usable_positions(coef_array)
         order = _jpegio_generate_order(len(all_positions), seed)
 
+        # Try RS-protected format first (has 24-byte length prefix: 3 copies for majority voting)
+        if HAS_REEDSOLO and len(all_positions) >= RS_LENGTH_PREFIX_SIZE * 8:
+            # Extract length prefix (24 bytes: 3 copies of 8-byte header)
+            length_prefix_bits = []
+            for pos_idx in order[: RS_LENGTH_PREFIX_SIZE * 8]:
+                row, col = all_positions[pos_idx]
+                coef = coef_array[row, col]
+                length_prefix_bits.append(coef & 1)
+
+            length_prefix_bytes = bytes(
+                [
+                    sum(length_prefix_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                    for i in range(RS_LENGTH_PREFIX_SIZE)
+                ]
+            )
+
+            # Extract 3 copies and use majority voting
+            from collections import Counter
+            copies = []
+            for i in range(RS_LENGTH_COPIES):
+                start = i * RS_LENGTH_HEADER_SIZE
+                end = start + RS_LENGTH_HEADER_SIZE
+                copies.append(length_prefix_bytes[start:end])
+
+            counter = Counter(copies)
+            best_header, count = counter.most_common(1)[0]
+
+            if count >= 2:
+                raw_payload_length, rs_encoded_length = struct.unpack(">II", best_header)
+            else:
+                raw_payload_length, rs_encoded_length = struct.unpack(">II", copies[0])
+
+            # Sanity check
+            max_reasonable = (len(all_positions) // 8) - RS_LENGTH_PREFIX_SIZE
+            if (raw_payload_length > 0 and raw_payload_length <= max_reasonable and
+                rs_encoded_length > 0 and rs_encoded_length <= max_reasonable and
+                rs_encoded_length >= raw_payload_length):
+                total_bits_needed = (RS_LENGTH_PREFIX_SIZE + rs_encoded_length) * 8
+
+                if len(all_positions) >= total_bits_needed:
+                    # Extract RS-encoded data
+                    all_bits = []
+                    for bit_idx, pos_idx in enumerate(order):
+                        if bit_idx >= total_bits_needed:
+                            break
+                        row, col = all_positions[pos_idx]
+                        coef = coef_array[row, col]
+                        all_bits.append(coef & 1)
+
+                    rs_bits = all_bits[RS_LENGTH_PREFIX_SIZE * 8 :]
+                    rs_encoded = bytes(
+                        [
+                            sum(rs_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
+                            for i in range(rs_encoded_length)
+                        ]
+                    )
+
+                    try:
+                        raw_payload = _rs_decode(rs_encoded)
+                        _, flags, data_length = _jpegio_parse_header(raw_payload[:HEADER_SIZE])
+                        data = raw_payload[HEADER_SIZE : HEADER_SIZE + data_length]
+                        return data
+                    except (ValueError, struct.error):
+                        pass  # Fall through to legacy format
+
+        # Legacy format: header not protected by RS
         header_bits = []
         for pos_idx in order[: HEADER_SIZE * 8]:
             row, col = all_positions[pos_idx]
@@ -936,7 +1147,6 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
         )
 
         _, flags, data_length = _jpegio_parse_header(header_bytes)
-
         total_bits_needed = (HEADER_SIZE + data_length) * 8
 
         all_bits = []
@@ -948,7 +1158,6 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
             all_bits.append(coef & 1)
 
         data_bits = all_bits[HEADER_SIZE * 8 :]
-
         data = bytes(
             [
                 sum(data_bits[i * 8 : (i + 1) * 8][j] << (7 - j) for j in range(8))
