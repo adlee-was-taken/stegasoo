@@ -1197,6 +1197,7 @@ def decode_page():
             ref_hash = hashlib.md5(ref_data).hexdigest()[:8]
             stego_hash = hashlib.md5(stego_data).hexdigest()[:8]
             print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
+            print(f"[DECODE DEBUG] channel_key: '{channel_key}'", file=sys.stderr)
             print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
             print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
 
@@ -1254,6 +1255,7 @@ def decode_page():
             )
 
             # Check for subprocess errors
+            print(f"[DECODE RESULT] success={decode_result.success}, error={decode_result.error}", file=sys.stderr)
             if not decode_result.success:
                 error_msg = decode_result.error or "Decoding failed"
                 # Check for channel key related errors
