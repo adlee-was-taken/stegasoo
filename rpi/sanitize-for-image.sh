@@ -71,13 +71,13 @@ fi
 
 clear
 echo ""
-echo -e "${GRAY}  .  *  .   .    *    .   *   .  *   .    *   .${NC}"
+echo -e "${GRAY}    .  *  .   .    *    .   *   .  *   .    *   .${NC}"
 echo -e "${CYAN}   ___  _____  ___    ___    _    ___    ___    ___${NC}"
 echo -e "${CYAN}  / __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\${NC}"
 echo -e "${CYAN}  \\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |${NC}"
 echo -e "${CYAN}  |___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/${NC}"
 echo ""
-echo -e "${GRAY}  *    .   *   .    *    .   *   .    *   .   *${NC}"
+echo -e "${GRAY}    *    .   *   .    *    .   *   .    *   .   *${NC}"
 echo ""
 if [ "$SOFT_RESET" = true ]; then
     echo -e "${CYAN}         Soft Reset (Factory)${NC}"
