@@ -103,10 +103,14 @@ Upload `.img.zst` to GitHub Releases.
 
 Users can flash with:
 ```bash
-# Linux
-zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
+# Option 1: rpi-imager CLI (supports .zst.zip directly)
+sudo rpi-imager --cli --disable-verify stegasoo-rpi-*.img.zst.zip /dev/sdX
 
-# Or use rpi-imager "Use custom" option
+# Option 2: flash-image.sh (auto-detects SD card, shows progress)
+sudo ./rpi/flash-image.sh stegasoo-rpi-*.img.zst.zip
+
+# Option 3: Manual dd
+zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 ```
 
 ---
