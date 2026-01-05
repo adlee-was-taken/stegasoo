@@ -513,58 +513,111 @@
                 <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Limits &amp; Specs</h5>
             </div>
             <div class="card-body">
-                <table class="table table-dark table-striped small">
-                    <tbody>
-                        <tr>
-                            <td><i class="bi bi-file-text me-2"></i>Max text</td>
-                            <td><strong>2M characters</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-file-earmark me-2"></i>Max file</td>
-                            <td><strong>{{ max_payload_kb }} KB</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-image me-2"></i>Max carrier</td>
-                            <td><strong>24 MP</strong> (~6000x4000)</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-soundwave me-2"></i>DCT capacity</td>
-                            <td><strong>~75 KB/MP</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-grid-3x3 me-2"></i>LSB capacity</td>
-                            <td><strong>~375 KB/MP</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-upload me-2"></i>Max upload</td>
-                            <td><strong>30 MB</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-clock me-2"></i>File expiry</td>
-                            <td><strong>5 min</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-key me-2"></i>PIN</td>
-                            <td><strong>6-9 digits</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-shield me-2"></i>RSA keys</td>
-                            <td><strong>2048, 3072, 4096 bit</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase</td>
-                            <td><strong>3-12 words</strong> (BIP-39)</td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-code me-2"></i>Python Version</td>
-                            <td><strong>3.10-3.12</strong></td>
-                        </tr>
-                        <tr>
-                            <td><i class="bi bi-box me-2"></i>Built with</td>
-                            <td>Flask, Pillow, NumPy, SciPy, jpegio, cryptography, argon2-cffi</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <!-- Key Specs - Always Visible -->
+                <div class="row text-center mb-4">
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-file-earmark text-primary fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Max Payload</div>
+                            <strong>{{ max_payload_kb }} KB</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-image text-info fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Max Carrier</div>
+                            <strong>24 MP</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-soundwave text-warning fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">DCT Capacity</div>
+                            <strong>~75 KB/MP</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-grid-3x3 text-success fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">LSB Capacity</div>
+                            <strong>~375 KB/MP</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-shield-check text-danger fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Encryption</div>
+                            <strong>AES-256</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-lg-2 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-bandaid text-info fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Error Correction</div>
+                            <strong>Reed-Solomon</strong>
+                            <span class="badge bg-info ms-1">v4.1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Correction Detail -->
+                <div class="alert alert-info small mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Reed-Solomon Error Correction:</strong> DCT mode corrects up to 16 byte errors per 223-byte chunk.
+                    Handles problematic carrier images with uniform areas that cause unstable DCT coefficients.
+                </div>
+
+                <!-- More Specs - Accordion -->
+                <div class="accordion" id="specsAccordion">
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-dark text-light py-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#moreSpecs">
+                                <i class="bi bi-list-ul me-2"></i>More Specifications
+                            </button>
+                        </h2>
+                        <div id="moreSpecs" class="accordion-collapse collapse" data-bs-parent="#specsAccordion">
+                            <div class="accordion-body p-0">
+                                <table class="table table-dark table-striped small mb-0">
+                                    <tbody>
+                                        <tr>
+                                            <td><i class="bi bi-file-text me-2"></i>Max text</td>
+                                            <td><strong>2M characters</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-upload me-2"></i>Max upload</td>
+                                            <td><strong>30 MB</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-clock me-2"></i>File expiry</td>
+                                            <td><strong>5 min</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-key me-2"></i>PIN</td>
+                                            <td><strong>6-9 digits</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-shield me-2"></i>RSA keys</td>
+                                            <td><strong>2048, 3072, 4096 bit</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-chat-quote me-2"></i>Passphrase</td>
+                                            <td><strong>3-12 words</strong> (BIP-39)</td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-code me-2"></i>Python Version</td>
+                                            <td><strong>3.10-3.12</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><i class="bi bi-box me-2"></i>Built with</td>
+                                            <td>Flask, Pillow, NumPy, SciPy, jpegio, reedsolo, cryptography, argon2-cffi</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
