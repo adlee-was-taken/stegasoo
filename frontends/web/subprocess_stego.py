@@ -179,6 +179,10 @@ class SubprocessStego:
                 cwd=str(self.worker_path.parent),
             )
 
+            # DEBUG: Log worker stderr to main process stderr
+            if result.stderr:
+                print(result.stderr, file=sys.stderr, end='')
+
             if result.returncode != 0:
                 # Worker crashed
                 return {
