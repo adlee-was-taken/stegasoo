@@ -3,8 +3,11 @@
 # Stegasoo Pi Image Smoke Test
 # Automated testing of a fresh Pi image
 #
-# Usage: ./smoke-test.sh [ip] [--https]
+# Usage: ./smoke-test.sh [ip] [--https] [--443] [--port=PORT]
 #        Default IP: 192.168.0.4
+#        --https    Use HTTPS (port 5000)
+#        --443      Use HTTPS on port 443
+#        --port=N   Specify custom port
 #
 
 set -e
@@ -17,20 +20,35 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # Configuration
-PI_IP="${1:-192.168.0.4}"
+PI_IP="192.168.0.4"
 HTTPS=false
-if [[ "$2" == "--https" ]] || [[ "$1" == "--https" ]]; then
-  HTTPS=true
-  if [[ "$1" == "--https" ]]; then
-    PI_IP="192.168.0.4"
-  fi
-fi
+PORT=5000
+
+# Parse arguments
+for arg in "$@"; do
+  case $arg in
+    --https) HTTPS=true ;;
+    --443) HTTPS=true; PORT=443 ;;
+    --port=*) PORT="${arg#*=}" ;;
+    --*) ;; # Ignore other flags
+    *)
+      # If it looks like an IP, use it
+      if [[ "$arg" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        PI_IP="$arg"
+      fi
+      ;;
+  esac
+done
 
 if [ "$HTTPS" = true ]; then
-  BASE_URL="https://$PI_IP:5000"
+  if [ "$PORT" = "443" ]; then
+    BASE_URL="https://$PI_IP"
+  else
+    BASE_URL="https://$PI_IP:$PORT"
+  fi
   CURL_OPTS="-k" # Allow self-signed certs
 else
-  BASE_URL="http://$PI_IP:5000"
+  BASE_URL="http://$PI_IP:$PORT"
   CURL_OPTS=""
 fi
 
