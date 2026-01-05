@@ -1101,6 +1101,7 @@ def encode_download(file_id):
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "image/png")
 
+    import hashlib
     download_hash = hashlib.md5(file_info["data"]).hexdigest()[:8]
     print(f"[DOWNLOAD] stego: {len(file_info['data'])} bytes, md5: {download_hash}", file=sys.stderr)
 
