@@ -894,7 +894,7 @@ def encode_page():
             print(f"[ENCODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
             print(f"[ENCODE DEBUG] carrier: {len(carrier_data)} bytes, md5: {carrier_hash}", file=sys.stderr)
             print(f"[ENCODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
-            print(f"[ENCODE DEBUG] channel_key: '{channel_key}'", file=sys.stderr)
+            print(f"[ENCODE DEBUG] channel_key: '{channel_key}', embed_mode: '{embed_mode}'", file=sys.stderr)
 
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
@@ -1200,7 +1200,7 @@ def decode_page():
             print(f"[DECODE DEBUG] ref: {len(ref_data)} bytes, md5: {ref_hash}", file=sys.stderr)
             print(f"[DECODE DEBUG] channel_key: '{channel_key}'", file=sys.stderr)
             print(f"[DECODE DEBUG] stego: {len(stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
-            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}'", file=sys.stderr)
+            print(f"[DECODE DEBUG] passphrase: '{passphrase}', pin: '{pin}', embed_mode: '{embed_mode}'", file=sys.stderr)
 
             # Handle RSA key - can come from .pem file or QR code image
             rsa_key_data = None
