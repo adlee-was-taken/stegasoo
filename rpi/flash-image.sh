@@ -3,10 +3,10 @@
 # Flash Stegasoo image to SD card
 # Auto-detects SD card, decompresses and writes with progress
 #
-# Usage: ./flash-image.sh <image.img.xz> [device]
-#        ./flash-image.sh <image.img> [device]
+# Usage: ./flash-image.sh <image> [device]
 #
-# If device is specified, skips auto-detection (useful for large drives)
+# Supports: .img, .img.zst, .img.xz, .img.gz, .img.zst.zip (GitHub release format)
+# If device is specified, skips auto-detection (useful for NVMe/large drives)
 #
 
 set -e
@@ -34,11 +34,14 @@ fi
 
 # Check for image argument
 if [ -z "$1" ]; then
-    echo -e "${RED}Usage: $0 <image.img.xz|image.img> [device]${NC}"
+    echo -e "${RED}Usage: $0 <image> [device]${NC}"
+    echo ""
+    echo "Supported formats: .img, .img.zst, .img.xz, .img.gz, .img.zst.zip"
     echo ""
     echo "Examples:"
-    echo "  $0 stegasoo-rpi-20260103.img.xz           # auto-detect SD card"
-    echo "  $0 stegasoo-rpi-20260103.img.xz /dev/sdb  # specify device"
+    echo "  $0 stegasoo-rpi-4.1.1.img.zst             # auto-detect SD card"
+    echo "  $0 stegasoo-rpi-4.1.1.img.zst.zip         # from GitHub release"
+    echo "  $0 stegasoo-rpi-4.1.1.img.zst /dev/sdb    # specify device"
     exit 1
 fi
 
@@ -48,6 +51,25 @@ MANUAL_DEVICE="$2"
 if [ ! -f "$IMAGE" ]; then
     echo -e "${RED}Error: Image file not found: $IMAGE${NC}"
     exit 1
+fi
+
+# Handle .zst.zip wrapper (GitHub releases workaround)
+if [[ "$IMAGE" == *.zst.zip ]]; then
+    echo -e "${YELLOW}Extracting .zst from zip wrapper...${NC}"
+    if ! command -v unzip &> /dev/null; then
+        echo -e "${RED}Error: unzip is required for .zst.zip files but not installed.${NC}"
+        exit 1
+    fi
+    TEMP_DIR=$(mktemp -d)
+    trap "rm -rf $TEMP_DIR" EXIT
+    unzip -q "$IMAGE" -d "$TEMP_DIR"
+    IMAGE=$(find "$TEMP_DIR" -name "*.zst" | head -1)
+    if [ -z "$IMAGE" ]; then
+        echo -e "${RED}Error: No .zst file found in zip archive${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}Found: $(basename "$IMAGE")${NC}"
+    echo ""
 fi
 
 # Detect compression
