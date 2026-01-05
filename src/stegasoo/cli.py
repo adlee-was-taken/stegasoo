@@ -56,7 +56,14 @@ def cli(ctx, json_output):
 
 
 @cli.command()
-@click.argument("image", type=click.Path(exists=True))
+@click.argument("carrier", type=click.Path(exists=True))
+@click.option(
+    "-r",
+    "--reference",
+    required=True,
+    type=click.Path(exists=True),
+    help="Reference photo (shared secret)",
+)
 @click.option("-m", "--message", help="Message to encode")
 @click.option(
     "-f",
@@ -86,18 +93,20 @@ def cli(ctx, json_output):
 @click.option("--dry-run", is_flag=True, help="Show capacity usage without encoding")
 @click.pass_context
 def encode(
-    ctx, image, message, file_payload, output, passphrase, pin, compress, algorithm, dry_run
+    ctx, carrier, reference, message, file_payload, output, passphrase, pin, compress, algorithm, dry_run
 ):
     """
     Encode a message or file into an image.
 
     Examples:
 
-        stegasoo encode photo.png -m "Secret message" --passphrase --pin
+        stegasoo encode photo.png -r ref.jpg -m "Secret message" --passphrase --pin
 
-        stegasoo encode photo.png -f secret.pdf -o encoded.png
+        stegasoo encode photo.png -r ref.jpg -f secret.pdf -o encoded.png
     """
     from PIL import Image
+    from .encode import encode as stegasoo_encode
+    from .encode import encode_file as stegasoo_encode_file
 
     if not message and not file_payload:
         raise click.UsageError("Either --message or --file is required")
@@ -123,13 +132,14 @@ def encode(
         payload_type = "text"
 
     # Get image capacity
-    with Image.open(image) as img:
+    with Image.open(carrier) as img:
         width, height = img.size
         capacity_bytes = (width * height * 3 // 8) - 69  # v3.2.0: corrected overhead
 
     if dry_run:
         result = {
-            "image": image,
+            "carrier": carrier,
+            "reference": reference,
             "dimensions": f"{width}x{height}",
             "capacity_bytes": capacity_bytes,
             "payload_type": payload_type,
@@ -142,7 +152,8 @@ def encode(
         if ctx.obj.get("json"):
             click.echo(json.dumps(result, indent=2))
         else:
-            click.echo(f"Image: {image} ({width}x{height})")
+            click.echo(f"Carrier: {carrier} ({width}x{height})")
+            click.echo(f"Reference: {reference}")
             click.echo(f"Capacity: {capacity_bytes:,} bytes ({capacity_bytes//1024} KB)")
             click.echo(f"Payload: {payload_size:,} bytes ({payload_type})")
             click.echo(f"Compression: {algorithm_name(compression_algo)}")
@@ -150,57 +161,159 @@ def encode(
             click.echo(f"Status: {'✓ Fits' if result['fits'] else '✗ Too large'}")
         return
 
-    # Actual encoding would happen here
-    # For now, show what would be done
-    output = output or f"{Path(image).stem}_encoded.png"
+    # Read input files
+    with open(reference, "rb") as f:
+        reference_data = f.read()
+    with open(carrier, "rb") as f:
+        carrier_data = f.read()
 
-    if ctx.obj.get("json"):
-        click.echo(
-            json.dumps(
-                {
-                    "status": "success",
-                    "input": image,
-                    "output": output,
-                    "payload_type": payload_type,
-                    "compression": algorithm_name(compression_algo),
-                },
-                indent=2,
+    # Determine output path
+    output = output or f"{Path(carrier).stem}_encoded.png"
+
+    try:
+        if file_payload:
+            # Encode file
+            result = stegasoo_encode_file(
+                filepath=file_payload,
+                reference_photo=reference_data,
+                carrier_image=carrier_data,
+                passphrase=passphrase,
+                pin=pin,
             )
-        )
-    else:
-        click.echo(f"✓ Encoded {payload_type} to {output}")
-        click.echo(f"  Compression: {algorithm_name(compression_algo)}")
+        else:
+            # Encode message
+            result = stegasoo_encode(
+                message=message,
+                reference_photo=reference_data,
+                carrier_image=carrier_data,
+                passphrase=passphrase,
+                pin=pin,
+            )
+
+        # Write output
+        with open(output, "wb") as f:
+            f.write(result.stego_image)
+
+        if ctx.obj.get("json"):
+            click.echo(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "carrier": carrier,
+                        "reference": reference,
+                        "output": output,
+                        "payload_type": payload_type,
+                        "compression": algorithm_name(compression_algo),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            click.echo(f"✓ Encoded {payload_type} to {output}")
+            click.echo(f"  Reference: {reference}")
+            click.echo(f"  Compression: {algorithm_name(compression_algo)}")
+
+    except Exception as e:
+        if ctx.obj.get("json"):
+            click.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            click.echo(f"✗ Encoding failed: {e}", err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
 @click.argument("image", type=click.Path(exists=True))
+@click.option(
+    "-r",
+    "--reference",
+    required=True,
+    type=click.Path(exists=True),
+    help="Reference photo (shared secret)",
+)
 @click.option("--passphrase", prompt=True, hide_input=True, help="Passphrase")
 @click.option("--pin", prompt=True, hide_input=True, help="PIN code")
 @click.option("-o", "--output", type=click.Path(), help="Output path for file payloads")
 @click.pass_context
-def decode(ctx, image, passphrase, pin, output):
+def decode(ctx, image, reference, passphrase, pin, output):
     """
     Decode a message or file from an image.
 
     Examples:
 
-        stegasoo decode encoded.png --passphrase --pin
+        stegasoo decode encoded.png -r ref.jpg --passphrase --pin
 
-        stegasoo decode encoded.png -o ./extracted/
+        stegasoo decode encoded.png -r ref.jpg -o ./extracted/
     """
-    # Actual decoding would happen here
-    result = {
-        "status": "success",
-        "image": image,
-        "payload_type": "text",
-        "message": "[Decoded message would appear here]",
-    }
+    from .decode import decode as stegasoo_decode
 
-    if ctx.obj.get("json"):
-        click.echo(json.dumps(result, indent=2))
-    else:
-        click.echo(f"Decoded from {image}:")
-        click.echo(result["message"])
+    # Read input files
+    with open(image, "rb") as f:
+        stego_data = f.read()
+    with open(reference, "rb") as f:
+        reference_data = f.read()
+
+    try:
+        result = stegasoo_decode(
+            stego_image=stego_data,
+            reference_photo=reference_data,
+            passphrase=passphrase,
+            pin=pin,
+        )
+
+        if result.is_file:
+            # File payload
+            filename = result.filename or "decoded_file"
+            output_path = Path(output) / filename if output else Path(filename)
+
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "wb") as f:
+                f.write(result.file_data)
+
+            if ctx.obj.get("json"):
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "image": image,
+                            "reference": reference,
+                            "payload_type": "file",
+                            "filename": filename,
+                            "output": str(output_path),
+                            "size": len(result.file_data),
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                click.echo(f"✓ Extracted file: {output_path}")
+                click.echo(f"  Size: {len(result.file_data):,} bytes")
+        else:
+            # Text message
+            if ctx.obj.get("json"):
+                click.echo(
+                    json.dumps(
+                        {
+                            "status": "success",
+                            "image": image,
+                            "reference": reference,
+                            "payload_type": "text",
+                            "message": result.message,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                click.echo(f"Decoded from {image}:")
+                click.echo(result.message)
+
+    except Exception as e:
+        if ctx.obj.get("json"):
+            click.echo(json.dumps({"status": "error", "error": str(e)}, indent=2))
+        else:
+            click.echo(f"✗ Decoding failed: {e}", err=True)
+        raise SystemExit(1)
 
 
 # =============================================================================
