@@ -99,6 +99,23 @@ const Stegasoo = {
                     }
                 });
             }
+
+            // Make preview clickable to replace file
+            if (preview) {
+                preview.style.cursor = 'pointer';
+                preview.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    input.click();
+                });
+            }
+
+            // Make entire zone clickable (in case label/preview don't cover it)
+            zone.addEventListener('click', (e) => {
+                // Only trigger if not clicking directly on the input
+                if (e.target !== input) {
+                    input.click();
+                }
+            });
         });
     },
     
@@ -575,7 +592,7 @@ const Stegasoo = {
                 console.log('QR crop/extract error:', err);
                 container.classList.remove('loading', 'scanning');
                 container.classList.add('error');
-                
+
                 // Update loader to show error
                 const loader = container.querySelector('.qr-loader');
                 if (loader) {
@@ -584,6 +601,17 @@ const Stegasoo = {
                         <span>No QR code detected</span>
                     `;
                 }
+
+                // Reset after delay so user can try again
+                setTimeout(() => {
+                    container.classList.remove('error');
+                    container.classList.add('d-none');
+                    label?.classList.remove('d-none');
+                    // Clear the file input so same file can be re-selected
+                    input.value = '';
+                    // Remove loader
+                    if (loader) loader.remove();
+                }, 2000);
             });
         });
     },

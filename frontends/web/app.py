@@ -192,6 +192,24 @@ app.config["HTTPS_ENABLED"] = os.environ.get("STEGASOO_HTTPS_ENABLED", "false").
 # Initialize auth module
 init_auth(app)
 
+
+@app.before_request
+def require_setup():
+    """Force redirect to setup if no users exist (first-run)."""
+    if not app.config.get("AUTH_ENABLED", True):
+        return None
+
+    # Skip for static files and setup-related routes
+    if request.endpoint in ("static", "setup", "setup_recovery", None):
+        return None
+
+    # If no users exist, redirect to setup
+    if not user_exists():
+        return redirect(url_for("setup"))
+
+    return None
+
+
 # Temporary file storage for sharing (file_id -> {data, timestamp, filename})
 TEMP_FILES: dict[str, dict] = {}
 THUMBNAIL_FILES: dict[str, bytes] = {}

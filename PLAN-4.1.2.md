@@ -167,21 +167,24 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 4. Forced First-Login Setup
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Users can navigate the app without creating an admin account first. Should force password setup before anything else.
 
 **Solution:** Middleware/decorator that redirects to setup page if no users exist.
 
-### Files to Modify
-- `frontends/web/app.py` (add before_request check)
-- `frontends/web/templates/setup.html` (ensure it blocks other nav)
+### Implementation
+- Added `@app.before_request` hook that redirects to /setup if no users exist
+- Skips redirect for static files and setup-related routes
+
+### Files Modified
+- `frontends/web/app.py` (added require_setup before_request hook)
 
 ---
 
 ## 5. Dropzone UX Fixes
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Dropzone has some interaction bugs:
 - Dropzone doesn't clear properly if first QR image fails
@@ -189,9 +192,14 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 **Solution:** Fix JS event handling and state management
 
-### Files to Modify
+### Implementation
+- Added click handler on preview images to trigger file input
+- Made entire drop zone clickable (not just label)
+- QR zone now resets after 2 seconds on error, allowing retry
+- Clear file input on QR error so same file can be re-selected
+
+### Files Modified
 - `frontends/web/static/js/stegasoo.js`
-- `frontends/web/static/css/style.css` (clickable preview)
 
 ---
 
@@ -272,6 +280,6 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## Notes
 
-- Keep 4.1.2 focused - 9 features (2 done)
+- Keep 4.1.2 focused - 9 features (4 done)
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
