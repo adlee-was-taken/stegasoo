@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Flash Stegasoo image to SD card
-# Auto-detects SD card, decompresses and writes with progress
+# Uses rpi-imager if available, falls back to dd
 #
 # Usage: ./flash-image.sh <image> [device]
 #
@@ -19,12 +19,26 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # Check for required tools
-for cmd in dd pv lsblk; do
+for cmd in dd lsblk; do
     if ! command -v $cmd &> /dev/null; then
         echo -e "${RED}Error: $cmd is required but not installed.${NC}"
         exit 1
     fi
 done
+
+# Check for optional tools
+HAS_RPI_IMAGER=false
+HAS_PV=false
+if command -v rpi-imager &> /dev/null; then
+    HAS_RPI_IMAGER=true
+fi
+if command -v pv &> /dev/null; then
+    HAS_PV=true
+fi
+
+if [ "$HAS_RPI_IMAGER" = false ] && [ "$HAS_PV" = false ]; then
+    echo -e "${YELLOW}Warning: Neither rpi-imager nor pv found. Progress will not be shown.${NC}"
+fi
 
 # Check for root
 if [ "$EUID" -ne 0 ]; then
@@ -224,14 +238,46 @@ echo ""
 echo -e "${GREEN}Flashing image to $SELECTED...${NC}"
 echo ""
 
-if [ "$COMPRESSED" = true ]; then
-    case "$COMP_TYPE" in
-        xz)  pv "$IMAGE" | xzcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-        zst) pv "$IMAGE" | zstdcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-        gz)  pv "$IMAGE" | zcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-    esac
+# Try rpi-imager first (faster, native support for compressed images)
+if command -v rpi-imager &> /dev/null; then
+    echo -e "${YELLOW}Using rpi-imager...${NC}"
+    if rpi-imager --cli --disable-verify "$IMAGE" "$SELECTED"; then
+        # rpi-imager succeeded
+        :
+    else
+        echo -e "${YELLOW}rpi-imager failed, falling back to dd...${NC}"
+        # Fall through to dd
+        USE_DD=true
+    fi
 else
-    pv "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
+    USE_DD=true
+fi
+
+# Fallback to dd
+if [ "$USE_DD" = true ]; then
+    if [ "$HAS_PV" = true ]; then
+        echo -e "${YELLOW}Using dd with progress...${NC}"
+        if [ "$COMPRESSED" = true ]; then
+            case "$COMP_TYPE" in
+                xz)  pv "$IMAGE" | xzcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+                zst) pv "$IMAGE" | zstdcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+                gz)  pv "$IMAGE" | zcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+            esac
+        else
+            pv "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
+        fi
+    else
+        echo -e "${YELLOW}Using dd (no progress - install pv for progress bar)...${NC}"
+        if [ "$COMPRESSED" = true ]; then
+            case "$COMP_TYPE" in
+                xz)  xzcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+                zst) zstdcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+                gz)  zcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+            esac
+        else
+            dd if="$IMAGE" of="$SELECTED" bs=4M conv=fsync status=progress
+        fi
+    fi
 fi
 
 echo ""
