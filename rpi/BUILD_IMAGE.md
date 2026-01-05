@@ -20,13 +20,22 @@ ssh admin@stegasoo.local
 # or use IP from router DHCP list
 ```
 
-## Step 3: Run Setup Script
+## Step 3: Pre-Setup
 
 ```bash
-# Download and run (avoid curl|bash stdin issues)
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
-chmod +x setup.sh
-./setup.sh
+# Take ownership of /opt (for pyenv, jpegio builds)
+sudo chown admin:admin /opt
+
+# Install git (not included in Lite image)
+sudo apt-get update && sudo apt-get install -y git
+```
+
+## Step 4: Clone & Run Setup
+
+```bash
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo
+./rpi/setup.sh
 ```
 
 This takes ~15-20 minutes and installs:
@@ -35,7 +44,7 @@ This takes ~15-20 minutes and installs:
 - Stegasoo with web UI
 - Systemd service
 
-## Step 4: Test It Works
+## Step 5: Test It Works
 
 ```bash
 sudo systemctl start stegasoo
@@ -43,14 +52,14 @@ curl -k https://localhost:5000
 # Should return HTML
 ```
 
-## Step 5: Sanitize for Distribution
+## Step 6: Sanitize for Distribution
 
 ```bash
 # Full sanitize (for final image - removes WiFi, shuts down)
-sudo ~/stegasoo/rpi/sanitize-for-image.sh
+sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
 # Or soft reset (for testing - keeps WiFi, reboots)
-sudo ~/stegasoo/rpi/sanitize-for-image.sh --soft
+sudo /opt/stegasoo/rpi/sanitize-for-image.sh --soft
 ```
 
 This removes:
@@ -63,7 +72,7 @@ This removes:
 
 The script validates all cleanup steps before finishing.
 
-## Step 6: Copy the Image
+## Step 7: Copy the Image
 
 Remove SD card, insert into your Linux machine:
 
@@ -75,7 +84,7 @@ lsblk
 sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
 ```
 
-## Step 7: Shrink & Compress
+## Step 8: Shrink & Compress
 
 ```bash
 # Optional: Shrink image (saves space)
@@ -87,7 +96,7 @@ sudo ./pishrink.sh stegasoo-rpi-*.img
 zstd -19 -T0 stegasoo-rpi-*.img
 ```
 
-## Step 8: Distribute
+## Step 9: Distribute
 
 Upload `.img.zst` to GitHub Releases.
 
@@ -104,11 +113,14 @@ zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 ## Quick Command Summary
 
 ```bash
-# On Pi:
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh && chmod +x setup.sh && ./setup.sh
+# On Pi (after SSH):
+sudo chown admin:admin /opt
+sudo apt-get update && sudo apt-get install -y git
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo && ./rpi/setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
-sudo ~/stegasoo/rpi/sanitize-for-image.sh
+sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
 # On your machine:
 sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress

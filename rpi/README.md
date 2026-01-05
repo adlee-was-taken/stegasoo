@@ -7,18 +7,14 @@ Scripts and resources for deploying Stegasoo on Raspberry Pi.
 On a fresh Raspberry Pi OS Lite (64-bit) installation:
 
 ```bash
-# Download and run (recommended)
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
-chmod +x setup.sh
-./setup.sh
-```
+# Pre-setup (git not included in Lite image)
+sudo chown $USER:$USER /opt
+sudo apt-get update && sudo apt-get install -y git
 
-Or clone the repo:
-
-```bash
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
-cd stegasoo/rpi
-./setup.sh
+# Clone and run setup
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git /opt/stegasoo
+cd /opt/stegasoo
+./rpi/setup.sh
 ```
 
 ## What the Setup Script Does
@@ -104,7 +100,7 @@ sudo systemctl restart stegasoo
 sudo systemctl stop stegasoo
 sudo systemctl disable stegasoo
 sudo rm /etc/systemd/system/stegasoo.service
-rm -rf ~/stegasoo
+rm -rf /opt/stegasoo
 ```
 
 ## Pre-built Images
@@ -133,10 +129,14 @@ In advanced settings, set:
 # SSH into the Pi
 ssh admin@stegasoo.local
 
-# Download and run setup script
-wget -O setup.sh https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh
-chmod +x setup.sh
-./setup.sh
+# Pre-setup
+sudo chown admin:admin /opt
+sudo apt-get update && sudo apt-get install -y git
+
+# Clone and run setup
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git /opt/stegasoo
+cd /opt/stegasoo
+./rpi/setup.sh
 ```
 
 ### 3. Test It Works
@@ -150,10 +150,10 @@ curl -k https://localhost:5000  # Should return HTML
 
 ```bash
 # Full sanitize (removes WiFi, shuts down for imaging)
-sudo ~/stegasoo/rpi/sanitize-for-image.sh
+sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
 # Or soft reset (keeps WiFi for testing, reboots)
-sudo ~/stegasoo/rpi/sanitize-for-image.sh --soft
+sudo /opt/stegasoo/rpi/sanitize-for-image.sh --soft
 ```
 
 This removes:
