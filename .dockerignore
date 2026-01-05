@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+venv/
+.venv/
+
+# Instance data (user creates fresh)
+frontends/web/instance/
+frontends/web/certs/
+instance/
+
+# Test data
+test_data/
+tests/
+
+# Pi-specific
+rpi/
+*.img
+*.img.zst
+*.img.zst.zip
+
+# Docs
+*.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+*.tmp
+.DS_Store

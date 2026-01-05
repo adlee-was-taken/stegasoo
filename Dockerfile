@@ -62,8 +62,8 @@ COPY src/ src/
 COPY data/ data/
 COPY frontends/web/ frontends/web/
 
-# Create upload directory
-RUN mkdir -p /tmp/stego_uploads
+# Create upload directory and instance directories (for volumes)
+RUN mkdir -p /tmp/stego_uploads /app/frontends/web/instance /app/frontends/web/certs
 
 # Create non-root user
 RUN useradd -m -u 1000 stego && chown -R stego:stego /app /tmp/stego_uploads
