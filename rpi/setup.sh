@@ -148,7 +148,8 @@ sudo apt-get install -y \
     liblzma-dev \
     libzbar0 \
     libjpeg-dev \
-    python3-dev
+    python3-dev \
+    btop
 
 echo -e "${GREEN}[3/11]${NC} Installing gum (TUI toolkit)..."
 # Add Charm repo for gum

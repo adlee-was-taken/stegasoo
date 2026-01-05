@@ -77,7 +77,7 @@ CHANNEL_KEY=""
 clear
 gum style \
   --foreground 212 --bold \
-  "Step 1 of 3: HTTPS Configuration"
+  "Step 1 of 4: HTTPS Configuration"
 echo ""
 
 gum style --foreground 245 "\
@@ -104,7 +104,7 @@ if [ "$ENABLE_HTTPS" = "true" ]; then
   clear
   gum style \
     --foreground 212 --bold \
-    "Step 2 of 3: Port Configuration"
+    "Step 2 of 4: Port Configuration"
   echo ""
 
   gum style --foreground 245 "\
@@ -133,7 +133,7 @@ fi
 clear
 gum style \
   --foreground 212 --bold \
-  "Step 3 of 3: Channel Key Configuration"
+  "Step 3 of 4: Channel Key Configuration"
 echo ""
 
 gum style --foreground 245 "\
@@ -191,6 +191,58 @@ if gum confirm "Generate a private channel key?" --default=false; then
 else
   gum style --foreground 214 "→ Using public mode"
   sleep 0.5
+fi
+
+# =============================================================================
+# Step 4: Overclock Configuration
+# =============================================================================
+
+ENABLE_OVERCLOCK="false"
+NEEDS_RESTART="false"
+
+# Detect Pi model
+PI_MODEL=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0')
+
+if [[ "$PI_MODEL" == *"Raspberry Pi 4"* ]] || [[ "$PI_MODEL" == *"Raspberry Pi 5"* ]]; then
+  clear
+  gum style \
+    --foreground 212 --bold \
+    "Step 4 of 4: Performance Tuning"
+  echo ""
+
+  gum style --foreground 245 "\
+Detected: $PI_MODEL
+
+Overclocking can improve DCT encode/decode performance.
+This is ONLY recommended if you have active cooling:
+  • Heatsink + Fan
+  • Active cooler case
+
+Without cooling, the Pi may throttle or become unstable."
+  echo ""
+
+  if gum confirm "Do you have active cooling (heatsink + fan)?" --default=false; then
+    echo ""
+    gum style --foreground 245 "\
+Recommended overclock settings:
+  • Pi 4: 2.0 GHz (stock 1.5 GHz) - ~33% faster
+  • Pi 5: 2.8 GHz (stock 2.4 GHz) - ~17% faster"
+    echo ""
+
+    if gum confirm "Enable overclock?" --default=true; then
+      ENABLE_OVERCLOCK="true"
+      NEEDS_RESTART="true"
+      gum style --foreground 82 "✓ Overclock will be enabled (restart required)"
+    else
+      gum style --foreground 214 "→ Running at stock speed"
+    fi
+  else
+    gum style --foreground 214 "→ Skipping overclock (no active cooling)"
+  fi
+  sleep 0.5
+else
+  # Not a Pi 4/5, skip overclock
+  :
 fi
 
 # =============================================================================
@@ -260,6 +312,38 @@ fi
 
 gum spin --spinner dot --title "Reloading systemd..." -- sudo systemctl daemon-reload
 gum style --foreground 82 "✓ Systemd reloaded"
+
+# Apply overclock if requested
+if [ "$ENABLE_OVERCLOCK" = "true" ]; then
+  gum spin --spinner dot --title "Configuring overclock..." -- bash -c "
+    CONFIG_FILE='/boot/firmware/config.txt'
+    # Fallback for older Pi OS
+    if [ ! -f \"\$CONFIG_FILE\" ]; then
+      CONFIG_FILE='/boot/config.txt'
+    fi
+
+    # Check if overclock already configured
+    if ! grep -q '^over_voltage=' \"\$CONFIG_FILE\" 2>/dev/null; then
+      # Detect Pi model for appropriate settings
+      PI_MODEL=\$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0')
+
+      echo '' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+      echo '# Overclock (configured by Stegasoo wizard)' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+
+      if [[ \"\$PI_MODEL\" == *'Raspberry Pi 5'* ]]; then
+        # Pi 5 overclock
+        echo 'over_voltage=4' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+        echo 'arm_freq=2800' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+      else
+        # Pi 4 overclock
+        echo 'over_voltage=6' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+        echo 'arm_freq=2000' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+        echo 'gpu_freq=700' | sudo tee -a \"\$CONFIG_FILE\" >/dev/null
+      fi
+    fi
+  "
+  gum style --foreground 82 "✓ Overclock configured"
+fi
 
 gum spin --spinner dot --title "Starting Stegasoo..." -- bash -c "sudo systemctl restart stegasoo && sleep 2"
 
@@ -345,3 +429,27 @@ echo ""
 
 gum style --foreground 212 --bold "Enjoy Stegasoo!"
 echo ""
+
+# Prompt for restart if overclock was enabled
+if [ "$NEEDS_RESTART" = "true" ]; then
+  echo ""
+  gum style \
+    --border rounded \
+    --border-foreground 226 \
+    --padding "1 2" \
+    --foreground 226 \
+    "Restart Required" \
+    "" \
+    "Overclock settings require a restart to take effect."
+  echo ""
+
+  if gum confirm "Restart now?" --default=true; then
+    gum style --foreground 82 "Restarting in 3 seconds..."
+    sleep 3
+    sudo reboot
+  else
+    gum style --foreground 214 "Remember to restart later for overclock to take effect:"
+    gum style --foreground 245 "  sudo reboot"
+    echo ""
+  fi
+fi
