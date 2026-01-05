@@ -179,8 +179,27 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ---
 
+## 5. Smoke Test Benchmarking
+
+**Status:** Planned
+
+**Problem:** No way to measure encode/decode performance or track regressions.
+
+**Solution:** Add timing to smoke tests using `hyperfine` or `time`.
+
+### Features
+- Benchmark encode/decode on test images
+- Output timing stats (min/max/avg)
+- Optional `--benchmark` flag for smoke-test.sh
+- Compare NVMe vs SD card, overclocked vs stock
+
+### Files to Modify
+- `rpi/smoke-test.sh`
+
+---
+
 ## Notes
 
-- Keep 4.1.2 focused - 4 small features
+- Keep 4.1.2 focused - 5 small features
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
