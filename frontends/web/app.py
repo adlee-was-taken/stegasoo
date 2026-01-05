@@ -1018,6 +1018,8 @@ def encode_page():
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
+            stego_hash = hashlib.md5(encode_result.stego_data).hexdigest()[:8]
+            print(f"[ENCODE RESULT] stego: {len(encode_result.stego_data)} bytes, md5: {stego_hash}", file=sys.stderr)
             TEMP_FILES[file_id] = {
                 "data": encode_result.stego_data,
                 "filename": filename,
@@ -1098,6 +1100,9 @@ def encode_download(file_id):
 
     file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "image/png")
+
+    download_hash = hashlib.md5(file_info["data"]).hexdigest()[:8]
+    print(f"[DOWNLOAD] stego: {len(file_info['data'])} bytes, md5: {download_hash}", file=sys.stderr)
 
     return send_file(
         io.BytesIO(file_info["data"]),
