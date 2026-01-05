@@ -373,15 +373,15 @@ HOSTNAME=$(hostname)
 # Build the access URL
 if [ "$ENABLE_HTTPS" = "true" ]; then
   if [ "$USE_PORT_443" = "true" ]; then
-    ACCESS_URL="https://$PI_IP"
-    ACCESS_URL_LOCAL="https://$HOSTNAME.local"
+    ACCESS_URL="https://$PI_IP/setup"
+    ACCESS_URL_LOCAL="https://$HOSTNAME.local/setup"
   else
-    ACCESS_URL="https://$PI_IP:5000"
-    ACCESS_URL_LOCAL="https://$HOSTNAME.local:5000"
+    ACCESS_URL="https://$PI_IP:5000/setup"
+    ACCESS_URL_LOCAL="https://$HOSTNAME.local:5000/setup"
   fi
 else
-  ACCESS_URL="http://$PI_IP:5000"
-  ACCESS_URL_LOCAL="http://$HOSTNAME.local:5000"
+  ACCESS_URL="http://$PI_IP:5000/setup"
+  ACCESS_URL_LOCAL="http://$HOSTNAME.local:5000/setup"
 fi
 
 gum style \
@@ -401,7 +401,7 @@ gum style \
   "Setup Complete!"
 
 echo ""
-gum style --foreground 82 --bold "Access URL:"
+gum style --foreground 82 --bold "Create your admin account:"
 gum style --foreground 226 "  $ACCESS_URL"
 gum style --foreground 245 "  $ACCESS_URL_LOCAL (if mDNS works)"
 echo ""

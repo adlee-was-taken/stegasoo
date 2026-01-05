@@ -446,15 +446,15 @@ echo ""
 
 PI_IP=$(hostname -I | awk '{print $1}')
 
-echo -e "${GREEN}Your Stegasoo server:${NC}"
+echo -e "${GREEN}Create your admin account:${NC}"
 if [ "$ENABLE_HTTPS" = "true" ]; then
     if [ "$USE_PORT_443" = "true" ]; then
-        echo -e "  ${YELLOW}https://$PI_IP${NC}"
+        echo -e "  ${YELLOW}https://$PI_IP/setup${NC}"
     else
-        echo -e "  ${YELLOW}https://$PI_IP:5000${NC}"
+        echo -e "  ${YELLOW}https://$PI_IP:5000/setup${NC}"
     fi
 else
-    echo -e "  ${YELLOW}http://$PI_IP:5000${NC}"
+    echo -e "  ${YELLOW}http://$PI_IP:5000/setup${NC}"
 fi
 
 echo ""
@@ -470,8 +470,6 @@ echo "  Stop:    sudo systemctl stop stegasoo"
 echo "  Status:  sudo systemctl status stegasoo"
 echo "  Logs:    journalctl -u stegasoo -f"
 echo ""
-echo -e "${YELLOW}Note: On first access, you'll create an admin account.${NC}"
-echo ""
 
 # Offer to start now
 read -p "Start Stegasoo now? [Y/n] " -n 1 -r
@@ -483,12 +481,12 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         echo -e "${GREEN}✓ Stegasoo is running!${NC}"
         if [ "$ENABLE_HTTPS" = "true" ]; then
             if [ "$USE_PORT_443" = "true" ]; then
-                echo -e "  Visit: ${YELLOW}https://$PI_IP${NC}"
+                echo -e "  Create admin: ${YELLOW}https://$PI_IP/setup${NC}"
             else
-                echo -e "  Visit: ${YELLOW}https://$PI_IP:5000${NC}"
+                echo -e "  Create admin: ${YELLOW}https://$PI_IP:5000/setup${NC}"
             fi
         else
-            echo -e "  Visit: ${YELLOW}http://$PI_IP:5000${NC}"
+            echo -e "  Create admin: ${YELLOW}http://$PI_IP:5000/setup${NC}"
         fi
     else
         echo -e "${RED}✗ Failed to start. Check logs:${NC} journalctl -u stegasoo -f"

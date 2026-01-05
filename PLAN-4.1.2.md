@@ -165,8 +165,22 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ---
 
+## 4. Forced First-Login Setup
+
+**Status:** Planned
+
+**Problem:** Users can navigate the app without creating an admin account first. Should force password setup before anything else.
+
+**Solution:** Middleware/decorator that redirects to setup page if no users exist.
+
+### Files to Modify
+- `frontends/web/app.py` (add before_request check)
+- `frontends/web/templates/setup.html` (ensure it blocks other nav)
+
+---
+
 ## Notes
 
-- Keep 4.1.2 focused - 3 features max
+- Keep 4.1.2 focused - 4 small features
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
