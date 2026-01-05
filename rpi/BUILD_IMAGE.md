@@ -33,7 +33,8 @@ sudo apt-get update && sudo apt-get install -y git
 ## Step 4: Clone & Run Setup
 
 ```bash
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
+cd /opt
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 cd stegasoo
 ./rpi/setup.sh
 ```
@@ -116,7 +117,7 @@ zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 # On Pi (after SSH):
 sudo chown admin:admin /opt
 sudo apt-get update && sudo apt-get install -y git
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git
+cd /opt && git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 cd stegasoo && ./rpi/setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000

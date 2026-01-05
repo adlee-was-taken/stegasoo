@@ -12,8 +12,9 @@ sudo chown $USER:$USER /opt
 sudo apt-get update && sudo apt-get install -y git
 
 # Clone and run setup
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git /opt/stegasoo
-cd /opt/stegasoo
+cd /opt
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+cd stegasoo
 ./rpi/setup.sh
 ```
 
@@ -138,8 +139,9 @@ sudo chown admin:admin /opt
 sudo apt-get update && sudo apt-get install -y git
 
 # Clone and run setup
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git /opt/stegasoo
-cd /opt/stegasoo
+cd /opt
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+cd stegasoo
 ./rpi/setup.sh
 ```
 
