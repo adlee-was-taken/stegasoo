@@ -111,6 +111,7 @@ def encode_operation(params: dict) -> dict:
         dct_output_format=params.get("dct_output_format", "png"),
         dct_color_mode=params.get("dct_color_mode", "color"),
         channel_key=resolved_channel_key,  # v4.0.0
+        progress_file=params.get("progress_file"),  # v4.1.2
     )
 
     # Build stats dict if available

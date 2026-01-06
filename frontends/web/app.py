@@ -26,7 +26,9 @@ import mimetypes
 import os
 import secrets
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from auth import (
@@ -36,6 +38,7 @@ from auth import (
     can_create_user,
     can_save_channel_key,
     change_password,
+    clear_recovery_key,
     create_admin_user,
     create_user,
     delete_channel_key,
@@ -45,12 +48,11 @@ from auth import (
     get_channel_key_by_id,
     get_current_user,
     get_non_admin_count,
+    get_recovery_key_hash,
     get_user_by_id,
     get_user_channel_keys,
     get_username,
     has_recovery_key,
-    get_recovery_key_hash,
-    clear_recovery_key,
     is_admin,
     is_authenticated,
     login_required,
@@ -59,10 +61,10 @@ from auth import (
     reset_user_password,
     save_channel_key,
     set_recovery_key_hash,
-    verify_and_reset_admin_password,
     update_channel_key_last_used,
     update_channel_key_name,
     user_exists,
+    verify_and_reset_admin_password,
     verify_user_password,
 )
 from auth import (
@@ -156,7 +158,13 @@ except ImportError:
 # ============================================================================
 # Runs encode/decode/compare in subprocesses to prevent jpegio/scipy crashes
 # from taking down the Flask server.
-from subprocess_stego import SubprocessStego
+from subprocess_stego import (
+    SubprocessStego,
+    cleanup_progress_file,
+    generate_job_id,
+    get_progress_file_path,
+    read_progress,
+)
 
 from stegasoo.qr_utils import (
     can_fit_in_qr,
@@ -194,6 +202,42 @@ app.config["HTTPS_ENABLED"] = os.environ.get("STEGASOO_HTTPS_ENABLED", "false").
 
 # Initialize auth module
 init_auth(app)
+
+# ============================================================================
+# ASYNC JOB MANAGEMENT (v4.1.2)
+# ============================================================================
+# Encode operations can run in background threads with progress reporting
+
+# Thread pool for background encode/decode operations
+_executor = ThreadPoolExecutor(max_workers=2)
+
+# Job storage: job_id -> {status, result, error, file_id, ...}
+_jobs = {}
+_jobs_lock = threading.Lock()
+
+
+def _store_job(job_id: str, data: dict) -> None:
+    """Thread-safe job storage."""
+    with _jobs_lock:
+        _jobs[job_id] = data
+
+
+def _get_job(job_id: str) -> dict | None:
+    """Thread-safe job retrieval."""
+    with _jobs_lock:
+        return _jobs.get(job_id)
+
+
+def _cleanup_old_jobs(max_age_seconds: int = 3600) -> None:
+    """Remove jobs older than max_age_seconds."""
+    now = time.time()
+    with _jobs_lock:
+        to_remove = [
+            jid for jid, data in _jobs.items() if now - data.get("created", 0) > max_age_seconds
+        ]
+        for jid in to_remove:
+            cleanup_progress_file(jid)
+            del _jobs[jid]
 
 
 @app.before_request
@@ -817,10 +861,119 @@ def api_check_fit():
 # ============================================================================
 
 
+def _run_encode_job(job_id: str, encode_params: dict) -> None:
+    """Background thread function for async encode."""
+    progress_file = get_progress_file_path(job_id)
+
+    try:
+        _store_job(job_id, {"status": "running", "created": time.time()})
+
+        # Run encode with progress file
+        if encode_params.get("file_data"):
+            encode_result = subprocess_stego.encode(
+                carrier_data=encode_params["carrier_data"],
+                reference_data=encode_params["ref_data"],
+                file_data=encode_params["file_data"],
+                file_name=encode_params["file_name"],
+                file_mime=encode_params["file_mime"],
+                passphrase=encode_params["passphrase"],
+                pin=encode_params.get("pin"),
+                rsa_key_data=encode_params.get("rsa_key_data"),
+                rsa_password=encode_params.get("key_password"),
+                embed_mode=encode_params["embed_mode"],
+                dct_output_format=encode_params.get("dct_output_format", "png"),
+                dct_color_mode=encode_params.get("dct_color_mode", "color"),
+                channel_key=encode_params.get("channel_key"),
+                progress_file=progress_file,
+            )
+        else:
+            encode_result = subprocess_stego.encode(
+                carrier_data=encode_params["carrier_data"],
+                reference_data=encode_params["ref_data"],
+                message=encode_params["message"],
+                passphrase=encode_params["passphrase"],
+                pin=encode_params.get("pin"),
+                rsa_key_data=encode_params.get("rsa_key_data"),
+                rsa_password=encode_params.get("key_password"),
+                embed_mode=encode_params["embed_mode"],
+                dct_output_format=encode_params.get("dct_output_format", "png"),
+                dct_color_mode=encode_params.get("dct_color_mode", "color"),
+                channel_key=encode_params.get("channel_key"),
+                progress_file=progress_file,
+            )
+
+        if not encode_result.success:
+            _store_job(
+                job_id,
+                {
+                    "status": "error",
+                    "error": encode_result.error or "Encoding failed",
+                    "created": time.time(),
+                },
+            )
+            return
+
+        # Determine output format
+        embed_mode = encode_params["embed_mode"]
+        dct_output_format = encode_params.get("dct_output_format", "png")
+        dct_color_mode = encode_params.get("dct_color_mode", "color")
+
+        if embed_mode == "dct" and dct_output_format == "jpeg":
+            output_ext = ".jpg"
+            output_mime = "image/jpeg"
+        else:
+            output_ext = ".png"
+            output_mime = "image/png"
+
+        filename = encode_result.filename
+        if not filename:
+            filename = generate_filename("stego", output_ext)
+        elif embed_mode == "dct" and dct_output_format == "jpeg" and filename.endswith(".png"):
+            filename = filename[:-4] + ".jpg"
+
+        # Store result
+        file_id = secrets.token_urlsafe(16)
+        TEMP_FILES[file_id] = {
+            "data": encode_result.stego_data,
+            "filename": filename,
+            "timestamp": time.time(),
+            "embed_mode": embed_mode,
+            "output_format": dct_output_format if embed_mode == "dct" else "png",
+            "color_mode": dct_color_mode if embed_mode == "dct" else None,
+            "mime_type": output_mime,
+            "channel_mode": encode_result.channel_mode,
+            "channel_fingerprint": encode_result.channel_fingerprint,
+        }
+
+        _store_job(
+            job_id,
+            {
+                "status": "complete",
+                "file_id": file_id,
+                "created": time.time(),
+            },
+        )
+
+    except Exception as e:
+        _store_job(
+            job_id,
+            {
+                "status": "error",
+                "error": str(e),
+                "created": time.time(),
+            },
+        )
+    finally:
+        cleanup_progress_file(job_id)
+
+
 @app.route("/encode", methods=["GET", "POST"])
 @login_required
 def encode_page():
     if request.method == "POST":
+        # Check if async mode requested
+        is_async = request.form.get("async") == "true" or request.headers.get("X-Async") == "true"
+
         try:
             # Get files
             ref_photo = request.files.get("reference_photo")
@@ -956,7 +1109,9 @@ def encode_page():
             # Pre-check payload capacity BEFORE encode (fail fast)
             from stegasoo.steganography import will_fit_by_mode
 
-            payload_size = len(payload.data) if hasattr(payload, "data") else len(payload.encode("utf-8"))
+            payload_size = (
+                len(payload.data) if hasattr(payload, "data") else len(payload.encode("utf-8"))
+            )
             fit_check = will_fit_by_mode(payload_size, carrier_data, embed_mode=embed_mode)
             if not fit_check.get("fits", True):
                 error_msg = (
@@ -972,8 +1127,35 @@ def encode_page():
                 flash(error_msg, "error")
                 return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
 
-            # v4.0.0: Include channel_key parameter
-            # Use subprocess-isolated encode to prevent crashes
+            # Build encode params for either sync or async
+            encode_params = {
+                "carrier_data": carrier_data,
+                "ref_data": ref_data,
+                "passphrase": passphrase,
+                "pin": pin if pin else None,
+                "rsa_key_data": rsa_key_data,
+                "key_password": key_password,
+                "embed_mode": embed_mode,
+                "dct_output_format": dct_output_format if embed_mode == "dct" else "png",
+                "dct_color_mode": dct_color_mode if embed_mode == "dct" else "color",
+                "channel_key": channel_key,
+            }
+
+            if payload_type == "file" and payload_file and payload_file.filename:
+                encode_params["file_data"] = payload.data
+                encode_params["file_name"] = payload.filename
+                encode_params["file_mime"] = payload.mime_type
+            else:
+                encode_params["message"] = payload
+
+            # ASYNC MODE: Start background job and return JSON
+            if is_async:
+                job_id = generate_job_id()
+                _store_job(job_id, {"status": "pending", "created": time.time()})
+                _executor.submit(_run_encode_job, job_id, encode_params)
+                return jsonify({"job_id": job_id, "status": "pending"})
+
+            # SYNC MODE: Run inline (original behavior)
             if payload_type == "file" and payload_file and payload_file.filename:
                 encode_result = subprocess_stego.encode(
                     carrier_data=carrier_data,
@@ -988,7 +1170,7 @@ def encode_page():
                     embed_mode=embed_mode,
                     dct_output_format=dct_output_format if embed_mode == "dct" else "png",
                     dct_color_mode=dct_color_mode if embed_mode == "dct" else "color",
-                    channel_key=channel_key,  # v4.0.0
+                    channel_key=channel_key,
                 )
             else:
                 encode_result = subprocess_stego.encode(
@@ -1002,7 +1184,7 @@ def encode_page():
                     embed_mode=embed_mode,
                     dct_output_format=dct_output_format if embed_mode == "dct" else "png",
                     dct_color_mode=dct_color_mode if embed_mode == "dct" else "color",
-                    channel_key=channel_key,  # v4.0.0
+                    channel_key=channel_key,
                 )
 
             # Check for subprocess errors
@@ -1056,6 +1238,53 @@ def encode_page():
             return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
 
     return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+
+
+# ============================================================================
+# ENCODE PROGRESS ENDPOINTS (v4.1.2)
+# ============================================================================
+
+
+@app.route("/encode/status/<job_id>")
+@login_required
+def encode_status(job_id):
+    """Get the status of an async encode job."""
+    job = _get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    response = {"status": job.get("status", "unknown")}
+
+    if job["status"] == "complete":
+        response["file_id"] = job.get("file_id")
+    elif job["status"] == "error":
+        response["error"] = job.get("error", "Unknown error")
+
+    return jsonify(response)
+
+
+@app.route("/encode/progress/<job_id>")
+@login_required
+def encode_progress(job_id):
+    """Get the progress of an async encode job."""
+    progress = read_progress(job_id)
+    if progress:
+        return jsonify(progress)
+
+    # No progress file yet - check job status
+    job = _get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    if job["status"] == "complete":
+        return jsonify({"percent": 100, "phase": "complete"})
+    elif job["status"] == "error":
+        return jsonify({"percent": 0, "phase": "error", "error": job.get("error")})
+    elif job["status"] == "pending":
+        return jsonify({"percent": 0, "phase": "starting"})
+
+    # Running but no progress file yet
+    return jsonify({"percent": 0, "phase": "initializing"})
 
 
 @app.route("/encode/result/<file_id>")
@@ -1402,12 +1631,7 @@ def api_tools_strip_metadata():
         buffer = io.BytesIO(clean_data)
         filename = image_file.filename.rsplit(".", 1)[0] + "_clean.png"
 
-        return send_file(
-            buffer,
-            mimetype="image/png",
-            as_attachment=True,
-            download_name=filename
-        )
+        return send_file(buffer, mimetype="image/png", as_attachment=True, download_name=filename)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -1429,13 +1653,15 @@ def api_tools_exif():
         # Check if it's a JPEG (editable) or not
         is_jpeg = image_data[:2] == b"\xff\xd8"
 
-        return jsonify({
-            "success": True,
-            "filename": image_file.filename,
-            "exif": exif,
-            "editable": is_jpeg,
-            "field_count": len(exif),
-        })
+        return jsonify(
+            {
+                "success": True,
+                "filename": image_file.filename,
+                "exif": exif,
+                "editable": is_jpeg,
+                "field_count": len(exif),
+            }
+        )
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
@@ -1454,6 +1680,7 @@ def api_tools_exif_update():
     updates_json = request.form.get("updates", "{}")
     try:
         import json
+
         updates = json.loads(updates_json)
     except json.JSONDecodeError:
         return jsonify({"success": False, "error": "Invalid updates JSON"}), 400
@@ -1499,11 +1726,19 @@ def api_tools_exif_clear():
         clean_data = strip_image_metadata(image_data, output_format=output_format)
 
         # Determine extension and mimetype
-        ext_map = {"PNG": ("png", "image/png"), "JPEG": ("jpg", "image/jpeg"), "BMP": ("bmp", "image/bmp")}
+        ext_map = {
+            "PNG": ("png", "image/png"),
+            "JPEG": ("jpg", "image/jpeg"),
+            "BMP": ("bmp", "image/bmp"),
+        }
         ext, mimetype = ext_map.get(output_format, ("png", "image/png"))
 
         # Return as downloadable file
-        stem = image_file.filename.rsplit(".", 1)[0] if "." in image_file.filename else image_file.filename
+        stem = (
+            image_file.filename.rsplit(".", 1)[0]
+            if "." in image_file.filename
+            else image_file.filename
+        )
         buffer = io.BytesIO(clean_data)
         return send_file(
             buffer,
@@ -1644,8 +1879,9 @@ def setup():
 @login_required
 def setup_recovery():
     """Recovery key setup page (Step 2 of initial setup)."""
-    from stegasoo.recovery import generate_recovery_key, hash_recovery_key, generate_recovery_qr
     import base64
+
+    from stegasoo.recovery import generate_recovery_key, generate_recovery_qr, hash_recovery_key
 
     # Only allow during initial setup (no recovery key yet, first admin)
     if has_recovery_key():
@@ -1724,8 +1960,9 @@ def recover():
 @admin_required
 def regenerate_recovery():
     """Generate a new recovery key (replaces existing one)."""
-    from stegasoo.recovery import generate_recovery_key, hash_recovery_key, generate_recovery_qr
     import base64
+
+    from stegasoo.recovery import generate_recovery_key, generate_recovery_qr, hash_recovery_key
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -1925,21 +2162,23 @@ def api_channel_keys():
     """Get saved channel keys for current user (JSON API)."""
     current_user = get_current_user()
     keys = get_user_channel_keys(current_user.id)
-    return jsonify({
-        "success": True,
-        "keys": [
-            {
-                "id": k.id,
-                "name": k.name,
-                "fingerprint": f"{k.channel_key[:4]}...{k.channel_key[-4:]}",
-                "channel_key": k.channel_key,
-                "last_used_at": k.last_used_at,
-            }
-            for k in keys
-        ],
-        "can_save": can_save_channel_key(current_user.id),
-        "max_keys": MAX_CHANNEL_KEYS,
-    })
+    return jsonify(
+        {
+            "success": True,
+            "keys": [
+                {
+                    "id": k.id,
+                    "name": k.name,
+                    "fingerprint": f"{k.channel_key[:4]}...{k.channel_key[-4:]}",
+                    "channel_key": k.channel_key,
+                    "last_used_at": k.last_used_at,
+                }
+                for k in keys
+            ],
+            "can_save": can_save_channel_key(current_user.id),
+            "max_keys": MAX_CHANNEL_KEYS,
+        }
+    )
 
 
 @app.route("/api/channel/keys/<int:key_id>/use", methods=["POST"])

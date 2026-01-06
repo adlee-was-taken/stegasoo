@@ -37,6 +37,7 @@ def encode(
     dct_output_format: str = "png",
     dct_color_mode: str = "color",
     channel_key: str | bool | None = None,
+    progress_file: str | None = None,
 ) -> EncodeResult:
     """
     Encode a message or file into an image.
@@ -118,6 +119,7 @@ def encode(
         embed_mode=embed_mode,
         dct_output_format=dct_output_format,
         dct_color_mode=dct_color_mode,
+        progress_file=progress_file,
     )
 
     # Generate filename

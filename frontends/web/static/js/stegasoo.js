@@ -917,9 +917,183 @@ const Stegasoo = {
     },
     
     // ========================================================================
+    // ASYNC ENCODE WITH PROGRESS (v4.1.2)
+    // ========================================================================
+
+    /**
+     * Submit encode form asynchronously with progress tracking
+     * @param {HTMLFormElement} form - The encode form
+     * @param {HTMLElement} btn - The submit button
+     */
+    async submitEncodeAsync(form, btn) {
+        const formData = new FormData(form);
+        formData.append('async', 'true');
+
+        // Show progress modal
+        this.showProgressModal('Encoding');
+
+        try {
+            // Start encode job
+            const response = await fetch('/encode', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to start encode');
+            }
+
+            const result = await response.json();
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            const jobId = result.job_id;
+
+            // Poll for progress
+            await this.pollEncodeProgress(jobId);
+
+        } catch (error) {
+            this.hideProgressModal();
+            alert('Encode failed: ' + error.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Encode';
+        }
+    },
+
+    /**
+     * Poll encode progress until complete
+     * @param {string} jobId - The job ID
+     */
+    async pollEncodeProgress(jobId) {
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const phaseText = document.getElementById('progressPhase');
+
+        const poll = async () => {
+            try {
+                // Check status first
+                const statusResponse = await fetch(`/encode/status/${jobId}`);
+                const statusData = await statusResponse.json();
+
+                if (statusData.status === 'complete') {
+                    // Done - redirect to result
+                    this.updateProgress(100, 'Complete!');
+                    setTimeout(() => {
+                        window.location.href = `/encode/result/${statusData.file_id}`;
+                    }, 500);
+                    return;
+                }
+
+                if (statusData.status === 'error') {
+                    throw new Error(statusData.error || 'Encode failed');
+                }
+
+                // Get progress
+                const progressResponse = await fetch(`/encode/progress/${jobId}`);
+                const progressData = await progressResponse.json();
+
+                const percent = progressData.percent || 0;
+                const phase = progressData.phase || 'processing';
+
+                this.updateProgress(percent, this.formatPhase(phase));
+
+                // Continue polling
+                setTimeout(poll, 500);
+
+            } catch (error) {
+                this.hideProgressModal();
+                alert('Encode failed: ' + error.message);
+            }
+        };
+
+        await poll();
+    },
+
+    /**
+     * Format phase name for display
+     */
+    formatPhase(phase) {
+        const phases = {
+            'starting': 'Starting...',
+            'initializing': 'Initializing...',
+            'embedding': 'Embedding data...',
+            'saving': 'Saving image...',
+            'finalizing': 'Finalizing...',
+            'complete': 'Complete!',
+        };
+        return phases[phase] || phase;
+    },
+
+    /**
+     * Show progress modal
+     */
+    showProgressModal(operation = 'Processing') {
+        // Create modal if doesn't exist
+        let modal = document.getElementById('progressModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'progressModal';
+            modal.className = 'modal fade';
+            modal.setAttribute('data-bs-backdrop', 'static');
+            modal.setAttribute('data-bs-keyboard', 'false');
+            modal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-light">
+                        <div class="modal-body p-4">
+                            <h5 class="mb-3" id="progressTitle">${operation}...</h5>
+                            <div class="progress mb-2" style="height: 24px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                     role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span id="progressPhase">Initializing...</span>
+                                <span id="progressText">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Reset progress
+        this.updateProgress(0, 'Initializing...');
+
+        // Show modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    },
+
+    /**
+     * Hide progress modal
+     */
+    hideProgressModal() {
+        const modal = document.getElementById('progressModal');
+        if (modal) {
+            const bsModal = bootstrap.Modal.getInstance(modal);
+            bsModal?.hide();
+        }
+    },
+
+    /**
+     * Update progress bar and text
+     */
+    updateProgress(percent, phase) {
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const phaseText = document.getElementById('progressPhase');
+
+        if (progressBar) progressBar.style.width = percent + '%';
+        if (progressText) progressText.textContent = Math.round(percent) + '%';
+        if (phaseText) phaseText.textContent = phase;
+    },
+
+    // ========================================================================
     // INITIALIZATION HELPERS
     // ========================================================================
-    
+
     initEncodePage() {
         this.initPasswordToggles();
         this.initRsaMethodToggle();
@@ -937,27 +1111,23 @@ const Stegasoo = {
             generateBtnId: 'channelKeyGenerate'
         });
 
-        // Form submission with channel key validation
+        // Form submission with async progress tracking (v4.1.2)
         const form = document.getElementById('encodeForm');
         const btn = document.getElementById('encodeBtn');
         form?.addEventListener('submit', (e) => {
+            e.preventDefault();
+
             if (!this.validateChannelKeyOnSubmit(form, 'channelSelect', 'channelKeyInput')) {
-                e.preventDefault();
                 return false;
             }
+
             if (btn) {
                 btn.disabled = true;
-                const startTime = Date.now();
-                const updateTimer = () => {
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const mins = Math.floor(elapsed / 60);
-                    const secs = elapsed % 60;
-                    const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Encoding... ${timeStr}`;
-                };
-                updateTimer();
-                setInterval(updateTimer, 1000);
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
             }
+
+            // Use async submission with progress tracking
+            this.submitEncodeAsync(form, btn);
         });
     },
     

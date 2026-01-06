@@ -47,6 +47,8 @@ import base64
 import json
 import subprocess
 import sys
+import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -233,6 +235,8 @@ class SubprocessStego:
         # Channel key (v4.0.0)
         channel_key: str | None = "auto",
         timeout: int | None = None,
+        # Progress file (v4.1.2)
+        progress_file: str | None = None,
     ) -> EncodeResult:
         """
         Encode a message or file into an image.
@@ -268,6 +272,7 @@ class SubprocessStego:
             "dct_output_format": dct_output_format,
             "dct_color_mode": dct_color_mode,
             "channel_key": channel_key,  # v4.0.0
+            "progress_file": progress_file,  # v4.1.2
         }
 
         if file_data:
@@ -496,3 +501,42 @@ def get_subprocess_stego() -> SubprocessStego:
     if _default_stego is None:
         _default_stego = SubprocessStego()
     return _default_stego
+
+
+# =============================================================================
+# Progress File Utilities (v4.1.2)
+# =============================================================================
+
+
+def generate_job_id() -> str:
+    """Generate a unique job ID for tracking encode/decode operations."""
+    return str(uuid.uuid4())[:8]
+
+
+def get_progress_file_path(job_id: str) -> str:
+    """Get the progress file path for a job ID."""
+    return str(Path(tempfile.gettempdir()) / f"stegasoo_progress_{job_id}.json")
+
+
+def read_progress(job_id: str) -> dict | None:
+    """
+    Read progress from file for a job ID.
+
+    Returns:
+        Progress dict with current, total, percent, phase, or None if not found
+    """
+    progress_file = get_progress_file_path(job_id)
+    try:
+        with open(progress_file) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def cleanup_progress_file(job_id: str) -> None:
+    """Remove progress file for a completed job."""
+    progress_file = get_progress_file_path(job_id)
+    try:
+        Path(progress_file).unlink(missing_ok=True)
+    except Exception:
+        pass

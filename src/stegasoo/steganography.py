@@ -39,6 +39,31 @@ from .debug import debug
 from .exceptions import CapacityError, EmbeddingError
 from .models import EmbedStats, FilePayload
 
+# Progress reporting interval
+PROGRESS_INTERVAL = 1000  # Write every N pixels for LSB
+
+
+def _write_progress(progress_file: str | None, current: int, total: int, phase: str = "embedding"):
+    """Write progress to file for frontend polling."""
+    if progress_file is None:
+        return
+    try:
+        import json
+
+        with open(progress_file, "w") as f:
+            json.dump(
+                {
+                    "current": current,
+                    "total": total,
+                    "percent": round((current / total) * 100, 1) if total > 0 else 0,
+                    "phase": phase,
+                },
+                f,
+            )
+    except Exception:
+        pass  # Don't let progress writing break encoding
+
+
 # Lossless formats that preserve LSB data
 LOSSLESS_FORMATS = {"PNG", "BMP", "TIFF"}
 
@@ -526,6 +551,7 @@ def embed_in_image(
     embed_mode: str = EMBED_MODE_LSB,
     dct_output_format: str = DCT_OUTPUT_PNG,
     dct_color_mode: str = "color",
+    progress_file: str | None = None,
 ) -> tuple[bytes, Union[EmbedStats, "DCTEmbedStats"], str]:
     """
     Embed data into an image using specified mode.
@@ -579,6 +605,7 @@ def embed_in_image(
             pixel_key,
             output_format=dct_output_format,
             color_mode=dct_color_mode,
+            progress_file=progress_file,
         )
 
         # Determine extension based on output format
@@ -594,7 +621,7 @@ def embed_in_image(
         return stego_bytes, dct_stats, ext
 
     # LSB MODE
-    return _embed_lsb(data, image_data, pixel_key, bits_per_channel, output_format)
+    return _embed_lsb(data, image_data, pixel_key, bits_per_channel, output_format, progress_file)
 
 
 def _embed_lsb(
@@ -603,6 +630,7 @@ def _embed_lsb(
     pixel_key: bytes,
     bits_per_channel: int = 1,
     output_format: str | None = None,
+    progress_file: str | None = None,
 ) -> tuple[bytes, EmbedStats, str]:
     """
     Embed data using LSB steganography (internal implementation).
@@ -659,8 +687,9 @@ def _embed_lsb(
 
         bit_idx = 0
         modified_pixels = 0
+        total_pixels_to_process = len(selected_indices)
 
-        for pixel_idx in selected_indices:
+        for progress_idx, pixel_idx in enumerate(selected_indices):
             if bit_idx >= len(binary_data):
                 break
 
@@ -689,6 +718,16 @@ def _embed_lsb(
             if modified:
                 new_pixels[pixel_idx] = (r, g, b)
                 modified_pixels += 1
+
+            # Report progress periodically
+            if progress_file and progress_idx % PROGRESS_INTERVAL == 0:
+                _write_progress(progress_file, progress_idx, total_pixels_to_process, "embedding")
+
+        # Final progress before save
+        if progress_file:
+            _write_progress(
+                progress_file, total_pixels_to_process, total_pixels_to_process, "saving"
+            )
 
         debug.print(f"Modified {modified_pixels} pixels (out of {len(selected_indices)} selected)")
 

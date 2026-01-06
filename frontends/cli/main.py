@@ -24,10 +24,30 @@ Usage:
     stegasoo channel [SUBCOMMAND]
 """
 
+import json
 import sys
+import tempfile
+import threading
+import time
+import uuid
 from pathlib import Path
 
 import click
+
+# Rich progress bar (optional)
+try:
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        SpinnerColumn,
+        TaskProgressColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
 
 # Add parent to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -599,6 +619,73 @@ def channel_clear(project, clear_all, force):
 
 
 # ============================================================================
+# PROGRESS BAR UTILITIES (v4.1.2)
+# ============================================================================
+
+
+def _generate_progress_job_id() -> str:
+    """Generate a unique job ID for progress tracking."""
+    return str(uuid.uuid4())[:8]
+
+
+def _get_progress_file_path(job_id: str) -> str:
+    """Get the progress file path for a job ID."""
+    return str(Path(tempfile.gettempdir()) / f"stegasoo_progress_{job_id}.json")
+
+
+def _read_progress(job_id: str) -> dict | None:
+    """Read progress from file for a job ID."""
+    progress_file = _get_progress_file_path(job_id)
+    try:
+        with open(progress_file) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def _cleanup_progress_file(job_id: str) -> None:
+    """Remove progress file for a completed job."""
+    progress_file = _get_progress_file_path(job_id)
+    try:
+        Path(progress_file).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _run_encode_with_progress(encode_func, encode_kwargs: dict, progress_file: str) -> tuple:
+    """
+    Run encode in a thread and return result.
+
+    Returns:
+        (success, result_or_error)
+    """
+    result_holder = {"result": None, "error": None}
+
+    def run():
+        try:
+            result_holder["result"] = encode_func(**encode_kwargs, progress_file=progress_file)
+        except Exception as e:
+            result_holder["error"] = e
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread, result_holder
+
+
+def _format_phase(phase: str) -> str:
+    """Format phase name for display."""
+    phases = {
+        "starting": "Starting",
+        "initializing": "Initializing",
+        "embedding": "Embedding",
+        "saving": "Saving",
+        "finalizing": "Finalizing",
+        "complete": "Complete",
+    }
+    return phases.get(phase, phase.capitalize())
+
+
+# ============================================================================
 # ENCODE COMMAND
 # ============================================================================
 
@@ -642,6 +729,7 @@ def channel_clear(project, clear_all, force):
     help="DCT color mode: grayscale (default) or color (preserves original colors)",
 )
 @click.option("--quiet", "-q", is_flag=True, help="Suppress output except errors")
+@click.option("--progress", is_flag=True, help="Show progress bar (requires rich)")
 def encode_cmd(
     ref,
     carrier,
@@ -661,6 +749,7 @@ def encode_cmd(
     dct_output_format,
     dct_color_mode,
     quiet,
+    progress,
 ):
     """
     Encode a secret message or file into an image.
@@ -808,19 +897,63 @@ def encode_cmd(
                 click.echo(channel_status)
 
         # v4.0.0: Include channel_key parameter
-        result = encode(
-            message=payload,
-            reference_photo=ref_photo,
-            carrier_image=carrier_image,
-            passphrase=passphrase,
-            pin=pin or "",
-            rsa_key_data=rsa_key_data,
-            rsa_password=effective_key_password,
-            embed_mode=embed_mode,
-            dct_output_format=dct_output_format,
-            dct_color_mode=dct_color_mode,
-            channel_key=resolved_channel_key,
-        )
+        # v4.1.2: Progress bar support
+        encode_kwargs = {
+            "message": payload,
+            "reference_photo": ref_photo,
+            "carrier_image": carrier_image,
+            "passphrase": passphrase,
+            "pin": pin or "",
+            "rsa_key_data": rsa_key_data,
+            "rsa_password": effective_key_password,
+            "embed_mode": embed_mode,
+            "dct_output_format": dct_output_format,
+            "dct_color_mode": dct_color_mode,
+            "channel_key": resolved_channel_key,
+        }
+
+        if progress and HAS_RICH:
+            # Run with progress bar
+            job_id = _generate_progress_job_id()
+            progress_file = _get_progress_file_path(job_id)
+
+            thread, result_holder = _run_encode_with_progress(encode, encode_kwargs, progress_file)
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+                transient=True,
+            ) as progress_bar:
+                task = progress_bar.add_task("Encoding...", total=100)
+
+                while thread.is_alive():
+                    prog = _read_progress(job_id)
+                    if prog:
+                        percent = prog.get("percent", 0)
+                        phase = _format_phase(prog.get("phase", "processing"))
+                        progress_bar.update(task, completed=percent, description=f"{phase}...")
+                    time.sleep(0.1)
+
+                # Final update
+                progress_bar.update(task, completed=100, description="Complete!")
+
+            _cleanup_progress_file(job_id)
+
+            if result_holder["error"]:
+                raise result_holder["error"]
+            result = result_holder["result"]
+
+        elif progress and not HAS_RICH:
+            click.secho(
+                "Warning: --progress requires 'rich' package. Install with: pip install rich",
+                fg="yellow",
+            )
+            result = encode(**encode_kwargs)
+        else:
+            result = encode(**encode_kwargs)
 
         # Determine output path
         if output:
