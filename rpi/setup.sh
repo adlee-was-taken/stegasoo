@@ -36,7 +36,9 @@ show_help() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  -h, --help    Show this help message"
+    echo "  -h, --help      Show this help message"
+    echo "  --no-prebuilt   Build from source instead of using pre-built venv"
+    echo "  --from-source   Same as --no-prebuilt"
     echo ""
     echo "Configuration:"
     echo "  Config files are loaded in order (later overrides earlier):"
@@ -93,7 +95,7 @@ echo -e "\033[1;37m                   Raspberry Pi Setup\033[0m"
 echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
 echo ""
 echo "  This will install Stegasoo with full DCT support"
-echo "  Estimated time: 15-20 minutes on Pi 5"
+echo "  Estimated time: ~2 minutes (pre-built) or 15-20 min (from source)"
 echo ""
 
 # Check if running on ARM
@@ -179,14 +181,22 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Check for pre-built venv tarball (skips 20+ min compile time)
+# Pre-built venv tarball (skips 20+ min compile time)
 PREBUILT_VENV="$INSTALL_DIR/rpi/stegasoo-venv-pi-arm64.tar.zst"
-PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-}"  # Optional: URL to download from
-USE_PREBUILT=false
+PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.3/stegasoo-venv-pi-arm64.tar.zst}"
+USE_PREBUILT=true
 
-if [ -f "$PREBUILT_VENV" ] || [ -n "$PREBUILT_VENV_URL" ]; then
-    USE_PREBUILT=true
-    echo -e "${GREEN}Found pre-built venv tarball - fast install mode${NC}"
+# Use local tarball if present, otherwise will download
+if [ -f "$PREBUILT_VENV" ]; then
+    echo -e "${GREEN}Found local pre-built venv - fast install mode${NC}"
+else
+    echo -e "${GREEN}Will download pre-built venv - fast install mode${NC}"
+fi
+
+# Allow --no-prebuilt flag to force from-source build
+if [[ " $* " =~ " --no-prebuilt " ]] || [[ " $* " =~ " --from-source " ]]; then
+    USE_PREBUILT=false
+    echo -e "${YELLOW}Building from source (--no-prebuilt specified)${NC}"
 fi
 
 echo -e "${GREEN}[5/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
