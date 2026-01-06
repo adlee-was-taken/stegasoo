@@ -13,7 +13,7 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please email: **security@example.com** (replace with your email)
+Instead, please email: **adlee-was-taken@proton.me** (replace with your email)
 
 Include:
 - Description of the vulnerability
