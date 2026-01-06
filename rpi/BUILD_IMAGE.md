@@ -1,5 +1,8 @@
 # Stegasoo Pi Image Build Workflow
 
+> **Note:** This guide is for developers building custom Pi images.
+> **End users:** Just download the pre-built `.img.zst` from [Releases](https://github.com/adlee-was-taken/stegasoo/releases), flash it, and boot. No build process needed.
+
 Quick reference for building a distributable SD card image.
 
 ## Step 1: Flash Fresh Raspbian
@@ -38,6 +41,9 @@ git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 ```
 
 ## Step 5: Copy Pre-built Tarball (from host)
+
+> **Dev-only asset:** This tarball is for building Pi images, not for end users.
+> It's available on [Releases](https://github.com/adlee-was-taken/stegasoo/releases) for image builders.
 
 ```bash
 # On your host machine:
