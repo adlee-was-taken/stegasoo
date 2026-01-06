@@ -80,3 +80,4 @@ tests/
 *.img.xz
 *.img.zst
 pishrink.sh
+*.img.zst.zip

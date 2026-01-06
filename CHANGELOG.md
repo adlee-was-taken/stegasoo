@@ -5,7 +5,7 @@ All notable changes to Stegasoo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
-## [4.1.2] - 2026-01-05
+## [4.1.3] - 2026-01-05
 
 ### Added
 - **Docker Deployment**: Production-ready containerization
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   - Validation, generation, compression, edge cases
   - 29 tests covering core library functionality
 - **Release Validation**: `scripts/validate-release.sh` for pre-release checks
+- **Custom SSL Documentation**: Guide for replacing certs, Let's Encrypt setup
 
 ### Changed
 - Pi MOTD shows CPU speed and temperature when overclocked
@@ -36,9 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - Setup script uses pyenv for Python 3.12 (Pi OS ships 3.13)
 
 ### Fixed
+- **SSL certificate generation**: Wizard and setup now generate certs when HTTPS enabled
 - DCT decode reliability improvements
 - Fixed `gum --inline` flag compatibility (not supported in all versions)
 - Wizard banner alignment and spacing issues
+- Better error handling in app.py for SSL failures
 
 ## [4.1.0] - 2026-01-04
 
@@ -177,7 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - CLI interface
 - Basic PIN authentication
 
-[4.1.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.1.0...v4.1.2
+[4.1.3]: https://github.com/adlee-was-taken/stegasoo/compare/v4.1.0...v4.1.3
 [4.1.0]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.2...v4.1.0
 [4.0.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.1...v4.0.2
 [4.0.1]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.0...v4.0.1
