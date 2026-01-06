@@ -586,11 +586,113 @@ def generate(ctx, words, pin_length, channel_key):
 
 
 @cli.command()
+@click.option("--full", is_flag=True, help="Show full system information (Pi stats)")
 @click.pass_context
-def info(ctx):
-    """Show version and feature information."""
+def info(ctx, full):
+    """Show version, features, and system information."""
+    import os
+    import subprocess
+
+    # Check for DCT support
+    try:
+        from .dct_steganography import HAS_SCIPY, HAS_JPEGIO
+        HAS_DCT = HAS_SCIPY and HAS_JPEGIO
+    except ImportError:
+        HAS_DCT = False
+
+    # Check service status
+    service_status = "unknown"
+    service_url = None
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "stegasoo"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        service_status = result.stdout.strip()
+        if service_status == "active":
+            # Try to get URL from service environment
+            env_result = subprocess.run(
+                ["systemctl", "show", "stegasoo", "--property=Environment"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            https_enabled = "HTTPS_ENABLED=true" in env_result.stdout
+            protocol = "https" if https_enabled else "http"
+            # Get IP
+            ip_result = subprocess.run(
+                ["hostname", "-I"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            ip = ip_result.stdout.strip().split()[0] if ip_result.stdout.strip() else "localhost"
+            service_url = f"{protocol}://{ip}"
+    except (subprocess.TimeoutExpired, FileNotFoundError, IndexError):
+        pass
+
+    # Check channel key
+    channel_fingerprint = None
+    channel_source = None
+    try:
+        from .channel import get_channel_key, get_channel_fingerprint, get_channel_status
+        key = get_channel_key()
+        if key:
+            channel_fingerprint = get_channel_fingerprint(key)
+            status = get_channel_status()
+            channel_source = status.get("source")
+    except ImportError:
+        pass
+
+    # System info (Pi-specific)
+    cpu_freq = None
+    cpu_temp = None
+    disk_free = None
+    uptime = None
+
+    if full:
+        try:
+            # CPU frequency
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq") as f:
+                cpu_freq = int(f.read().strip()) // 1000  # MHz
+        except (FileNotFoundError, ValueError):
+            pass
+
+        try:
+            # CPU temp
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                cpu_temp = int(f.read().strip()) / 1000  # Celsius
+        except (FileNotFoundError, ValueError):
+            pass
+
+        try:
+            # Disk free
+            st = os.statvfs("/")
+            disk_free = (st.f_bavail * st.f_frsize) / (1024 ** 3)  # GB
+        except OSError:
+            pass
+
+        try:
+            # Uptime
+            with open("/proc/uptime") as f:
+                uptime_secs = float(f.read().split()[0])
+                days = int(uptime_secs // 86400)
+                hours = int((uptime_secs % 86400) // 3600)
+                uptime = f"{days}d {hours}h" if days else f"{hours}h"
+        except (FileNotFoundError, ValueError):
+            pass
+
     info_data = {
         "version": __version__,
+        "service": service_status,
+        "url": service_url,
+        "dct_support": HAS_DCT,
+        "channel": {
+            "fingerprint": channel_fingerprint,
+            "source": channel_source,
+        } if channel_fingerprint else None,
         "compression": {
             "available": [algorithm_name(a) for a in get_available_algorithms()],
             "lz4_installed": HAS_LZ4,
@@ -599,20 +701,54 @@ def info(ctx):
             "max_message_bytes": MAX_MESSAGE_SIZE,
             "max_file_payload_bytes": MAX_FILE_PAYLOAD_SIZE,
         },
+        "system": {
+            "cpu_mhz": cpu_freq,
+            "temp_c": cpu_temp,
+            "disk_free_gb": round(disk_free, 1) if disk_free else None,
+            "uptime": uptime,
+        } if full else None,
     }
 
     if ctx.obj.get("json"):
         click.echo(json.dumps(info_data, indent=2))
     else:
-        click.echo(f"Stegasoo v{__version__}")
-        click.echo("\nCompression algorithms:")
-        for algo in get_available_algorithms():
-            click.echo(f"  • {algorithm_name(algo)}")
-        if not HAS_LZ4:
-            click.echo("    (install 'lz4' for LZ4 support)")
-        click.echo("\nLimits:")
-        click.echo(f"  • Max message: {MAX_MESSAGE_SIZE:,} bytes")
-        click.echo(f"  • Max file payload: {MAX_FILE_PAYLOAD_SIZE:,} bytes")
+        # Fastfetch-style output
+        click.echo(f"\033[1mSTEGASOO\033[0m v{__version__}")
+        click.echo("─" * 36)
+
+        # Service status
+        if service_status == "active":
+            click.echo(f"  Service:     \033[32m● running\033[0m")
+            if service_url:
+                click.echo(f"  URL:         {service_url}")
+        elif service_status == "inactive":
+            click.echo(f"  Service:     \033[31m○ stopped\033[0m")
+        else:
+            click.echo(f"  Service:     \033[33m? {service_status}\033[0m")
+
+        # Channel
+        if channel_fingerprint:
+            masked = f"{channel_fingerprint[:4]}••••••••{channel_fingerprint[-4:]}"
+            click.echo(f"  Channel:     {masked}")
+        else:
+            click.echo(f"  Channel:     \033[33mpublic\033[0m")
+
+        # DCT
+        dct_status = "\033[32m✓ enabled\033[0m" if HAS_DCT else "\033[31m✗ disabled\033[0m"
+        click.echo(f"  DCT:         {dct_status}")
+
+        # System info (if --full)
+        if full and any([cpu_freq, cpu_temp, disk_free, uptime]):
+            click.echo("─" * 36)
+            if cpu_freq:
+                click.echo(f"  CPU:         {cpu_freq} MHz")
+            if cpu_temp:
+                temp_color = "\033[32m" if cpu_temp < 60 else "\033[33m" if cpu_temp < 75 else "\033[31m"
+                click.echo(f"  Temp:        {temp_color}{cpu_temp:.1f}°C\033[0m")
+            if uptime:
+                click.echo(f"  Uptime:      {uptime}")
+            if disk_free:
+                click.echo(f"  Disk:        {disk_free:.1f} GB free")
 
 
 # =============================================================================

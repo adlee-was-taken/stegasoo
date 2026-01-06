@@ -2,7 +2,7 @@
 
 A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work under the hood.
 
-**Version 4.0** - Updated for simplified authentication (no date dependency)
+**Version 4.1** - Updated for channel keys and deployment isolation
 
 ---
 
@@ -22,7 +22,7 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           STEGASOO ARCHITECTURE (v4.0)                      │
+│                           STEGASOO ARCHITECTURE (v4.1)                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   INPUTS                    PROCESSING                      OUTPUT          │
@@ -30,8 +30,8 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 │                                                                             │
 │   Reference Photo ─┐                                                        │
 │   Passphrase ──────┼──► Argon2id KDF ──► AES-256 Key                        │
-│   PIN/RSA Key ─────┘                           │                            │
-│                                                ▼                            │
+│   PIN/RSA Key ─────┤                           │                            │
+│   Channel Key ─────┘  (v4.1)                   ▼                            │
 │   Message/File ────────────────────────► AES-256-GCM ──► Ciphertext         │
 │                                          Encryption            │            │
 │                                                                ▼            │
@@ -50,11 +50,24 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 | Header size | 75 bytes | 65 bytes (no date field) |
 | Python support | 3.10+ | 3.10-3.12 only |
 
+### v4.1 Changes
+
+| Change | v4.0 | v4.1 |
+|--------|------|------|
+| Channel keys | None | 32-byte deployment isolation |
+| Key derivation | passphrase + ref + pin | passphrase + ref + pin + channel |
+| Web auth | Session-based | Session + admin/user roles |
+| Raspberry Pi | Manual setup | First-boot wizard with gum |
+| Docker | Basic | Production-ready compose |
+
+**Channel Keys** provide deployment isolation - messages encoded on one Stegasoo instance cannot be decoded by another instance with a different channel key, even with the same passphrase/PIN/reference photo.
+
 ### Module Responsibilities
 
 | Module | File | Purpose |
 |--------|------|---------|
 | **Crypto** | `crypto.py` | Key derivation (Argon2id), AES-256-GCM encryption/decryption |
+| **Channel** | `channel.py` | Channel key management, deployment isolation (v4.1) |
 | **Steganography** | `steganography.py` | LSB pixel manipulation, capacity calculation |
 | **DCT Steganography** | `dct_steganography.py` | Frequency-domain embedding, jpegio integration |
 | **Compression** | `compression.py` | Optional LZ4 compression of payload |
