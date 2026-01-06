@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Shared environment variables
 x-common-env: &common-env
   STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}
@@ -30,9 +28,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2048M
         reservations:
-          memory: 384M
+          memory: 1024M
 
   # ============================================================================
   # REST API (FastAPI)
@@ -50,9 +48,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2048M
         reservations:
-          memory: 384M
+          memory: 1024M
 
 # Named volumes for persistent data
 volumes:

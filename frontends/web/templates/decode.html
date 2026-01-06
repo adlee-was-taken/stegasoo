@@ -518,5 +518,8 @@ advancedOptionsDec?.addEventListener('show.bs.collapse', () => {
 advancedOptionsDec?.addEventListener('hide.bs.collapse', () => {
     document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
 });
+
+// Loading state for decode button
+Stegasoo.initFormLoading('decodeForm', 'decodeBtn', 'Decoding...');
 </script>
 {% endblock %}

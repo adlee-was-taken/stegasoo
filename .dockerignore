@@ -22,8 +22,10 @@ tests/
 # Pi-specific
 rpi/
 *.img
+*.img.xz
 *.img.zst
 *.img.zst.zip
+pishrink.sh
 
 # Docs
 *.md
@@ -37,3 +39,15 @@ docs/
 *.log
 *.tmp
 .DS_Store
+
+# Dev scripts and old files
+scripts/
+old_files/
+*_old
+*_old.*
+*.bak
+*.orig
+
+# Temp files
+frontends/web/temp_files/
+*.db
