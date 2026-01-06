@@ -6,9 +6,8 @@
 | ------- | ------------------ | ----- |
 | 4.1.x   | Current Version | What you SHOULD be using. |
 | 4.x.x   | ⚠️ Security fixes only | Upgrade (EOL soon) |
-| 3.x.x   | ❌ End of life | |
-| 2.x.x   | ❌ End of life | |
-| 1.x.x   | ❌ End of life | |
+| <= 3.x.x   | ❌ End of life | |
+
 
 ## Reporting a Vulnerability
 
