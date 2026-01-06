@@ -404,8 +404,7 @@ gum style --foreground 245 "  $ACCESS_URL_LOCAL (if mDNS works)"
 
 if [ -n "$CHANNEL_KEY" ]; then
   echo ""
-  gum style --foreground 82 --bold "Channel Key:" --inline
-  gum style --foreground 226 " $CHANNEL_KEY"
+  echo -e "\033[1;32mChannel Key:\033[0m \033[0;33m$CHANNEL_KEY\033[0m"
 fi
 
 echo ""
