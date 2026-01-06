@@ -100,7 +100,7 @@
                                     <li><strong>Output:</strong> JPEG or PNG</li>
                                     <li><strong>Color:</strong> Color or grayscale</li>
                                     <li><strong>Speed:</strong> ~2s</li>
-                                    <li><strong>Error Correction:</strong> Reed-Solomon <span class="badge bg-info ms-1">v4.1</span></li>
+                                    <li><strong>Error Correction:</strong> Reed-Solomon</li>
                                 </ul>
                                 <hr>
                                 <div class="small">
@@ -375,56 +375,64 @@
                 <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Version History</h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-dark table-sm small">
-                        <thead>
-                            <tr>
-                                <th>Version</th>
-                                <th>Changes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>4.1.0</strong></td>
-                                <td>
-                                    <strong>Reed-Solomon error correction</strong> for DCT mode (corrects up to 16 byte errors per 223-byte chunk),
-                                    majority voting on length headers, improved robustness with problematic carrier images
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>4.0.0</strong></td>
-                                <td>
-                                    <strong>Channel keys</strong> for group/deployment isolation,
-                                    DCT default, simplified auth, passphrase replaces day_phrase,
-                                    4-word default, JPEG fix, large image support, subprocess isolation, Python 3.10-3.12
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3.2.0</td>
-                                <td>Single passphrase, more default words</td>
-                            </tr>
-                            <tr>
-                                <td>3.0.0</td>
-                                <td>DCT mode, JPEG output, color preservation</td>
-                            </tr>
-                            <tr>
-                                <td>2.2.0</td>
-                                <td>QR code RSA key import/export</td>
-                            </tr>
-                            <tr>
-                                <td>2.1.0</td>
-                                <td>File embedding, compression</td>
-                            </tr>
-                            <tr>
-                                <td>2.0.0</td>
-                                <td>Web UI, REST API, RSA keys</td>
-                            </tr>
-                            <tr>
-                                <td>1.0.0</td>
-                                <td>Initial release, CLI only, LSB mode</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- Current Version - Prominent -->
+                <div class="alert alert-success mb-4">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success fs-6 me-3">v4.1.2</span>
+                        <div>
+                            <strong>Progress bars</strong> for encode operations,
+                            <strong>mobile-responsive polish</strong>,
+                            DCT decode bug fix, release validation script
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Previous Versions - Accordion -->
+                <div class="accordion" id="versionAccordion">
+                    <div class="accordion-item bg-dark">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed bg-dark text-light py-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#olderVersions">
+                                <i class="bi bi-archive me-2"></i>Previous Versions
+                            </button>
+                        </h2>
+                        <div id="olderVersions" class="accordion-collapse collapse" data-bs-parent="#versionAccordion">
+                            <div class="accordion-body p-0">
+                                <table class="table table-dark table-sm small mb-0">
+                                    <tbody>
+                                        <tr>
+                                            <td width="80"><strong>4.1.1</strong></td>
+                                            <td>DCT RS format stability, Docker cleanup, first-boot wizard</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>4.1.0</strong></td>
+                                            <td>Reed-Solomon error correction for DCT, majority voting headers</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>4.0.0</strong></td>
+                                            <td>Channel keys, DCT default, subprocess isolation</td>
+                                        </tr>
+                                        <tr>
+                                            <td>3.2.0</td>
+                                            <td>Single passphrase, more default words</td>
+                                        </tr>
+                                        <tr>
+                                            <td>3.0.0</td>
+                                            <td>DCT mode, JPEG output, color preservation</td>
+                                        </tr>
+                                        <tr>
+                                            <td>2.x</td>
+                                            <td>Web UI, REST API, RSA keys, QR codes, file embedding</td>
+                                        </tr>
+                                        <tr>
+                                            <td>1.0.0</td>
+                                            <td>Initial release, CLI only, LSB mode</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -553,9 +561,8 @@
                     <div class="col-6 col-md-4 col-lg-2 mb-3">
                         <div class="p-3 bg-dark rounded h-100">
                             <i class="bi bi-bandaid text-info fs-3 d-block mb-2"></i>
-                            <div class="small text-muted">Error Correction</div>
-                            <strong>Reed-Solomon</strong>
-                            <span class="badge bg-info ms-1">v4.1</span>
+                            <div class="small text-muted">DCT ECC</div>
+                            <strong>RS Code</strong>
                         </div>
                     </div>
                 </div>

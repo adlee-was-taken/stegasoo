@@ -45,6 +45,7 @@ from .image_utils import (
 
 # Steganography functions
 from .steganography import (
+    calculate_capacity_by_mode,
     compare_modes,
     has_dct_support,
     will_fit_by_mode,
@@ -92,6 +93,7 @@ from .constants import (
     EMBED_MODE_LSB,
     FORMAT_VERSION,
     LOSSLESS_FORMATS,
+    MAX_FILE_PAYLOAD_SIZE,
     MAX_IMAGE_PIXELS,
     MAX_MESSAGE_SIZE,
     MAX_PASSPHRASE_WORDS,
@@ -149,6 +151,7 @@ from .validation import (
 MIN_MESSAGE_LENGTH = 1
 MAX_MESSAGE_LENGTH = MAX_MESSAGE_SIZE
 MAX_PAYLOAD_SIZE = MAX_MESSAGE_SIZE
+# MAX_FILE_PAYLOAD_SIZE imported from constants above
 SUPPORTED_IMAGE_FORMATS = LOSSLESS_FORMATS
 LSB_BYTES_PER_PIXEL = 3 / 8
 DCT_BYTES_PER_PIXEL = 0.125
@@ -188,6 +191,7 @@ __all__ = [
     "has_argon2",
     # Steganography
     "has_dct_support",
+    "calculate_capacity_by_mode",
     "compare_modes",
     "will_fit_by_mode",
     # QR utilities
@@ -252,6 +256,7 @@ __all__ = [
     "MAX_MESSAGE_LENGTH",
     "MAX_MESSAGE_SIZE",
     "MAX_PAYLOAD_SIZE",
+    "MAX_FILE_PAYLOAD_SIZE",
     "MIN_IMAGE_PIXELS",
     "MAX_IMAGE_PIXELS",
     "SUPPORTED_IMAGE_FORMATS",
