@@ -426,13 +426,14 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
     echo -e " \033[0;32m●\033[0m Stegasoo is running"
     echo -e "   \033[0;33m$STEGASOO_URL\033[0m"
-    # Show CPU stats if overclocked
-    if grep -qE "^(arm_freq|over_voltage)" /boot/firmware/config.txt 2>/dev/null || \
-       grep -qE "^(arm_freq|over_voltage)" /boot/config.txt 2>/dev/null; then
-        CPU_FREQ=$(vcgencmd measure_clock arm 2>/dev/null | cut -d= -f2)
+    # Show CPU stats if overclocked (read configured freq, not current idle freq)
+    CONFIG_FILE=""
+    if [ -f /boot/firmware/config.txt ]; then CONFIG_FILE="/boot/firmware/config.txt"
+    elif [ -f /boot/config.txt ]; then CONFIG_FILE="/boot/config.txt"; fi
+    if [ -n "$CONFIG_FILE" ] && grep -qE "^arm_freq=" "$CONFIG_FILE" 2>/dev/null; then
+        CPU_MHZ=$(grep "^arm_freq=" "$CONFIG_FILE" | cut -d= -f2)
         CPU_TEMP=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2)
-        if [ -n "$CPU_FREQ" ] && [ -n "$CPU_TEMP" ]; then
-            CPU_MHZ=$((CPU_FREQ / 1000000))
+        if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
             echo -e "   \033[0;35m⚡\033[0m ${CPU_MHZ} MHz  \033[0;35m🌡\033[0m ${CPU_TEMP}"
         fi
     fi
