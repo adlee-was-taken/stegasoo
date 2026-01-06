@@ -4,16 +4,16 @@
 
 | Version | Supported          | Notes |
 | ------- | ------------------ | ----- |
-| 4.x.x   | ✅ Active | Current release |
-| 3.x.x   | ⚠️ Security fixes only | Upgrade recommended |
-| 2.x.x   | ❌ End of life | |
-| 1.x.x   | ❌ End of life | |
+| 4.1.x   | Current Version | What you SHOULD be using. |
+| 4.x.x   | ⚠️ Security fixes only | Upgrade (EOL soon) |
+| <= 3.x.x   | ❌ End of life | |
+
 
 ## Reporting a Vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please email: **security@example.com** (replace with your email)
+Instead, please email: **adlee-was-taken@proton.me**
 
 Include:
 - Description of the vulnerability

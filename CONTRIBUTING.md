@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Stegasoo! This document provides 
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10 - 3.12
 - Git
 - Docker (optional, for container testing)
 
