@@ -63,7 +63,8 @@ COPY data/ data/
 COPY frontends/web/ frontends/web/
 
 # Create upload directory and instance directories (for volumes)
-RUN mkdir -p /tmp/stego_uploads /app/frontends/web/instance /app/frontends/web/certs
+# temp_files is for multi-worker temp file sharing
+RUN mkdir -p /tmp/stego_uploads /app/frontends/web/instance /app/frontends/web/certs /app/frontends/web/temp_files
 
 # Create non-root user
 RUN useradd -m -u 1000 stego && chown -R stego:stego /app /tmp/stego_uploads

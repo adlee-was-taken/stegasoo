@@ -83,6 +83,7 @@ from flask import (
 )
 from PIL import Image
 from ssl_utils import ensure_certs
+import temp_storage
 
 os.environ["NUMPY_MADVISE_HUGEPAGE"] = "0"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -257,9 +258,10 @@ def require_setup():
     return None
 
 
-# Temporary file storage for sharing (file_id -> {data, timestamp, filename})
-TEMP_FILES: dict[str, dict] = {}
-THUMBNAIL_FILES: dict[str, bytes] = {}
+# DEPRECATED: In-memory storage replaced by file-based temp_storage module
+# Kept for backwards compatibility during transition
+TEMP_FILES: dict[str, dict] = {}  # Not used - see temp_storage.py
+THUMBNAIL_FILES: dict[str, bytes] = {}  # Not used - see temp_storage.py
 
 
 # ============================================================================
@@ -397,16 +399,7 @@ def generate_thumbnail(image_data: bytes, size: tuple = THUMBNAIL_SIZE) -> bytes
 
 def cleanup_temp_files():
     """Remove expired temporary files."""
-    now = time.time()
-    expired = [
-        fid for fid, info in TEMP_FILES.items() if now - info["timestamp"] > TEMP_FILE_EXPIRY
-    ]
-
-    for fid in expired:
-        TEMP_FILES.pop(fid, None)
-        # Also clean up corresponding thumbnail
-        thumb_id = f"{fid}_thumb"
-        THUMBNAIL_FILES.pop(thumb_id, None)
+    temp_storage.cleanup_expired(TEMP_FILE_EXPIRY)
 
 
 def allowed_image(filename: str) -> bool:
@@ -563,13 +556,11 @@ def generate():
                 if not qr_too_large:
                     qr_token = secrets.token_urlsafe(16)
                     cleanup_temp_files()
-                    TEMP_FILES[qr_token] = {
-                        "data": creds.rsa_key_pem.encode(),
+                    temp_storage.save_temp_file(qr_token, creds.rsa_key_pem.encode(), {
                         "filename": "rsa_key.pem",
-                        "timestamp": time.time(),
                         "type": "rsa_key",
                         "compress": qr_needs_compression,
-                    }
+                    })
 
             # v3.2.0: Single passphrase instead of daily phrases
             return render_template(
@@ -606,10 +597,10 @@ def generate_qr(token):
     if not HAS_QRCODE:
         return "QR code support not available", 501
 
-    if token not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(token)
+    if not file_info:
         return "Token expired or invalid", 404
 
-    file_info = TEMP_FILES[token]
     if file_info.get("type") != "rsa_key":
         return "Invalid token type", 400
 
@@ -630,10 +621,10 @@ def generate_qr_download(token):
     if not HAS_QRCODE:
         return "QR code support not available", 501
 
-    if token not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(token)
+    if not file_info:
         return "Token expired or invalid", 404
 
-    file_info = TEMP_FILES[token]
     if file_info.get("type") != "rsa_key":
         return "Invalid token type", 400
 
@@ -933,17 +924,15 @@ def _run_encode_job(job_id: str, encode_params: dict) -> None:
 
         # Store result
         file_id = secrets.token_urlsafe(16)
-        TEMP_FILES[file_id] = {
-            "data": encode_result.stego_data,
+        temp_storage.save_temp_file(file_id, encode_result.stego_data, {
             "filename": filename,
-            "timestamp": time.time(),
             "embed_mode": embed_mode,
             "output_format": dct_output_format if embed_mode == "dct" else "png",
             "color_mode": dct_color_mode if embed_mode == "dct" else None,
             "mime_type": output_mime,
             "channel_mode": encode_result.channel_mode,
             "channel_fingerprint": encode_result.channel_fingerprint,
-        }
+        })
 
         _store_job(
             job_id,
@@ -1212,10 +1201,8 @@ def encode_page():
             # Store temporarily
             file_id = secrets.token_urlsafe(16)
             cleanup_temp_files()
-            TEMP_FILES[file_id] = {
-                "data": encode_result.stego_data,
+            temp_storage.save_temp_file(file_id, encode_result.stego_data, {
                 "filename": filename,
-                "timestamp": time.time(),
                 "embed_mode": embed_mode,
                 "output_format": dct_output_format if embed_mode == "dct" else "png",
                 "color_mode": dct_color_mode if embed_mode == "dct" else None,
@@ -1223,7 +1210,7 @@ def encode_page():
                 # Channel info (v4.0.0)
                 "channel_mode": encode_result.channel_mode,
                 "channel_fingerprint": encode_result.channel_fingerprint,
-            }
+            })
 
             return redirect(url_for("encode_result", file_id=file_id))
 
@@ -1290,11 +1277,10 @@ def encode_progress(job_id):
 @app.route("/encode/result/<file_id>")
 @login_required
 def encode_result(file_id):
-    if file_id not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(file_id)
+    if not file_info:
         flash("File expired or not found. Please encode again.", "error")
         return redirect(url_for("encode_page"))
-
-    file_info = TEMP_FILES[file_id]
 
     # Generate thumbnail
     thumbnail_data = generate_thumbnail(file_info["data"])
@@ -1302,7 +1288,7 @@ def encode_result(file_id):
 
     if thumbnail_data:
         thumbnail_id = f"{file_id}_thumb"
-        THUMBNAIL_FILES[thumbnail_id] = thumbnail_data
+        temp_storage.save_thumbnail(thumbnail_id, thumbnail_data)
 
     return render_template(
         "encode_result.html",
@@ -1322,22 +1308,23 @@ def encode_result(file_id):
 @login_required
 def encode_thumbnail(thumb_id):
     """Serve thumbnail image."""
-    if thumb_id not in THUMBNAIL_FILES:
+    thumb_data = temp_storage.get_thumbnail(thumb_id)
+    if not thumb_data:
         return "Thumbnail not found", 404
 
     return send_file(
-        io.BytesIO(THUMBNAIL_FILES[thumb_id]), mimetype="image/jpeg", as_attachment=False
+        io.BytesIO(thumb_data), mimetype="image/jpeg", as_attachment=False
     )
 
 
 @app.route("/encode/download/<file_id>")
 @login_required
 def encode_download(file_id):
-    if file_id not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(file_id)
+    if not file_info:
         flash("File expired or not found.", "error")
         return redirect(url_for("encode_page"))
 
-    file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "image/png")
 
     return send_file(
@@ -1352,10 +1339,10 @@ def encode_download(file_id):
 @login_required
 def encode_file_route(file_id):
     """Serve file for Web Share API."""
-    if file_id not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(file_id)
+    if not file_info:
         return "Not found", 404
 
-    file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "image/png")
 
     return send_file(
@@ -1370,11 +1357,11 @@ def encode_file_route(file_id):
 @login_required
 def encode_cleanup(file_id):
     """Manually cleanup a file after sharing."""
-    TEMP_FILES.pop(file_id, None)
+    temp_storage.delete_temp_file(file_id)
 
     # Also cleanup thumbnail if exists
     thumb_id = f"{file_id}_thumb"
-    THUMBNAIL_FILES.pop(thumb_id, None)
+    temp_storage.delete_thumbnail(thumb_id)
 
     return jsonify({"status": "ok"})
 
@@ -1497,12 +1484,10 @@ def decode_page():
                 cleanup_temp_files()
 
                 filename = decode_result.filename or "decoded_file"
-                TEMP_FILES[file_id] = {
-                    "data": decode_result.file_data,
+                temp_storage.save_temp_file(file_id, decode_result.file_data, {
                     "filename": filename,
                     "mime_type": decode_result.mime_type,
-                    "timestamp": time.time(),
-                }
+                })
 
                 return render_template(
                     "decode.html",
@@ -1559,11 +1544,11 @@ def decode_page():
 @login_required
 def decode_download(file_id):
     """Download decoded file."""
-    if file_id not in TEMP_FILES:
+    file_info = temp_storage.get_temp_file(file_id)
+    if not file_info:
         flash("File expired or not found.", "error")
         return redirect(url_for("decode_page"))
 
-    file_info = TEMP_FILES[file_id]
     mime_type = file_info.get("mime_type", "application/octet-stream")
 
     return send_file(
@@ -2319,6 +2304,12 @@ def admin_user_password_reset():
 
 if __name__ == "__main__":
     base_dir = Path(__file__).parent
+
+    # Clean up any leftover temp files from previous runs
+    temp_storage.init(base_dir / "temp_files")
+    cleaned = temp_storage.cleanup_all()
+    if cleaned > 0:
+        print(f"Cleaned up {cleaned} leftover temp files from previous run")
 
     # HTTPS configuration
     ssl_context = None

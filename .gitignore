@@ -81,3 +81,6 @@ tests/
 *.img.zst
 pishrink.sh
 *.img.zst.zip
+
+# Temp file storage
+frontends/web/temp_files/
