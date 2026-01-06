@@ -21,6 +21,12 @@ cd "$JPEGIO_DIR"
 
 echo "Applying ARM64 patch to jpegio..."
 
+# Fix CRLF line endings (jpegio uses Windows line endings)
+if file setup.py | grep -q CRLF; then
+    echo "  Converting CRLF to LF..."
+    sed -i 's/\r$//' setup.py
+fi
+
 # Strategy 1: Try the standard patch file
 if [ -f "$PATCH_FILE" ]; then
     echo "  Trying patch file..."
