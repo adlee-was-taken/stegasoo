@@ -309,6 +309,7 @@ echo "  Added stegasoo to PATH"
 if [ -f "$INSTALL_DIR/rpi/skel/.bashrc" ]; then
     if ! grep -q "Stegasoo Pi" ~/.bashrc 2>/dev/null; then
         cp "$INSTALL_DIR/rpi/skel/.bashrc" ~/.bashrc
+        source ~/.bashrc 2>/dev/null || true
         echo "  Installed custom .bashrc"
     else
         echo "  Custom .bashrc already installed"

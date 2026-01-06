@@ -212,18 +212,3 @@ fi
 
 export PATH="$HOME/.local/bin:$PATH"
 
-# ============================================================================
-# Welcome Message (first login only)
-# ============================================================================
-
-if [ -z "$STEGASOO_WELCOMED" ]; then
-    export STEGASOO_WELCOMED=1
-    echo ""
-    echo -e "\e[38;5;82m  ___  _____  ___    ___    _    ___    ___    ___\e[0m"
-    echo -e "\e[38;5;82m / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\\e[0m"
-    echo -e "\e[38;5;82m \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |\e[0m"
-    echo -e "\e[38;5;82m |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/\e[0m"
-    echo ""
-    echo -e "\e[38;5;245mType 'sysinfo' for system status, 'steglog' for logs\e[0m"
-    echo ""
-fi
