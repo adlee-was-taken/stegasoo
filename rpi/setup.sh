@@ -165,7 +165,31 @@ else
     echo "  gum already installed"
 fi
 
-echo -e "${GREEN}[4/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+echo -e "${GREEN}[4/12]${NC} Cloning Stegasoo..."
+
+# Clone Stegasoo first (needed to check for pre-built tarball)
+if [ -d "$INSTALL_DIR/.git" ]; then
+    echo "  Stegasoo directory exists, updating..."
+    cd "$INSTALL_DIR"
+    git fetch origin
+    git checkout "$STEGASOO_BRANCH"
+    git pull origin "$STEGASOO_BRANCH"
+else
+    git clone -b "$STEGASOO_BRANCH" "$STEGASOO_REPO" "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
+fi
+
+# Check for pre-built venv tarball (skips 20+ min compile time)
+PREBUILT_VENV="$INSTALL_DIR/rpi/stegasoo-venv-pi-arm64.tar.zst"
+PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-}"  # Optional: URL to download from
+USE_PREBUILT=false
+
+if [ -f "$PREBUILT_VENV" ] || [ -n "$PREBUILT_VENV_URL" ]; then
+    USE_PREBUILT=true
+    echo -e "${GREEN}Found pre-built venv tarball - fast install mode${NC}"
+fi
+
+echo -e "${GREEN}[5/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
 
 # Install pyenv if not present
 if [ ! -d "$HOME/.pyenv" ]; then
@@ -185,16 +209,21 @@ if [ ! -d "$HOME/.pyenv" ]; then
         echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
     fi
 else
-    echo "pyenv already installed, skipping..."
+    echo "  pyenv already installed"
     export PYENV_ROOT="$HOME/.pyenv"
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init -)"
 fi
 
-# Install Python 3.12 if not present
+# Install Python 3.12 if not present (required even for pre-built venv)
 if ! pyenv versions | grep -q "$PYTHON_VERSION"; then
-    echo "Building Python $PYTHON_VERSION (this takes ~10 minutes)..."
+    if [ "$USE_PREBUILT" = true ]; then
+        echo -e "  ${YELLOW}Note: Python $PYTHON_VERSION needed for pre-built venv${NC}"
+    fi
+    echo "  Building Python $PYTHON_VERSION (this takes ~10 minutes)..."
     pyenv install $PYTHON_VERSION
+else
+    echo "  Python $PYTHON_VERSION already installed"
 fi
 pyenv global $PYTHON_VERSION
 
@@ -205,25 +234,8 @@ if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[5/12]${NC} Cloning Stegasoo..."
-
-# Clone Stegasoo first (needed for jpegio patch script)
-if [ -d "$INSTALL_DIR/.git" ]; then
-    echo "  Stegasoo directory exists, updating..."
-    cd "$INSTALL_DIR"
-    git fetch origin
-    git checkout "$STEGASOO_BRANCH"
-    git pull origin "$STEGASOO_BRANCH"
-else
-    git clone -b "$STEGASOO_BRANCH" "$STEGASOO_REPO" "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-fi
-
-# Check for pre-built venv tarball (skips 20+ min compile time)
-PREBUILT_VENV="$INSTALL_DIR/rpi/stegasoo-venv-pi-arm64.tar.zst"
-PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-}"  # Optional: URL to download from
-
-if [ -f "$PREBUILT_VENV" ] || [ -n "$PREBUILT_VENV_URL" ]; then
+# Fast path: use pre-built venv if available
+if [ "$USE_PREBUILT" = true ]; then
     echo -e "${GREEN}[6/8]${NC} Installing pre-built Python environment..."
 
     # Download if URL provided and local file doesn't exist
