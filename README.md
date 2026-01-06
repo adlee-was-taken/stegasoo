@@ -102,9 +102,23 @@ black src/ tests/ frontends/
 ruff check src/ tests/ frontends/
 ```
 
+## Docker
+
+```bash
+# Quick start
+docker-compose up -d
+
+# Access
+# Web UI:   http://localhost:5000
+# REST API: http://localhost:8000
+```
+
+See [DOCKER.md](DOCKER.md) for full documentation.
+
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) - Installation guide
+- [DOCKER.md](DOCKER.md) - Docker deployment
 - [CLI.md](CLI.md) - Command-line reference
 - [API.md](API.md) - REST API documentation
 - [WEB_UI.md](WEB_UI.md) - Web interface guide
