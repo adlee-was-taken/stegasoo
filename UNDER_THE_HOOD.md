@@ -35,7 +35,7 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 │   Message/File ────────────────────────► AES-256-GCM ──► Ciphertext         │
 │                                          Encryption            │            │
 │                                                                ▼            │
-│   Carrier Image ───────────────────────────────────────► Embedding ──► Stego│
+│   Carrier Image ───────────────────────────────────────► Embedding ─► Stego │
 │                                                          (LSB/DCT)    Image │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -626,7 +626,7 @@ Factor 1: Reference Photo    ─┐
   • 80-256 bits entropy       │
   • "Something you have"      │
                               ├──► Combined entropy: 133-400+ bits
-Factor 2: Passphrase         │    (Beyond brute force)
+Factor 2: Passphrase          │    (Beyond brute force)
   • 43-132 bits entropy       │
   • "Something you know"      │
   • 4 words default (v4.0)    │
@@ -688,7 +688,7 @@ AUTHENTICATED ENCRYPTION (AES-256-GCM)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│                              ENCODE FLOW (v4.0)                               │
+│                              ENCODE FLOW (v4.0)                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 User Inputs                    Processing                           Output
@@ -714,14 +714,14 @@ Carrier Image ──────────────────────
                                                           │     │
                                               ┌───────────┴─────┴────────────┐
                                               │                              │
-                                       LSB Mode                       DCT Mode
+                                           LSB Mode                       DCT Mode
                                               │                              │
                                               ▼                              ▼
-                                     embed_lsb()                    embed_in_dct()
-                                     (pixel LSBs)                   (DCT coefficients)
+                                         embed_lsb()                    embed_in_dct()
+                                         (pixel LSBs)                 (DCT coefficients)
                                               │                              │
                                               ▼                              ▼
-                                         PNG Output                  PNG or JPEG
+                                          PNG Output                    PNG or JPEG
                                               │                              │
                                               └──────────┬───────────────────┘
                                                          │
