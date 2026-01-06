@@ -84,3 +84,4 @@ pishrink.sh
 
 # Temp file storage
 frontends/web/temp_files/
+rpi/config.json

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Flash Raspberry Pi image with headless config (Trixie/Bookworm compatible)
-# Usage: ./flash-pi.sh <image.img.xz> <device>
+# Usage: ./flash-stock-img.sh <image.img.xz> <device>
 # Reads settings from config.json in same directory
 #
 # Uses the same firstrun.sh approach as rpi-imager for compatibility
@@ -103,11 +103,64 @@ sleep 1
 # ============================================================================
 if [ -b "${DEVICE}1" ]; then
     BOOT_PART="${DEVICE}1"
+    ROOT_PART="${DEVICE}2"
 elif [ -b "${DEVICE}p1" ]; then
     BOOT_PART="${DEVICE}p1"
+    ROOT_PART="${DEVICE}p2"
 else
     echo "Error: Could not find boot partition"
     exit 1
+fi
+
+# ============================================================================
+# Resize rootfs to 16GB (faster imaging)
+# ============================================================================
+echo
+read -p "Resize rootfs to 16GB for faster imaging? [Y/n] " resize_confirm
+if [[ ! "$resize_confirm" =~ ^[Nn]$ ]]; then
+    echo "Resizing rootfs partition to 16GB..."
+
+    # Get boot partition end
+    BOOT_END=$(sudo parted -s "$DEVICE" unit s print | grep "^ 1" | awk '{print $3}' | tr -d 's')
+
+    # Calculate 16GB in sectors (512 byte sectors)
+    # 16GB = 16 * 1024 * 1024 * 1024 / 512 = 33554432 sectors
+    ROOT_SIZE_SECTORS=33554432
+    ROOT_END=$((BOOT_END + ROOT_SIZE_SECTORS))
+
+    # Delete and recreate partition 2 with fixed size
+    sudo parted -s "$DEVICE" rm 2
+    sudo parted -s "$DEVICE" mkpart primary ext4 $((BOOT_END + 1))s ${ROOT_END}s
+
+    # Refresh partition table
+    sudo partprobe "$DEVICE"
+    sleep 1
+
+    # Check and resize filesystem
+    echo "Checking filesystem..."
+    sudo e2fsck -f -y "$ROOT_PART" 2>/dev/null || true
+
+    echo "Resizing filesystem to fit partition..."
+    sudo resize2fs "$ROOT_PART"
+
+    # Disable Pi OS auto-expand on first boot
+    echo "Disabling auto-expand..."
+    TEMP_ROOT=$(mktemp -d)
+    sudo mount "$ROOT_PART" "$TEMP_ROOT"
+
+    # Remove resize2fs_once service if it exists
+    sudo rm -f "$TEMP_ROOT/etc/init.d/resize2fs_once"
+    sudo rm -f "$TEMP_ROOT/etc/rc3.d/S01resize2fs_once"
+
+    # Disable the systemd resize service
+    sudo rm -f "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
+
+    # Remove init= parameter from cmdline.txt on boot partition (handled later)
+
+    sudo umount "$TEMP_ROOT"
+    rmdir "$TEMP_ROOT"
+
+    echo "  Rootfs resized to 16GB (auto-expand disabled)"
 fi
 
 MOUNT_DIR=$(mktemp -d)
@@ -213,8 +266,8 @@ sudo chmod +x "$MOUNT_DIR/firstrun.sh"
 echo "Updating cmdline.txt..."
 CMDLINE="$MOUNT_DIR/cmdline.txt"
 if [ -f "$CMDLINE" ]; then
-    # Read current cmdline, strip any existing systemd.run, append new one
-    CURRENT=$(cat "$CMDLINE" | tr -d '\n' | sed 's| systemd.run.*||g')
+    # Read current cmdline, strip existing systemd.run and init= (auto-expand)
+    CURRENT=$(cat "$CMDLINE" | tr -d '\n' | sed 's| systemd.run.*||g' | sed 's| init=[^ ]*||g')
     echo "$CURRENT systemd.run=/boot/firmware/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target" | sudo tee "$CMDLINE" > /dev/null
     echo "  cmdline.txt updated"
 fi

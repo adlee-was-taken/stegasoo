@@ -1,0 +1,12 @@
+{
+  "hostname": "stegasoo",
+  "username": "admin",
+  "password": "stegasoo",
+  "wifiSSID": "YourNetworkName",
+  "wifiPassword": "YourWiFiPassword",
+  "wifiCountry": "US",
+  "locale": "en_US.UTF-8",
+  "keyboardLayout": "us",
+  "timezone": "America/New_York",
+  "enableSSH": true
+}

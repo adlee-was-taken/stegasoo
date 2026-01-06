@@ -120,7 +120,34 @@ else
 fi
 
 # =============================================================================
-# 2. Unit Tests (if they exist)
+# 2. Security Audit
+# =============================================================================
+section "Security Audit"
+
+# pip-audit for known vulnerabilities
+if command -v ./venv/bin/pip-audit &> /dev/null; then
+    echo -n "Running pip-audit... "
+    if ./venv/bin/pip-audit --quiet 2>/dev/null; then
+        pass "No known vulnerabilities"
+    else
+        fail "pip-audit found vulnerabilities (run: ./venv/bin/pip-audit)"
+    fi
+else
+    echo -n "Installing pip-audit... "
+    if ./venv/bin/pip install pip-audit --quiet 2>/dev/null; then
+        echo -n "Running pip-audit... "
+        if ./venv/bin/pip-audit --quiet 2>/dev/null; then
+            pass "No known vulnerabilities"
+        else
+            fail "pip-audit found vulnerabilities (run: ./venv/bin/pip-audit)"
+        fi
+    else
+        skip "Could not install pip-audit"
+    fi
+fi
+
+# =============================================================================
+# 3. Unit Tests (if they exist)
 # =============================================================================
 section "Unit Tests"
 
@@ -136,7 +163,7 @@ else
 fi
 
 # =============================================================================
-# 3. Import Tests
+# 4. Import Tests
 # =============================================================================
 section "Import Tests"
 
@@ -165,7 +192,7 @@ else
 fi
 
 # =============================================================================
-# 4. Encode/Decode Sanity Test
+# 5. Encode/Decode Sanity Test
 # =============================================================================
 section "Encode/Decode Test"
 
@@ -205,7 +232,7 @@ else
 fi
 
 # =============================================================================
-# 5. Docker Build & Test (optional)
+# 6. Docker Build & Test (optional)
 # =============================================================================
 if $INCLUDE_DOCKER; then
     section "Docker"
@@ -248,7 +275,7 @@ else
 fi
 
 # =============================================================================
-# 6. Pi Smoke Test (optional)
+# 7. Pi Smoke Test (optional)
 # =============================================================================
 if $INCLUDE_PI; then
     section "Pi Smoke Test"

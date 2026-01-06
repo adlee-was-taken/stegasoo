@@ -2,9 +2,9 @@
 
 ## Build / Deploy
 - [ ] Pre-built Python 3.12 venv tarball for Pi (skip 20+ min compile)
-- [ ] Fixed partition sizing in flash script (8-16GB rootfs for faster imaging)
-- [ ] Rename `flash-pi.sh` → `flash-stock-img.sh` for clarity
-- [ ] pip-audit integration in release validation
+- [x] Fixed partition sizing in flash script (16GB rootfs for faster imaging)
+- [x] Rename `flash-pi.sh` → `flash-stock-img.sh` for clarity
+- [x] pip-audit integration in release validation
 
 ## Features
 - [ ] QR channel key sharing (needs UI thought - avoid crowding encode/decode pages)
