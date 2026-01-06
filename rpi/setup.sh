@@ -135,6 +135,7 @@ sudo apt-get install -y \
     build-essential \
     git \
     curl \
+    zstd \
     libssl-dev \
     zlib1g-dev \
     libbz2-dev \
@@ -218,49 +219,83 @@ else
     cd "$INSTALL_DIR"
 fi
 
-echo -e "${GREEN}[6/12]${NC} Creating Python virtual environment..."
+# Check for pre-built venv tarball (skips 20+ min compile time)
+PREBUILT_VENV="$INSTALL_DIR/rpi/stegasoo-venv-pi-arm64.tar.zst"
+PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-}"  # Optional: URL to download from
 
-# Create venv with pyenv Python (not system Python)
-# Use pyenv which to get actual path (handles 3.12 -> 3.12.12 mapping)
-PYENV_PYTHON=$(pyenv which python)
-echo "  Using Python: $PYENV_PYTHON"
-if [ ! -d "venv" ]; then
-    "$PYENV_PYTHON" -m venv venv
-fi
-source venv/bin/activate
+if [ -f "$PREBUILT_VENV" ] || [ -n "$PREBUILT_VENV_URL" ]; then
+    echo -e "${GREEN}[6/8]${NC} Installing pre-built Python environment..."
 
-# Verify we're using the right Python
-VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-echo "  venv Python: $VENV_PY"
+    # Download if URL provided and local file doesn't exist
+    if [ ! -f "$PREBUILT_VENV" ] && [ -n "$PREBUILT_VENV_URL" ]; then
+        echo "  Downloading pre-built venv..."
+        curl -L -o "$PREBUILT_VENV" "$PREBUILT_VENV_URL"
+    fi
 
-echo -e "${GREEN}[7/12]${NC} Building jpegio for ARM..."
+    # Extract pre-built venv (zstd compressed)
+    echo "  Extracting pre-built venv (this is much faster!)..."
+    zstd -d "$PREBUILT_VENV" --stdout | tar -xf - -C "$INSTALL_DIR"
 
-# Clone jpegio
-JPEGIO_DIR="/tmp/jpegio-build"
-rm -rf "$JPEGIO_DIR"
-git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
+    # Activate and verify
+    source venv/bin/activate
+    VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+    echo -e "  ${GREEN}✓${NC} venv Python: $VENV_PY"
 
-# Apply ARM64 patch
-if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
-    bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
+    # Install stegasoo package in editable mode (quick, no compile)
+    echo -e "${GREEN}[7/8]${NC} Installing Stegasoo package..."
+    pip install -e "." --quiet
+
+    # Adjust step numbers for rest of script
+    STEP_OFFSET=-4
 else
-    echo "  Applying inline ARM64 patch..."
-    sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
+    echo -e "${GREEN}[6/12]${NC} Creating Python virtual environment..."
+    echo -e "  ${YELLOW}Note: No pre-built venv found. Building from source (20+ min)${NC}"
+    echo -e "  ${YELLOW}To speed up future installs, add stegasoo-venv-pi-arm64.tar.gz to rpi/${NC}"
+
+    # Create venv with pyenv Python (not system Python)
+    # Use pyenv which to get actual path (handles 3.12 -> 3.12.12 mapping)
+    PYENV_PYTHON=$(pyenv which python)
+    echo "  Using Python: $PYENV_PYTHON"
+    if [ ! -d "venv" ]; then
+        "$PYENV_PYTHON" -m venv venv
+    fi
+    source venv/bin/activate
+
+    # Verify we're using the right Python
+    VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+    echo "  venv Python: $VENV_PY"
+
+    echo -e "${GREEN}[7/12]${NC} Building jpegio for ARM..."
+
+    # Clone jpegio
+    JPEGIO_DIR="/tmp/jpegio-build"
+    rm -rf "$JPEGIO_DIR"
+    git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
+
+    # Apply ARM64 patch
+    if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
+        bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
+    else
+        echo "  Applying inline ARM64 patch..."
+        sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
+    fi
+
+    cd "$JPEGIO_DIR"
+
+    # Build jpegio into venv
+    pip install --upgrade pip setuptools wheel cython numpy
+    pip install .
+
+    cd "$INSTALL_DIR"
+    rm -rf "$JPEGIO_DIR"
+
+    echo -e "${GREEN}[8/12]${NC} Installing Stegasoo..."
+
+    # Install dependencies (jpegio already in venv, won't re-download)
+    pip install -e ".[web]"
+
+    STEP_OFFSET=0
 fi
-
-cd "$JPEGIO_DIR"
-
-# Build jpegio into venv
-pip install --upgrade pip setuptools wheel cython numpy
-pip install .
-
-cd "$INSTALL_DIR"
-rm -rf "$JPEGIO_DIR"
-
-echo -e "${GREEN}[8/12]${NC} Installing Stegasoo..."
-
-# Install dependencies (jpegio already in venv, won't re-download)
-pip install -e ".[web]"
 
 echo -e "${GREEN}[9/12]${NC} Creating systemd service..."
 

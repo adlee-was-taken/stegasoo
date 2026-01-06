@@ -1561,7 +1561,25 @@ def decode_download(file_id):
 
 @app.route("/about")
 def about():
-    return render_template("about.html", has_argon2=has_argon2(), has_qrcode_read=HAS_QRCODE_READ)
+    from stegasoo.channel import get_channel_status
+
+    channel_status = get_channel_status()
+
+    # Check if user is admin (for QR sharing)
+    current_user = get_current_user()
+    is_admin = current_user.is_admin if current_user else False
+
+    return render_template(
+        "about.html",
+        has_argon2=has_argon2(),
+        has_qrcode_read=HAS_QRCODE_READ,
+        # Channel info (bugfix - was not being passed)
+        channel_configured=channel_status["configured"],
+        channel_fingerprint=channel_status.get("fingerprint"),
+        channel_source=channel_status.get("source"),
+        # Admin check for QR sharing
+        is_admin=is_admin,
+    )
 
 
 # ============================================================================

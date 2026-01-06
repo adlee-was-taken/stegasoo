@@ -168,12 +168,41 @@ fi
 DEV_SIZE=$(blockdev --getsize64 "$SELECTED")
 
 echo ""
-echo -e "${GREEN}[1/3]${NC} Copying image from $SELECTED..."
+echo -e "${GREEN}[1/4]${NC} Copying image from $SELECTED..."
 dd if="$SELECTED" bs=4M status=none | pv -s "$DEV_SIZE" > "$IMG_FILE"
 sync
 
 echo ""
-echo -e "${GREEN}[2/3]${NC} Shrinking image..."
+echo -e "${GREEN}[2/4]${NC} Re-enabling auto-expand for distribution..."
+# Mount the image and restore auto-expand service (may have been disabled during build)
+LOOP_DEV=$(losetup -f --show -P "$IMG_FILE")
+if [ -n "$LOOP_DEV" ]; then
+    TEMP_MOUNT=$(mktemp -d)
+    if mount "${LOOP_DEV}p2" "$TEMP_MOUNT" 2>/dev/null; then
+        # Re-enable the resize service if the service file exists
+        SERVICE_FILE="$TEMP_MOUNT/lib/systemd/system/rpi-resizerootfs.service"
+        SERVICE_LINK="$TEMP_MOUNT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
+        if [ -f "$SERVICE_FILE" ] && [ ! -L "$SERVICE_LINK" ]; then
+            mkdir -p "$(dirname "$SERVICE_LINK")"
+            ln -sf /lib/systemd/system/rpi-resizerootfs.service "$SERVICE_LINK"
+            echo -e "  ${GREEN}✓${NC} Auto-expand service re-enabled"
+        elif [ -L "$SERVICE_LINK" ]; then
+            echo -e "  ${GREEN}✓${NC} Auto-expand already enabled"
+        else
+            echo -e "  ${YELLOW}⚠${NC} Could not find resize service file"
+        fi
+        umount "$TEMP_MOUNT"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Could not mount rootfs, skipping auto-expand fix"
+    fi
+    rmdir "$TEMP_MOUNT" 2>/dev/null || true
+    losetup -d "$LOOP_DEV"
+else
+    echo -e "  ${YELLOW}⚠${NC} Could not create loop device, skipping auto-expand fix"
+fi
+
+echo ""
+echo -e "${GREEN}[3/4]${NC} Shrinking image..."
 if command -v pishrink.sh &> /dev/null; then
     pishrink.sh "$IMG_FILE"
 elif [ -f "./pishrink.sh" ]; then
@@ -187,11 +216,11 @@ fi
 
 echo ""
 if [ "$SKIP_COMPRESS" = true ]; then
-    echo -e "${GREEN}[3/3]${NC} Skipping compression (.img output)"
+    echo -e "${GREEN}[4/4]${NC} Skipping compression (.img output)"
     FINAL_SIZE=$(du -h "$IMG_FILE" | awk '{print $1}')
     OUTPUT="$IMG_FILE"
 else
-    echo -e "${GREEN}[3/3]${NC} Compressing with zstd..."
+    echo -e "${GREEN}[4/4]${NC} Compressing with zstd..."
     pv "$IMG_FILE" | zstd -19 -T0 -q > "$OUTPUT"
     rm -f "$IMG_FILE"
     FINAL_SIZE=$(du -h "$OUTPUT" | awk '{print $1}')

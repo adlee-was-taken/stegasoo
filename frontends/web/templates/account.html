@@ -140,6 +140,13 @@
                             {% endif %}
                         </div>
                         <div class="btn-group btn-group-sm">
+                            {% if is_admin %}
+                            <button type="button" class="btn btn-outline-info"
+                                    onclick="showKeyQr('{{ key.channel_key }}', '{{ key.name }}')"
+                                    title="Show QR Code">
+                                <i class="bi bi-qr-code"></i>
+                            </button>
+                            {% endif %}
                             <button type="button" class="btn btn-outline-secondary"
                                     onclick="renameKey({{ key.id }}, '{{ key.name }}')"
                                     title="Rename">
@@ -218,10 +225,38 @@
         </div>
     </div>
 </div>
+
+{% if is_admin %}
+<!-- QR Code Modal (Admin only) -->
+<div class="modal fade" id="qrModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-qr-code me-2"></i><span id="qrKeyName">Channel Key</span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <canvas id="qrCanvas" class="bg-white p-2 rounded"></canvas>
+                <div class="mt-2">
+                    <code class="small" id="qrKeyDisplay"></code>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="qrDownload">
+                    <i class="bi bi-download me-1"></i>Download PNG
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+{% if is_admin %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+{% endif %}
 <script>
 StegasooAuth.initPasswordConfirmation('accountForm', 'newPasswordInput', 'newPasswordConfirmInput');
 
@@ -230,5 +265,45 @@ function renameKey(keyId, currentName) {
     document.getElementById('renameForm').action = '/account/keys/' + keyId + '/rename';
     new bootstrap.Modal(document.getElementById('renameModal')).show();
 }
+
+{% if is_admin %}
+function showKeyQr(channelKey, keyName) {
+    // Format key with dashes if not already
+    const clean = channelKey.replace(/-/g, '').toUpperCase();
+    const formatted = clean.match(/.{4}/g)?.join('-') || clean;
+
+    // Update modal content
+    document.getElementById('qrKeyName').textContent = keyName;
+    document.getElementById('qrKeyDisplay').textContent = formatted;
+
+    // Generate QR code
+    const canvas = document.getElementById('qrCanvas');
+    if (typeof QRCode !== 'undefined' && canvas) {
+        QRCode.toCanvas(canvas, formatted, {
+            width: 200,
+            margin: 2,
+            color: { dark: '#000', light: '#fff' }
+        }, function(error) {
+            if (error) {
+                console.error('QR generation error:', error);
+                return;
+            }
+            new bootstrap.Modal(document.getElementById('qrModal')).show();
+        });
+    }
+}
+
+// Download QR as PNG
+document.getElementById('qrDownload')?.addEventListener('click', function() {
+    const canvas = document.getElementById('qrCanvas');
+    const keyName = document.getElementById('qrKeyName').textContent;
+    if (canvas) {
+        const link = document.createElement('a');
+        link.download = 'stegasoo-channel-key-' + keyName.toLowerCase().replace(/\s+/g, '-') + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+});
+{% endif %}
 </script>
 {% endblock %}

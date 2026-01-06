@@ -26,8 +26,8 @@ ssh admin@stegasoo.local
 # Take ownership of /opt (for pyenv, jpegio builds)
 sudo chown admin:admin /opt
 
-# Install git (not included in Lite image)
-sudo apt-get update && sudo apt-get install -y git
+# Install git and zstd (not included in Lite image)
+sudo apt-get update && sudo apt-get install -y git zstd jq
 ```
 
 ## Step 4: Clone & Run Setup
@@ -39,7 +39,22 @@ cd stegasoo
 ./rpi/setup.sh
 ```
 
-This takes ~15-20 minutes and installs:
+### Fast Build Option (with pre-built venv)
+
+If you have `stegasoo-venv-pi-arm64.tar.zst` from a previous build:
+
+```bash
+cd /opt
+git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+
+# Copy pre-built venv (from your host machine)
+# On host: scp rpi/stegasoo-venv-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+
+cd stegasoo
+./rpi/setup.sh  # Detects tarball, extracts instead of compiling (~2 min vs 20+)
+```
+
+**Standard build** takes ~15-20 minutes and installs:
 - Python 3.12 via pyenv
 - jpegio (patched for ARM)
 - Stegasoo with web UI

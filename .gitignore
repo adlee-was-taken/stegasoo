@@ -85,3 +85,6 @@ pishrink.sh
 # Temp file storage
 frontends/web/temp_files/
 rpi/config.json
+
+# Pre-built venv tarball (39MB - too large for git)
+rpi/stegasoo-venv-pi-arm64.tar.zst
