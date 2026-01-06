@@ -5,6 +5,41 @@ All notable changes to Stegasoo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [4.1.2] - 2026-01-05
+
+### Added
+- **Docker Deployment**: Production-ready containerization
+  - `docker-compose.yml` for Web UI (port 5000) and REST API (port 8000)
+  - Multi-stage builds with base image for faster rebuilds
+  - Health checks, resource limits (768MB), and volume persistence
+  - Comprehensive `DOCKER.md` documentation
+- **Raspberry Pi First-Boot Wizard**: Interactive TUI setup experience
+  - `gum` TUI toolkit for styled prompts and spinners
+  - WiFi configuration, HTTPS setup, channel key generation
+  - Overclock presets (Pi 5: 2.8/3.0 GHz with cooling recommendations)
+  - Port 443 redirect option for clean HTTPS URLs
+  - Styled banners with purple→blue gradient and gold logo
+- **Pi Image Distribution**: Scripts for SD card imaging
+  - `sanitize-for-image.sh` removes credentials, SSH keys, user data
+  - Soft reset mode for testing without clearing WiFi
+  - Auto-validates sanitization before imaging
+- **Unit Tests**: Comprehensive pytest test suite
+  - Tests for encode/decode, LSB/DCT modes, channel keys
+  - Validation, generation, compression, edge cases
+  - 29 tests covering core library functionality
+- **Release Validation**: `scripts/validate-release.sh` for pre-release checks
+
+### Changed
+- Pi MOTD shows CPU speed and temperature when overclocked
+- Mobile UI polish and responsive improvements
+- Standardized ASCII banners across all Pi scripts
+- Setup script uses pyenv for Python 3.12 (Pi OS ships 3.13)
+
+### Fixed
+- DCT decode reliability improvements
+- Fixed `gum --inline` flag compatibility (not supported in all versions)
+- Wizard banner alignment and spacing issues
+
 ## [4.1.0] - 2026-01-04
 
 ### Added
@@ -142,6 +177,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - CLI interface
 - Basic PIN authentication
 
+[4.1.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.1.0...v4.1.2
+[4.1.0]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.2...v4.1.0
 [4.0.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.1...v4.0.2
 [4.0.1]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/adlee-was-taken/stegasoo/compare/v3.2.0...v4.0.0

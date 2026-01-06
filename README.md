@@ -115,6 +115,23 @@ docker-compose up -d
 
 See [DOCKER.md](DOCKER.md) for full documentation.
 
+## Raspberry Pi
+
+Pre-built SD card images available for Pi 4/5:
+
+```bash
+# Flash image (download from GitHub Releases)
+zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
+
+# First boot runs interactive setup wizard:
+# - WiFi configuration
+# - HTTPS with port 443
+# - Channel key generation
+# - Optional overclocking
+```
+
+See [rpi/README.md](rpi/README.md) for manual installation.
+
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) - Installation guide
