@@ -385,17 +385,16 @@ else
 fi
 
 echo ""
-gum style \
-  --border double \
-  --border-foreground 82 \
-  --padding "0 2" \
-  --align center \
-  " ___  _____  ___    ___    _    ___    ___    ___" \
-  " / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\" \
-  " \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |" \
-  " |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/" \
-  "" \
-  "Setup Complete!"
+echo ""
+echo -e "\033[0;90m   .  *  .   .    *    .   *   .  *   .    *   .\033[0m"
+echo -e "\033[0;36m  ___  _____  ___    ___    _    ___    ___    ___\033[0m"
+echo -e "\033[0;36m / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\\\\033[0m"
+echo -e "\033[0;36m \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |\033[0m"
+echo -e "\033[0;36m |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/\033[0m"
+echo ""
+echo -e "\033[0;90m   *    .   *   .    *    .   *   .    *   .   *\033[0m"
+echo ""
+gum style --foreground 82 --bold --align center "Setup Complete!"
 
 echo ""
 gum style --foreground 82 --bold "Create your admin account:"
