@@ -345,6 +345,16 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     echo ""
     echo -e " \033[0;32m●\033[0m Stegasoo is running"
     echo -e "   \033[0;33m$STEGASOO_URL\033[0m"
+    # Show CPU stats if overclocked
+    if grep -qE "^(arm_freq|over_voltage)" /boot/firmware/config.txt 2>/dev/null || \
+       grep -qE "^(arm_freq|over_voltage)" /boot/config.txt 2>/dev/null; then
+        CPU_FREQ=$(vcgencmd measure_clock arm 2>/dev/null | cut -d= -f2)
+        CPU_TEMP=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2)
+        if [ -n "$CPU_FREQ" ] && [ -n "$CPU_TEMP" ]; then
+            CPU_MHZ=$((CPU_FREQ / 1000000))
+            echo -e "   \033[0;35m⚡\033[0m ${CPU_MHZ} MHz  \033[0;35m🌡\033[0m ${CPU_TEMP}"
+        fi
+    fi
     echo ""
 else
     echo ""
