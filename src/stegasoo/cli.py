@@ -105,6 +105,7 @@ def encode(
         stegasoo encode photo.png -r ref.jpg -f secret.pdf -o encoded.png
     """
     from PIL import Image
+
     from .encode import encode as stegasoo_encode
     from .encode import encode_file as stegasoo_encode_file
 
@@ -1108,7 +1109,9 @@ def admin_recover(db_path, password):
         stegasoo admin recover --db /path/to/stegasoo.db
     """
     import sqlite3
+
     from argon2 import PasswordHasher
+
     from .recovery import verify_recovery_key
 
     # Try default paths if not specified

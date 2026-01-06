@@ -7,7 +7,7 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 1. Real Progress Bar for Encode/Decode
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Users see elapsed time but no indication of how far along the operation is. Long DCT encodes on Pi can take 2-3 minutes with no feedback.
 
@@ -76,7 +76,7 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 3. Mobile-Responsive Polish
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** UI works on mobile but has rough edges - cramped buttons, hard-to-tap targets, awkward layouts on small screens.
 
@@ -203,7 +203,7 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## 8. Release Validation Script
 
-**Status:** Planned
+**Status:** Done
 
 **Problem:** Manual release checklist is error-prone. Need automated validation.
 
@@ -245,6 +245,6 @@ Polish and UX improvements after the 4.1.1 stability release.
 
 ## Notes
 
-- Keep 4.1.2 focused - 9 features (6 done)
+- Keep 4.1.2 focused - 9 features (9 done)
 - Don't break DCT compatibility (4.1.1 RS format is stable)
 - Test on Pi before release
