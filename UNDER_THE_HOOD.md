@@ -22,17 +22,17 @@ A detailed breakdown of how Stegasoo's LSB and DCT steganography modes work unde
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           STEGASOO ARCHITECTURE (v4.0)                       │
+│                           STEGASOO ARCHITECTURE (v4.0)                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   INPUTS                    PROCESSING                      OUTPUT          │
 │   ───────                   ──────────                      ──────          │
 │                                                                             │
 │   Reference Photo ─┐                                                        │
-│   Passphrase ──────┼──► Argon2id KDF ──► AES-256 Key                       │
+│   Passphrase ──────┼──► Argon2id KDF ──► AES-256 Key                        │
 │   PIN/RSA Key ─────┘                           │                            │
 │                                                ▼                            │
-│   Message/File ────────────────────────► AES-256-GCM ──► Ciphertext        │
+│   Message/File ────────────────────────► AES-256-GCM ──► Ciphertext         │
 │                                          Encryption            │            │
 │                                                                ▼            │
 │   Carrier Image ───────────────────────────────────────► Embedding ──► Stego│
