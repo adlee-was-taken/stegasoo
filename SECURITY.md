@@ -4,9 +4,9 @@
 
 | Version | Supported          | Notes |
 | ------- | ------------------ | ----- |
-| 4.1.x   | Current Version | |
-| 4.x.x   | ⚠️ Security fixes only | EOL Soon |
-| 3.x.x   | ❌ End of life | Upgrade recommended |
+| 4.1.x   | Current Version | What you SHOULD be using. |
+| 4.x.x   | ⚠️ Security fixes only | Upgrade (EOL soon) |
+| 3.x.x   | ❌ End of life | |
 | 2.x.x   | ❌ End of life | |
 | 1.x.x   | ❌ End of life | |
 
