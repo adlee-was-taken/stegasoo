@@ -39,22 +39,20 @@ cd stegasoo
 ./rpi/setup.sh
 ```
 
-### Fast Build Option (with pre-built venv)
+### Default: Fast Build (downloads pre-built environment)
 
-If you have `stegasoo-venv-pi-arm64.tar.zst` from a previous build:
+By default, `setup.sh` downloads a pre-built tarball from GitHub releases containing:
+- pyenv with Python 3.12 (pre-compiled for ARM64)
+- venv with all dependencies (jpegio, scipy, etc.)
 
+This reduces install time from **20+ minutes to ~2 minutes**.
+
+To force a from-source build:
 ```bash
-cd /opt
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
-
-# Copy pre-built venv (from your host machine)
-# On host: scp rpi/stegasoo-venv-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
-
-cd stegasoo
-./rpi/setup.sh  # Detects tarball, extracts instead of compiling (~2 min vs 20+)
+./rpi/setup.sh --no-prebuilt
 ```
 
-**Standard build** takes ~15-20 minutes and installs:
+**From-source build** takes ~15-20 minutes and installs:
 - Python 3.12 via pyenv
 - jpegio (patched for ARM)
 - Stegasoo with web UI
@@ -126,6 +124,40 @@ sudo ./rpi/flash-image.sh stegasoo-rpi-*.img.zst.zip
 
 # Option 3: Manual dd
 zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
+```
+
+---
+
+## Creating the Pre-built Tarball
+
+After a successful from-source build, create the pre-built tarball for future installs:
+
+```bash
+# On the Pi after successful setup:
+cd ~
+
+# Strip caches and tests from venv (295MB → 208MB)
+find /opt/stegasoo/venv/ -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null
+find /opt/stegasoo/venv/ -type d -name 'tests' -exec rm -rf {} + 2>/dev/null
+find /opt/stegasoo/venv/ -type d -name 'test' -exec rm -rf {} + 2>/dev/null
+
+# Create venv tarball
+cd /opt/stegasoo
+tar -cf - venv/ | zstd -19 -T0 > ~/stegasoo-venv.tar.zst
+
+# Create combined tarball (pyenv + venv pointer)
+cd ~
+tar -cf - .pyenv stegasoo-venv.tar.zst | zstd -19 -T0 > /tmp/stegasoo-pi-arm64.tar.zst
+
+# Check size (should be ~50-60MB)
+ls -lh /tmp/stegasoo-pi-arm64.tar.zst
+```
+
+Pull to host and upload to GitHub releases:
+```bash
+# On host:
+scp admin@stegasoo.local:/tmp/stegasoo-pi-arm64.tar.zst ./
+# Upload to GitHub releases as stegasoo-pi-arm64.tar.zst
 ```
 
 ---

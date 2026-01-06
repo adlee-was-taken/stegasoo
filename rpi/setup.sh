@@ -181,16 +181,17 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Pre-built venv tarball (skips 20+ min compile time)
-PREBUILT_VENV="$INSTALL_DIR/rpi/stegasoo-venv-pi-arm64.tar.zst"
-PREBUILT_VENV_URL="${PREBUILT_VENV_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.3/stegasoo-venv-pi-arm64.tar.zst}"
+# Pre-built environment tarball (skips 20+ min compile time)
+# Includes both pyenv Python 3.12 AND venv with all dependencies
+PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-pi-arm64.tar.zst"
+PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.3/stegasoo-pi-arm64.tar.zst}"
 USE_PREBUILT=true
 
 # Use local tarball if present, otherwise will download
-if [ -f "$PREBUILT_VENV" ]; then
-    echo -e "${GREEN}Found local pre-built venv - fast install mode${NC}"
+if [ -f "$PREBUILT_TARBALL" ]; then
+    echo -e "${GREEN}Found local pre-built environment - fast install mode${NC}"
 else
-    echo -e "${GREEN}Will download pre-built venv - fast install mode${NC}"
+    echo -e "${GREEN}Will download pre-built environment - fast install mode${NC}"
 fi
 
 # Allow --no-prebuilt flag to force from-source build
@@ -199,16 +200,25 @@ if [[ " $* " =~ " --no-prebuilt " ]] || [[ " $* " =~ " --from-source " ]]; then
     echo -e "${YELLOW}Building from source (--no-prebuilt specified)${NC}"
 fi
 
-echo -e "${GREEN}[5/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+# Fast path: use pre-built environment if available
+if [ "$USE_PREBUILT" = true ]; then
+    echo -e "${GREEN}[5/8]${NC} Installing pre-built Python environment..."
 
-# Install pyenv if not present
-if [ ! -d "$HOME/.pyenv" ]; then
-    curl https://pyenv.run | bash
+    # Download if local file doesn't exist
+    if [ ! -f "$PREBUILT_TARBALL" ]; then
+        echo "  Downloading pre-built environment (~50MB)..."
+        curl -L -o "$PREBUILT_TARBALL" "$PREBUILT_URL"
+    fi
 
-    # Add pyenv to current shell
+    # Extract pre-built environment (includes pyenv Python + venv)
+    echo "  Extracting pre-built environment..."
+    zstd -d "$PREBUILT_TARBALL" --stdout | tar -xf - -C "$HOME"
+
+    # Setup pyenv in current shell
     export PYENV_ROOT="$HOME/.pyenv"
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init -)"
+    pyenv global $PYTHON_VERSION
 
     # Add to .bashrc if not already there
     if ! grep -q 'PYENV_ROOT' ~/.bashrc; then
@@ -218,48 +228,20 @@ if [ ! -d "$HOME/.pyenv" ]; then
         echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
         echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
     fi
-else
-    echo "  pyenv already installed"
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-fi
 
-# Install Python 3.12 if not present (required even for pre-built venv)
-if ! pyenv versions | grep -q "$PYTHON_VERSION"; then
-    if [ "$USE_PREBUILT" = true ]; then
-        echo -e "  ${YELLOW}Note: Python $PYTHON_VERSION needed for pre-built venv${NC}"
+    # Verify Python
+    INSTALLED_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+    echo -e "  ${GREEN}✓${NC} Python: $INSTALLED_PY"
+
+    # Extract venv to install dir
+    echo -e "${GREEN}[6/8]${NC} Setting up virtual environment..."
+    if [ -f "$HOME/stegasoo-venv.tar.zst" ]; then
+        zstd -d "$HOME/stegasoo-venv.tar.zst" --stdout | tar -xf - -C "$INSTALL_DIR"
+        rm "$HOME/stegasoo-venv.tar.zst"
     fi
-    echo "  Building Python $PYTHON_VERSION (this takes ~10 minutes)..."
-    pyenv install $PYTHON_VERSION
-else
-    echo "  Python $PYTHON_VERSION already installed"
-fi
-pyenv global $PYTHON_VERSION
-
-# Verify Python version
-INSTALLED_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
-    echo -e "${RED}Error: Python $PYTHON_VERSION not active. Got: $INSTALLED_PY${NC}"
-    exit 1
-fi
-
-# Fast path: use pre-built venv if available
-if [ "$USE_PREBUILT" = true ]; then
-    echo -e "${GREEN}[6/8]${NC} Installing pre-built Python environment..."
-
-    # Download if URL provided and local file doesn't exist
-    if [ ! -f "$PREBUILT_VENV" ] && [ -n "$PREBUILT_VENV_URL" ]; then
-        echo "  Downloading pre-built venv..."
-        curl -L -o "$PREBUILT_VENV" "$PREBUILT_VENV_URL"
-    fi
-
-    # Extract pre-built venv (zstd compressed)
-    echo "  Extracting pre-built venv (this is much faster!)..."
-    zstd -d "$PREBUILT_VENV" --stdout | tar -xf - -C "$INSTALL_DIR"
 
     # Activate and verify
-    source venv/bin/activate
+    source "$INSTALL_DIR/venv/bin/activate"
     VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
     echo -e "  ${GREEN}✓${NC} venv Python: $VENV_PY"
 
@@ -270,6 +252,47 @@ if [ "$USE_PREBUILT" = true ]; then
     # Adjust step numbers for rest of script
     STEP_OFFSET=-4
 else
+    echo -e "${GREEN}[5/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+
+    # Install pyenv if not present
+    if [ ! -d "$HOME/.pyenv" ]; then
+        curl https://pyenv.run | bash
+
+        # Add pyenv to current shell
+        export PYENV_ROOT="$HOME/.pyenv"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+
+        # Add to .bashrc if not already there
+        if ! grep -q 'PYENV_ROOT' ~/.bashrc; then
+            echo '' >> ~/.bashrc
+            echo '# pyenv' >> ~/.bashrc
+            echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+            echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+            echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
+        fi
+    else
+        echo "  pyenv already installed"
+        export PYENV_ROOT="$HOME/.pyenv"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+    fi
+
+    # Install Python 3.12 if not present
+    if ! pyenv versions | grep -q "$PYTHON_VERSION"; then
+        echo "  Building Python $PYTHON_VERSION (this takes ~10 minutes)..."
+        pyenv install $PYTHON_VERSION
+    else
+        echo "  Python $PYTHON_VERSION already installed"
+    fi
+    pyenv global $PYTHON_VERSION
+
+    # Verify Python version
+    INSTALLED_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
+    if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
+        echo -e "${RED}Error: Python $PYTHON_VERSION not active. Got: $INSTALLED_PY${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}[6/12]${NC} Creating Python virtual environment..."
     echo -e "  ${YELLOW}Note: No pre-built venv found. Building from source (20+ min)${NC}"
     echo -e "  ${YELLOW}To speed up future installs, add stegasoo-venv-pi-arm64.tar.gz to rpi/${NC}"

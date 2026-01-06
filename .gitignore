@@ -86,5 +86,6 @@ pishrink.sh
 frontends/web/temp_files/
 rpi/config.json
 
-# Pre-built venv tarball (39MB - too large for git)
+# Pre-built Pi tarballs (too large for git)
+rpi/stegasoo-pi-arm64.tar.zst
 rpi/stegasoo-venv-pi-arm64.tar.zst
