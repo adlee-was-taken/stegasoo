@@ -1,7 +1,9 @@
 #!/bin/bash
-# Flash Raspberry Pi image with headless config
+# Flash Raspberry Pi image with headless config (Trixie/Bookworm compatible)
 # Usage: ./flash-pi.sh <image.img.xz> <device>
 # Reads settings from config.json in same directory
+#
+# Uses the same firstrun.sh approach as rpi-imager for compatibility
 
 set -e
 
@@ -20,13 +22,16 @@ PI_USER=$(jq -r '.username' "$CONFIG_FILE")
 PI_PASS=$(jq -r '.password' "$CONFIG_FILE")
 WIFI_SSID=$(jq -r '.wifiSSID' "$CONFIG_FILE")
 WIFI_PASS=$(jq -r '.wifiPassword' "$CONFIG_FILE")
-WIFI_COUNTRY=$(jq -r '.wifiCountry' "$CONFIG_FILE")
-HOSTNAME=$(jq -r '.hostname' "$CONFIG_FILE")
+WIFI_COUNTRY=$(jq -r '.wifiCountry // "US"' "$CONFIG_FILE")
+PI_HOSTNAME=$(jq -r '.hostname' "$CONFIG_FILE")
+PI_TIMEZONE=$(jq -r '.timezone // "America/New_York"' "$CONFIG_FILE")
+PI_KEYMAP=$(jq -r '.keyboardLayout // "us"' "$CONFIG_FILE")
 
 echo "Loaded config from $CONFIG_FILE"
-echo "  Hostname: $HOSTNAME"
+echo "  Hostname: $PI_HOSTNAME"
 echo "  User: $PI_USER"
 echo "  WiFi: $WIFI_SSID"
+echo "  Timezone: $PI_TIMEZONE"
 echo
 
 # ============================================================================
@@ -62,6 +67,17 @@ if [ "$confirm" != "yes" ]; then
     exit 1
 fi
 
+# Ask about wiping
+echo
+read -p "Wipe partition table first? (recommended if having issues) [y/N] " wipe_confirm
+if [[ "$wipe_confirm" =~ ^[Yy]$ ]]; then
+    echo "Wiping partition table..."
+    sudo wipefs -a "$DEVICE"
+    sudo dd if=/dev/zero of="$DEVICE" bs=1M count=10 status=none
+    sync
+    echo "  Wiped clean"
+fi
+
 # ============================================================================
 # Flash image
 # ============================================================================
@@ -77,18 +93,14 @@ fi
 echo "Syncing..."
 sync
 
-# ============================================================================
-# Configure boot partition
-# ============================================================================
-BOOT_MOUNT=$(mktemp -d)
-echo "Mounting boot partition to $BOOT_MOUNT..."
-
-# Wait for partition to appear
+# Wait for partitions
 sleep 2
 sudo partprobe "$DEVICE" 2>/dev/null || true
 sleep 1
 
-# Try both partition naming schemes
+# ============================================================================
+# Find partitions
+# ============================================================================
 if [ -b "${DEVICE}1" ]; then
     BOOT_PART="${DEVICE}1"
 elif [ -b "${DEVICE}p1" ]; then
@@ -98,82 +110,123 @@ else
     exit 1
 fi
 
-sudo mount "$BOOT_PART" "$BOOT_MOUNT"
+MOUNT_DIR=$(mktemp -d)
+
+# ============================================================================
+# Configure boot partition with firstrun.sh (rpi-imager method)
+# ============================================================================
+echo "Mounting boot partition..."
+sudo mount "$BOOT_PART" "$MOUNT_DIR"
 
 # Enable SSH
 echo "Enabling SSH..."
-sudo touch "$BOOT_MOUNT/ssh"
+sudo touch "$MOUNT_DIR/ssh"
 
-# Set user/password
-echo "Setting user credentials..."
+# Generate password hash
 PASS_HASH=$(echo "$PI_PASS" | openssl passwd -6 -stdin)
-echo "${PI_USER}:${PASS_HASH}" | sudo tee "$BOOT_MOUNT/userconf.txt" > /dev/null
 
-# Set hostname
-echo "Setting hostname to $HOSTNAME..."
-echo "$HOSTNAME" | sudo tee "$BOOT_MOUNT/hostname" > /dev/null
+# Create firstrun.sh - this is exactly what rpi-imager generates
+echo "Creating firstrun.sh..."
+sudo tee "$MOUNT_DIR/firstrun.sh" > /dev/null << 'EOFSCRIPT'
+#!/bin/bash
+set +e
 
-# Cleanup boot partition
-echo "Unmounting boot..."
-sudo umount "$BOOT_MOUNT"
-
-# ============================================================================
-# Configure rootfs partition (for NetworkManager WiFi)
-# ============================================================================
-if [ -n "$WIFI_SSID" ]; then
-    echo "Configuring WiFi on rootfs..."
-
-    # Find rootfs partition
-    if [ -b "${DEVICE}2" ]; then
-        ROOT_PART="${DEVICE}2"
-    elif [ -b "${DEVICE}p2" ]; then
-        ROOT_PART="${DEVICE}p2"
-    else
-        echo "Warning: Could not find rootfs partition, skipping WiFi config"
-        rmdir "$BOOT_MOUNT"
-        exit 0
-    fi
-
-    sudo mount "$ROOT_PART" "$BOOT_MOUNT"
-
-    # Create NetworkManager connection file
-    NM_DIR="$BOOT_MOUNT/etc/NetworkManager/system-connections"
-    sudo mkdir -p "$NM_DIR"
-
-    sudo tee "$NM_DIR/$WIFI_SSID.nmconnection" > /dev/null << EOF
-[connection]
-id=$WIFI_SSID
-type=wifi
-autoconnect=true
-
-[wifi]
-mode=infra
-ssid=$WIFI_SSID
-
-[wifi-security]
-key-mgmt=wpa-psk
-psk=$WIFI_PASS
-
-[ipv4]
-method=auto
-
-[ipv6]
-method=auto
-EOF
-
-    sudo chmod 600 "$NM_DIR/$WIFI_SSID.nmconnection"
-
-    echo "Unmounting rootfs..."
-    sudo umount "$BOOT_MOUNT"
+CURRENT_HOSTNAME=$(cat /etc/hostname | tr -d " \t\n\r")
+if [ -f /usr/lib/raspberrypi-sys-mods/imager_custom ]; then
+   /usr/lib/raspberrypi-sys-mods/imager_custom set_hostname PLACEHOLDER_HOSTNAME
+else
+   echo PLACEHOLDER_HOSTNAME >/etc/hostname
+   sed -i "s/127.0.1.1.*$CURRENT_HOSTNAME/127.0.1.1\tPLACEHOLDER_HOSTNAME/g" /etc/hosts
 fi
 
-rmdir "$BOOT_MOUNT"
+FIRSTUSER=$(getent passwd 1000 | cut -d: -f1)
+FIRSTUSERHOME=$(getent passwd 1000 | cut -d: -f6)
+
+if [ -f /usr/lib/raspberrypi-sys-mods/imager_custom ]; then
+   /usr/lib/raspberrypi-sys-mods/imager_custom enable_ssh
+else
+   systemctl enable ssh
+fi
+
+if [ -f /usr/lib/userconf-pi/userconf ]; then
+   /usr/lib/userconf-pi/userconf 'PLACEHOLDER_USER' 'PLACEHOLDER_HASH'
+else
+   echo "$FIRSTUSER:"'PLACEHOLDER_HASH' | chpasswd -e
+   if [ "$FIRSTUSER" != "PLACEHOLDER_USER" ]; then
+      usermod -l "PLACEHOLDER_USER" "$FIRSTUSER"
+      usermod -m -d "/home/PLACEHOLDER_USER" "PLACEHOLDER_USER"
+      groupmod -n "PLACEHOLDER_USER" "$FIRSTUSER"
+      if grep -q "^autologin-user=" /etc/lightdm/lightdm.conf 2>/dev/null; then
+         sed -i "s/^autologin-user=.*/autologin-user=PLACEHOLDER_USER/" /etc/lightdm/lightdm.conf
+      fi
+      if [ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
+         sed -i "s/$FIRSTUSER/PLACEHOLDER_USER/" /etc/systemd/system/getty@tty1.service.d/autologin.conf
+      fi
+   fi
+fi
+
+if [ -f /usr/lib/raspberrypi-sys-mods/imager_custom ]; then
+   /usr/lib/raspberrypi-sys-mods/imager_custom set_keymap 'PLACEHOLDER_KEYMAP'
+   /usr/lib/raspberrypi-sys-mods/imager_custom set_timezone 'PLACEHOLDER_TIMEZONE'
+fi
+
+if [ -f /usr/lib/raspberrypi-sys-mods/imager_custom ]; then
+   /usr/lib/raspberrypi-sys-mods/imager_custom set_wlan 'PLACEHOLDER_SSID' 'PLACEHOLDER_WIFIPASS' 'PLACEHOLDER_COUNTRY'
+else
+cat >/etc/wpa_supplicant/wpa_supplicant.conf <<'WPAEOF'
+country=PLACEHOLDER_COUNTRY
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+ap_scan=1
+update_config=1
+network={
+	ssid="PLACEHOLDER_SSID"
+	psk="PLACEHOLDER_WIFIPASS"
+}
+WPAEOF
+   chmod 600 /etc/wpa_supplicant/wpa_supplicant.conf
+   rfkill unblock wifi
+   for filename in /var/lib/systemd/rfkill/*:wlan ; do
+      echo 0 > "$filename"
+   done
+fi
+
+rm -f /boot/firstrun.sh
+rm -f /boot/firmware/firstrun.sh
+sed -i 's| systemd.run.*||g' /boot/cmdline.txt 2>/dev/null
+sed -i 's| systemd.run.*||g' /boot/firmware/cmdline.txt 2>/dev/null
+exit 0
+EOFSCRIPT
+
+# Replace placeholders with actual values
+sudo sed -i "s/PLACEHOLDER_HOSTNAME/$PI_HOSTNAME/g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s/PLACEHOLDER_USER/$PI_USER/g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s|PLACEHOLDER_HASH|$PASS_HASH|g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s/PLACEHOLDER_KEYMAP/$PI_KEYMAP/g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s|PLACEHOLDER_TIMEZONE|$PI_TIMEZONE|g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s/PLACEHOLDER_SSID/$WIFI_SSID/g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s/PLACEHOLDER_WIFIPASS/$WIFI_PASS/g" "$MOUNT_DIR/firstrun.sh"
+sudo sed -i "s/PLACEHOLDER_COUNTRY/$WIFI_COUNTRY/g" "$MOUNT_DIR/firstrun.sh"
+
+sudo chmod +x "$MOUNT_DIR/firstrun.sh"
+
+# Update cmdline.txt to run firstrun.sh on boot
+echo "Updating cmdline.txt..."
+CMDLINE="$MOUNT_DIR/cmdline.txt"
+if [ -f "$CMDLINE" ]; then
+    # Read current cmdline, strip any existing systemd.run, append new one
+    CURRENT=$(cat "$CMDLINE" | tr -d '\n' | sed 's| systemd.run.*||g')
+    echo "$CURRENT systemd.run=/boot/firmware/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target" | sudo tee "$CMDLINE" > /dev/null
+    echo "  cmdline.txt updated"
+fi
+
+sudo umount "$MOUNT_DIR"
+rmdir "$MOUNT_DIR"
 
 echo
 echo "Done! SD card is ready."
-echo "  Hostname: $HOSTNAME"
+echo "  Hostname: $PI_HOSTNAME"
 echo "  User: $PI_USER"
 echo "  SSH: enabled"
 echo "  WiFi: $WIFI_SSID"
 echo
-echo "Insert into Pi and boot. Find it with: ping $HOSTNAME.local"
+echo "Insert into Pi and boot. Find it with: ping $PI_HOSTNAME.local"
