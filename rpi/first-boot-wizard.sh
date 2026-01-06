@@ -384,19 +384,16 @@ else
   ACCESS_URL_LOCAL="http://$HOSTNAME.local:5000/setup"
 fi
 
+echo ""
 gum style \
   --border double \
   --border-foreground 82 \
-  --padding "1 2" \
-  --margin "1" \
+  --padding "0 2" \
   --align center \
-  "    .  *  .   .    *    .   *   .  *   .    *   ." \
   "  ___  _____  ___    ___    _    ___    ___    ___" \
-  "  / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\" \
-  "  \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |" \
-  "  |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/" \
-  "" \
-  "    *    .   *   .    *    .   *   .    *   .   *" \
+  " / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\" \
+  " \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |" \
+  " |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/" \
   "" \
   "Setup Complete!"
 
@@ -404,52 +401,33 @@ echo ""
 gum style --foreground 82 --bold "Create your admin account:"
 gum style --foreground 226 "  $ACCESS_URL"
 gum style --foreground 245 "  $ACCESS_URL_LOCAL (if mDNS works)"
-echo ""
 
 if [ -n "$CHANNEL_KEY" ]; then
-  gum style --foreground 82 --bold "Channel Key:"
-  gum style --foreground 226 "  $CHANNEL_KEY"
   echo ""
+  gum style --foreground 82 --bold "Channel Key:" --inline
+  gum style --foreground 226 " $CHANNEL_KEY"
 fi
 
+echo ""
 gum style --foreground 82 --bold "First Steps:"
-gum style --foreground 255 \
-  "  1. Open the URL above in your browser" \
-  "  2. Accept the security warning (self-signed cert)" \
-  "  3. Create your admin account" \
-  "  4. Start encoding secret messages!"
-echo ""
+gum style --foreground 255 "  1. Open URL → 2. Accept cert → 3. Create admin → 4. Encode!"
 
-gum style --foreground 82 --bold "Useful Commands:"
-gum style --foreground 245 \
-  "  sudo systemctl status stegasoo   # Check status" \
-  "  sudo systemctl restart stegasoo  # Restart" \
-  "  journalctl -u stegasoo -f        # View logs"
 echo ""
-
-gum style --foreground 212 --bold "Enjoy Stegasoo!"
-echo ""
+gum style --foreground 245 "Commands: systemctl {status|restart} stegasoo, journalctl -u stegasoo -f"
 
 # Prompt for restart if overclock was enabled
 if [ "$NEEDS_RESTART" = "true" ]; then
   echo ""
-  gum style \
-    --border rounded \
-    --border-foreground 226 \
-    --padding "1 2" \
-    --foreground 226 \
-    "Restart Required" \
-    "" \
-    "Overclock settings require a restart to take effect."
-  echo ""
-
+  gum style --foreground 226 --bold "⚠ Restart required for overclock settings"
   if gum confirm "Restart now?" --default=true; then
     gum style --foreground 82 "Restarting in 3 seconds..."
     sleep 3
     sudo reboot
   else
-    gum style --foreground 214 "Remember to restart later for overclock to take effect:"
-    gum style --foreground 245 "  sudo reboot"
-    echo ""
+    gum style --foreground 214 "Run 'sudo reboot' later to apply overclock."
   fi
 fi
+
+echo ""
+gum style --foreground 212 --bold "Enjoy Stegasoo!"
+echo ""
