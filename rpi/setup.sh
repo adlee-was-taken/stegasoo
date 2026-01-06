@@ -290,7 +290,7 @@ echo -e "${GREEN}[10/12]${NC} Enabling service..."
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
 
-echo -e "${GREEN}[11/12]${NC} Adding stegasoo to PATH..."
+echo -e "${GREEN}[11/12]${NC} Setting up user environment..."
 
 # Add stegasoo venv and rpi scripts to PATH for all users
 sudo tee /etc/profile.d/stegasoo-path.sh > /dev/null <<'PATHEOF'
@@ -303,7 +303,17 @@ if [ -d /opt/stegasoo/rpi ]; then
 fi
 PATHEOF
 sudo chmod 644 /etc/profile.d/stegasoo-path.sh
-echo "  Added /opt/stegasoo/venv/bin and /opt/stegasoo/rpi to PATH"
+echo "  Added stegasoo to PATH"
+
+# Install custom bashrc if not already customized
+if [ -f "$INSTALL_DIR/rpi/skel/.bashrc" ]; then
+    if ! grep -q "Stegasoo Pi" ~/.bashrc 2>/dev/null; then
+        cp "$INSTALL_DIR/rpi/skel/.bashrc" ~/.bashrc
+        echo "  Installed custom .bashrc"
+    else
+        echo "  Custom .bashrc already installed"
+    fi
+fi
 
 echo -e "${GREEN}[12/12]${NC} Setting up login banner..."
 
