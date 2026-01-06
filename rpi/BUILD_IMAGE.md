@@ -30,35 +30,41 @@ sudo chown admin:admin /opt
 sudo apt-get update && sudo apt-get install -y git zstd jq
 ```
 
-## Step 4: Clone & Run Setup
+## Step 4: Clone Repo
 
 ```bash
 cd /opt
 git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
-cd stegasoo
-./rpi/setup.sh
 ```
 
-### Default: Fast Build (downloads pre-built environment)
+## Step 5: Copy Pre-built Tarball (from host)
 
-By default, `setup.sh` downloads a pre-built tarball from GitHub releases containing:
+```bash
+# On your host machine:
+scp rpi/stegasoo-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+```
+
+This tarball contains:
 - pyenv with Python 3.12 (pre-compiled for ARM64)
 - venv with all dependencies (jpegio, scipy, etc.)
 
-This reduces install time from **20+ minutes to ~2 minutes**.
+Install time: **~2 minutes** (vs 20+ min from source)
 
-To force a from-source build:
+## Step 6: Run Setup
+
 ```bash
-./rpi/setup.sh --no-prebuilt
+cd /opt/stegasoo
+./rpi/setup.sh  # Detects local tarball, skips download
 ```
 
-**From-source build** takes ~15-20 minutes and installs:
-- Python 3.12 via pyenv
-- jpegio (patched for ARM)
-- Stegasoo with web UI
-- Systemd service
+### From-Source Build (optional)
 
-## Step 5: Test It Works
+To build without the pre-built tarball:
+```bash
+./rpi/setup.sh --no-prebuilt  # Takes 15-20 minutes
+```
+
+## Step 7: Test It Works
 
 ```bash
 sudo systemctl start stegasoo
@@ -66,7 +72,7 @@ curl -k https://localhost:5000
 # Should return HTML
 ```
 
-## Step 6: Sanitize for Distribution
+## Step 8: Sanitize for Distribution
 
 ```bash
 # Full sanitize (for final image - removes WiFi, shuts down)
@@ -86,7 +92,7 @@ This removes:
 
 The script validates all cleanup steps before finishing.
 
-## Step 7: Copy the Image
+## Step 9: Copy the Image
 
 Remove SD card, insert into your Linux machine:
 
@@ -98,7 +104,7 @@ lsblk
 sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
 ```
 
-## Step 8: Shrink & Compress
+## Step 10: Shrink & Compress
 
 ```bash
 # Optional: Shrink image (saves space)
@@ -110,7 +116,7 @@ sudo ./pishrink.sh stegasoo-rpi-*.img
 zstd -19 -T0 stegasoo-rpi-*.img
 ```
 
-## Step 9: Distribute
+## Step 11: Distribute
 
 Upload `.img.zst` to GitHub Releases.
 
@@ -167,14 +173,19 @@ scp admin@stegasoo.local:/tmp/stegasoo-pi-arm64.tar.zst ./
 ```bash
 # On Pi (after SSH):
 sudo chown admin:admin /opt
-sudo apt-get update && sudo apt-get install -y git
+sudo apt-get update && sudo apt-get install -y git zstd jq
 cd /opt && git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
-cd stegasoo && ./rpi/setup.sh
+
+# On host (copy tarball):
+scp rpi/stegasoo-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+
+# On Pi (run setup):
+cd /opt/stegasoo && ./rpi/setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
 sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
-# On your machine:
+# On host (pull image):
 sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
 zstd -19 -T0 stegasoo-rpi-*.img
 ```
