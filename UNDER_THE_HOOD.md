@@ -793,8 +793,8 @@ Stego Image ──────────► detect_mode() ──────�
 Both modes share the same cryptographic foundation (Argon2id + AES-256-GCM) and multi-factor authentication, ensuring security regardless of embedding method.
 
 The choice comes down to your use case:
-- **Private channel?** → LSB (maximum capacity)
 - **Public platform?** → DCT (maximum compatibility)
+- **Private channel?** → LSB (maximum capacity)
 
 ### v4.0 Simplifications
 
