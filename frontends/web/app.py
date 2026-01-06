@@ -2324,9 +2324,21 @@ if __name__ == "__main__":
     ssl_context = None
     if app.config.get("HTTPS_ENABLED", False):
         hostname = os.environ.get("STEGASOO_HOSTNAME", "localhost")
-        cert_path, key_path = ensure_certs(base_dir, hostname)
-        ssl_context = (str(cert_path), str(key_path))
-        print(f"HTTPS enabled with self-signed certificate for {hostname}")
+        try:
+            cert_path, key_path = ensure_certs(base_dir, hostname)
+            if cert_path.exists() and key_path.exists():
+                ssl_context = (str(cert_path), str(key_path))
+                print(f"HTTPS enabled with self-signed certificate for {hostname}")
+            else:
+                print("ERROR: SSL certificates not found after generation attempt")
+                print(f"  Expected: {cert_path}, {key_path}")
+                print("  Falling back to HTTP (INSECURE)")
+        except Exception as e:
+            print(f"ERROR: Failed to generate SSL certificates: {e}")
+            print("  Falling back to HTTP (INSECURE)")
+            print("  To fix: mkdir -p certs && openssl req -x509 -newkey rsa:2048 \\")
+            print("    -keyout certs/server.key -out certs/server.crt -days 365 -nodes \\")
+            print("    -subj '/CN=localhost'")
 
     # Auth status
     if app.config.get("AUTH_ENABLED", True):

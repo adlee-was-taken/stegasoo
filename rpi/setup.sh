@@ -465,6 +465,31 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+# Generate SSL certificates if HTTPS enabled
+if [ "$ENABLE_HTTPS" = "true" ]; then
+    echo "  Generating SSL certificates..."
+    CERT_DIR="$INSTALL_DIR/frontends/web/certs"
+    mkdir -p "$CERT_DIR"
+
+    # Get local IP for SAN
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    PI_HOSTNAME=$(hostname)
+
+    # Generate cert with SANs for IP, hostname, and localhost
+    openssl req -x509 -newkey rsa:2048 \
+      -keyout "$CERT_DIR/server.key" \
+      -out "$CERT_DIR/server.crt" \
+      -days 365 -nodes \
+      -subj "/O=Stegasoo/CN=$PI_HOSTNAME" \
+      -addext "subjectAltName=DNS:$PI_HOSTNAME,DNS:$PI_HOSTNAME.local,DNS:localhost,IP:$LOCAL_IP,IP:127.0.0.1" \
+      2>/dev/null
+
+    # Fix permissions
+    chmod 600 "$CERT_DIR/server.key"
+    chown -R "$USER:$USER" "$CERT_DIR"
+    echo -e "  ${GREEN}✓${NC} SSL certificates generated"
+fi
+
 # Setup port 443 redirect if requested
 if [ "$USE_PORT_443" = "true" ]; then
     echo "  Setting up port 443 redirect..."

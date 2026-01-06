@@ -279,6 +279,32 @@ EOF
 "
 gum style --foreground 82 "✓ Service configured"
 
+# Generate SSL certificates if HTTPS enabled
+if [ "$ENABLE_HTTPS" = "true" ]; then
+  gum spin --spinner dot --title "Generating SSL certificates..." -- bash -c "
+    CERT_DIR='$INSTALL_DIR/frontends/web/certs'
+    mkdir -p \"\$CERT_DIR\"
+
+    # Get local IP for SAN
+    LOCAL_IP=\$(hostname -I | awk '{print \$1}')
+    HOSTNAME=\$(hostname)
+
+    # Generate cert with SANs for IP, hostname, and localhost
+    openssl req -x509 -newkey rsa:2048 \
+      -keyout \"\$CERT_DIR/server.key\" \
+      -out \"\$CERT_DIR/server.crt\" \
+      -days 365 -nodes \
+      -subj \"/O=Stegasoo/CN=\$HOSTNAME\" \
+      -addext \"subjectAltName=DNS:\$HOSTNAME,DNS:\$HOSTNAME.local,DNS:localhost,IP:\$LOCAL_IP,IP:127.0.0.1\" \
+      2>/dev/null
+
+    # Fix permissions
+    chmod 600 \"\$CERT_DIR/server.key\"
+    chown -R $STEGASOO_USER:\$(id -gn $STEGASOO_USER) \"\$CERT_DIR\"
+  "
+  gum style --foreground 82 "✓ SSL certificates generated"
+fi
+
 # Setup port 443 if requested
 if [ "$USE_PORT_443" = "true" ]; then
   gum spin --spinner dot --title "Setting up port 443 redirect..." -- bash -c "

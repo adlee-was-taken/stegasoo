@@ -553,6 +553,85 @@ print(f'jpegio: {has_jpegio_support()}')
 
 ---
 
+## Custom SSL Certificates
+
+By default, Stegasoo generates a self-signed certificate for HTTPS. To use your own certificate (e.g., from Let's Encrypt or your organization's CA):
+
+### Replace Self-Signed Certificates
+
+```bash
+# Stop the service
+sudo systemctl stop stegasoo
+
+# Backup existing certs (optional)
+mv /opt/stegasoo/frontends/web/certs /opt/stegasoo/frontends/web/certs.bak
+
+# Create new certs directory
+mkdir -p /opt/stegasoo/frontends/web/certs
+
+# Copy your certificates (adjust paths as needed)
+cp /path/to/your/certificate.crt /opt/stegasoo/frontends/web/certs/server.crt
+cp /path/to/your/private.key /opt/stegasoo/frontends/web/certs/server.key
+
+# Set permissions (key must be readable by service user)
+chmod 600 /opt/stegasoo/frontends/web/certs/server.key
+chown -R $(whoami):$(whoami) /opt/stegasoo/frontends/web/certs
+
+# Start the service
+sudo systemctl start stegasoo
+```
+
+### Generate New Self-Signed Certificate
+
+If your certificate expires or you need to regenerate:
+
+```bash
+# Stop service
+sudo systemctl stop stegasoo
+
+# Generate new cert with SANs
+CERT_DIR="/opt/stegasoo/frontends/web/certs"
+LOCAL_IP=$(hostname -I | awk '{print $1}')
+HOSTNAME=$(hostname)
+
+openssl req -x509 -newkey rsa:2048 \
+  -keyout "$CERT_DIR/server.key" \
+  -out "$CERT_DIR/server.crt" \
+  -days 365 -nodes \
+  -subj "/O=Stegasoo/CN=$HOSTNAME" \
+  -addext "subjectAltName=DNS:$HOSTNAME,DNS:$HOSTNAME.local,DNS:localhost,IP:$LOCAL_IP,IP:127.0.0.1"
+
+chmod 600 "$CERT_DIR/server.key"
+
+# Start service
+sudo systemctl start stegasoo
+```
+
+### Let's Encrypt with Certbot
+
+For publicly accessible servers:
+
+```bash
+# Install certbot
+sudo apt install certbot
+
+# Get certificate (standalone mode)
+sudo certbot certonly --standalone -d yourdomain.com
+
+# Copy to Stegasoo
+sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem /opt/stegasoo/frontends/web/certs/server.crt
+sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem /opt/stegasoo/frontends/web/certs/server.key
+sudo chown $(whoami):$(whoami) /opt/stegasoo/frontends/web/certs/*
+sudo chmod 600 /opt/stegasoo/frontends/web/certs/server.key
+
+# Restart
+sudo systemctl restart stegasoo
+```
+
+**Note:** Set up a cron job or systemd timer to copy renewed certificates and restart Stegasoo.
+
+---
+
 ## Verification
 
 ### Check Installation
