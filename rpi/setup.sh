@@ -455,11 +455,11 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     echo -e " 🚀 Stegasoo running     🌐 \033[0;33m$STEGASOO_URL\033[0m"
     if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
         # Temp emoji: ice<50, cool 50-70, fire>70
-        TEMP_NUM=\$(echo "\$CPU_TEMP" | grep -oE "[0-9]+" | head -1)
-        if [ -n "\$TEMP_NUM" ]; then
-            if [ "\$TEMP_NUM" -ge 70 ]; then
+        TEMP_NUM=$(echo "$CPU_TEMP" | grep -oE "[0-9]+" | head -1)
+        if [ -n "$TEMP_NUM" ]; then
+            if [ "$TEMP_NUM" -ge 70 ]; then
                 TEMP_EMOJI="🔥"
-            elif [ "\$TEMP_NUM" -ge 50 ]; then
+            elif [ "$TEMP_NUM" -ge 50 ]; then
                 TEMP_EMOJI="😎"
             else
                 TEMP_EMOJI="🧊"
@@ -467,7 +467,7 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
         else
             TEMP_EMOJI="🌡"
         fi
-        echo -e " \033[0;35m⚡\033[0m \${CPU_MHZ} MHz             \${TEMP_EMOJI} \${CPU_TEMP}"
+        echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz             ${TEMP_EMOJI} ${CPU_TEMP}"
     fi
     echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
     echo ""
@@ -480,6 +480,10 @@ fi
 MOTDEOF
 sudo chmod 644 /etc/profile.d/stegasoo-motd.sh
 echo "  Created login banner"
+
+# Shorten the default Debian MOTD boilerplate
+echo "Debian GNU/Linux · License: /usr/share/doc/*/copyright" | sudo tee /etc/motd > /dev/null
+echo "  Shortened system MOTD"
 
 echo ""
 echo -e "${BOLD}Installation Complete!${NC}"
