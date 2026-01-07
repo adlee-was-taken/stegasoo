@@ -7,12 +7,40 @@ Uses cryptography library (already a dependency).
 
 import datetime
 import ipaddress
+import socket
 from pathlib import Path
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+
+
+def _get_local_ips() -> list[str]:
+    """Get local IP addresses for this machine."""
+    ips = []
+    try:
+        # Get hostname and resolve to IP
+        hostname = socket.gethostname()
+        for addr_info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = addr_info[4][0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except Exception:
+        pass
+
+    # Also try connecting to external to get primary interface IP
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        if ip not in ips:
+            ips.append(ip)
+        s.close()
+    except Exception:
+        pass
+
+    return ips
 
 
 def get_cert_paths(base_dir: Path) -> tuple[Path, Path]:
@@ -64,11 +92,25 @@ def generate_self_signed_cert(
         x509.DNSName("localhost"),
         x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
     ]
+
+    # Add hostname.local for mDNS access
+    if not hostname.endswith(".local"):
+        san_list.append(x509.DNSName(f"{hostname}.local"))
+
     # Add the hostname as IP if it looks like one
     try:
         san_list.append(x509.IPAddress(ipaddress.IPv4Address(hostname)))
     except ipaddress.AddressValueError:
         pass
+
+    # Add local network IPs
+    for local_ip in _get_local_ips():
+        try:
+            ip_addr = ipaddress.IPv4Address(local_ip)
+            if x509.IPAddress(ip_addr) not in san_list:
+                san_list.append(x509.IPAddress(ip_addr))
+        except (ipaddress.AddressValueError, ValueError):
+            pass
 
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
