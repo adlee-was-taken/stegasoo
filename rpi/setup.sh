@@ -452,7 +452,7 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
         CPU_TEMP=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2)
     fi
     # Compact two-column layout
-    echo -e " \033[0;32m●\033[0m Stegasoo running    \033[0;32m●\033[0m \033[0;33m$STEGASOO_URL\033[0m"
+    echo -e " 🚀 Stegasoo running    🚀 \033[0;33m$STEGASOO_URL\033[0m"
     if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
         echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz           \033[0;35m🌡\033[0m ${CPU_TEMP}"
     fi
