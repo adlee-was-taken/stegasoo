@@ -1,21 +1,27 @@
 """
 Stegasoo Steganography Functions (v3.2.0)
 
-LSB and DCT embedding modes with pseudo-random pixel/coefficient selection.
+This is the core embedding/extraction module. Two modes available:
 
-Changes in v3.0:
-- DCT domain embedding mode (requires scipy)
-- embed_mode parameter for encode/decode
-- Auto-detection of embedding mode
-- Comparison utilities
+LSB (Least Significant Bit) Mode:
+- Classic steganography technique - hide bits in the least significant bit of pixel values
+- Works on any image, outputs lossless PNG/BMP
+- Higher capacity than DCT, but destroyed by JPEG compression
+- Great for: high-capacity needs, lossless workflows
 
-Changes in v3.0.1:
-- dct_output_format parameter for DCT mode ('png' or 'jpeg')
-- dct_color_mode parameter for DCT mode ('grayscale' or 'color')
+DCT Mode (see dct_steganography.py):
+- Hides data in frequency-domain coefficients
+- Survives some image processing, works with JPEG
+- Lower capacity but more robust
+- Great for: JPEG images, robustness needs
 
-Changes in v3.2.0:
-- Fixed HEADER_OVERHEAD constant (65 bytes, not 104 - date field removed)
-- Updated ENCRYPTION_OVERHEAD calculation
+Both modes use pseudo-random pixel/coefficient selection based on a key.
+Without the key, you don't know where to look - security through obscurity
+PLUS actual encryption of the payload.
+
+v3.0: Added DCT mode with scipy
+v3.0.1: DCT output format options (PNG/JPEG, grayscale/color)
+v3.2.0: Fixed overhead calculations after removing date field
 """
 
 import io
@@ -83,24 +89,31 @@ EXT_TO_FORMAT = {
 }
 
 # =============================================================================
-# OVERHEAD CONSTANTS (v4.0.0 - Updated for channel key support)
+# OVERHEAD CONSTANTS
 # =============================================================================
-# v4.0.0 Header format (with flags byte for channel key indicator):
-#   Magic:   4 bytes  (\x89ST3)
-#   Version: 1 byte   (5 for v4.0.0)
-#   Flags:   1 byte   (bit 0 = has channel key)
-#   Salt:    32 bytes
-#   IV:      12 bytes
-#   Tag:     16 bytes
-#   -----------------
-#   Total:   66 bytes
 #
-# v3.2.0 had 65 bytes (no flags byte)
-# v3.1.0 had date field (10 bytes + 1 byte length) = 76 bytes header
+# Every stego image has some overhead before the actual payload:
+#
+# The encrypted message format (v4.0.0):
+# ┌─────────────────────────────────────────────────────────────────┐
+# │ \x89ST3 │ v5 │ flags │  salt (32)  │  iv (12)  │  tag (16)  │ ... │
+# │ magic  │ ver│       │             │           │            │ data│
+# └─────────────────────────────────────────────────────────────────┘
+#   4 bytes  1    1         32            12           16         var
+#
+# Plus LSB embedding adds a 4-byte length prefix so we know where to stop.
+#
+# History of overhead sizes (in case you're debugging old images):
+# - v3.1.0: 76 bytes (had date field - 10+1 bytes)
+# - v3.2.0: 65 bytes (removed date, simpler)
+# - v4.0.0: 66 bytes (added flags byte for channel key)
 
-HEADER_OVERHEAD = 66  # v4.0.0: Magic + version + flags + salt + iv + tag
-LENGTH_PREFIX = 4  # 4 bytes for payload length in LSB embedding
-ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX  # 70 bytes total
+HEADER_OVERHEAD = 66  # What the crypto layer adds to any message
+LENGTH_PREFIX = 4     # We prepend the payload length for LSB extraction
+ENCRYPTION_OVERHEAD = HEADER_OVERHEAD + LENGTH_PREFIX  # Total: 70 bytes
+
+# That 70 bytes is your minimum image capacity requirement.
+# A tiny 100x100 image gives you ~3750 bytes capacity, minus 70 = ~3680 usable.
 
 # DCT output format options (v3.0.1)
 DCT_OUTPUT_PNG = "png"
@@ -456,6 +469,20 @@ def compare_modes(image_data: bytes) -> dict:
 # =============================================================================
 # PIXEL INDEX GENERATION
 # =============================================================================
+#
+# The key insight: we don't hide data in sequential pixels (that's easy to find).
+# Instead, we scatter the data across pseudo-random pixel locations.
+#
+# The pixel selection key (derived from passphrase + photo + pin) determines
+# WHICH pixels get modified. Without the key, an attacker would have to:
+# 1. Know we're using LSB steganography
+# 2. Try every possible subset of pixels
+# 3. Decrypt the result (which they also can't do without the key)
+#
+# We use ChaCha20 as a CSPRNG (Cryptographically Secure PRNG). It's:
+# - Fast (faster than AES-CTR on most CPUs)
+# - Deterministic (same key = same sequence, needed for extraction)
+# - Secure (can't predict the sequence without the key)
 
 
 @debug.time
@@ -463,8 +490,13 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
     """
     Generate pseudo-random pixel indices for embedding.
 
-    Uses ChaCha20 as a CSPRNG seeded by the key to deterministically
-    select which pixels will hold hidden data.
+    This is the "where do we hide the bits?" function. We use ChaCha20
+    to generate a deterministic sequence of pixel indices that only
+    someone with the same key can reproduce.
+
+    Two strategies based on how much of the image we're using:
+    - >= 50% capacity: Full Fisher-Yates shuffle (sample without replacement)
+    - < 50% capacity: Direct random sampling (faster, same result)
     """
     debug.validate(len(key) == 32, f"Pixel key must be 32 bytes, got {len(key)}")
     debug.validate(num_pixels > 0, f"Number of pixels must be positive, got {num_pixels}")
@@ -475,6 +507,8 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
 
     debug.print(f"Generating {num_needed} pixel indices from {num_pixels} total pixels")
 
+    # Strategy 1: Full shuffle when we need a lot of pixels
+    # Fisher-Yates shuffle is O(n) and gives us perfect random sampling
     if num_needed >= num_pixels // 2:
         debug.print(f"Using full shuffle (needed {num_needed}/{num_pixels} pixels)")
         nonce = b"\x00" * 16
@@ -482,8 +516,10 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
         encryptor = cipher.encryptor()
 
         indices = list(range(num_pixels))
+        # Get enough random bytes to do the shuffle
         random_bytes = encryptor.update(b"\x00" * (num_pixels * 4))
 
+        # Fisher-Yates shuffle - swap each element with a random earlier element
         for i in range(num_pixels - 1, 0, -1):
             j_bytes = random_bytes[(num_pixels - 1 - i) * 4 : (num_pixels - i) * 4]
             j = int.from_bytes(j_bytes, "big") % (i + 1)
@@ -493,14 +529,17 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
         debug.print(f"Generated {len(selected)} indices via shuffle")
         return selected
 
+    # Strategy 2: Direct sampling when we need fewer pixels
+    # Generate random indices until we have enough unique ones
     debug.print(f"Using optimized selection (needed {num_needed}/{num_pixels} pixels)")
     selected = []
-    used = set()
+    used = set()  # Track which pixels we've already picked
 
     nonce = b"\x00" * 16
     cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
     encryptor = cipher.encryptor()
 
+    # Pre-generate 2x the bytes we think we'll need (for collision handling)
     bytes_needed = (num_needed * 2) * 4
     random_bytes = encryptor.update(b"\x00" * bytes_needed)
 
@@ -514,8 +553,9 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
             used.add(idx)
             selected.append(idx)
         else:
-            collisions += 1
+            collisions += 1  # Birthday paradox in action
 
+    # Edge case: ran out of pre-generated bytes (very high collision rate)
     if len(selected) < num_needed:
         debug.print(f"Need {num_needed - len(selected)} more indices, generating...")
         extra_needed = num_needed - len(selected)
@@ -539,6 +579,23 @@ def generate_pixel_indices(key: bytes, num_pixels: int, num_needed: int) -> list
 # =============================================================================
 # EMBEDDING FUNCTIONS
 # =============================================================================
+#
+# The actual bit-hiding magic happens here. LSB embedding is conceptually simple:
+#
+# Original pixel RGB: (142, 87, 201)
+# In binary:          (10001110, 01010111, 11001001)
+#                                      ^       ^       ^
+#                      These are the LSBs (least significant bits)
+#
+# To hide the bits [1, 0, 1]:
+# Modified pixel RGB: (10001111, 01010110, 11001001) = (143, 86, 201)
+#                                      ^       ^       ^
+#                      Changed!     Changed!  Already 1, no change needed
+#
+# The human eye can't see the difference between 142 and 143.
+# But we've hidden 3 bits of secret data in one pixel.
+#
+# With a 1000x1000 image: 1 million pixels * 3 channels = 3 million bits = 375 KB!
 
 
 @debug.time

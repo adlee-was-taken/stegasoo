@@ -1,22 +1,30 @@
 """
 DCT Domain Steganography Module (v4.1.0)
 
-Embeds data in DCT coefficients with two approaches:
-1. PNG output: Scipy-based DCT transform (grayscale or color)
-2. JPEG output: jpegio-based coefficient manipulation (if available)
+The fancy pants mode. Instead of hiding bits in pixel values (LSB mode),
+we hide them in the *frequency domain* - specifically in the Discrete Cosine
+Transform coefficients that JPEG compression uses internally.
 
-v4.1.0 Changes:
-- Reed-Solomon error correction protects against bit errors in problematic blocks
-- Majority voting on length headers (3 copies) for additional robustness
-- RS can correct up to 16 byte errors per 223-byte chunk
+Why is this cool?
+- Survives some image processing that would destroy LSB data
+- Works with JPEG without the usual "save destroys everything" problem
+- Uses the same math that JPEG itself uses - we're hiding in plain sight
 
-v3.2.0-patch2 Changes:
-- Chunked processing for large images to avoid heap corruption
-- Process image in vertical strips to limit memory per operation
-- Isolated DCT operations with fresh array allocations
-- Workaround for scipy.fftpack memory issues
+Two approaches depending on what you want:
+1. PNG output: We do our own DCT math via scipy (works on any image)
+2. JPEG output: We use jpegio to directly tweak the coefficients (chef's kiss)
 
-Requires: scipy (for PNG mode), optionally jpegio (for JPEG mode), reedsolo (for error correction)
+v4.1.0 - The "please stop corrupting my data" release:
+- Reed-Solomon error correction (can fix up to 16 byte errors per chunk)
+- Majority voting on headers (store 3 copies, take the winner)
+- Because some image regions are just... problematic
+
+v3.2.0-patch2 - The "scipy why are you like this" release:
+- Chunked processing because scipy's FFT was corrupting memory on big images
+- Process blocks one at a time with fresh arrays
+- Yes, it's slower. No, I don't care. Correctness > speed.
+
+Requires: scipy (PNG mode), optionally jpegio (JPEG mode), reedsolo (error correction)
 """
 
 import gc
@@ -87,11 +95,31 @@ def _write_progress(progress_file: str | None, current: int, total: int, phase: 
 # CONSTANTS
 # ============================================================================
 
+# JPEG uses 8x8 blocks for DCT - this is baked into the standard
 BLOCK_SIZE = 8
+
+# The zig-zag order of DCT coefficients. JPEG stores them this way because
+# the human eye is more sensitive to low frequencies (top-left corner)
+# than high frequencies (bottom-right). After quantization, most high-freq
+# coefficients become zero, so zig-zag gives great compression.
+#
+# Visual of an 8x8 DCT block with zig-zag numbering:
+#
+#   DC  1   5   6  14  15  27  28     <- Low frequency (smooth gradients)
+#    2  4   7  13  16  26  29  42
+#    3  8  12  17  25  30  41  43
+#    9 11  18  24  31  40  44  53
+#   10 19  23  32  39  45  52  54
+#   20 22  33  38  46  51  55  60
+#   21 34  37  47  50  56  59  61
+#   35 36  48  49  57  58  62  63     <- High frequency (fine detail/noise)
+#
+# Position (0,0) is the DC coefficient - the average brightness of the block.
+# We NEVER touch DC because changing it causes visible brightness shifts.
 EMBED_POSITIONS = [
-    (0, 1),
-    (1, 0),
-    (2, 0),
+    (0, 1),   # 1st AC coefficient
+    (1, 0),   # 2nd AC coefficient
+    (2, 0),   # ... and so on in zig-zag order
     (1, 1),
     (0, 2),
     (0, 3),
@@ -124,32 +152,59 @@ EMBED_POSITIONS = [
     (6, 1),
     (7, 0),
 ]
+
+# We use positions 4-20 (mid-frequency range). Here's the reasoning:
+# - Positions 0-3: Too low frequency, changes are visible as color shifts
+# - Positions 4-20: Sweet spot - carries enough energy to survive, not visible
+# - Positions 21+: High frequency, often quantized to zero, unreliable
 DEFAULT_EMBED_POSITIONS = EMBED_POSITIONS[4:20]
+
+# Quantization step for QIM (Quantization Index Modulation).
+# This is how we actually embed bits: we round the coefficient to a grid
+# and then nudge it based on whether we want a 0 or 1.
+# Bigger step = more robust to noise, but more visible. 25 is a good balance.
 QUANT_STEP = 25
-DCT_MAGIC = b"DCTS"
-HEADER_SIZE = 10
+
+# Magic bytes so we can identify our own images
+DCT_MAGIC = b"DCTS"      # scipy DCT mode marker
+JPEGIO_MAGIC = b"JPGS"   # jpegio native JPEG mode marker
+HEADER_SIZE = 10         # Magic (4) + version (1) + flags (1) + length (4)
+
 OUTPUT_FORMAT_PNG = "png"
 OUTPUT_FORMAT_JPEG = "jpeg"
-JPEG_OUTPUT_QUALITY = 95
-JPEGIO_MAGIC = b"JPGS"
+JPEG_OUTPUT_QUALITY = 95  # High quality but not 100 (100 causes issues, see below)
+
+# For jpegio mode: we only embed in coefficients with magnitude >= 2
+# Coefficients of 0 or 1 are usually quantized noise - unreliable
 JPEGIO_MIN_COEF_MAGNITUDE = 2
+
+# We embed in the Y (luminance) channel only - it has the most capacity
+# Cb/Cr are often subsampled 4:2:0 anyway
 JPEGIO_EMBED_CHANNEL = 0
-FLAG_COLOR_MODE = 0x01
-FLAG_RS_PROTECTED = 0x02  # Reed-Solomon error correction enabled
 
-# Reed-Solomon settings - 32 symbols can correct up to 16 byte errors per 223-byte chunk
+# Header flags
+FLAG_COLOR_MODE = 0x01      # Set if we preserved color (YCbCr mode)
+FLAG_RS_PROTECTED = 0x02    # Set if Reed-Solomon protected (v4.1.0+)
+
+# Reed-Solomon settings - the "please don't lose my data" system
+# 32 parity symbols per chunk means we can correct up to 16 byte errors
+# Math: RS(255, 223) where 255-223=32 parity bytes, corrects floor(32/2)=16
 RS_NSYM = 32
-RS_LENGTH_HEADER_SIZE = 8  # 8 bytes: 4 for raw_payload_length + 4 for rs_payload_length
-RS_LENGTH_COPIES = 3  # Store length header 3 times for majority voting
-RS_LENGTH_PREFIX_SIZE = RS_LENGTH_HEADER_SIZE * RS_LENGTH_COPIES  # Total: 24 bytes
 
-# Chunking settings for large images
-MAX_CHUNK_HEIGHT = 512  # Process in 512-pixel tall strips
+# We store the payload length 3 times and take majority vote
+# Because if the length is wrong, everything is wrong
+RS_LENGTH_HEADER_SIZE = 8   # 4 bytes raw length + 4 bytes RS-encoded length
+RS_LENGTH_COPIES = 3        # Store 3 copies, need 2 to agree
+RS_LENGTH_PREFIX_SIZE = RS_LENGTH_HEADER_SIZE * RS_LENGTH_COPIES  # 24 bytes total
 
-# JPEG normalization settings
-# JPEGs with quality=100 have all quantization values = 1, which crashes jpegio
-JPEGIO_NORMALIZE_QUALITY = 95  # Re-save quality for problematic JPEGs
-JPEGIO_MAX_QUANT_VALUE_THRESHOLD = 1  # If all quant values <= this, normalize
+# Chunking for large images - scipy's FFT gets memory-corrupty on huge arrays
+MAX_CHUNK_HEIGHT = 512  # Process in strips to keep memory sane
+
+# Fun bug: JPEGs saved with quality=100 have quantization tables full of 1s
+# This makes the DCT coefficients HUGE and jpegio crashes spectacularly
+# Solution: detect and re-save at quality 95 first
+JPEGIO_NORMALIZE_QUALITY = 95
+JPEGIO_MAX_QUANT_VALUE_THRESHOLD = 1  # All 1s in quant table = bad news
 
 
 # ============================================================================
@@ -209,13 +264,26 @@ def has_jpegio_support() -> bool:
 
 # ============================================================================
 # REED-SOLOMON ERROR CORRECTION
-# Protects against bit errors in problematic image blocks
 # ============================================================================
+#
+# Why do we need this? DCT embedding isn't perfect. Some image regions are
+# problematic - flat areas, high compression, edge cases. Bits can flip.
+#
+# Reed-Solomon is the same error correction used in CDs, DVDs, QR codes, and
+# deep space communications. If it's good enough for Voyager, it's good enough
+# for hiding cat pictures in other cat pictures.
+#
+# How it works (simplified):
+# 1. Take your data bytes
+# 2. Add extra "parity" bytes calculated from the data
+# 3. If some bytes get corrupted, the math lets you reconstruct them
+# 4. RS(255, 223) means: 255 byte blocks, 223 data + 32 parity
+# 5. Can correct up to 16 corrupted bytes per block (floor(32/2))
+#
+# The tradeoff: ~14% overhead (32/223). Worth it for reliability.
 
-# Check for reedsolo availability
 try:
     from reedsolo import ReedSolomonError, RSCodec
-
     HAS_REEDSOLO = True
 except ImportError:
     HAS_REEDSOLO = False
@@ -224,48 +292,78 @@ except ImportError:
 
 
 def _rs_encode(data: bytes) -> bytes:
-    """Add Reed-Solomon error correction symbols to data."""
+    """
+    Wrap data in Reed-Solomon error correction.
+
+    Takes your precious payload and adds parity bytes so we can
+    recover from the inevitable bit-rot of DCT embedding.
+    """
     if not HAS_REEDSOLO:
-        return data  # No protection if reedsolo not available
+        return data  # YOLO mode - no protection, good luck
     rs = RSCodec(RS_NSYM)
     return bytes(rs.encode(data))
 
 
 def _rs_decode(data: bytes) -> bytes:
-    """Decode Reed-Solomon protected data, correcting errors if possible."""
+    """
+    Decode Reed-Solomon protected data, fixing errors along the way.
+
+    This is where the magic happens. If bits got flipped during
+    extraction, RS will quietly fix them. If too many flipped...
+    well, we tried.
+    """
     if not HAS_REEDSOLO:
-        return data  # No decoding if reedsolo not available
+        return data
     rs = RSCodec(RS_NSYM)
     try:
         decoded, _, errata_pos = rs.decode(data)
         if errata_pos:
-            pass  # Errors were corrected
+            # Errors were found and corrected - RS earned its keep today
+            pass
         return bytes(decoded)
     except ReedSolomonError as e:
+        # Too many errors - the image got mangled beyond repair
         raise StegasooRSError(f"Image corrupted beyond repair: {e}") from e
 
 
 # ============================================================================
 # SAFE DCT FUNCTIONS
-# These create fresh arrays to avoid scipy memory corruption issues
 # ============================================================================
+#
+# Story time: scipy's fftpack (the old DCT implementation) has memory issues
+# when you process large images. We'd get random garbage in our output, or
+# worse, segfaults. Turns out it was reusing internal buffers in unsafe ways.
+#
+# The fix? Be paranoid. Every single array operation creates a fresh copy.
+# Is it slower? Yes. Does it work? Also yes. I'll take correct over fast.
+#
+# The newer scipy.fft module is better, but we still play it safe because
+# not everyone has the latest scipy and I don't want debugging nightmares.
 
 
 def _safe_dct2(block: np.ndarray) -> np.ndarray:
     """
-    Apply 2D DCT with memory isolation.
-    Creates a completely fresh array to avoid heap corruption.
+    Apply 2D DCT (Discrete Cosine Transform) to an 8x8 block.
+
+    The DCT converts spatial data (pixel values) into frequency data
+    (how much of each frequency component is present). It's the heart
+    of JPEG compression.
+
+    We do it row-by-row and column-by-column with fresh arrays each time
+    because scipy's built-in dct2 can corrupt memory on large batches.
+    Paranoid? Yes. Necessary? Also yes.
     """
-    # Create a brand new array (not a view)
+    # Create a brand new array (not a view) - paranoia level: maximum
     safe_block = np.array(block, dtype=np.float64, copy=True, order="C")
 
-    # First DCT on columns (transpose -> DCT rows -> transpose back)
+    # 2D DCT = 1D DCT on rows, then 1D DCT on columns (separable transform)
+    # First pass: DCT each column
     temp = np.zeros_like(safe_block, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         col = np.array(safe_block[:, i], dtype=np.float64, copy=True)
-        temp[:, i] = dct(col, norm="ortho")
+        temp[:, i] = dct(col, norm="ortho")  # ortho normalization for symmetry
 
-    # Second DCT on rows
+    # Second pass: DCT each row of the result
     result = np.zeros_like(temp, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         row = np.array(temp[i, :], dtype=np.float64, copy=True)
@@ -276,19 +374,22 @@ def _safe_dct2(block: np.ndarray) -> np.ndarray:
 
 def _safe_idct2(block: np.ndarray) -> np.ndarray:
     """
-    Apply 2D inverse DCT with memory isolation.
-    Creates a completely fresh array to avoid heap corruption.
+    Apply 2D inverse DCT - convert frequency data back to pixels.
+
+    After we've embedded our secret bits in the DCT coefficients,
+    we need to convert back to pixel values. This is the reverse
+    of _safe_dct2.
+
+    Same paranoid memory handling because same paranoid developer.
     """
-    # Create a brand new array (not a view)
     safe_block = np.array(block, dtype=np.float64, copy=True, order="C")
 
-    # First IDCT on rows
+    # Inverse is the same idea: IDCT rows, then IDCT columns
     temp = np.zeros_like(safe_block, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         row = np.array(safe_block[i, :], dtype=np.float64, copy=True)
         temp[i, :] = idct(row, norm="ortho")
 
-    # Second IDCT on columns
     result = np.zeros_like(temp, dtype=np.float64, order="C")
     for i in range(BLOCK_SIZE):
         col = np.array(temp[:, i], dtype=np.float64, copy=True)
@@ -348,8 +449,25 @@ def _unpad_image(image: np.ndarray, original_size: tuple[int, int]) -> np.ndarra
 
 
 def _embed_bit_in_coeff(coef: float, bit: int, quant_step: int = QUANT_STEP) -> float:
+    """
+    Embed a single bit into a DCT coefficient using QIM.
+
+    QIM (Quantization Index Modulation) is smarter than simple LSB flipping.
+    Instead of just changing the last bit, we round to a quantization grid
+    and use odd/even to encode 0/1.
+
+    Why is this better?
+    - More robust to noise (small changes don't flip the bit)
+    - Works naturally with JPEG's own quantization
+    - The change is spread across the coefficient's magnitude
+
+    Visual example (quant_step=25):
+    - Coef = 73, want bit=0 -> round to 75 (75/25=3, 3%2=1) -> nudge to 50 (50/25=2, 2%2=0)
+    - Coef = 73, want bit=1 -> round to 75 (75/25=3, 3%2=1) -> already odd, keep at 75
+    """
     quantized = round(coef / quant_step)
     if (quantized % 2) != bit:
+        # Need to flip even<->odd. Nudge in the direction that's closest.
         if quantized % 2 == 0 and bit == 1:
             quantized += 1 if coef >= quantized * quant_step else -1
         elif quantized % 2 == 1 and bit == 0:
@@ -358,13 +476,35 @@ def _embed_bit_in_coeff(coef: float, bit: int, quant_step: int = QUANT_STEP) -> 
 
 
 def _extract_bit_from_coeff(coef: float, quant_step: int = QUANT_STEP) -> int:
+    """
+    Extract a bit from a DCT coefficient.
+
+    The inverse of _embed_bit_in_coeff. We round to the quantization grid
+    and check if it's odd (1) or even (0).
+
+    This is why QIM is robust: small noise in the coefficient usually
+    doesn't change which grid point we round to.
+    """
     quantized = round(coef / quant_step)
     return int(quantized % 2)
 
 
 def _generate_block_order(num_blocks: int, seed: bytes) -> list:
+    """
+    Generate a pseudo-random order for processing blocks.
+
+    This is crucial for security - if we just went left-to-right, top-to-bottom,
+    anyone could find the message by checking blocks in order. Instead, we
+    use a keyed shuffle so only someone with the same seed can find the data.
+
+    The seed comes from the crypto layer (derived from passphrase + photo + pin),
+    so the block order is effectively part of the encryption.
+    """
+    # Use SHA-256 to expand the seed into randomness
     hash_bytes = hashlib.sha256(seed).digest()
+    # Seed numpy's RNG (we use RandomState for reproducibility across versions)
     rng = np.random.RandomState(int.from_bytes(hash_bytes[:4], "big"))
+    # Fisher-Yates shuffle
     order = list(range(num_blocks))
     rng.shuffle(order)
     return order
@@ -393,14 +533,28 @@ def _save_color_image(rgb_array: np.ndarray, output_format: str = OUTPUT_FORMAT_
 
 
 def _rgb_to_ycbcr(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Convert RGB to YCbCr color space.
+
+    YCbCr separates brightness (Y) from color (Cb=blue-ish, Cr=red-ish).
+    This is what JPEG uses internally, and it's great for us because:
+    - Human eyes are WAY more sensitive to brightness than color
+    - We can hide data in Y without it being as visible
+    - Cb/Cr are often subsampled (4:2:0) so Y has more capacity anyway
+
+    The coefficients here are from ITU-R BT.601 - the standard for video.
+    """
     R = rgb[:, :, 0].astype(np.float64)
     G = rgb[:, :, 1].astype(np.float64)
     B = rgb[:, :, 2].astype(np.float64)
 
+    # Y = luminance (brightness). Green contributes most because eyes are most sensitive to it.
     Y = np.array(0.299 * R + 0.587 * G + 0.114 * B, dtype=np.float64, copy=True, order="C")
+    # Cb = blue-difference chroma (centered at 128)
     Cb = np.array(
         128 - 0.168736 * R - 0.331264 * G + 0.5 * B, dtype=np.float64, copy=True, order="C"
     )
+    # Cr = red-difference chroma (centered at 128)
     Cr = np.array(
         128 + 0.5 * R - 0.418688 * G - 0.081312 * B, dtype=np.float64, copy=True, order="C"
     )
@@ -409,6 +563,12 @@ def _rgb_to_ycbcr(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def _ycbcr_to_rgb(Y: np.ndarray, Cb: np.ndarray, Cr: np.ndarray) -> np.ndarray:
+    """
+    Convert YCbCr back to RGB.
+
+    After embedding in the Y channel, we need to reconstruct RGB for display.
+    The Cb/Cr channels are unchanged - we only touched luminance.
+    """
     R = Y + 1.402 * (Cr - 128)
     G = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128)
     B = Y + 1.772 * (Cb - 128)

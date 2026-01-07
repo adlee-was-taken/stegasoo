@@ -1,18 +1,26 @@
 """
 Stegasoo Cryptographic Functions (v4.0.0 - Channel Key Support)
 
-Key derivation, encryption, and decryption using AES-256-GCM.
-Supports both text messages and binary file payloads.
+This is the crypto layer - where we turn plaintext into indecipherable noise.
 
-BREAKING CHANGES in v4.0.0:
-- Added channel key support for deployment/group isolation
-- Messages encoded with a channel key require the same key to decode
-- Channel key can be configured via environment, config file, or explicit parameter
-- FORMAT_VERSION bumped to 5
+The security model is multi-factor:
+┌────────────────────────────────────────────────────────────────────┐
+│  SOMETHING YOU HAVE          SOMETHING YOU KNOW                    │
+│  ├─ Reference photo          ├─ Passphrase (4+ BIP-39 words)      │
+│  └─ RSA private key (opt)    └─ PIN (6-9 digits)                  │
+│                                                                    │
+│  DEPLOYMENT BINDING                                                │
+│  └─ Channel key (ties messages to a specific server/group)        │
+└────────────────────────────────────────────────────────────────────┘
 
-BREAKING CHANGES in v3.2.0:
-- Removed date dependency from key derivation
-- Renamed day_phrase → passphrase (no daily rotation needed)
+All factors get mixed together through Argon2id (memory-hard KDF) to derive
+the actual encryption key. Miss any factor = wrong key = garbage output.
+
+Encryption: AES-256-GCM (authenticated encryption - tamper = detection)
+KDF: Argon2id (256MB RAM, 4 iterations) or PBKDF2 fallback (600K iterations)
+
+v4.0.0: Added channel key for server/group isolation
+v3.2.0: Removed date dependency (was cute but annoying in practice)
 """
 
 import hashlib
@@ -98,25 +106,38 @@ def _resolve_channel_key(channel_key: str | bool | None) -> bytes | None:
 # =============================================================================
 # CORE CRYPTO FUNCTIONS
 # =============================================================================
+#
+# The "reference photo as a key" concept is one of Stegasoo's unique features.
+# Most steganography tools just use a password. We add the photo as a
+# "something you have" factor - like a hardware token, but it's a cat picture.
 
 
 def hash_photo(image_data: bytes) -> bytes:
     """
     Compute deterministic hash of photo pixel content.
 
-    This normalizes the image to RGB and hashes the raw pixel data,
-    making it resistant to metadata changes.
+    This is the magic sauce that turns your cat photo into a cryptographic key.
+
+    Why pixels and not the file hash?
+    - File metadata changes (EXIF stripped, resaved) = different file hash
+    - But pixel content stays the same
+    - We hash the RGB values directly, so format conversions don't matter
+
+    The double-hash with prefix is belt-and-suspenders mixing. Probably
+    overkill, but hey, it's crypto - paranoia is a feature.
 
     Args:
-        image_data: Raw image file bytes
+        image_data: Raw image file bytes (any format PIL can read)
 
     Returns:
-        32-byte SHA-256 hash
+        32-byte SHA-256 hash of pixel content
     """
+    # Convert to RGB to normalize (RGBA, grayscale, etc. all become RGB)
     img: Image.Image = Image.open(io.BytesIO(image_data)).convert("RGB")
     pixels = img.tobytes()
 
-    # Double-hash with prefix for additional mixing
+    # Double-hash: SHA256(SHA256(pixels) + first 1KB of pixels)
+    # The prefix adds image-specific data to prevent length-extension shenanigans
     h = hashlib.sha256(pixels).digest()
     h = hashlib.sha256(h + pixels[:1024]).digest()
     return h
@@ -133,20 +154,38 @@ def derive_hybrid_key(
     """
     Derive encryption key from multiple factors.
 
-    Combines:
-    - Photo hash (something you have)
-    - Passphrase (something you know)
-    - PIN (something you know, static)
-    - RSA key (something you have)
-    - Channel key (deployment/group binding)
-    - Salt (random per message)
+    This is the heart of Stegasoo's security model. We take all the things
+    you need to prove you're authorized (photo, passphrase, PIN, etc.) and
+    blend them together into one 32-byte key.
 
-    Uses Argon2id if available, falls back to PBKDF2.
+    The flow:
+    ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+    │ Photo hash  │ + │ passphrase  │ + │ PIN + RSA   │ + salt
+    └─────────────┘   └─────────────┘   └─────────────┘
+           │                 │                 │
+           └────────────────┴────────────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    Argon2id     │  <- Memory-hard KDF
+                    │   256MB / 4 iter │  <- Makes brute force expensive
+                    └─────────────────┘
+                             │
+                             ▼
+                      32-byte AES key
+
+    Why Argon2id?
+    - Memory-hard: attackers can't just throw GPUs at it
+    - 256MB RAM per attempt = expensive at scale
+    - Winner of the Password Hashing Competition (2015)
+    - "id" variant resists both side-channel and GPU attacks
+
+    Fallback: PBKDF2-SHA512 with 600K iterations (for systems without argon2)
 
     Args:
         photo_data: Reference photo bytes
-        passphrase: Shared passphrase (recommend 4+ words)
-        salt: Random salt for this message
+        passphrase: Shared passphrase (recommend 4+ words from BIP-39)
+        salt: Random salt for this message (32 bytes)
         pin: Optional static PIN
         rsa_key_data: Optional RSA key bytes
         channel_key: Channel key parameter:
@@ -155,7 +194,7 @@ def derive_hybrid_key(
             - "" or False: No channel key (public mode)
 
     Returns:
-        32-byte derived key
+        32-byte derived key (ready for AES-256)
 
     Raises:
         KeyDerivationError: If key derivation fails
@@ -163,31 +202,36 @@ def derive_hybrid_key(
     try:
         photo_hash = hash_photo(photo_data)
 
-        # Resolve channel key
+        # Resolve channel key (server-specific binding)
         channel_hash = _resolve_channel_key(channel_key)
 
-        # Build key material
+        # Build key material by concatenating all factors
+        # Passphrase is lowercased to be forgiving of case differences
         key_material = photo_hash + passphrase.lower().encode() + pin.encode() + salt
 
-        # Add RSA key hash if provided
+        # Add RSA key hash if provided (another "something you have")
         if rsa_key_data:
             key_material += hashlib.sha256(rsa_key_data).digest()
 
-        # Add channel key hash if configured (v4.0.0)
+        # Add channel key hash if configured (v4.0.0 - deployment binding)
         if channel_hash:
             key_material += channel_hash
 
+        # Run it all through the KDF
         if HAS_ARGON2:
+            # Argon2id: the good stuff
             key = hash_secret_raw(
                 secret=key_material,
                 salt=salt[:32],
-                time_cost=ARGON2_TIME_COST,
-                memory_cost=ARGON2_MEMORY_COST,
-                parallelism=ARGON2_PARALLELISM,
+                time_cost=ARGON2_TIME_COST,      # 4 iterations
+                memory_cost=ARGON2_MEMORY_COST,  # 256 MB RAM
+                parallelism=ARGON2_PARALLELISM,  # 4 threads
                 hash_len=32,
-                type=Type.ID,
+                type=Type.ID,  # Hybrid mode: resists side-channel AND GPU attacks
             )
         else:
+            # PBKDF2 fallback for systems without argon2-cffi
+            # 600K iterations is slow but not memory-hard
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA512(),
                 length=32,
@@ -347,9 +391,12 @@ def _unpack_payload(data: bytes) -> DecodeResult:
 # =============================================================================
 # HEADER FLAGS (v4.0.0)
 # =============================================================================
+#
+# The flags byte tells us about the message without decrypting it.
+# Currently just one flag, but the byte gives us room for 8.
 
-# Header flag bits
-FLAG_CHANNEL_KEY = 0x01  # Set if encoded with a channel key
+FLAG_CHANNEL_KEY = 0x01  # Bit 0: Message was encoded with a channel key
+# Future flags could include: compression, file attachment, etc.
 
 
 def encrypt_message(
@@ -361,33 +408,40 @@ def encrypt_message(
     channel_key: str | bool | None = None,
 ) -> bytes:
     """
-    Encrypt message or file using AES-256-GCM with hybrid key derivation.
+    Encrypt message or file using AES-256-GCM.
 
-    Message format (v4.0.0 - with channel key support):
-    - Magic header (4 bytes)
-    - Version (1 byte) = 5
-    - Flags (1 byte) - indicates if channel key was used
-    - Salt (32 bytes)
-    - IV (12 bytes)
-    - Auth tag (16 bytes)
-    - Ciphertext (variable, padded)
+    This is where plaintext becomes ciphertext. We use AES-256-GCM which is:
+    - AES: The standard, used by everyone from banks to governments
+    - 256-bit key: Enough entropy to survive until the heat death of the universe
+    - GCM mode: Authenticated encryption - if anyone tampers, decryption fails
+
+    The output format (v4.0.0):
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │ \x89ST3 │ 05 │ flags │  salt (32B)  │  iv (12B)  │  tag (16B)  │ ··· │
+    │  magic  │ver │       │              │            │             │cipher│
+    └──────────────────────────────────────────────────────────────────────┘
+
+    Why the random padding at the end?
+    - Message length can reveal information (traffic analysis)
+    - We add 64-319 random bytes and round to 256-byte boundary
+    - All messages look roughly the same size
 
     Args:
         message: Message string, raw bytes, or FilePayload to encrypt
-        photo_data: Reference photo bytes
-        passphrase: Shared passphrase (recommend 4+ words for good entropy)
-        pin: Optional static PIN
-        rsa_key_data: Optional RSA key bytes
+        photo_data: Reference photo bytes (your "key photo")
+        passphrase: Shared passphrase (recommend 4+ words from BIP-39)
+        pin: Optional static PIN for additional security
+        rsa_key_data: Optional RSA key bytes (another "something you have")
         channel_key: Channel key parameter:
-            - None or "auto": Use configured key
+            - None or "auto": Use server's configured key
             - str: Use this specific key
             - "" or False: No channel key (public mode)
 
     Returns:
-        Encrypted message bytes
+        Encrypted message bytes ready for embedding
 
     Raises:
-        EncryptionError: If encryption fails
+        EncryptionError: If encryption fails (shouldn't happen with valid inputs)
     """
     try:
         salt = secrets.token_bytes(SALT_SIZE)
