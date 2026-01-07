@@ -29,6 +29,33 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# Source banner.sh if available (for local runs), otherwise define inline
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+if [ -f "$SCRIPT_DIR/banner.sh" ]; then
+    source "$SCRIPT_DIR/banner.sh"
+else
+    # Inline banner functions for curl-pipe execution
+    print_gradient_line() {
+        echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
+    }
+    print_banner() {
+        local subtitle="$1"
+        echo ""
+        print_gradient_line
+        echo -e "\033[0;90m · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·\033[0m"
+        echo -e "\033[38;5;220m    ___  _____  ___    ___    _    ___    ___    ___\033[0m"
+        echo -e "\033[38;5;220m   / __||_   _|| __|  / __|  /_\\  / __|  / _ \\  / _ \\\\\033[0m"
+        echo -e "\033[38;5;220m   \\__ \\  | |  | _|  | (_ | / _ \\ \\__ \\ | (_) || (_) |\033[0m"
+        echo -e "\033[38;5;220m   |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/\033[0m"
+        echo -e "\033[0;90m · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·\033[0m"
+        print_gradient_line
+        if [ -n "$subtitle" ]; then
+            echo -e "\033[1;37m                    ${subtitle}\033[0m"
+            print_gradient_line
+        fi
+    }
+fi
+
 # Show help
 show_help() {
     echo "Stegasoo Raspberry Pi Setup Script"
@@ -82,17 +109,7 @@ for config_file in "/etc/stegasoo.conf" "$HOME/.config/stegasoo/stegasoo.conf"; 
 done
 
 clear
-echo ""
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
-echo -e "${GRAY} · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·${NC}"
-echo -e "\033[38;5;220m    ___  _____  ___    ___    _    ___    ___    ___\033[0m"
-echo -e "\033[38;5;220m   / __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\\033[0m"
-echo -e "\033[38;5;220m   \\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |\033[0m"
-echo -e "\033[38;5;220m   |___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/\033[0m"
-echo -e "${GRAY} · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·${NC}"
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
-echo -e "\033[1;37m                   Raspberry Pi Setup\033[0m"
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
+print_banner "Raspberry Pi Setup"
 echo ""
 echo "  This will install Stegasoo with full DCT support"
 echo "  Estimated time: ~2 minutes (pre-built) or 15-20 min (from source)"
@@ -424,19 +441,22 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     echo -e "\033[38;5;220m   |___/  |_|  |___|  \\___//_/ \\_\\|___/  \\___/  \\___/\033[0m"
     echo -e "\033[0;90m · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·\033[0m"
     echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
-    echo -e " \033[0;32m●\033[0m Stegasoo is running"
-    echo -e "   \033[0;33m$STEGASOO_URL\033[0m"
     # Show CPU stats if overclocked (read configured freq, not current idle freq)
     CONFIG_FILE=""
     if [ -f /boot/firmware/config.txt ]; then CONFIG_FILE="/boot/firmware/config.txt"
     elif [ -f /boot/config.txt ]; then CONFIG_FILE="/boot/config.txt"; fi
+    CPU_MHZ=""
+    CPU_TEMP=""
     if [ -n "$CONFIG_FILE" ] && grep -qE "^arm_freq=" "$CONFIG_FILE" 2>/dev/null; then
         CPU_MHZ=$(grep "^arm_freq=" "$CONFIG_FILE" | cut -d= -f2)
         CPU_TEMP=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2)
-        if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
-            echo -e "   \033[0;35m⚡\033[0m ${CPU_MHZ} MHz  \033[0;35m🌡\033[0m ${CPU_TEMP}"
-        fi
     fi
+    # Compact two-column layout
+    echo -e " \033[0;32m●\033[0m Stegasoo running    \033[0;32m●\033[0m \033[0;33m$STEGASOO_URL\033[0m"
+    if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
+        echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz            \033[0;35m🌡\033[0m ${CPU_TEMP}"
+    fi
+    echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
     echo ""
 else
     echo ""

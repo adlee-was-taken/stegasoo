@@ -29,6 +29,10 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Source banner functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/banner.sh"
+
 # Show help
 show_help() {
     echo "Stegasoo Sanitize Script - Prepare Pi for SD Card Imaging"
@@ -70,21 +74,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 clear
-echo ""
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
-echo -e "${GRAY} · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·${NC}"
-echo -e "\033[38;5;220m    ___  _____  ___    ___    _    ___    ___    ___\033[0m"
-echo -e "\033[38;5;220m   / __||_   _|| __|  / __|  /_\\\\  / __|  / _ \\\\  / _ \\\\\033[0m"
-echo -e "\033[38;5;220m   \\\\__ \\\\  | |  | _|  | (_ | / _ \\\\ \\\\__ \\\\ | (_) || (_) |\033[0m"
-echo -e "\033[38;5;220m   |___/  |_|  |___|  \\___|/_/ \\_\\\\|___/  \\\\___/  \\\\___/\033[0m"
-echo -e "${GRAY} · .  · .  *  · .  *  · .  *  · .  *  · .  *  · .  ·${NC}"
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
 if [ "$SOFT_RESET" = true ]; then
-    echo -e "\033[1;37m                  Soft Reset (Factory)\033[0m"
+    print_banner "Soft Reset (Factory)"
 else
-    echo -e "\033[1;37m                  Sanitize for Imaging\033[0m"
+    print_banner "Sanitize for Imaging"
 fi
-echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
 echo ""
 
 if [ "$SOFT_RESET" = true ]; then
