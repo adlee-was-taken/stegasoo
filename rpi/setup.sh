@@ -454,7 +454,20 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     # Compact two-column layout
     echo -e " 🚀 Stegasoo running    🔗 \033[0;33m$STEGASOO_URL\033[0m"
     if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
-        echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz             \033[0;35m🌡\033[0m ${CPU_TEMP}"
+        # Temp emoji: ice<50, cool 50-70, fire>70
+        TEMP_NUM=\$(echo "\$CPU_TEMP" | grep -oE "[0-9]+" | head -1)
+        if [ -n "\$TEMP_NUM" ]; then
+            if [ "\$TEMP_NUM" -ge 70 ]; then
+                TEMP_EMOJI="🔥"
+            elif [ "\$TEMP_NUM" -ge 50 ]; then
+                TEMP_EMOJI="😎"
+            else
+                TEMP_EMOJI="🧊"
+            fi
+        else
+            TEMP_EMOJI="🌡"
+        fi
+        echo -e " \033[0;35m⚡\033[0m \${CPU_MHZ} MHz             \${TEMP_EMOJI} \${CPU_TEMP}"
     fi
     echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
     echo ""
