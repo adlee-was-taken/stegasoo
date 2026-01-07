@@ -5,6 +5,27 @@ All notable changes to Stegasoo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [4.1.5] - 2026-01-07
+
+### Added
+- **Developer Documentation**: Educational comments throughout core modules
+  - DCT module: zig-zag diagrams, QIM explanation, Reed-Solomon deep dive
+  - LSB module: visual bit embedding examples, ChaCha20 pixel selection
+  - Crypto module: multi-factor KDF flow diagrams, Argon2id reasoning
+  - CLI module: Click patterns (groups, JSON output, secure input)
+  - Web UI module: Flask architecture, subprocess isolation, async jobs
+- **Pi Test Automation**: `rpi/kickoff-pi-test.sh` script
+  - One command to flash, wait for boot, setup, and smoke test
+  - Self-contained (no dotfile dependencies)
+- **v4.2 Wishlist**: `WISHLIST-4.2.md` for blue-sky ideas (GPU acceleration)
+
+### Changed
+- **Pi MOTD Improvements**:
+  - Dynamic temperature emoji (ice/cool/fire based on temp)
+  - Rocket emoji for service status, globe emoji for URL
+  - Shortened Debian boilerplate message
+  - Fixed escaped variable syntax in heredoc
+
 ## [4.1.3] - 2026-01-05
 
 ### Added
@@ -180,6 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - CLI interface
 - Basic PIN authentication
 
+[4.1.5]: https://github.com/adlee-was-taken/stegasoo/compare/v4.1.3...v4.1.5
 [4.1.3]: https://github.com/adlee-was-taken/stegasoo/compare/v4.1.0...v4.1.3
 [4.1.0]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.2...v4.1.0
 [4.0.2]: https://github.com/adlee-was-taken/stegasoo/compare/v4.0.1...v4.0.2
