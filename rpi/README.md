@@ -32,7 +32,7 @@ cd stegasoo
 - Raspberry Pi 4 or 5
 - Raspberry Pi OS Lite (64-bit) - Bookworm or later
 - 4GB+ RAM recommended (2GB minimum)
-- ~2GB free disk space
+- 16GB+ SD card (pre-built images are 16GB)
 - Internet connection
 
 ### Performance
@@ -199,17 +199,14 @@ After Pi shuts down, remove SD card and on another Linux machine:
 # Find SD card device (BE CAREFUL - wrong device = data loss!)
 lsblk
 
-# Copy (replace sdX with your SD card)
-sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
-
-# Shrink the image (optional but recommended)
-wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
-chmod +x pishrink.sh
-sudo ./pishrink.sh stegasoo-rpi-*.img
-
-# Compress (zstd is faster than xz with similar compression)
-zstd -19 -T0 stegasoo-rpi-*.img
+# Pull image (auto-resizes to 16GB, compresses with zstd)
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
 ```
+
+The `pull-image.sh` script automatically:
+- Resizes rootfs to exactly 16GB (consistent image size)
+- Disables Pi OS auto-expand
+- Compresses with zstd for fast decompression
 
 ### 6. Distribute
 

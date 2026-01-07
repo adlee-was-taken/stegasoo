@@ -191,6 +191,22 @@ echo
 echo -e "${GREEN}Done!${NC} Image saved to: $OUTPUT"
 ls -lh "$OUTPUT"
 
+# ============================================================================
+# Optional: Zip-wrap for GitHub releases
+# ============================================================================
 echo
-echo "To verify:"
-echo "  zstdcat $OUTPUT | fdisk -l /dev/stdin"
+read -p "Create .zst.zip wrapper for GitHub? [y/N] " zip_confirm
+if [[ "$zip_confirm" =~ ^[Yy]$ ]]; then
+    ZIP_OUTPUT="${OUTPUT}.zip"
+    echo -e "${YELLOW}Creating zip wrapper (store mode, no compression)...${NC}"
+    zip -0 "$ZIP_OUTPUT" "$OUTPUT"
+    echo -e "${GREEN}Done!${NC} Upload this to GitHub Releases:"
+    ls -lh "$ZIP_OUTPUT"
+    echo
+    echo "Users can flash with:"
+    echo "  sudo ./rpi/flash-image.sh $ZIP_OUTPUT"
+else
+    echo
+    echo "To verify:"
+    echo "  zstdcat $OUTPUT | fdisk -l /dev/stdin"
+fi

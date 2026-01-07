@@ -98,7 +98,7 @@ This removes:
 
 The script validates all cleanup steps before finishing.
 
-## Step 9: Copy the Image
+## Step 9: Pull the Image
 
 Remove SD card, insert into your Linux machine:
 
@@ -106,23 +106,13 @@ Remove SD card, insert into your Linux machine:
 # Find the SD card device (CAREFUL!)
 lsblk
 
-# Copy (replace sdX with actual device, e.g., sda)
-sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
+# Pull image (auto-resizes to 16GB, compresses with zstd)
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
 ```
 
-## Step 10: Shrink & Compress
+The script automatically resizes rootfs to 16GB, disables auto-expand, and compresses.
 
-```bash
-# Optional: Shrink image (saves space)
-wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
-chmod +x pishrink.sh
-sudo ./pishrink.sh stegasoo-rpi-*.img
-
-# Compress (zstd is faster than xz with similar ratio)
-zstd -19 -T0 stegasoo-rpi-*.img
-```
-
-## Step 11: Distribute
+## Step 10: Distribute
 
 Upload `.img.zst` to GitHub Releases.
 
@@ -191,7 +181,6 @@ sudo systemctl start stegasoo
 curl -k https://localhost:5000
 sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
-# On host (pull image):
-sudo dd if=/dev/sdX of=stegasoo-rpi-$(date +%Y%m%d).img bs=4M status=progress
-zstd -19 -T0 stegasoo-rpi-*.img
+# On host (pull image - auto-resizes to 16GB):
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
 ```
