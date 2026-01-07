@@ -454,7 +454,7 @@ if systemctl is-active --quiet stegasoo 2>/dev/null; then
     # Compact two-column layout
     echo -e " 🚀 Stegasoo running    🔗 \033[0;33m$STEGASOO_URL\033[0m"
     if [ -n "$CPU_MHZ" ] && [ -n "$CPU_TEMP" ]; then
-        echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz           \033[0;35m🌡\033[0m ${CPU_TEMP}"
+        echo -e " \033[0;35m⚡\033[0m ${CPU_MHZ} MHz             \033[0;35m🌡\033[0m ${CPU_TEMP}"
     fi
     echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
     echo ""
