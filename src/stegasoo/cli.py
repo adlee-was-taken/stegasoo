@@ -723,10 +723,10 @@ def info(ctx, full):
 
     # Check for DCT support
     try:
-        from .dct_steganography import HAS_SCIPY, HAS_JPEGIO
-        HAS_DCT = HAS_SCIPY and HAS_JPEGIO
+        from .dct_steganography import HAS_JPEGIO, HAS_SCIPY
+        has_dct = HAS_SCIPY and HAS_JPEGIO
     except ImportError:
-        HAS_DCT = False
+        has_dct = False
 
     # Check service status
     service_status = "unknown"
@@ -765,7 +765,7 @@ def info(ctx, full):
     channel_fingerprint = None
     channel_source = None
     try:
-        from .channel import get_channel_key, get_channel_fingerprint, get_channel_status
+        from .channel import get_channel_fingerprint, get_channel_key, get_channel_status
         key = get_channel_key()
         if key:
             channel_fingerprint = get_channel_fingerprint(key)
@@ -816,7 +816,7 @@ def info(ctx, full):
         "version": __version__,
         "service": service_status,
         "url": service_url,
-        "dct_support": HAS_DCT,
+        "dct_support": has_dct,
         "channel": {
             "fingerprint": channel_fingerprint,
             "source": channel_source,
@@ -846,11 +846,11 @@ def info(ctx, full):
 
         # Service status
         if service_status == "active":
-            click.echo(f"  Service:     \033[32m● running\033[0m")
+            click.echo("  Service:     \033[32m● running\033[0m")
             if service_url:
                 click.echo(f"  URL:         {service_url}")
         elif service_status == "inactive":
-            click.echo(f"  Service:     \033[31m○ stopped\033[0m")
+            click.echo("  Service:     \033[31m○ stopped\033[0m")
         else:
             click.echo(f"  Service:     \033[33m? {service_status}\033[0m")
 
@@ -859,10 +859,10 @@ def info(ctx, full):
             masked = f"{channel_fingerprint[:4]}••••••••{channel_fingerprint[-4:]}"
             click.echo(f"  Channel:     {masked}")
         else:
-            click.echo(f"  Channel:     \033[33mpublic\033[0m")
+            click.echo("  Channel:     \033[33mpublic\033[0m")
 
         # DCT
-        dct_status = "\033[32m✓ enabled\033[0m" if HAS_DCT else "\033[31m✗ disabled\033[0m"
+        dct_status = "\033[32m✓ enabled\033[0m" if has_dct else "\033[31m✗ disabled\033[0m"
         click.echo(f"  DCT:         {dct_status}")
 
         # System info (if --full)

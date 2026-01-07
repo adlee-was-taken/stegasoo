@@ -69,6 +69,7 @@ scripts/*
 !scripts/validate-release.sh
 
 # Web UI auth database and SSL certs
+instance/
 frontends/web/instance/
 frontends/web/certs/
 

@@ -14,8 +14,6 @@ It does NOT touch instance/ (auth database) or any other directories.
 """
 
 import json
-import os
-import shutil
 import time
 from pathlib import Path
 from threading import Lock
