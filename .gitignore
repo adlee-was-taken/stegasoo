@@ -87,9 +87,8 @@ frontends/web/temp_files/
 rpi/config.json
 
 # Pre-built Pi tarballs and images (release assets, too large for git)
-rpi/stegasoo-pi-arm64.tar.zst
-rpi/stegasoo-pi-arm64.tar.zst.zip
-rpi/stegasoo-venv-pi-arm64.tar.zst
+rpi/*.tar.zst
+rpi/*.tar.zst.zip
 rpi/*.img
 rpi/*.img.zst
 rpi/*.img.zst.zip

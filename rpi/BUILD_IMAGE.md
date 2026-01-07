@@ -47,7 +47,7 @@ git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 
 ```bash
 # On your host machine:
-scp rpi/stegasoo-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+scp rpi/stegasoo-rpi-runtime-env-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
 ```
 
 This tarball contains:
@@ -149,17 +149,17 @@ tar -cf - venv/ | zstd -19 -T0 > ~/stegasoo-venv.tar.zst
 
 # Create combined tarball (pyenv + venv pointer)
 cd ~
-tar -cf - .pyenv stegasoo-venv.tar.zst | zstd -19 -T0 > /tmp/stegasoo-pi-arm64.tar.zst
+tar -cf - .pyenv stegasoo-venv.tar.zst | zstd -19 -T0 > /tmp/stegasoo-rpi-runtime-env-arm64.tar.zst
 
 # Check size (should be ~50-60MB)
-ls -lh /tmp/stegasoo-pi-arm64.tar.zst
+ls -lh /tmp/stegasoo-rpi-runtime-env-arm64.tar.zst
 ```
 
 Pull to host and upload to GitHub releases:
 ```bash
 # On host:
-scp admin@stegasoo.local:/tmp/stegasoo-pi-arm64.tar.zst ./
-# Upload to GitHub releases as stegasoo-pi-arm64.tar.zst
+scp admin@stegasoo.local:/tmp/stegasoo-rpi-runtime-env-arm64.tar.zst ./
+# Upload to GitHub releases as stegasoo-rpi-runtime-env-arm64.tar.zst
 ```
 
 ---
@@ -173,7 +173,7 @@ sudo apt-get update && sudo apt-get install -y git zstd jq
 cd /opt && git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 
 # On host (copy tarball):
-scp rpi/stegasoo-pi-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+scp rpi/stegasoo-rpi-runtime-env-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
 
 # On Pi (run setup):
 cd /opt/stegasoo && ./rpi/setup.sh

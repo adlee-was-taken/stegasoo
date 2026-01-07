@@ -200,8 +200,8 @@ fi
 
 # Pre-built environment tarball (skips 20+ min compile time)
 # Includes both pyenv Python 3.12 AND venv with all dependencies
-PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-pi-arm64.tar.zst"
-PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.3/stegasoo-pi-arm64.tar.zst}"
+PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-rpi-runtime-env-arm64.tar.zst"
+PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.5/stegasoo-rpi-runtime-env-arm64.tar.zst}"
 USE_PREBUILT=true
 
 # Use local tarball if present, otherwise will download
