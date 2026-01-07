@@ -1,0 +1,29 @@
+# Host Machine Dependencies for Stegasoo Pi Scripts
+# =================================================
+#
+# Quick install (Debian/Ubuntu):
+#   sudo apt install parted e2fsprogs zstd zip bc pv jq unzip sshpass
+#
+# Or install with this file:
+#   sudo apt install $(grep -v '^#' rpi/host-requirements.txt | grep -v '^$' | xargs)
+
+# pull-image.sh - Create distributable images
+parted              # Partition table reading/writing
+e2fsprogs           # e2fsck, resize2fs for ext4
+zstd                # Compression (zstd -T0 -3)
+zip                 # Optional .zst.zip wrapper for GitHub
+bc                  # Floating point math for size display
+pv                  # Progress bar (optional, falls back to dd status)
+
+# flash-image.sh - Flash images to SD cards
+unzip               # Extract .zst.zip wrappers
+zstd                # Decompress .zst images
+pv                  # Progress bar (optional)
+jq                  # Parse config.json for headless WiFi (optional)
+
+# kickoff-pi-test.sh - Automated flash+test
+sshpass             # Non-interactive SSH with password
+avahi-utils         # avahi-resolve for .local hostname lookup
+
+# Optional tools
+rpi-imager          # Faster flashing (flash-image.sh falls back to dd)
