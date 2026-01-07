@@ -314,6 +314,8 @@ class SubprocessStego:
         # Channel key (v4.0.0)
         channel_key: str | None = "auto",
         timeout: int | None = None,
+        # Progress tracking (v4.1.5)
+        progress_file: str | None = None,
     ) -> DecodeResult:
         """
         Decode a message or file from a stego image.
@@ -328,6 +330,7 @@ class SubprocessStego:
             embed_mode: 'auto', 'lsb', or 'dct'
             channel_key: 'auto' (server config), 'none' (public), or explicit key (v4.0.0)
             timeout: Operation timeout in seconds
+            progress_file: Path to write progress updates (v4.1.5)
 
         Returns:
             DecodeResult with message or file_data on success
@@ -340,6 +343,7 @@ class SubprocessStego:
             "pin": pin,
             "embed_mode": embed_mode,
             "channel_key": channel_key,  # v4.0.0
+            "progress_file": progress_file,  # v4.1.5
         }
 
         if rsa_key_data:

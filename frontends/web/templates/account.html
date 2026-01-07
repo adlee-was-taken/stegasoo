@@ -177,9 +177,16 @@
                                    placeholder="Key name" required maxlength="50">
                         </div>
                         <div class="col-7">
-                            <input type="text" name="channel_key" class="form-control form-control-sm font-monospace"
-                                   placeholder="Channel key (32 hex chars)" required
-                                   pattern="[0-9a-fA-F\-]{32,39}" title="32 hex characters">
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="channel_key" id="channelKeyInput"
+                                       class="form-control font-monospace"
+                                       placeholder="XXXX-XXXX-..." required
+                                       pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}">
+                                <button type="button" class="btn btn-outline-secondary" id="scanChannelKeyBtn"
+                                        title="Scan QR code with camera">
+                                    <i class="bi bi-camera"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-sm btn-outline-primary">
@@ -254,11 +261,33 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 {% if is_admin %}
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 {% endif %}
 <script>
 StegasooAuth.initPasswordConfirmation('accountForm', 'newPasswordInput', 'newPasswordConfirmInput');
+
+// Webcam QR scanning for channel key input (v4.1.5)
+document.getElementById('scanChannelKeyBtn')?.addEventListener('click', function() {
+    Stegasoo.showQrScanner((text) => {
+        const input = document.getElementById('channelKeyInput');
+        if (input) {
+            // Clean and format the key
+            const clean = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            if (clean.length === 32) {
+                input.value = clean.match(/.{4}/g).join('-');
+            } else {
+                input.value = text.toUpperCase();
+            }
+        }
+    }, 'Scan Channel Key');
+});
+
+// Format channel key input as user types
+document.getElementById('channelKeyInput')?.addEventListener('input', function() {
+    Stegasoo.formatChannelKeyInput(this);
+});
 
 function renameKey(keyId, currentName) {
     document.getElementById('renameInput').value = currentName;

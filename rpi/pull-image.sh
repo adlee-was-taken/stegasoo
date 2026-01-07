@@ -1,236 +1,76 @@
 #!/bin/bash
+# Pull Raspberry Pi image from SD card (after setup)
+# Only pulls the actual used partition space, not the entire SD card
 #
-# Pull Stegasoo image from SD card
-# Auto-detects SD card, copies with progress, shrinks, and compresses
-#
-# Usage: ./pull-image.sh [output-name] [device]
-#        Output will be: stegasoo-rpi-YYYYMMDD.img.zst (or custom name)
-#        Use .img extension to skip compression: ./pull-image.sh foo.img
-#
-# If device is specified, skips auto-detection (useful for large drives)
-#
+# Usage: ./pull-image.sh <device> <output.img.zst>
+# Example: ./pull-image.sh /dev/sdb stegasoo-rpi-4.1.5.img.zst
 
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-# Check for required tools
-for cmd in dd pv zstd lsblk; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "${RED}Error: $cmd is required but not installed.${NC}"
-        exit 1
-    fi
-done
-
-# Check for root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}Error: Must run as root (sudo)${NC}"
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <device> <output.img.zst>"
+    echo "Example: $0 /dev/sdb stegasoo-rpi-4.1.5.img.zst"
     exit 1
 fi
 
-# Output filename and optional device
-if [ -n "$1" ]; then
-    OUTPUT="$1"
-else
-    OUTPUT="stegasoo-rpi-$(date +%Y%m%d).img.zst"
-fi
-MANUAL_DEVICE="$2"
+DEVICE="$1"
+OUTPUT="$2"
 
-# Check if output ends in .img (skip compression) or .zst (compress)
-SKIP_COMPRESS=false
-if [[ "$OUTPUT" == *.img ]]; then
-    IMG_FILE="$OUTPUT"
-    SKIP_COMPRESS=true
-elif [[ "$OUTPUT" == *.zst ]]; then
-    IMG_FILE="${OUTPUT%.zst}"
-else
-    # No recognized extension, add .img.zst
-    IMG_FILE="${OUTPUT}.img"
-    OUTPUT="${OUTPUT}.img.zst"
+if [ ! -b "$DEVICE" ]; then
+    echo "Error: Device not found: $DEVICE"
+    exit 1
 fi
 
-echo -e "${BLUE}"
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║              Stegasoo SD Card Image Puller                    ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
-echo -e "${NC}"
-
-# Use manual device or auto-detect
-if [ -n "$MANUAL_DEVICE" ]; then
-    # Manual device specified
-    if [ ! -b "$MANUAL_DEVICE" ]; then
-        echo -e "${RED}Error: $MANUAL_DEVICE is not a block device${NC}"
-        exit 1
-    fi
-    SELECTED="$MANUAL_DEVICE"
-    echo -e "Using specified device: ${YELLOW}$SELECTED${NC}"
-    echo ""
-    lsblk "$SELECTED" -o NAME,SIZE,TYPE,MODEL
-    echo ""
-else
-    # Auto-detect SD card candidates
-    # Looking for: USB/removable, 8-128GB, not mounted as root filesystem
-    echo -e "${BOLD}Scanning for SD cards...${NC}"
-    echo ""
-
-    declare -a CANDIDATES
-    declare -a CANDIDATE_INFO
-
-    while IFS= read -r line; do
-        DEV=$(echo "$line" | awk '{print $1}')
-        SIZE=$(echo "$line" | awk '{print $2}')
-        TYPE=$(echo "$line" | awk '{print $3}')
-        TRAN=$(echo "$line" | awk '{print $4}')
-        MODEL=$(echo "$line" | awk '{print $5" "$6" "$7}' | xargs)
-
-        # Skip if it's the root filesystem
-        if mount | grep -q "^/dev/${DEV}[0-9]* on / "; then
-            continue
-        fi
-
-        # Skip if any partition is mounted as root
-        ROOT_DEV=$(mount | grep " on / " | awk '{print $1}' | sed 's/[0-9]*$//')
-        if [[ "/dev/$DEV" == "$ROOT_DEV" ]]; then
-            continue
-        fi
-
-        # Get size in bytes for reliable comparison
-        SIZE_BYTES=$(lsblk -b -d -o SIZE -n "/dev/$DEV" 2>/dev/null | tr -d ' ')
-        SIZE_GB_INT=$((SIZE_BYTES / 1073741824))  # 1024^3
-
-        # Check if size is in SD card range (8GB - 128GB)
-        if [ "$SIZE_GB_INT" -ge 8 ] && [ "$SIZE_GB_INT" -le 128 ]; then
-            CANDIDATES+=("/dev/$DEV")
-            CANDIDATE_INFO+=("$SIZE $TYPE ${TRAN:-???} $MODEL")
-        fi
-    done < <(lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL -n | grep "disk")
-
-    if [ ${#CANDIDATES[@]} -eq 0 ]; then
-        echo -e "${RED}No SD card candidates found.${NC}"
-        echo "Looking for USB/removable disks between 8GB and 128GB."
-        echo ""
-        echo "Available disks:"
-        lsblk -d -o NAME,SIZE,TYPE,TRAN,MODEL
-        echo ""
-        echo -e "${YELLOW}Tip: Specify device manually: $0 output.img.zst /dev/sdX${NC}"
-        exit 1
-    fi
-
-    echo -e "${GREEN}Found ${#CANDIDATES[@]} candidate(s):${NC}"
-    echo ""
-
-    for i in "${!CANDIDATES[@]}"; do
-        echo -e "  ${BOLD}[$((i+1))]${NC} ${CANDIDATES[$i]} - ${CANDIDATE_INFO[$i]}"
-    done
-
-    echo ""
-
-    if [ ${#CANDIDATES[@]} -eq 1 ]; then
-        SELECTED="${CANDIDATES[0]}"
-        echo -e "Auto-selected: ${YELLOW}$SELECTED${NC}"
-    else
-        read -p "Select device [1-${#CANDIDATES[@]}]: " -r
-        if [[ ! $REPLY =~ ^[0-9]+$ ]] || [ "$REPLY" -lt 1 ] || [ "$REPLY" -gt ${#CANDIDATES[@]} ]; then
-            echo -e "${RED}Invalid selection.${NC}"
-            exit 1
-        fi
-        SELECTED="${CANDIDATES[$((REPLY-1))]}"
-    fi
-fi
-
-# Show partitions
-echo ""
-echo -e "${BOLD}Partitions on $SELECTED:${NC}"
-lsblk "$SELECTED" -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT
-echo ""
-
-# Final confirmation
-echo -e "${RED}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${RED}║  WARNING: This will read the ENTIRE device:                   ║${NC}"
-echo -e "${RED}║  $SELECTED                                                  ║${NC}"
-echo -e "${RED}╚═══════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "Output: ${YELLOW}$OUTPUT${NC}"
-echo ""
-read -p "Continue? [y/N] " -n 1 -r
+echo "Device info:"
+lsblk "$DEVICE"
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+
+# Get partition info
+echo "Partition table:"
+sudo parted -s "$DEVICE" unit s print
+echo
+
+# Get the end of the last partition (partition 2 = rootfs)
+END_SECTOR=$(sudo parted -s "$DEVICE" unit s print | grep "^ 2" | awk '{print $3}' | tr -d 's')
+
+if [ -z "$END_SECTOR" ]; then
+    echo "Error: Could not determine partition 2 end sector"
+    exit 1
+fi
+
+# Add a small buffer (1MB = 2048 sectors) for safety
+TOTAL_SECTORS=$((END_SECTOR + 2048))
+TOTAL_BYTES=$((TOTAL_SECTORS * 512))
+TOTAL_GB=$(echo "scale=2; $TOTAL_BYTES / 1073741824" | bc)
+
+echo "Image will be approximately ${TOTAL_GB}GB (${TOTAL_SECTORS} sectors)"
+echo "Output file: $OUTPUT"
+echo
+
+read -p "Proceed with image pull? [Y/n] " confirm
+if [[ "$confirm" =~ ^[Nn]$ ]]; then
     echo "Aborted."
     exit 1
 fi
 
-# Get device size for pv
-DEV_SIZE=$(blockdev --getsize64 "$SELECTED")
+echo "Pulling image..."
+echo
 
-echo ""
-echo -e "${GREEN}[1/4]${NC} Copying image from $SELECTED..."
-dd if="$SELECTED" bs=4M status=none | pv -s "$DEV_SIZE" > "$IMG_FILE"
-sync
-
-echo ""
-echo -e "${GREEN}[2/4]${NC} Re-enabling auto-expand for distribution..."
-# Mount the image and restore auto-expand service (may have been disabled during build)
-LOOP_DEV=$(losetup -f --show -P "$IMG_FILE")
-if [ -n "$LOOP_DEV" ]; then
-    TEMP_MOUNT=$(mktemp -d)
-    if mount "${LOOP_DEV}p2" "$TEMP_MOUNT" 2>/dev/null; then
-        # Re-enable the resize service if the service file exists
-        SERVICE_FILE="$TEMP_MOUNT/lib/systemd/system/rpi-resizerootfs.service"
-        SERVICE_LINK="$TEMP_MOUNT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
-        if [ -f "$SERVICE_FILE" ] && [ ! -L "$SERVICE_LINK" ]; then
-            mkdir -p "$(dirname "$SERVICE_LINK")"
-            ln -sf /lib/systemd/system/rpi-resizerootfs.service "$SERVICE_LINK"
-            echo -e "  ${GREEN}✓${NC} Auto-expand service re-enabled"
-        elif [ -L "$SERVICE_LINK" ]; then
-            echo -e "  ${GREEN}✓${NC} Auto-expand already enabled"
-        else
-            echo -e "  ${YELLOW}⚠${NC} Could not find resize service file"
-        fi
-        umount "$TEMP_MOUNT"
-    else
-        echo -e "  ${YELLOW}⚠${NC} Could not mount rootfs, skipping auto-expand fix"
-    fi
-    rmdir "$TEMP_MOUNT" 2>/dev/null || true
-    losetup -d "$LOOP_DEV"
+# Use pv if available for progress, otherwise fallback to dd status
+if command -v pv &> /dev/null; then
+    sudo dd if="$DEVICE" bs=512 count=$TOTAL_SECTORS 2>/dev/null | \
+        pv -s $TOTAL_BYTES | \
+        zstd -T0 -3 > "$OUTPUT"
 else
-    echo -e "  ${YELLOW}⚠${NC} Could not create loop device, skipping auto-expand fix"
+    sudo dd if="$DEVICE" bs=512 count=$TOTAL_SECTORS status=progress | \
+        zstd -T0 -3 > "$OUTPUT"
 fi
 
-echo ""
-echo -e "${GREEN}[3/4]${NC} Shrinking image..."
-if command -v pishrink.sh &> /dev/null; then
-    pishrink.sh "$IMG_FILE"
-elif [ -f "./pishrink.sh" ]; then
-    bash ./pishrink.sh "$IMG_FILE"
-elif [ -f "../pishrink.sh" ]; then
-    bash ../pishrink.sh "$IMG_FILE"
-else
-    echo -e "${YELLOW}pishrink.sh not found, skipping shrink step.${NC}"
-    echo "Download from: https://github.com/Drewsif/PiShrink"
-fi
+echo
+echo "Done! Image saved to: $OUTPUT"
+ls -lh "$OUTPUT"
 
-echo ""
-if [ "$SKIP_COMPRESS" = true ]; then
-    echo -e "${GREEN}[4/4]${NC} Skipping compression (.img output)"
-    FINAL_SIZE=$(du -h "$IMG_FILE" | awk '{print $1}')
-    OUTPUT="$IMG_FILE"
-else
-    echo -e "${GREEN}[4/4]${NC} Compressing with zstd..."
-    pv "$IMG_FILE" | zstd -19 -T0 -q > "$OUTPUT"
-    rm -f "$IMG_FILE"
-    FINAL_SIZE=$(du -h "$OUTPUT" | awk '{print $1}')
-fi
-
-echo ""
-echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║                    Image Complete!                            ║${NC}"
-echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "Output: ${YELLOW}$OUTPUT${NC}"
-echo -e "Size:   ${YELLOW}$FINAL_SIZE${NC}"
-echo ""
+# Show verification info
+echo
+echo "To verify, you can check the image with:"
+echo "  zstdcat $OUTPUT | fdisk -l /dev/stdin"

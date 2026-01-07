@@ -231,20 +231,14 @@ const StegasooGenerate = {
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
-    <title>Stegasoo RSA Key QR Code</title>
+    <title>QR Code</title>
     <style>
-        body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
         img { max-width: 400px; }
-        .warning { margin-top: 20px; padding: 10px; border: 2px solid #ff9800; background: #fff3e0; max-width: 400px; text-align: center; font-size: 12px; }
     </style>
 </head>
 <body>
-    <h2>Stegasoo RSA Private Key</h2>
-    <img src="${qrImg.src}" alt="RSA Key QR Code">
-    <div class="warning">
-        <strong>Warning:</strong> This QR code contains your unencrypted RSA private key.
-        Store securely and destroy after use.
-    </div>
+    <img src="${qrImg.src}" alt="QR Code">
     <script>window.onload = function() { window.print(); }<\/script>
 </body>
 </html>`);

@@ -136,13 +136,32 @@ def encode_operation(params: dict) -> dict:
     }
 
 
+def _write_decode_progress(progress_file: str | None, percent: int, phase: str) -> None:
+    """Write decode progress to file."""
+    if not progress_file:
+        return
+    try:
+        import json
+        with open(progress_file, "w") as f:
+            json.dump({"percent": percent, "phase": phase}, f)
+    except Exception:
+        pass  # Best effort
+
+
 def decode_operation(params: dict) -> dict:
     """Handle decode operation."""
     from stegasoo import decode
 
+    progress_file = params.get("progress_file")
+
+    # Progress: starting
+    _write_decode_progress(progress_file, 5, "reading")
+
     # Decode base64 inputs
     stego_data = base64.b64decode(params["stego_b64"])
     reference_data = base64.b64decode(params["reference_b64"])
+
+    _write_decode_progress(progress_file, 15, "reading")
 
     # Optional RSA key
     rsa_key_data = None
@@ -151,6 +170,8 @@ def decode_operation(params: dict) -> dict:
 
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
+
+    _write_decode_progress(progress_file, 25, "extracting")
 
     # Call decode with correct parameter names
     result = decode(
@@ -163,6 +184,8 @@ def decode_operation(params: dict) -> dict:
         embed_mode=params.get("embed_mode", "auto"),
         channel_key=resolved_channel_key,  # v4.0.0
     )
+
+    _write_decode_progress(progress_file, 90, "finalizing")
 
     if result.is_file:
         return {

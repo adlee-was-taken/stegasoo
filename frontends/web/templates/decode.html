@@ -4,6 +4,74 @@
 
 {% block content %}
 <style>
+/* Accordion styling */
+.step-accordion .accordion-button {
+    background: rgba(30, 40, 50, 0.6);
+    color: #fff;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+.step-accordion .accordion-button:not(.collapsed) {
+    background: linear-gradient(90deg, rgba(99, 179, 237, 0.15) 0%, rgba(40, 50, 60, 0.8) 40%, rgba(40, 50, 60, 0.8) 100%);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(99, 179, 237, 0.1);
+    border-left: 3px solid rgba(99, 179, 237, 0.6);
+}
+.step-accordion .accordion-button::after {
+    filter: invert(1);
+}
+.step-accordion .accordion-body {
+    background: rgba(30, 40, 50, 0.4);
+    padding: 1rem;
+}
+.step-accordion .accordion-item {
+    border-color: rgba(255,255,255,0.1);
+    background: transparent;
+}
+.step-accordion .accordion-item:first-child .accordion-button {
+    border-radius: 0;
+}
+.step-accordion .accordion-item:last-child .accordion-button.collapsed {
+    border-radius: 0;
+}
+.step-summary {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    margin-left: auto;
+    padding-right: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50%;
+}
+.step-summary.has-content {
+    color: rgba(99, 179, 237, 0.8);
+}
+.step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.step-number {
+    background: rgba(246, 173, 85, 0.2);
+    color: #f6ad55;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border: 1px solid rgba(246, 173, 85, 0.3);
+}
+.step-number.complete {
+    background: rgba(72, 187, 120, 0.2);
+    color: #48bb78;
+    border-color: rgba(72, 187, 120, 0.3);
+}
+
 /* Glowing passphrase input */
 .passphrase-input {
     background: rgba(30, 40, 50, 0.8) !important;
@@ -13,20 +81,17 @@
     font-size: 1.1rem;
     letter-spacing: 0.5px;
     padding: 12px 16px;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
-
 .passphrase-input:focus {
     border-color: rgba(99, 179, 237, 0.8) !important;
-    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4), 0 0 40px rgba(99, 179, 237, 0.2) !important;
-    background: rgba(30, 40, 50, 0.95) !important;
+    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4) !important;
 }
-
 .passphrase-input::placeholder {
     color: rgba(99, 179, 237, 0.4);
 }
 
-/* Glowing PIN input */
+/* PIN input */
 .pin-input-container .form-control {
     background: rgba(30, 40, 50, 0.8) !important;
     border: 2px solid rgba(246, 173, 85, 0.3) !important;
@@ -35,18 +100,10 @@
     font-size: 1.2rem;
     letter-spacing: 3px;
     text-align: center;
-    transition: all 0.3s ease;
 }
-
 .pin-input-container .form-control:focus {
     border-color: rgba(246, 173, 85, 0.8) !important;
-    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4), 0 0 40px rgba(246, 173, 85, 0.2) !important;
-    background: rgba(30, 40, 50, 0.95) !important;
-}
-
-.pin-input-container .form-control::placeholder {
-    color: rgba(246, 173, 85, 0.4);
-    letter-spacing: 1px;
+    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4) !important;
 }
 
 /* QR Crop Animation */
@@ -55,8 +112,12 @@
     overflow: hidden;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
 }
-
 .qr-crop-container img {
     display: block;
     max-height: 180px;
@@ -65,15 +126,10 @@
     margin: 0 auto;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.qr-crop-container .qr-original {
-    opacity: 1;
-}
-
+.qr-crop-container .qr-original { opacity: 1; }
 .qr-crop-container .qr-cropped {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0;
     max-height: 160px;
@@ -81,29 +137,14 @@
     min-height: 140px;
     object-fit: contain;
 }
-
 .qr-crop-container.scan-complete .qr-original {
     opacity: 0;
     transform: scale(1.1);
     filter: blur(4px);
 }
-
 .qr-crop-container.scan-complete .qr-cropped {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
-}
-
-.qr-crop-container .crop-badge {
-    position: absolute;
-    bottom: 4px;
-    right: 4px;
-    font-size: 0.65rem;
-    opacity: 0;
-    transition: opacity 0.3s ease 0.4s;
-}
-
-.qr-crop-container.scan-complete .crop-badge {
-    opacity: 1;
 }
 </style>
 
@@ -113,13 +154,13 @@
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-unlock-fill me-2"></i>Decode Secret Message or File</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body {% if not decoded_message and not decoded_file %}p-0{% endif %}">
                 {% if decoded_message %}
                 <!-- Text Message Result -->
                 <div class="alert alert-success">
                     <h6><i class="bi bi-check-circle me-2"></i>Message Decrypted Successfully!</h6>
                 </div>
-               
+
                 <label class="form-label text-muted">Decoded Message: <small class="text-secondary">(click to copy)</small></label>
                 <div class="alert-message p-3 rounded bg-dark border border-secondary mb-3" id="decodedContent" style="white-space: pre-wrap; cursor: pointer; transition: border-color 0.2s;"
                      onclick="navigator.clipboard.writeText(this.innerText).then(() => { this.style.borderColor = '#198754'; this.dataset.origText = this.innerHTML; this.innerHTML = '<i class=\'bi bi-check-circle text-success\'></i> Copied to clipboard!'; setTimeout(() => { this.innerHTML = this.dataset.origText; this.style.borderColor = ''; }, 1500); }).catch(() => alert('Failed to copy'))"
@@ -129,13 +170,13 @@
                 <a href="/decode" class="btn btn-outline-light w-100">
                     <i class="bi bi-arrow-repeat me-2"></i>Decode Another
                 </a>
-                
+
                 {% elif decoded_file %}
                 <!-- File Result -->
                 <div class="alert alert-success">
                     <h6><i class="bi bi-check-circle me-2"></i>File Decrypted Successfully!</h6>
                 </div>
-                
+
                 <div class="text-center mb-4">
                     <i class="bi bi-file-earmark-check text-success" style="font-size: 4rem;"></i>
                     <h5 class="mt-3">{{ filename }}</h5>
@@ -144,345 +185,270 @@
                     <small class="text-muted">Type: {{ mime_type }}</small>
                     {% endif %}
                 </div>
-                
+
                 <a href="{{ url_for('decode_download', file_id=file_id) }}" class="btn btn-primary btn-lg w-100 mb-3">
                     <i class="bi bi-download me-2"></i>Download File
                 </a>
-                
+
                 <div class="alert alert-warning small">
                     <i class="bi bi-clock me-1"></i>
                     <strong>File expires in 5 minutes.</strong> Download now.
                 </div>
-                
+
                 <a href="/decode" class="btn btn-outline-light w-100">
                     <i class="bi bi-arrow-repeat me-2"></i>Decode Another
                 </a>
-                
+
                 {% else %}
                 <!-- Decode Form -->
                 <form method="POST" enctype="multipart/form-data" id="decodeForm">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-image me-1"></i> Reference Photo
-                            </label>
-                            <div class="drop-zone scan-container" id="refDropZone">
-                                <input type="file" name="reference_photo" accept="image/*" required>
-                                <div class="drop-zone-label">
-                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
-                                    <span class="text-muted">Drop image or click to browse</span>
-                                </div>
-                                <img class="drop-zone-preview d-none" id="refPreview">
-                                <!-- Scan overlay elements -->
-                                <div class="scan-overlay">
-                                    <div class="scan-grid"></div>
-                                    <div class="scan-line"></div>
-                                </div>
-                                <!-- Corner brackets (shown after scan) -->
-                                <div class="scan-corners">
-                                    <div class="scan-corner tl"></div>
-                                    <div class="scan-corner tr"></div>
-                                    <div class="scan-corner bl"></div>
-                                    <div class="scan-corner br"></div>
-                                </div>
-                                <!-- Data panel (shown after scan) -->
-                                <div class="scan-data-panel">
-                                    <div class="scan-data-filename">
-                                        <i class="bi bi-check-circle-fill"></i>
-                                        <span id="refFileName">image.jpg</span>
-                                    </div>
-                                    <div class="scan-data-row">
-                                        <span class="scan-status-badge">Hash Acquired</span>
-                                        <span class="scan-data-value" id="refFileSize">--</span>
-                                    </div>
-                                    <div class="scan-hash-preview" id="refHashPreview">SHA256: ················</div>
-                                </div>
-                            </div>
-                            <div class="form-text">
-                                The same reference photo used for encoding
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-file-earmark-image me-1"></i> Stego Image
-                            </label>
-                            <div class="drop-zone pixel-container" id="stegoDropZone">
-                                <input type="file" name="stego_image" accept="image/*" required>
-                                <div class="drop-zone-label">
-                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
-                                    <span class="text-muted">Drop image or click to browse</span>
-                                </div>
-                                <img class="drop-zone-preview d-none" id="stegoPreview">
-                                <!-- Pixel blocks overlay - populated by JS -->
-                                <div class="pixel-blocks"></div>
-                                <!-- Pixel scan line -->
-                                <div class="pixel-scan-line"></div>
-                                <!-- Corner brackets -->
-                                <div class="pixel-corners">
-                                    <div class="pixel-corner tl"></div>
-                                    <div class="pixel-corner tr"></div>
-                                    <div class="pixel-corner bl"></div>
-                                    <div class="pixel-corner br"></div>
-                                </div>
-                                <!-- Data panel -->
-                                <div class="pixel-data-panel">
-                                    <div class="pixel-data-filename">
-                                        <i class="bi bi-check-circle-fill"></i>
-                                        <span id="stegoFileName">image.png</span>
-                                    </div>
-                                    <div class="pixel-data-row">
-                                        <span class="pixel-status-badge">Stego Loaded</span>
-                                        <span class="pixel-data-value" id="stegoFileSize">--</span>
-                                    </div>
-                                    <div class="pixel-dimensions" id="stegoDims">-- × -- px</div>
-                                </div>
-                            </div>
-                            <div class="form-text">
-                                The image containing the hidden message/file
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-chat-quote me-1"></i> Passphrase
-                        </label>
-                        <input type="text" name="passphrase" id="passphraseInput" class="form-control passphrase-input" 
-                               placeholder="e.g., correct horse battery staple" required>
-                        <div class="form-text">
-                            The passphrase used during encoding (typically 4 words)
-                        </div>
-                    </div>
-                    
-                    <hr class="my-4">
-                    
-                    <h6 class="text-muted mb-3">
-                        SECURITY FACTORS 
-                        <span class="text-warning small">(provide same factors used during encoding)</span>
-                    </h6>
-                    
-                    <div class="mb-3">
-                      <div class="security-box">
-                        <label class="form-label">
-                            <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
-                        </label>
 
-                        <!-- RSA Input Method Toggle -->
-                        <div class="btn-group w-100 mb-2" role="group">
-                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
-                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
-                                <i class="bi bi-file-earmark me-1"></i>.pem File
-                            </label>
+                    <div class="accordion step-accordion" id="decodeAccordion">
 
-                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
-                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
-                                <i class="bi bi-qr-code me-1"></i>QR Code
-                            </label>
-                        </div>
-
-                        <!-- .pem File Input -->
-                        <div id="rsaFileSection">
-                            <input type="file" name="rsa_key" class="form-control form-control-sm" id="rsaKeyInput" accept=".pem,.key,application/x-pem-file">
-                        </div>
-
-                        <!-- QR Code Input -->
-                        <div id="rsaQrSection" class="d-none">
-                            <div class="drop-zone p-3" id="qrDropZone">
-                                <input type="file" name="rsa_key_qr" accept="image/*" id="rsaKeyQrInput">
-                                <div class="drop-zone-label text-center">
-                                    <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
-                                    <span class="text-muted small">Drop QR image or click to browse</span>
-                                </div>
-                                <!-- Crop animation container -->
-                                <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
-                                    <img class="qr-original" id="qrOriginal" alt="Original">
-                                    <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
-                                    <!-- Data panel -->
-                                    <div class="qr-data-panel">
-                                        <div class="qr-data-filename">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            <span>RSA Key loaded</span>
-                                        </div>
-                                        <div class="qr-data-row">
-                                            <span class="qr-status-badge">RSA Key</span>
-                                            <span class="qr-data-value">--</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Key Password (always visible) -->
-                        <div class="input-group input-group-sm mt-2">
-                            <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
-                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- PIN + Channel Row -->
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                          <div class="security-box h-100">
-                            <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
-                            <div class="input-group pin-input-container">
-                                <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9">
-                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
-                                    <i class="bi bi-eye"></i>
+                        <!-- ================================================================
+                             STEP 1: IMAGES & MODE
+                             ================================================================ -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#stepImages">
+                                    <span class="step-title">
+                                        <span class="step-number" id="stepImagesNumber">1</span>
+                                        <i class="bi bi-images me-1"></i> Images & Mode
+                                    </span>
+                                    <span class="step-summary" id="stepImagesSummary">Select reference & stego</span>
                                 </button>
-                            </div>
-                            <div class="form-text">If PIN was used during encoding</div>
-                          </div>
-                        </div>
+                            </h2>
+                            <div id="stepImages" class="accordion-collapse collapse show" data-bs-parent="#decodeAccordion">
+                                <div class="accordion-body">
 
-                        <div class="col-md-6 mb-3">
-                          <div class="security-box h-100">
-                            <label class="form-label">
-                                <i class="bi bi-broadcast me-1"></i> Channel
-                                <span class="badge bg-info ms-1">v4.1</span>
-                                <a href="/about#channel-keys" class="text-muted ms-1" title="Learn about channels"><i class="bi bi-info-circle"></i></a>
-                            </label>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-image me-1"></i> Reference Photo
+                                            </label>
+                                            <div class="drop-zone scan-container" id="refDropZone">
+                                                <input type="file" name="reference_photo" accept="image/*" required id="refPhotoInput">
+                                                <div class="drop-zone-label">
+                                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                                    <span class="text-muted">Drop image or click</span>
+                                                </div>
+                                                <img class="drop-zone-preview d-none" id="refPreview">
+                                                <div class="scan-overlay"><div class="scan-grid"></div><div class="scan-line"></div></div>
+                                                <div class="scan-corners">
+                                                    <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+                                                    <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+                                                </div>
+                                                <div class="scan-data-panel">
+                                                    <div class="scan-data-filename"><i class="bi bi-check-circle-fill"></i><span id="refFileName">image.jpg</span></div>
+                                                    <div class="scan-data-row"><span class="scan-status-badge">Hash Acquired</span><span class="scan-data-value" id="refFileSize">--</span></div>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">Same reference photo used for encoding</div>
+                                        </div>
 
-                            <select class="form-select" name="channel_key" id="channelSelectDec">
-                                <option value="auto" selected>Auto{% if channel_configured %} (Server Key){% endif %}</option>
-                                <option value="none">Public</option>
-                                {% if saved_channel_keys %}
-                                <optgroup label="Saved Keys">
-                                    {% for key in saved_channel_keys %}
-                                    <option value="{{ key.channel_key }}" data-key-id="{{ key.id }}">{{ key.name }} ({{ key.channel_key[:4] }}...)</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
-                                <option value="custom">Custom...</option>
-                            </select>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-file-earmark-image me-1"></i> Stego Image
+                                            </label>
+                                            <div class="drop-zone pixel-container" id="stegoDropZone">
+                                                <input type="file" name="stego_image" accept="image/*" required id="stegoInput">
+                                                <div class="drop-zone-label">
+                                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                                    <span class="text-muted">Drop image or click</span>
+                                                </div>
+                                                <img class="drop-zone-preview d-none" id="stegoPreview">
+                                                <div class="pixel-blocks"></div>
+                                                <div class="pixel-scan-line"></div>
+                                                <div class="pixel-corners">
+                                                    <div class="pixel-corner tl"></div><div class="pixel-corner tr"></div>
+                                                    <div class="pixel-corner bl"></div><div class="pixel-corner br"></div>
+                                                </div>
+                                                <div class="pixel-data-panel">
+                                                    <div class="pixel-data-filename"><i class="bi bi-check-circle-fill"></i><span id="stegoFileName">image.png</span></div>
+                                                    <div class="pixel-data-row"><span class="pixel-status-badge">Stego Loaded</span><span class="pixel-data-value" id="stegoFileSize">--</span></div>
+                                                    <div class="pixel-dimensions" id="stegoDims">-- x -- px</div>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">Image containing the hidden message</div>
+                                        </div>
+                                    </div>
 
-                            <!-- Server channel indicator (compact) -->
-                            <div class="small text-success mt-2 {% if not channel_configured %}d-none{% endif %}" id="channelServerInfoDec" data-fingerprint="{{ (channel_fingerprint[:4] if channel_fingerprint else '') }}-••••-···-••••-{{ channel_fingerprint[-4:] if channel_fingerprint else '' }}">
-                                {% if channel_configured and channel_fingerprint %}
-                                <i class="bi bi-shield-lock me-1"></i>
-                                Server: <code>{{ channel_fingerprint[:4] }}-••••-···-••••-{{ channel_fingerprint[-4:] }}</code>
-                                {% endif %}
-                            </div>
-                          </div>
-                        </div>
-                    </div>
-
-                    <!-- Custom Channel Key Input (shown when Custom selected) -->
-                    <div class="mb-4 d-none" id="channelCustomInputDec">
-                        <div class="security-box">
-                            <label class="form-label"><i class="bi bi-key me-1"></i> Custom Channel Key</label>
-                            <div class="input-group">
-                                <input type="text" name="channel_key_custom" class="form-control font-monospace"
-                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                                       pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}"
-                                       id="channelKeyInputDec">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- ================================================================
-                         ADVANCED OPTIONS (v3.0) - Extraction Mode
-                         ================================================================ -->
-                    <div class="mb-4">
-                        <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptionsDec" role="button" aria-expanded="false">
-                            <i class="bi bi-gear me-1"></i> Advanced Options
-                            <i class="bi bi-chevron-down ms-1" id="advancedChevronDec"></i>
-                        </a>
-                        
-                        <div class="collapse" id="advancedOptionsDec">
-                            <div class="card card-body mt-2 bg-dark border-secondary">
-                                
-                                <!-- Extraction Mode Selection -->
-                                <div class="mb-0">
-                                    <label class="form-label">
-                                        <i class="bi bi-cpu me-1"></i> Extraction Mode
-                                        <span class="badge bg-info ms-1">v3.0</span>
-                                    </label>
-                                    
-                                    <div class="d-flex gap-2">
-                                        <!-- Auto Mode -->
+                                    <!-- Extraction Mode -->
+                                    <label class="form-label"><i class="bi bi-cpu me-1"></i> Extraction Mode</label>
+                                    <div class="d-flex gap-2 mb-2">
                                         <label class="mode-btn flex-fill active" id="autoModeCard" for="modeAuto">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
-                                            <i class="bi bi-magic text-success"></i>
+                                            <i class="bi bi-magic text-success ms-2"></i>
                                             <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· Try both</span></span>
                                         </label>
-                                        
-                                        <!-- LSB Mode -->
-                                        <label class="mode-btn flex-fill" id="lsbModeCardDec" for="modeLsbDec">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsbDec" value="lsb">
-                                            <i class="bi bi-grid-3x3-gap text-primary"></i>
-                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Spatial</span></span>
+                                        <label class="mode-btn flex-fill" id="lsbModeCard" for="modeLsb">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb">
+                                            <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
+                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Email</span></span>
                                         </label>
-                                        
-                                        <!-- DCT Mode -->
-                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %}" id="dctModeCardDec" for="modeDctDec">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDctDec" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                            <i class="bi bi-soundwave text-warning"></i>
-                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Frequency</span></span>
+                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard" for="modeDct">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
+                                            <i class="bi bi-soundwave text-warning ms-2"></i>
+                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Social</span></span>
                                         </label>
                                     </div>
-                                    
-                                    <div class="form-text mt-2">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        <strong>Auto</strong> tries LSB first, then DCT.
-                                        {% if not has_dct %}
-                                        <span class="text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>DCT requires scipy</span>
-                                        {% endif %}
+                                    <div class="form-text">
+                                        <i class="bi bi-lightbulb me-1"></i><strong>Auto</strong> tries LSB first, then DCT.
                                     </div>
+
                                 </div>
-                                
                             </div>
                         </div>
+
+                        <!-- ================================================================
+                             STEP 2: SECURITY
+                             ================================================================ -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#stepSecurity">
+                                    <span class="step-title">
+                                        <span class="step-number" id="stepSecurityNumber">2</span>
+                                        <i class="bi bi-shield-lock me-1"></i> Security
+                                    </span>
+                                    <span class="step-summary" id="stepSecuritySummary">Passphrase & keys</span>
+                                </button>
+                            </h2>
+                            <div id="stepSecurity" class="accordion-collapse collapse" data-bs-parent="#decodeAccordion">
+                                <div class="accordion-body">
+
+                                    <!-- Passphrase -->
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="bi bi-chat-quote me-1"></i> Passphrase</label>
+                                        <input type="text" name="passphrase" class="form-control passphrase-input"
+                                               placeholder="e.g., apple forest thunder mountain" required id="passphraseInput">
+                                        <div class="form-text">The passphrase used during encoding</div>
+                                    </div>
+
+                                    <hr class="my-3 opacity-25">
+                                    <div class="small text-muted mb-2">Provide same factors used during encoding</div>
+
+                                    <div class="row">
+                                        <!-- PIN -->
+                                        <div class="col-md-6 mb-2">
+                                            <div class="security-box h-100">
+                                                <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
+                                                <div class="input-group pin-input-container">
+                                                    <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9">
+                                                    <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                                </div>
+                                        </div>
+
+                                        <!-- Channel -->
+                                        <div class="col-md-6 mb-2">
+                                            <div class="security-box h-100">
+                                                <label class="form-label"><i class="bi bi-broadcast me-1"></i> Channel</label>
+                                                <select class="form-select form-select-sm" name="channel_key" id="channelSelectDec">
+                                                    <option value="auto" selected>Auto{% if channel_configured %} (Server){% endif %}</option>
+                                                    <option value="none">Public</option>
+                                                    {% if saved_channel_keys %}
+                                                    <optgroup label="Saved Keys">
+                                                        {% for key in saved_channel_keys %}
+                                                        <option value="{{ key.channel_key }}">{{ key.name }}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    {% endif %}
+                                                    <option value="custom">Custom...</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Custom Channel Key -->
+                                    <div class="mb-3 d-none" id="channelCustomInputDec">
+                                        <div class="security-box">
+                                            <label class="form-label"><i class="bi bi-key me-1"></i> Custom Channel Key</label>
+                                            <div class="input-group">
+                                                <input type="text" name="channel_key_custom" class="form-control form-control-sm font-monospace"
+                                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" id="channelKeyInputDec">
+                                                <button class="btn btn-outline-secondary btn-sm" type="button" id="channelKeyScanDec" title="Scan QR"><i class="bi bi-camera"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- RSA Key -->
+                                    <div class="mb-3">
+                                        <div class="security-box">
+                                            <label class="form-label"><i class="bi bi-file-earmark-lock me-1"></i> RSA Key <span class="text-muted">(if used)</span></label>
+                                            <div class="btn-group w-100 mb-2" role="group">
+                                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
+                                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile"><i class="bi bi-file-earmark me-1"></i>.pem</label>
+                                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
+                                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr"><i class="bi bi-qr-code me-1"></i>QR</label>
+                                            </div>
+                                            <div id="rsaFileSection">
+                                                <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
+                                            </div>
+                                            <div id="rsaQrSection" class="d-none d-flex flex-column">
+                                                <input type="hidden" name="rsa_key_pem" id="rsaKeyPem">
+                                                <div class="drop-zone p-2 w-100" id="qrDropZone">
+                                                    <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
+                                                    <div class="drop-zone-label text-center">
+                                                        <i class="bi bi-qr-code-scan fs-5 d-block text-muted mb-1"></i>
+                                                        <span class="text-muted small">Drop QR image</span>
+                                                    </div>
+                                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
+                                                        <img class="qr-original" id="qrOriginal" alt="Original">
+                                                        <img class="qr-cropped" id="qrCropped" alt="Cropped">
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="rsaQrWebcam">
+                                                    <i class="bi bi-camera me-1"></i>Scan with Camera
+                                                </button>
+                                            </div>
+                                            <div class="input-group input-group-sm mt-2">
+                                                <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
+                                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput"><i class="bi bi-eye"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-lg w-100" id="decodeBtn">
-                        <i class="bi bi-unlock me-2"></i>Decode
-                    </button>
+
+                    <!-- Submit Button -->
+                    <div class="p-3">
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="decodeBtn">
+                            <i class="bi bi-unlock me-2"></i>Decode
+                        </button>
+                    </div>
+
                 </form>
-                
                 {% endif %}
             </div>
         </div>
-        
+
         {% if not decoded_message and not decoded_file %}
+        <!-- Troubleshooting Card -->
         <div class="card mt-4">
             <div class="card-body">
                 <h6 class="text-muted mb-3"><i class="bi bi-question-circle me-2"></i>Troubleshooting</h6>
                 <ul class="list-unstyled text-muted small mb-0">
                     <li class="mb-2">
                         <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        Use the <strong>exact same reference photo</strong> file (byte-for-byte identical)
+                        Use the <strong>exact same reference photo</strong> (byte-for-byte identical)
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        Enter the <strong>exact passphrase</strong> used during encoding (case-sensitive, spacing matters)
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-check-circle-fill text-success me-1"></i>
-                        Provide the <strong>same security factors</strong> (PIN and/or RSA key) used during encoding
+                        Enter the <strong>exact passphrase</strong> used during encoding
                     </li>
                     <li class="mb-2">
                         <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
-                        Ensure the stego image hasn't been <strong>resized, cropped, or recompressed</strong>
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
-                        <strong>Format compatibility:</strong> v4.0 cannot decode messages from v3.1 or earlier (different format)
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-broadcast text-info me-1"></i>
-                        <strong>Channel key:</strong> Use the same channel (Auto/Public/Custom) that was used during encoding
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-info-circle-fill text-info me-1"></i>
-                        If using an RSA key, verify the <strong>password is correct</strong> (if key is encrypted)
+                        Ensure the stego image hasn't been <strong>resized or recompressed</strong>
                     </li>
                     <li class="mb-0">
                         <i class="bi bi-info-circle-fill text-info me-1"></i>
-                        If auto-detection fails, try specifying <strong>LSB or DCT mode</strong> in Advanced Options
+                        If auto-detection fails, try specifying <strong>LSB or DCT mode</strong>
                     </li>
                 </ul>
             </div>
@@ -495,31 +461,92 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
-// Extraction mode button active state toggle
-const extractModeRadios = document.querySelectorAll('input[name="embed_mode"]');
-const extractModeBtns = { 
-    'auto': document.getElementById('autoModeCard'), 
-    'lsb': document.getElementById('lsbModeCardDec'), 
-    'dct': document.getElementById('dctModeCardDec') 
-};
+// ============================================================================
+// ACCORDION SUMMARY UPDATES
+// ============================================================================
 
-extractModeRadios.forEach(radio => {
+function updateImagesSummary() {
+    const ref = document.getElementById('refPhotoInput')?.files[0];
+    const stego = document.getElementById('stegoInput')?.files[0];
+    const mode = document.querySelector('input[name="embed_mode"]:checked')?.value?.toUpperCase() || 'AUTO';
+    const summary = document.getElementById('stepImagesSummary');
+    const stepNum = document.getElementById('stepImagesNumber');
+
+    if (ref && stego) {
+        const refName = ref.name.length > 12 ? ref.name.slice(0, 10) + '..' : ref.name;
+        const stegoName = stego.name.length > 12 ? stego.name.slice(0, 10) + '..' : stego.name;
+        summary.textContent = `${refName} + ${stegoName}, ${mode}`;
+        summary.classList.add('has-content');
+        stepNum.classList.add('complete');
+        stepNum.innerHTML = '<i class="bi bi-check"></i>';
+    } else if (ref || stego) {
+        summary.textContent = ref ? ref.name.slice(0, 15) : stego.name.slice(0, 15);
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '1';
+    } else {
+        summary.textContent = 'Select reference & stego';
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '1';
+    }
+}
+
+function updateSecuritySummary() {
+    const passphrase = document.getElementById('passphraseInput')?.value || '';
+    const pin = document.getElementById('pinInput')?.value || '';
+    const rsaFile = document.querySelector('input[name="rsa_key"]')?.files[0];
+    const rsaPem = document.getElementById('rsaKeyPem')?.value || '';
+    const summary = document.getElementById('stepSecuritySummary');
+    const stepNum = document.getElementById('stepSecurityNumber');
+
+    const parts = [];
+    if (passphrase.trim()) parts.push('passphrase');
+    if (pin) parts.push('PIN');
+    if (rsaFile || rsaPem) parts.push('RSA');
+
+    if (parts.length > 0) {
+        summary.textContent = parts.join(' + ');
+        summary.classList.add('has-content');
+        if (passphrase.trim()) {
+            stepNum.classList.add('complete');
+            stepNum.innerHTML = '<i class="bi bi-check"></i>';
+        }
+    } else {
+        summary.textContent = 'Passphrase & keys';
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '2';
+    }
+}
+
+// Attach listeners
+document.getElementById('refPhotoInput')?.addEventListener('change', updateImagesSummary);
+document.getElementById('stegoInput')?.addEventListener('change', updateImagesSummary);
+document.querySelectorAll('input[name="embed_mode"]').forEach(r => r.addEventListener('change', updateImagesSummary));
+
+document.getElementById('passphraseInput')?.addEventListener('input', updateSecuritySummary);
+document.getElementById('pinInput')?.addEventListener('input', updateSecuritySummary);
+document.querySelector('input[name="rsa_key"]')?.addEventListener('change', updateSecuritySummary);
+
+// ============================================================================
+// MODE SWITCHING
+// ============================================================================
+
+const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
+const modeBtns = { 'auto': document.getElementById('autoModeCard'), 'lsb': document.getElementById('lsbModeCard'), 'dct': document.getElementById('dctModeCard') };
+
+modeRadios.forEach(radio => {
     radio.addEventListener('change', () => {
-        Object.values(extractModeBtns).forEach(btn => btn?.classList.remove('active'));
-        extractModeBtns[radio.value]?.classList.add('active');
+        Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
+        modeBtns[radio.value]?.classList.add('active');
     });
 });
 
-// Advanced options chevron
-const advancedOptionsDec = document.getElementById('advancedOptionsDec');
-advancedOptionsDec?.addEventListener('show.bs.collapse', () => {
-    document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-down', 'bi-chevron-up');
-});
-advancedOptionsDec?.addEventListener('hide.bs.collapse', () => {
-    document.getElementById('advancedChevronDec')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
-});
+// ============================================================================
+// LOADING STATE
+// ============================================================================
 
-// Loading state for decode button
 Stegasoo.initFormLoading('decodeForm', 'decodeBtn', 'Decoding...');
 </script>
 {% endblock %}

@@ -120,28 +120,64 @@ read -p "Resize rootfs to 16GB for faster imaging? [Y/n] " resize_confirm
 if [[ ! "$resize_confirm" =~ ^[Nn]$ ]]; then
     echo "Resizing rootfs partition to 16GB..."
 
-    # Get boot partition end
+    # Get current partition size in bytes
+    CURRENT_SIZE=$(sudo blockdev --getsize64 "$ROOT_PART")
+    TARGET_BYTES=$((16 * 1024 * 1024 * 1024))  # 16GB in bytes
+
+    # Get boot partition end in sectors
     BOOT_END=$(sudo parted -s "$DEVICE" unit s print | grep "^ 1" | awk '{print $3}' | tr -d 's')
 
     # Calculate 16GB in sectors (512 byte sectors)
-    # 16GB = 16 * 1024 * 1024 * 1024 / 512 = 33554432 sectors
     ROOT_SIZE_SECTORS=33554432
     ROOT_END=$((BOOT_END + ROOT_SIZE_SECTORS))
 
-    # Delete and recreate partition 2 with fixed size
-    sudo parted -s "$DEVICE" rm 2
-    sudo parted -s "$DEVICE" mkpart primary ext4 $((BOOT_END + 1))s ${ROOT_END}s
+    if [ "$CURRENT_SIZE" -lt "$TARGET_BYTES" ]; then
+        # EXPANDING: partition first, then filesystem
+        echo "Current partition is smaller than 16GB - expanding..."
 
-    # Refresh partition table
-    sudo partprobe "$DEVICE"
-    sleep 1
+        # Delete and recreate partition 2 with 16GB size
+        echo "Expanding partition to 16GB..."
+        sudo parted -s "$DEVICE" rm 2
+        sudo parted -s "$DEVICE" mkpart primary ext4 $((BOOT_END + 1))s ${ROOT_END}s
 
-    # Check and resize filesystem
-    echo "Checking filesystem..."
-    sudo e2fsck -f -y "$ROOT_PART" 2>/dev/null || true
+        # Refresh partition table
+        sudo partprobe "$DEVICE"
+        sleep 2
 
-    echo "Resizing filesystem to fit partition..."
-    sudo resize2fs "$ROOT_PART"
+        # Expand filesystem to fill the new partition
+        echo "Expanding filesystem to fill partition..."
+        sudo e2fsck -f -y "$ROOT_PART" 2>/dev/null || true
+        sudo resize2fs "$ROOT_PART"
+    else
+        # SHRINKING: filesystem first, then partition
+        echo "Current partition is larger than 16GB - shrinking..."
+
+        # Check and shrink filesystem first
+        echo "Checking filesystem..."
+        sudo e2fsck -f -y "$ROOT_PART" 2>/dev/null || true
+
+        # Shrink filesystem to 15.5GB (leave room for partition overhead)
+        echo "Shrinking filesystem to 15500M..."
+        sudo resize2fs "$ROOT_PART" 15500M
+
+        # Delete and recreate partition 2 with 16GB size
+        echo "Shrinking partition to 16GB..."
+        sudo parted -s "$DEVICE" rm 2
+        sudo parted -s "$DEVICE" mkpart primary ext4 $((BOOT_END + 1))s ${ROOT_END}s
+
+        # Refresh partition table
+        sudo partprobe "$DEVICE"
+        sleep 2
+
+        # Expand filesystem to fill the partition exactly
+        echo "Expanding filesystem to fill partition..."
+        sudo e2fsck -f -y "$ROOT_PART" 2>/dev/null || true
+        sudo resize2fs "$ROOT_PART"
+    fi
+
+    # Verify and show result
+    echo "Verifying partition size..."
+    sudo parted -s "$DEVICE" unit GB print | grep "^ 2"
 
     # Disable Pi OS auto-expand on first boot
     echo "Disabling auto-expand..."
@@ -155,12 +191,10 @@ if [[ ! "$resize_confirm" =~ ^[Nn]$ ]]; then
     # Disable the systemd resize service
     sudo rm -f "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
 
-    # Remove init= parameter from cmdline.txt on boot partition (handled later)
-
     sudo umount "$TEMP_ROOT"
     rmdir "$TEMP_ROOT"
 
-    echo "  Rootfs resized to 16GB (auto-expand disabled)"
+    echo "  Rootfs set to 16GB (auto-expand disabled)"
 fi
 
 MOUNT_DIR=$(mktemp -d)
@@ -283,3 +317,12 @@ echo "  SSH: enabled"
 echo "  WiFi: $WIFI_SSID"
 echo
 echo "Insert into Pi and boot. Find it with: ping $PI_HOSTNAME.local"
+
+# If we resized, remind about pull-image.sh
+if [[ ! "$resize_confirm" =~ ^[Nn]$ ]]; then
+    echo
+    echo "=== After setup, use pull-image.sh to create distributable image ==="
+    echo "  ./pull-image.sh $DEVICE stegasoo-rpi-VERSION.img.zst"
+    echo
+    echo "This will only pull the 16GB partition, not the entire SD card."
+fi

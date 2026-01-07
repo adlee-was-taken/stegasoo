@@ -95,6 +95,47 @@ src/stegasoo/dct_steganography.py
 
 ---
 
+---
+
+## Browser Webcam QR Scanning
+
+Add webcam-based QR code scanning for all key input fields.
+
+### Use Cases
+- Import channel key via QR scan on account page
+- Scan QR codes instead of typing long keys
+
+### Implementation
+
+**1. Add JS QR scanning library**
+- Use `jsQR` or `html5-qrcode` (client-side, no server needed)
+- Include via CDN in base template
+
+**2. Add camera button to channel key inputs**
+- Account page: "Add Key" field
+- Encode/decode pages: channel key selector (if manual input)
+
+**3. Camera modal component**
+- Request camera permission
+- Live video preview
+- Auto-detect QR and populate input field
+- Close modal on successful scan
+
+### Files to Modify
+```
+frontends/web/templates/base.html      - Add QR library CDN
+frontends/web/templates/account.html   - Camera button + modal
+frontends/web/static/js/stegasoo.js    - QR scan methods
+```
+
+### Testing Checklist
+- [ ] Camera permission prompt works
+- [ ] QR detected and input populated
+- [ ] Works on mobile browsers
+- [ ] Graceful fallback if no camera
+
+---
+
 ## Other 4.1.5 Ideas (if time)
 
 - [ ] Role-based permissions: admin / mod / user

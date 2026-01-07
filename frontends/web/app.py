@@ -169,6 +169,7 @@ from subprocess_stego import (
 
 from stegasoo.qr_utils import (
     can_fit_in_qr,
+    decompress_data,
     detect_and_crop_qr,
     extract_key_from_qr,
     generate_qr_code,
@@ -1049,12 +1050,19 @@ def encode_page():
             ref_data = ref_photo.read()
             carrier_data = carrier.read()
 
-            # Handle RSA key - can come from .pem file or QR code image
+            # Handle RSA key - can come from .pem file, QR code image, or webcam-scanned PEM (v4.1.5)
             rsa_key_data = None
+            rsa_key_pem = request.form.get("rsa_key_pem", "").strip()
             rsa_key_qr = request.files.get("rsa_key_qr")
             rsa_key_from_qr = False
 
-            if rsa_key_file and rsa_key_file.filename:
+            if rsa_key_pem:
+                # Webcam-scanned PEM key (v4.1.5) - may be compressed
+                if rsa_key_pem.startswith("STEGASOO-Z:"):
+                    rsa_key_pem = decompress_data(rsa_key_pem)
+                rsa_key_data = rsa_key_pem.encode("utf-8")
+                rsa_key_from_qr = True
+            elif rsa_key_file and rsa_key_file.filename:
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
                 qr_image_data = rsa_key_qr.read()
@@ -1371,6 +1379,82 @@ def encode_cleanup(file_id):
 # ============================================================================
 
 
+def _run_decode_job(job_id: str, decode_params: dict) -> None:
+    """Background thread function for async decode."""
+    progress_file = get_progress_file_path(job_id)
+
+    try:
+        _store_job(job_id, {"status": "running", "created": time.time()})
+
+        # Run decode with progress file
+        decode_result = subprocess_stego.decode(
+            stego_data=decode_params["stego_data"],
+            reference_data=decode_params["ref_data"],
+            passphrase=decode_params["passphrase"],
+            pin=decode_params.get("pin"),
+            rsa_key_data=decode_params.get("rsa_key_data"),
+            rsa_password=decode_params.get("rsa_password"),
+            embed_mode=decode_params.get("embed_mode", "auto"),
+            channel_key=decode_params.get("channel_key"),
+            progress_file=progress_file,
+        )
+
+        if not decode_result.success:
+            _store_job(
+                job_id,
+                {
+                    "status": "error",
+                    "error": decode_result.error or "Decoding failed",
+                    "error_type": decode_result.error_type,
+                    "created": time.time(),
+                },
+            )
+            return
+
+        # Store result based on type
+        if decode_result.is_file:
+            file_id = secrets.token_urlsafe(16)
+            filename = decode_result.filename or "decoded_file"
+            temp_storage.save_temp_file(file_id, decode_result.file_data, {
+                "filename": filename,
+                "mime_type": decode_result.mime_type,
+            })
+            _store_job(
+                job_id,
+                {
+                    "status": "complete",
+                    "file_id": file_id,
+                    "is_file": True,
+                    "filename": filename,
+                    "file_size": len(decode_result.file_data),
+                    "mime_type": decode_result.mime_type,
+                    "created": time.time(),
+                },
+            )
+        else:
+            _store_job(
+                job_id,
+                {
+                    "status": "complete",
+                    "is_file": False,
+                    "message": decode_result.message,
+                    "created": time.time(),
+                },
+            )
+
+    except Exception as e:
+        _store_job(
+            job_id,
+            {
+                "status": "error",
+                "error": str(e),
+                "created": time.time(),
+            },
+        )
+    finally:
+        cleanup_progress_file(job_id)
+
+
 @app.route("/decode", methods=["GET", "POST"])
 @login_required
 def decode_page():
@@ -1414,12 +1498,19 @@ def decode_page():
             ref_data = ref_photo.read()
             stego_data = stego_image.read()
 
-            # Handle RSA key - can come from .pem file or QR code image
+            # Handle RSA key - can come from .pem file, QR code image, or webcam-scanned PEM (v4.1.5)
             rsa_key_data = None
+            rsa_key_pem = request.form.get("rsa_key_pem", "").strip()
             rsa_key_qr = request.files.get("rsa_key_qr")
             rsa_key_from_qr = False
 
-            if rsa_key_file and rsa_key_file.filename:
+            if rsa_key_pem:
+                # Webcam-scanned PEM key (v4.1.5) - may be compressed
+                if rsa_key_pem.startswith("STEGASOO-Z:"):
+                    rsa_key_pem = decompress_data(rsa_key_pem)
+                rsa_key_data = rsa_key_pem.encode("utf-8")
+                rsa_key_from_qr = True
+            elif rsa_key_file and rsa_key_file.filename:
                 rsa_key_data = rsa_key_file.read()
             elif rsa_key_qr and rsa_key_qr.filename and HAS_QRCODE_READ:
                 qr_image_data = rsa_key_qr.read()
@@ -1454,6 +1545,29 @@ def decode_page():
                     flash(result.error_message, "error")
                     return render_template("decode.html", has_qrcode_read=HAS_QRCODE_READ)
 
+            # Check for async mode (v4.1.5)
+            is_async = request.form.get("async") == "true" or request.headers.get("X-Async") == "true"
+
+            # Build decode params
+            decode_params = {
+                "stego_data": stego_data,
+                "ref_data": ref_data,
+                "passphrase": passphrase,
+                "pin": pin if pin else None,
+                "rsa_key_data": rsa_key_data,
+                "rsa_password": key_password,
+                "embed_mode": embed_mode,
+                "channel_key": channel_key,
+            }
+
+            # ASYNC MODE: Start background job and return JSON
+            if is_async:
+                job_id = generate_job_id()
+                _store_job(job_id, {"status": "pending", "created": time.time()})
+                _executor.submit(_run_decode_job, job_id, decode_params)
+                return jsonify({"job_id": job_id, "status": "pending"})
+
+            # SYNC MODE: Run inline (original behavior)
             # v4.0.0: Include channel_key parameter
             # Use subprocess-isolated decode to prevent crashes
             decode_result = subprocess_stego.decode(
@@ -1557,6 +1671,92 @@ def decode_download(file_id):
         as_attachment=True,
         download_name=file_info["filename"],
     )
+
+
+# ============================================================================
+# DECODE PROGRESS ENDPOINTS (v4.1.5)
+# ============================================================================
+
+
+@app.route("/decode/status/<job_id>")
+@login_required
+def decode_status(job_id):
+    """Get the status of an async decode job."""
+    job = _get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    response = {"status": job.get("status", "unknown")}
+
+    if job["status"] == "complete":
+        response["is_file"] = job.get("is_file", False)
+        if job.get("is_file"):
+            response["file_id"] = job.get("file_id")
+            response["filename"] = job.get("filename")
+            response["file_size"] = job.get("file_size")
+            response["mime_type"] = job.get("mime_type")
+        else:
+            response["message"] = job.get("message")
+    elif job["status"] == "error":
+        response["error"] = job.get("error", "Unknown error")
+        response["error_type"] = job.get("error_type")
+
+    return jsonify(response)
+
+
+@app.route("/decode/progress/<job_id>")
+@login_required
+def decode_progress(job_id):
+    """Get the progress of an async decode job."""
+    progress = read_progress(job_id)
+    if progress:
+        return jsonify(progress)
+
+    # No progress file yet - check job status
+    job = _get_job(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    if job["status"] == "complete":
+        return jsonify({"percent": 100, "phase": "complete"})
+    elif job["status"] == "error":
+        return jsonify({"percent": 0, "phase": "error", "error": job.get("error")})
+    elif job["status"] == "pending":
+        return jsonify({"percent": 0, "phase": "starting"})
+
+    # Running but no progress file yet
+    return jsonify({"percent": 5, "phase": "reading"})
+
+
+@app.route("/decode/result/<job_id>")
+@login_required
+def decode_result(job_id):
+    """Get the result page for an async decode job."""
+    job = _get_job(job_id)
+    if not job:
+        flash("Job not found or expired.", "error")
+        return redirect(url_for("decode_page"))
+
+    if job["status"] != "complete":
+        flash("Decode not complete.", "error")
+        return redirect(url_for("decode_page"))
+
+    if job.get("is_file"):
+        return render_template(
+            "decode.html",
+            decoded_file=True,
+            file_id=job.get("file_id"),
+            filename=job.get("filename"),
+            file_size=format_size(job.get("file_size", 0)),
+            mime_type=job.get("mime_type"),
+            has_qrcode_read=HAS_QRCODE_READ,
+        )
+    else:
+        return render_template(
+            "decode.html",
+            decoded_message=job.get("message"),
+            has_qrcode_read=HAS_QRCODE_READ,
+        )
 
 
 @app.route("/about")

@@ -4,11 +4,75 @@
 
 {% block content %}
 <style>
-/* Glowing passphrase input */
-.passphrase-input-container {
-    position: relative;
+/* Accordion styling */
+.step-accordion .accordion-button {
+    background: rgba(30, 40, 50, 0.6);
+    color: #fff;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+.step-accordion .accordion-button:not(.collapsed) {
+    background: linear-gradient(90deg, rgba(99, 179, 237, 0.15) 0%, rgba(40, 50, 60, 0.8) 40%, rgba(40, 50, 60, 0.8) 100%);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(99, 179, 237, 0.1);
+    border-left: 3px solid rgba(99, 179, 237, 0.6);
+}
+.step-accordion .accordion-button::after {
+    filter: invert(1);
+}
+.step-accordion .accordion-body {
+    background: rgba(30, 40, 50, 0.4);
+    padding: 1rem;
+}
+.step-accordion .accordion-item {
+    border-color: rgba(255,255,255,0.1);
+    background: transparent;
+}
+.step-accordion .accordion-item:first-child .accordion-button {
+    border-radius: 0;
+}
+.step-accordion .accordion-item:last-child .accordion-button.collapsed {
+    border-radius: 0;
+}
+.step-summary {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    margin-left: auto;
+    padding-right: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50%;
+}
+.step-summary.has-content {
+    color: rgba(99, 179, 237, 0.8);
+}
+.step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.step-number {
+    background: rgba(246, 173, 85, 0.2);
+    color: #f6ad55;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border: 1px solid rgba(246, 173, 85, 0.3);
+}
+.step-number.complete {
+    background: rgba(72, 187, 120, 0.2);
+    color: #48bb78;
+    border-color: rgba(72, 187, 120, 0.3);
 }
 
+/* Glowing passphrase input */
 .passphrase-input {
     background: rgba(30, 40, 50, 0.8) !important;
     border: 2px solid rgba(99, 179, 237, 0.3) !important;
@@ -17,20 +81,17 @@
     font-size: 1.1rem;
     letter-spacing: 0.5px;
     padding: 12px 16px;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
-
 .passphrase-input:focus {
     border-color: rgba(99, 179, 237, 0.8) !important;
-    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4), 0 0 40px rgba(99, 179, 237, 0.2) !important;
-    background: rgba(30, 40, 50, 0.95) !important;
+    box-shadow: 0 0 20px rgba(99, 179, 237, 0.4) !important;
 }
-
 .passphrase-input::placeholder {
     color: rgba(99, 179, 237, 0.4);
 }
 
-/* Glowing PIN input */
+/* PIN input */
 .pin-input-container .form-control {
     background: rgba(30, 40, 50, 0.8) !important;
     border: 2px solid rgba(246, 173, 85, 0.3) !important;
@@ -39,18 +100,10 @@
     font-size: 1.2rem;
     letter-spacing: 3px;
     text-align: center;
-    transition: all 0.3s ease;
 }
-
 .pin-input-container .form-control:focus {
     border-color: rgba(246, 173, 85, 0.8) !important;
-    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4), 0 0 40px rgba(246, 173, 85, 0.2) !important;
-    background: rgba(30, 40, 50, 0.95) !important;
-}
-
-.pin-input-container .form-control::placeholder {
-    color: rgba(246, 173, 85, 0.4);
-    letter-spacing: 1px;
+    box-shadow: 0 0 20px rgba(246, 173, 85, 0.4) !important;
 }
 
 /* QR Crop Animation */
@@ -59,8 +112,12 @@
     overflow: hidden;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.3);
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
 }
-
 .qr-crop-container img {
     display: block;
     max-height: 180px;
@@ -69,15 +126,10 @@
     margin: 0 auto;
     transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.qr-crop-container .qr-original {
-    opacity: 1;
-}
-
+.qr-crop-container .qr-original { opacity: 1; }
 .qr-crop-container .qr-cropped {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0.3);
     opacity: 0;
     max-height: 160px;
@@ -85,29 +137,14 @@
     min-height: 140px;
     object-fit: contain;
 }
-
 .qr-crop-container.scan-complete .qr-original {
     opacity: 0;
     transform: scale(1.1);
     filter: blur(4px);
 }
-
 .qr-crop-container.scan-complete .qr-cropped {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
-}
-
-.qr-crop-container .crop-badge {
-    position: absolute;
-    bottom: 4px;
-    right: 4px;
-    font-size: 0.65rem;
-    opacity: 0;
-    transition: opacity 0.3s ease 0.4s;
-}
-
-.qr-crop-container.scan-complete .crop-badge {
-    opacity: 1;
 }
 </style>
 
@@ -117,428 +154,326 @@
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-lock-fill me-2"></i>Encode Secret Message or File</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 <form method="POST" enctype="multipart/form-data" id="encodeForm">
-                    <!-- Removed client_date hidden field -->
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-image me-1"></i> Reference Photo
-                            </label>
-                            <div class="drop-zone scan-container" id="refDropZone">
-                                <input type="file" name="reference_photo" accept="image/*" required>
-                                <div class="drop-zone-label">
-                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
-                                    <span class="text-muted">Drop image or click to browse</span>
-                                </div>
-                                <img class="drop-zone-preview d-none" id="refPreview">
-                                <!-- Scan overlay elements -->
-                                <div class="scan-overlay">
-                                    <div class="scan-grid"></div>
-                                    <div class="scan-line"></div>
-                                </div>
-                                <!-- Corner brackets (shown after scan) -->
-                                <div class="scan-corners">
-                                    <div class="scan-corner tl"></div>
-                                    <div class="scan-corner tr"></div>
-                                    <div class="scan-corner bl"></div>
-                                    <div class="scan-corner br"></div>
-                                </div>
-                                <!-- Data panel (shown after scan) -->
-                                <div class="scan-data-panel">
-                                    <div class="scan-data-filename">
-                                        <i class="bi bi-check-circle-fill"></i>
-                                        <span id="refFileName">image.jpg</span>
-                                    </div>
-                                    <div class="scan-data-row">
-                                        <span class="scan-status-badge">Hash Acquired</span>
-                                        <span class="scan-data-value" id="refFileSize">--</span>
-                                    </div>
-                                    <div class="scan-hash-preview" id="refHashPreview">SHA256: ················</div>
-                                </div>
-                            </div>
-                            <div class="form-text">
-                                The secret photo both parties have (NOT transmitted)
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-file-image me-1"></i> Carrier Image
-                            </label>
-                            <div class="drop-zone pixel-container" id="carrierDropZone">
-                                <input type="file" name="carrier" accept="image/*" required id="carrierInput">
-                                <div class="drop-zone-label">
-                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
-                                    <span class="text-muted">Drop image or click to browse</span>
-                                </div>
-                                <img class="drop-zone-preview d-none" id="carrierPreview">
-                                <!-- Pixel blocks overlay - populated by JS -->
-                                <div class="pixel-blocks"></div>
-                                <!-- Pixel scan line -->
-                                <div class="pixel-scan-line"></div>
-                                <!-- Corner brackets -->
-                                <div class="pixel-corners">
-                                    <div class="pixel-corner tl"></div>
-                                    <div class="pixel-corner tr"></div>
-                                    <div class="pixel-corner bl"></div>
-                                    <div class="pixel-corner br"></div>
-                                </div>
-                                <!-- Data panel -->
-                                <div class="pixel-data-panel">
-                                    <div class="pixel-data-filename">
-                                        <i class="bi bi-check-circle-fill"></i>
-                                        <span id="carrierFileName">image.jpg</span>
-                                    </div>
-                                    <div class="pixel-data-row">
-                                        <span class="pixel-status-badge">Carrier Loaded</span>
-                                        <span class="pixel-data-value" id="carrierFileSize">--</span>
-                                    </div>
-                                    <div class="pixel-dimensions" id="carrierDims">-- × -- px</div>
-                                </div>
-                            </div>
-                            <div class="form-text">
-                                The image to hide your message in (e.g., a meme)
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Capacity Info Panel (shown when carrier loaded) -->
-                    <div class="alert alert-info small d-none" id="capacityPanel">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <i class="bi bi-rulers me-1"></i>
-                                <strong>Carrier:</strong> <span id="carrierDimensions">-</span>
-                            </div>
-                            <div class="col-auto">
-                                <span class="badge bg-warning text-dark me-1" id="dctCapacityBadge">DCT: -</span>
-                                <span class="badge bg-primary" id="lsbCapacityBadge">LSB: -</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Embedding Mode Selection -->
-                    <div class="mb-4">
-                        <label class="form-label">
-                            <i class="bi bi-cpu me-1"></i> Embedding Mode
-                        </label>
-                        
-                        <div class="d-flex gap-2">
-                            <!-- DCT Mode -->
-                            <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
-                                <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
-                                <i class="bi bi-soundwave text-warning ms-2"></i>
-                                <span class="ms-2"><strong>DCT</strong> <span class="text-muted">· Social Media</span></span>
-                                <i class="bi bi-info-circle text-muted mode-info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<b>DCT Mode</b><br>• JPEG output<br>• Survives recompression<br>• ~75 KB/MP capacity"></i>
-                                {% if not has_dct %}
-                                <span class="small text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>Requires scipy</span>
-                                {% endif %}
-                            </label>
-                            
-                            <!-- LSB Mode -->
-                            <label class="mode-btn flex-fill {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
-                                <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
-                                <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
-                                <span class="ms-2"><strong>LSB</strong> <span class="text-muted">· Email & Files</span></span>
-                                <i class="bi bi-info-circle text-muted mode-info-icon ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<b>LSB Mode</b><br>• Full color PNG output<br>• Higher capacity (~375 KB/MP)"></i>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <!-- Payload Type Selector -->
-                    <div class="mb-3">
-                        <label class="form-label">
-                            <i class="bi bi-box me-1"></i> What to Encode
-                        </label>
-                        <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="payload_type" id="payloadText" value="text" checked>
-                            <label class="btn btn-outline-primary" for="payloadText">
-                                <i class="bi bi-chat-left-text me-1"></i> Text Message
-                            </label>
-                            
-                            <input type="radio" class="btn-check" name="payload_type" id="payloadFile" value="file">
-                            <label class="btn btn-outline-primary" for="payloadFile">
-                                <i class="bi bi-file-earmark me-1"></i> File
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <!-- Text Message Input -->
-                    <div class="mb-3" id="textPayloadSection">
-                        <label class="form-label">
-                            <i class="bi bi-chat-left-text me-1"></i> Secret Message
-                        </label>
-                        <textarea name="message" class="form-control" rows="4" id="messageInput"
-                                  placeholder="Enter your secret message here..."></textarea>
-                        <div class="d-flex justify-content-between form-text">
-                            <span>
-                                <span id="charCount">0</span> / 250,000 characters
-                                <span id="charWarning" class="text-warning d-none ms-2">
-                                    <i class="bi bi-exclamation-triangle"></i> Getting long!
-                                </span>
-                            </span>
-                            <span id="charPercent" class="text-muted">0%</span>
-                        </div>
-                    </div>
-                    
-                    <!-- File Upload Input -->
-                    <div class="mb-3 d-none" id="filePayloadSection">
-                        <label class="form-label">
-                            <i class="bi bi-file-earmark me-1"></i> File to Embed
-                        </label>
-                        <div class="drop-zone" id="payloadDropZone">
-                            <input type="file" name="payload_file" id="payloadFileInput">
-                            <div class="drop-zone-label" id="payloadDropLabel">
-                                <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
-                                <span class="text-muted">Drop any file or click to browse</span>
-                                <div class="small text-muted mt-1">Max {{ max_payload_kb }} KB</div>
-                            </div>
-                        </div>
-                        <div class="form-text">
-                            Supports any file type: PDF, ZIP, documents, etc.
-                        </div>
-                        <div id="fileInfo" class="d-none mt-2 p-2 bg-dark rounded">
-                            <i class="bi bi-file-earmark-check text-success me-2"></i>
-                            <span id="fileInfoName"></span>
-                            <span class="text-muted">(<span id="fileInfoSize"></span>)</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Passphrase input with glow styling -->
-                    <div class="mb-3">
-                        <label class="form-label" id="passphraseLabel">
-                            <i class="bi bi-chat-quote me-1"></i> Passphrase
-                        </label>
-                        <div class="passphrase-input-container">
-                            <input type="text" name="passphrase" class="form-control passphrase-input" 
-                                   placeholder="e.g., apple forest thunder mountain" required
-                                   id="passphraseInput">
-                        </div>
-                        <div class="form-text">
-                            Your passphrase for this message
-                        </div>
-                        <div class="form-text mt-1" id="passphraseWarning" style="display: none;">
-                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                            Passphrase should have at least {{ recommended_passphrase_words }} words for good security
-                        </div>
-                    </div>
-                    
-                    <hr class="my-4">
-                    
-                    <h6 class="text-muted mb-3">
-                        SECURITY FACTORS 
-                        <span class="text-warning small">(provide at least one: PIN or RSA Key)</span>
-                    </h6>
-                    
-                    <div class="mb-3">
-                      <div class="security-box">
-                        <label class="form-label">
-                            <i class="bi bi-file-earmark-lock me-1"></i> RSA Key
-                        </label>
 
-                        <!-- RSA Input Method Toggle -->
-                        <div class="btn-group w-100 mb-2" role="group">
-                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
-                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile">
-                                <i class="bi bi-file-earmark me-1"></i>.pem File
-                            </label>
+                    <div class="accordion step-accordion" id="encodeAccordion">
 
-                            <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
-                            <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr">
-                                <i class="bi bi-qr-code me-1"></i>QR Code
-                            </label>
-                        </div>
-
-                        <!-- .pem File Input -->
-                        <div id="rsaFileSection">
-                            <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
-                        </div>
-
-                        <!-- QR Code Input -->
-                        <div id="rsaQrSection" class="d-none">
-                            <div class="drop-zone p-3" id="qrDropZone">
-                                <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
-                                <div class="drop-zone-label text-center">
-                                    <i class="bi bi-qr-code-scan fs-4 d-block text-muted mb-1"></i>
-                                    <span class="text-muted small">Drop QR image or click to browse</span>
-                                </div>
-                                <!-- Crop animation container -->
-                                <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
-                                    <img class="qr-original" id="qrOriginal" alt="Original">
-                                    <img class="qr-cropped" id="qrCropped" alt="Cropped QR">
-                                    <!-- Data panel -->
-                                    <div class="qr-data-panel">
-                                        <div class="qr-data-filename">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            <span>RSA Key loaded</span>
-                                        </div>
-                                        <div class="qr-data-row">
-                                            <span class="qr-status-badge">RSA Key</span>
-                                            <span class="qr-data-value">--</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Key Password (always visible) -->
-                        <div class="input-group input-group-sm mt-2">
-                            <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
-                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- PIN + Channel Row -->
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                          <div class="security-box h-100">
-                            <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
-                            <div class="input-group pin-input-container">
-                              <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9">
-                              <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
-                                <i class="bi bi-eye"></i>
-                              </button>
-                            </div>
-                            <div class="form-text">Static 6-9 digit PIN</div>
-                          </div>
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                          <div class="security-box h-100">
-                            <label class="form-label">
-                                <i class="bi bi-broadcast me-1"></i> Channel
-                                <span class="badge bg-info ms-1">v4.1</span>
-                                <a href="/about#channel-keys" class="text-muted ms-1" title="Learn about channels"><i class="bi bi-info-circle"></i></a>
-                            </label>
-
-                            <select class="form-select" name="channel_key" id="channelSelect">
-                                <option value="auto" selected>Auto{% if channel_configured %} (Server Key){% endif %}</option>
-                                <option value="none">Public</option>
-                                {% if saved_channel_keys %}
-                                <optgroup label="Saved Keys">
-                                    {% for key in saved_channel_keys %}
-                                    <option value="{{ key.channel_key }}" data-key-id="{{ key.id }}">{{ key.name }} ({{ key.channel_key[:4] }}...)</option>
-                                    {% endfor %}
-                                </optgroup>
-                                {% endif %}
-                                <option value="custom">Custom...</option>
-                            </select>
-
-                            <!-- Server channel indicator (compact) -->
-                            <div class="small text-success mt-2 {% if not channel_configured %}d-none{% endif %}" id="channelServerInfo" data-fingerprint="{{ (channel_fingerprint[:4] if channel_fingerprint else '') }}-••••-···-••••-{{ channel_fingerprint[-4:] if channel_fingerprint else '' }}">
-                                {% if channel_configured and channel_fingerprint %}
-                                <i class="bi bi-shield-lock me-1"></i>
-                                Server: <code>{{ channel_fingerprint[:4] }}-••••-···-••••-{{ channel_fingerprint[-4:] }}</code>
-                                {% endif %}
-                            </div>
-                          </div>
-                        </div>
-                    </div>
-
-                    <!-- Custom Channel Key Input (shown when Custom selected) -->
-                    <div class="mb-4 d-none" id="channelCustomInput">
-                        <div class="security-box">
-                            <label class="form-label"><i class="bi bi-key me-1"></i> Custom Channel Key</label>
-                            <div class="input-group">
-                                <input type="text" name="channel_key_custom" class="form-control font-monospace"
-                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                                       pattern="[A-Za-z0-9]{4}(-[A-Za-z0-9]{4}){7}"
-                                       id="channelKeyInput">
-                                <button class="btn btn-outline-secondary" type="button" id="channelKeyGenerate" title="Generate random key">
-                                    <i class="bi bi-shuffle"></i>
+                        <!-- ================================================================
+                             STEP 1: IMAGES
+                             ================================================================ -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#stepImages">
+                                    <span class="step-title">
+                                        <span class="step-number" id="stepImagesNumber">1</span>
+                                        <i class="bi bi-images me-1"></i> Images & Mode
+                                    </span>
+                                    <span class="step-summary" id="stepImagesSummary">Select reference & carrier</span>
                                 </button>
-                            </div>
-                            <div class="invalid-feedback" id="channelKeyError">
-                                Invalid format. Use: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Advanced Options (DCT sub-options only) -->
-                    <div class="mb-4 {% if not has_dct %}d-none{% endif %}" id="advancedOptionsContainer">
-                        <a class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="collapse" href="#advancedOptions" role="button" aria-expanded="false">
-                            <i class="bi bi-gear me-1"></i> DCT Options
-                            <i class="bi bi-chevron-down ms-1" id="advancedChevron"></i>
-                        </a>
-                        
-                        <div class="collapse" id="advancedOptions">
-                            <div class="card card-body mt-2 bg-dark border-secondary py-3">
-                                
-                                <!-- DCT Color Mode - Compact -->
-                                <div class="mb-3">
-                                    <label class="form-label small mb-2">
-                                        <i class="bi bi-palette me-1"></i> Color
-                                    </label>
-                                    <div class="d-flex gap-2">
-                                        <label class="mode-btn equal-width active" id="dctColorCard" for="dctColorColor">
-                                            <input class="form-check-input" type="radio" name="dct_color_mode" id="dctColorColor" value="color" checked>
-                                            <i class="bi bi-palette-fill text-success"></i>
-                                            <span class="ms-2"><strong>Color</strong> <span class="badge bg-success ms-1">Default</span></span>
+                            </h2>
+                            <div id="stepImages" class="accordion-collapse collapse show" data-bs-parent="#encodeAccordion">
+                                <div class="accordion-body">
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-image me-1"></i> Reference Photo
+                                            </label>
+                                            <div class="drop-zone scan-container" id="refDropZone">
+                                                <input type="file" name="reference_photo" accept="image/*" required id="refPhotoInput">
+                                                <div class="drop-zone-label">
+                                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                                    <span class="text-muted">Drop image or click</span>
+                                                </div>
+                                                <img class="drop-zone-preview d-none" id="refPreview">
+                                                <div class="scan-overlay"><div class="scan-grid"></div><div class="scan-line"></div></div>
+                                                <div class="scan-corners">
+                                                    <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+                                                    <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+                                                </div>
+                                                <div class="scan-data-panel">
+                                                    <div class="scan-data-filename"><i class="bi bi-check-circle-fill"></i><span id="refFileName">image.jpg</span></div>
+                                                    <div class="scan-data-row"><span class="scan-status-badge">Hash Acquired</span><span class="scan-data-value" id="refFileSize">--</span></div>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">Secret photo both parties have</div>
+                                        </div>
+
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-file-image me-1"></i> Carrier Image
+                                            </label>
+                                            <div class="drop-zone pixel-container" id="carrierDropZone">
+                                                <input type="file" name="carrier" accept="image/*" required id="carrierInput">
+                                                <div class="drop-zone-label">
+                                                    <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                                    <span class="text-muted">Drop image or click</span>
+                                                </div>
+                                                <img class="drop-zone-preview d-none" id="carrierPreview">
+                                                <div class="pixel-blocks"></div>
+                                                <div class="pixel-scan-line"></div>
+                                                <div class="pixel-corners">
+                                                    <div class="pixel-corner tl"></div><div class="pixel-corner tr"></div>
+                                                    <div class="pixel-corner bl"></div><div class="pixel-corner br"></div>
+                                                </div>
+                                                <div class="pixel-data-panel">
+                                                    <div class="pixel-data-filename"><i class="bi bi-check-circle-fill"></i><span id="carrierFileName">image.jpg</span></div>
+                                                    <div class="pixel-data-row"><span class="pixel-status-badge">Carrier Loaded</span><span class="pixel-data-value" id="carrierFileSize">--</span></div>
+                                                    <div class="pixel-dimensions" id="carrierDims">-- x -- px</div>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">Image to hide your message in</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Capacity Info -->
+                                    <div class="alert alert-info small d-none mb-3" id="capacityPanel">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-rulers me-1"></i><span id="carrierDimensions">-</span></span>
+                                            <span>
+                                                <span class="badge bg-warning text-dark me-1" id="dctCapacityBadge">DCT: -</span>
+                                                <span class="badge bg-primary" id="lsbCapacityBadge">LSB: -</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Embedding Mode -->
+                                    <label class="form-label"><i class="bi bi-cpu me-1"></i> Embedding Mode</label>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
+                                            <i class="bi bi-soundwave text-warning ms-2"></i>
+                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Social</span></span>
                                         </label>
-                                        <label class="mode-btn equal-width" id="dctGrayscaleCard" for="dctColorGrayscale">
-                                            <input class="form-check-input" type="radio" name="dct_color_mode" id="dctColorGrayscale" value="grayscale">
-                                            <i class="bi bi-circle-half text-secondary"></i>
-                                            <span class="ms-2"><strong>Grayscale</strong></span>
+                                        <label class="mode-btn flex-fill {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
+                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
+                                            <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
+                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Email</span></span>
                                         </label>
                                     </div>
-                                </div>
-                                
-                                <!-- DCT Output Format - Compact -->
-                                <div class="mb-0">
-                                    <label class="form-label small mb-2">
-                                        <i class="bi bi-file-image me-1"></i> Format
-                                    </label>
-                                    <div class="d-flex gap-2">
-                                        <label class="mode-btn equal-width active" id="dctJpegCard" for="dctFormatJpeg">
-                                            <input class="form-check-input" type="radio" name="dct_output_format" id="dctFormatJpeg" value="jpeg" checked>
-                                            <i class="bi bi-file-earmark-richtext text-warning"></i>
-                                            <span class="ms-2"><strong>JPEG</strong> <span class="badge bg-warning text-dark ms-1">Default</span></span>
-                                        </label>
-                                        <label class="mode-btn equal-width" id="dctPngCard" for="dctFormatPng">
-                                            <input class="form-check-input" type="radio" name="dct_output_format" id="dctFormatPng" value="png">
-                                            <i class="bi bi-file-earmark-image text-primary"></i>
-                                            <span class="ms-2"><strong>PNG</strong> <span class="text-muted d-none d-sm-inline">· Lossless</span></span>
-                                        </label>
+
+                                    <!-- DCT Options (inline, compact) -->
+                                    <div class="{% if not has_dct %}d-none{% endif %}" id="dctOptionsInline">
+                                        <div class="row g-2 mt-2" id="dctOptionsRow">
+                                            <div class="col-6">
+                                                <select class="form-select form-select-sm" name="dct_color_mode" id="dctColorSelect">
+                                                    <option value="color" selected>Color</option>
+                                                    <option value="grayscale">Grayscale</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <select class="form-select form-select-sm" name="dct_output_format" id="dctFormatSelect">
+                                                    <option value="jpeg" selected>JPEG</option>
+                                                    <option value="png">PNG</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
+
                                 </div>
-                                
                             </div>
                         </div>
+
+                        <!-- ================================================================
+                             STEP 2: PAYLOAD
+                             ================================================================ -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#stepPayload">
+                                    <span class="step-title">
+                                        <span class="step-number" id="stepPayloadNumber">2</span>
+                                        <i class="bi bi-box me-1"></i> Payload
+                                    </span>
+                                    <span class="step-summary" id="stepPayloadSummary">Message or file to hide</span>
+                                </button>
+                            </h2>
+                            <div id="stepPayload" class="accordion-collapse collapse" data-bs-parent="#encodeAccordion">
+                                <div class="accordion-body">
+
+                                    <!-- Payload Type Toggle -->
+                                    <div class="btn-group w-100 mb-3" role="group">
+                                        <input type="radio" class="btn-check" name="payload_type" id="payloadText" value="text" checked>
+                                        <label class="btn btn-outline-primary" for="payloadText">
+                                            <i class="bi bi-chat-left-text me-1"></i> Text Message
+                                        </label>
+                                        <input type="radio" class="btn-check" name="payload_type" id="payloadFile" value="file">
+                                        <label class="btn btn-outline-primary" for="payloadFile">
+                                            <i class="bi bi-file-earmark me-1"></i> File
+                                        </label>
+                                    </div>
+
+                                    <!-- Text Message -->
+                                    <div id="textPayloadSection">
+                                        <textarea name="message" class="form-control" rows="4" id="messageInput"
+                                                  placeholder="Enter your secret message here..."></textarea>
+                                        <div class="d-flex justify-content-between form-text">
+                                            <span><span id="charCount">0</span> chars</span>
+                                            <span id="charPercent" class="text-muted">0%</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- File Upload -->
+                                    <div class="d-none" id="filePayloadSection">
+                                        <div class="drop-zone" id="payloadDropZone">
+                                            <input type="file" name="payload_file" id="payloadFileInput">
+                                            <div class="drop-zone-label" id="payloadDropLabel">
+                                                <i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i>
+                                                <span class="text-muted">Drop file or click (max {{ max_payload_kb }} KB)</span>
+                                            </div>
+                                        </div>
+                                        <div id="fileInfo" class="d-none mt-2 p-2 bg-dark rounded small">
+                                            <i class="bi bi-file-earmark-check text-success me-2"></i>
+                                            <span id="fileInfoName"></span>
+                                            <span class="text-muted">(<span id="fileInfoSize"></span>)</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ================================================================
+                             STEP 3: SECURITY
+                             ================================================================ -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#stepSecurity">
+                                    <span class="step-title">
+                                        <span class="step-number" id="stepSecurityNumber">3</span>
+                                        <i class="bi bi-shield-lock me-1"></i> Security
+                                    </span>
+                                    <span class="step-summary" id="stepSecuritySummary">Passphrase & keys</span>
+                                </button>
+                            </h2>
+                            <div id="stepSecurity" class="accordion-collapse collapse" data-bs-parent="#encodeAccordion">
+                                <div class="accordion-body">
+
+                                    <!-- Passphrase -->
+                                    <div class="mb-3">
+                                        <label class="form-label"><i class="bi bi-chat-quote me-1"></i> Passphrase</label>
+                                        <input type="text" name="passphrase" class="form-control passphrase-input"
+                                               placeholder="e.g., apple forest thunder mountain" required id="passphraseInput">
+                                        <div class="form-text">Your passphrase for this message</div>
+                                    </div>
+
+                                    <hr class="my-3 opacity-25">
+                                    <div class="small text-muted mb-2">Provide at least one: PIN or RSA Key</div>
+
+                                    <div class="row">
+                                        <!-- PIN -->
+                                        <div class="col-md-6 mb-2">
+                                            <div class="security-box h-100">
+                                                <label class="form-label"><i class="bi bi-123 me-1"></i> PIN</label>
+                                                <div class="input-group pin-input-container">
+                                                    <input type="password" name="pin" class="form-control" id="pinInput" placeholder="••••••" maxlength="9">
+                                                    <button class="btn btn-outline-secondary" type="button" data-toggle-password="pinInput">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                                </div>
+                                        </div>
+
+                                        <!-- Channel -->
+                                        <div class="col-md-6 mb-2">
+                                            <div class="security-box h-100">
+                                                <label class="form-label"><i class="bi bi-broadcast me-1"></i> Channel</label>
+                                                <select class="form-select form-select-sm" name="channel_key" id="channelSelect">
+                                                    <option value="auto" selected>Auto{% if channel_configured %} (Server){% endif %}</option>
+                                                    <option value="none">Public</option>
+                                                    {% if saved_channel_keys %}
+                                                    <optgroup label="Saved Keys">
+                                                        {% for key in saved_channel_keys %}
+                                                        <option value="{{ key.channel_key }}">{{ key.name }}</option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    {% endif %}
+                                                    <option value="custom">Custom...</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Custom Channel Key -->
+                                    <div class="mb-3 d-none" id="channelCustomInput">
+                                        <div class="security-box">
+                                            <label class="form-label"><i class="bi bi-key me-1"></i> Custom Channel Key</label>
+                                            <div class="input-group">
+                                                <input type="text" name="channel_key_custom" class="form-control form-control-sm font-monospace"
+                                                       placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" id="channelKeyInput">
+                                                <button class="btn btn-outline-secondary btn-sm" type="button" id="channelKeyScan" title="Scan QR"><i class="bi bi-camera"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" type="button" id="channelKeyGenerate" title="Generate"><i class="bi bi-shuffle"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- RSA Key -->
+                                    <div class="mb-3">
+                                        <div class="security-box">
+                                            <label class="form-label"><i class="bi bi-file-earmark-lock me-1"></i> RSA Key <span class="text-muted">(optional)</span></label>
+                                            <div class="btn-group w-100 mb-2" role="group">
+                                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodFile" value="file" checked>
+                                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodFile"><i class="bi bi-file-earmark me-1"></i>.pem</label>
+                                                <input type="radio" class="btn-check" name="rsa_input_method" id="rsaMethodQr" value="qr">
+                                                <label class="btn btn-outline-secondary btn-sm" for="rsaMethodQr"><i class="bi bi-qr-code me-1"></i>QR</label>
+                                            </div>
+                                            <div id="rsaFileSection">
+                                                <input type="file" name="rsa_key" class="form-control form-control-sm" accept=".pem">
+                                            </div>
+                                            <div id="rsaQrSection" class="d-none d-flex flex-column">
+                                                <input type="hidden" name="rsa_key_pem" id="rsaKeyPem">
+                                                <div class="drop-zone p-2 w-100" id="qrDropZone">
+                                                    <input type="file" name="rsa_key_qr" accept="image/*" id="rsaQrInput">
+                                                    <div class="drop-zone-label text-center">
+                                                        <i class="bi bi-qr-code-scan fs-5 d-block text-muted mb-1"></i>
+                                                        <span class="text-muted small">Drop QR image</span>
+                                                    </div>
+                                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
+                                                        <img class="qr-original" id="qrOriginal" alt="Original">
+                                                        <img class="qr-cropped" id="qrCropped" alt="Cropped">
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="rsaQrWebcam">
+                                                    <i class="bi bi-camera me-1"></i>Scan with Camera
+                                                </button>
+                                            </div>
+                                            <div class="input-group input-group-sm mt-2">
+                                                <input type="password" name="rsa_password" class="form-control" id="rsaPasswordInput" placeholder="Key password (if encrypted)">
+                                                <button class="btn btn-outline-secondary" type="button" data-toggle-password="rsaPasswordInput"><i class="bi bi-eye"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-lg w-100" id="encodeBtn">
-                        <i class="bi bi-lock me-2"></i>Encode
-                    </button>
+
+                    <!-- Submit Button -->
+                    <div class="p-3">
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="encodeBtn">
+                            <i class="bi bi-lock me-2"></i>Encode
+                        </button>
+                    </div>
+
                 </form>
-               
-                <hr class="my-4">
-                
-                <div class="row text-center text-muted small">
-                    <div class="col-4">
-                        <i class="bi bi-shield-check fs-4 d-block mb-1 text-success"></i>
-                        AES-256-GCM Encryption
-                    </div>
-                    <div class="col-4">
-                        <i class="bi bi-shuffle fs-4 d-block mb-1 text-info"></i>
-                        Random Pixel Embedding
-                    </div>
-                    <div class="col-4">
-                        <i class="bi bi-eye-slash fs-4 d-block mb-1 text-warning"></i>
-                        Undetectable by Analysis
-                    </div>
-                </div>
-                
-                <div class="alert alert-secondary mt-4 small">
-                    <i class="bi bi-info-circle me-1"></i>
-                    <strong>Limits:</strong> 
-                    Carrier image max ~24 megapixels (6000x4000). 
-                    Files max 30MB upload. 
-                    Payload max {{ max_payload_kb }} KB.
-                </div>
+            </div>
+        </div>
+
+        <!-- Footer info -->
+        <div class="row text-center text-muted small mt-3">
+            <div class="col-4">
+                <i class="bi bi-shield-check fs-5 d-block mb-1 text-success"></i>
+                AES-256-GCM
+            </div>
+            <div class="col-4">
+                <i class="bi bi-shuffle fs-5 d-block mb-1 text-info"></i>
+                Random Pixels
+            </div>
+            <div class="col-4">
+                <i class="bi bi-eye-slash fs-5 d-block mb-1 text-warning"></i>
+                Undetectable
             </div>
         </div>
     </div>
@@ -549,7 +484,105 @@
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
 // ============================================================================
-// ENCODE PAGE - Payload type switching
+// ACCORDION SUMMARY UPDATES
+// ============================================================================
+
+function updateImagesSummary() {
+    const ref = document.getElementById('refPhotoInput')?.files[0];
+    const carrier = document.getElementById('carrierInput')?.files[0];
+    const mode = document.querySelector('input[name="embed_mode"]:checked')?.value?.toUpperCase() || 'LSB';
+    const summary = document.getElementById('stepImagesSummary');
+    const stepNum = document.getElementById('stepImagesNumber');
+
+    if (ref && carrier) {
+        const refName = ref.name.length > 12 ? ref.name.slice(0, 10) + '..' : ref.name;
+        const carName = carrier.name.length > 12 ? carrier.name.slice(0, 10) + '..' : carrier.name;
+        summary.textContent = `${refName} + ${carName}, ${mode}`;
+        summary.classList.add('has-content');
+        stepNum.classList.add('complete');
+        stepNum.innerHTML = '<i class="bi bi-check"></i>';
+    } else if (ref || carrier) {
+        summary.textContent = ref ? ref.name.slice(0, 15) : carrier.name.slice(0, 15);
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '1';
+    } else {
+        summary.textContent = 'Select reference & carrier';
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '1';
+    }
+}
+
+function updatePayloadSummary() {
+    const isText = document.getElementById('payloadText')?.checked;
+    const message = document.getElementById('messageInput')?.value || '';
+    const file = document.getElementById('payloadFileInput')?.files[0];
+    const summary = document.getElementById('stepPayloadSummary');
+    const stepNum = document.getElementById('stepPayloadNumber');
+
+    if (isText && message.trim()) {
+        const preview = message.trim().slice(0, 25) + (message.length > 25 ? '...' : '');
+        summary.textContent = `"${preview}"`;
+        summary.classList.add('has-content');
+        stepNum.classList.add('complete');
+        stepNum.innerHTML = '<i class="bi bi-check"></i>';
+    } else if (!isText && file) {
+        summary.textContent = file.name.slice(0, 20);
+        summary.classList.add('has-content');
+        stepNum.classList.add('complete');
+        stepNum.innerHTML = '<i class="bi bi-check"></i>';
+    } else {
+        summary.textContent = 'Message or file to hide';
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '2';
+    }
+}
+
+function updateSecuritySummary() {
+    const passphrase = document.getElementById('passphraseInput')?.value || '';
+    const pin = document.getElementById('pinInput')?.value || '';
+    const rsaFile = document.querySelector('input[name="rsa_key"]')?.files[0];
+    const rsaPem = document.getElementById('rsaKeyPem')?.value || '';
+    const summary = document.getElementById('stepSecuritySummary');
+    const stepNum = document.getElementById('stepSecurityNumber');
+
+    const parts = [];
+    if (passphrase.trim()) parts.push('passphrase');
+    if (pin) parts.push('PIN');
+    if (rsaFile || rsaPem) parts.push('RSA');
+
+    if (parts.length > 0) {
+        summary.textContent = parts.join(' + ');
+        summary.classList.add('has-content');
+        if (passphrase.trim() && (pin || rsaFile || rsaPem)) {
+            stepNum.classList.add('complete');
+            stepNum.innerHTML = '<i class="bi bi-check"></i>';
+        }
+    } else {
+        summary.textContent = 'Passphrase & keys';
+        summary.classList.remove('has-content');
+        stepNum.classList.remove('complete');
+        stepNum.textContent = '3';
+    }
+}
+
+// Attach listeners
+document.getElementById('refPhotoInput')?.addEventListener('change', updateImagesSummary);
+document.getElementById('carrierInput')?.addEventListener('change', updateImagesSummary);
+document.querySelectorAll('input[name="embed_mode"]').forEach(r => r.addEventListener('change', updateImagesSummary));
+
+document.getElementById('messageInput')?.addEventListener('input', updatePayloadSummary);
+document.getElementById('payloadFileInput')?.addEventListener('change', updatePayloadSummary);
+document.querySelectorAll('input[name="payload_type"]').forEach(r => r.addEventListener('change', updatePayloadSummary));
+
+document.getElementById('passphraseInput')?.addEventListener('input', updateSecuritySummary);
+document.getElementById('pinInput')?.addEventListener('input', updateSecuritySummary);
+document.querySelector('input[name="rsa_key"]')?.addEventListener('change', updateSecuritySummary);
+
+// ============================================================================
+// PAYLOAD TYPE SWITCHING
 // ============================================================================
 
 const payloadTextRadio = document.getElementById('payloadText');
@@ -563,7 +596,6 @@ function updatePayloadSection() {
     const isText = payloadTextRadio.checked;
     textSection.classList.toggle('d-none', !isText);
     fileSection.classList.toggle('d-none', isText);
-    
     if (isText) {
         messageInput.setAttribute('required', '');
         payloadFileInput.removeAttribute('required');
@@ -571,42 +603,25 @@ function updatePayloadSection() {
         messageInput.removeAttribute('required');
         payloadFileInput.setAttribute('required', '');
     }
+    updatePayloadSummary();
 }
 
 payloadTextRadio?.addEventListener('change', updatePayloadSection);
 payloadFileRadio?.addEventListener('change', updatePayloadSection);
 
 // ============================================================================
-// ENCODE PAGE - Passphrase validation
-// ============================================================================
-
-const passphraseInput = document.getElementById('passphraseInput');
-const passphraseWarning = document.getElementById('passphraseWarning');
-
-passphraseInput?.addEventListener('input', function() {
-    const words = this.value.trim().split(/\s+/).filter(w => w.length > 0);
-    const recommendedWords = {{ recommended_passphrase_words }};
-    
-    if (passphraseWarning) {
-        passphraseWarning.style.display = (words.length > 0 && words.length < recommendedWords) ? 'block' : 'none';
-    }
-});
-
-// ============================================================================
-// ENCODE PAGE - Payload file info
+// FILE INFO DISPLAY
 // ============================================================================
 
 payloadFileInput?.addEventListener('change', function() {
     const fileInfo = document.getElementById('fileInfo');
     const fileInfoName = document.getElementById('fileInfoName');
     const fileInfoSize = document.getElementById('fileInfoSize');
-    
     if (this.files && this.files[0]) {
         const file = this.files[0];
         fileInfo?.classList.remove('d-none');
         if (fileInfoName) fileInfoName.textContent = file.name;
         if (fileInfoSize) fileInfoSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
-        
         const label = document.getElementById('payloadDropLabel');
         if (label) label.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>${file.name}`;
     } else {
@@ -615,141 +630,70 @@ payloadFileInput?.addEventListener('change', function() {
 });
 
 // ============================================================================
-// ENCODE PAGE - Character counter
+// CHARACTER COUNTER
 // ============================================================================
 
 messageInput?.addEventListener('input', function() {
     const count = this.value.length;
-    const max = 250000;
-    const percent = Math.round((count / max) * 100);
-    
-    const charCount = document.getElementById('charCount');
-    const charPercent = document.getElementById('charPercent');
-    const charWarning = document.getElementById('charWarning');
-    
-    if (charCount) charCount.textContent = count.toLocaleString();
-    if (charPercent) charPercent.textContent = percent + '%';
-    charWarning?.classList.toggle('d-none', percent < 80);
+    document.getElementById('charCount').textContent = count.toLocaleString();
+    document.getElementById('charPercent').textContent = Math.round((count / 250000) * 100) + '%';
 });
 
 // ============================================================================
-// ENCODE PAGE - Carrier capacity
+// CAPACITY FETCH
 // ============================================================================
 
-const capacityPanel = document.getElementById('capacityPanel');
 const carrierInput = document.getElementById('carrierInput');
-
 carrierInput?.addEventListener('change', function() {
     if (this.files && this.files[0]) {
-        fetchCapacityComparison(this.files[0]);
+        const formData = new FormData();
+        formData.append('carrier', this.files[0]);
+        fetch('/api/compare-capacity', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) return;
+                document.getElementById('carrierDimensions').textContent = `${data.width} x ${data.height}`;
+                document.getElementById('lsbCapacityBadge').textContent = `LSB: ${data.lsb.capacity_kb} KB`;
+                document.getElementById('dctCapacityBadge').textContent = `DCT: ${data.dct.capacity_kb} KB`;
+                document.getElementById('capacityPanel')?.classList.remove('d-none');
+            }).catch(() => {});
     }
 });
 
-function fetchCapacityComparison(file) {
-    const formData = new FormData();
-    formData.append('carrier', file);
-    
-    fetch('/api/compare-capacity', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) return;
-        
-        const dims = document.getElementById('carrierDimensions');
-        const lsbBadge = document.getElementById('lsbCapacityBadge');
-        const dctBadge = document.getElementById('dctCapacityBadge');
-        
-        if (dims) dims.textContent = `${data.width} × ${data.height} (${(data.width * data.height / 1000000).toFixed(1)} MP)`;
-        if (lsbBadge) lsbBadge.textContent = `LSB: ${data.lsb.capacity_kb} KB`;
-        if (dctBadge) dctBadge.textContent = `DCT: ${data.dct.capacity_kb} KB`;
-        
-        capacityPanel?.classList.remove('d-none');
-    })
-    .catch(err => console.error('Capacity fetch failed:', err));
-}
-
 // ============================================================================
-// ENCODE PAGE - Mode switching (LSB/DCT)
+// MODE SWITCHING
 // ============================================================================
 
-// Initialize tooltips for mode info icons
-document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-    new bootstrap.Tooltip(el);
-});
-
-// Mode button active state toggle
 const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
 const modeBtns = { 'dct': document.getElementById('dctModeCard'), 'lsb': document.getElementById('lsbModeCard') };
+const dctOptionsRow = document.getElementById('dctOptionsRow');
 
 modeRadios.forEach(radio => {
     radio.addEventListener('change', () => {
         Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
         modeBtns[radio.value]?.classList.add('active');
+        dctOptionsRow?.classList.toggle('d-none', radio.value !== 'dct');
     });
 });
 
-// Show/hide DCT options
-const modeDct = document.getElementById('modeDct');
-const advancedOptionsContainer = document.getElementById('advancedOptionsContainer');
-
-document.querySelectorAll('input[name="embed_mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-        advancedOptionsContainer?.classList.toggle('d-none', !modeDct?.checked);
-    });
-});
-
-// DCT color mode button active state toggle
-const colorModeRadios = document.querySelectorAll('input[name="dct_color_mode"]');
-const colorModeBtns = { 'color': document.getElementById('dctColorCard'), 'grayscale': document.getElementById('dctGrayscaleCard') };
-
-colorModeRadios.forEach(radio => {
-    radio.addEventListener('change', () => {
-        Object.values(colorModeBtns).forEach(btn => btn?.classList.remove('active'));
-        colorModeBtns[radio.value]?.classList.add('active');
-    });
-});
-
-// DCT format button active state toggle
-const formatRadios = document.querySelectorAll('input[name="dct_output_format"]');
-const formatBtns = { 'png': document.getElementById('dctPngCard'), 'jpeg': document.getElementById('dctJpegCard') };
-
-formatRadios.forEach(radio => {
-    radio.addEventListener('change', () => {
-        Object.values(formatBtns).forEach(btn => btn?.classList.remove('active'));
-        formatBtns[radio.value]?.classList.add('active');
-    });
-});
-
-// Advanced options chevron
-const advancedOptionsEl = document.getElementById('advancedOptions');
-advancedOptionsEl?.addEventListener('show.bs.collapse', () => {
-    document.getElementById('advancedChevron')?.classList.replace('bi-chevron-down', 'bi-chevron-up');
-});
-advancedOptionsEl?.addEventListener('hide.bs.collapse', () => {
-    document.getElementById('advancedChevron')?.classList.replace('bi-chevron-up', 'bi-chevron-down');
-});
+// Show DCT options if DCT selected initially
+if (document.getElementById('modeDct')?.checked) {
+    dctOptionsRow?.classList.remove('d-none');
+}
 
 // ============================================================================
-// ENCODE PAGE - Duplicate file check
+// DUPLICATE FILE CHECK
 // ============================================================================
 
 function checkDuplicateFiles() {
     const refInput = document.querySelector('input[name="reference_photo"]');
     const carInput = document.querySelector('input[name="carrier"]');
-    
     if (refInput?.files[0] && carInput?.files[0]) {
-        if (refInput.files[0].name === carInput.files[0].name && 
-            refInput.files[0].size === carInput.files[0].size) {
-            alert("Security Warning: You cannot use the same image for both Reference and Carrier!");
+        if (refInput.files[0].name === carInput.files[0].name && refInput.files[0].size === carInput.files[0].size) {
+            alert("You cannot use the same image for both Reference and Carrier!");
             carInput.value = '';
             document.getElementById('carrierPreview')?.classList.add('d-none');
-            const label = document.querySelector('#carrierDropZone .drop-zone-label');
-            if (label) {
-                label.innerHTML = '<i class="bi bi-cloud-arrow-up fs-3 d-block mb-2 text-muted"></i><span class="text-muted">Drop image or click to browse</span>';
-            }
-            capacityPanel?.classList.add('d-none');
+            updateImagesSummary();
         }
     }
 }

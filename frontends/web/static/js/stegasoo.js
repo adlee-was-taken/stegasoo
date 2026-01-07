@@ -1091,6 +1091,400 @@ const Stegasoo = {
     },
 
     // ========================================================================
+    // ASYNC DECODE WITH PROGRESS (v4.1.5)
+    // ========================================================================
+
+    /**
+     * Submit decode form asynchronously with progress tracking
+     * @param {HTMLFormElement} form - The decode form
+     * @param {HTMLElement} btn - The submit button
+     */
+    async submitDecodeAsync(form, btn) {
+        const formData = new FormData(form);
+        formData.append('async', 'true');
+
+        // Show progress modal
+        this.showProgressModal('Decoding');
+
+        try {
+            // Start decode job
+            const response = await fetch('/decode', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to start decode');
+            }
+
+            const result = await response.json();
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            const jobId = result.job_id;
+
+            // Poll for progress
+            await this.pollDecodeProgress(jobId);
+
+        } catch (error) {
+            this.hideProgressModal();
+            alert('Decode failed: ' + error.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Decode';
+        }
+    },
+
+    /**
+     * Poll decode progress until complete
+     * @param {string} jobId - The job ID
+     */
+    async pollDecodeProgress(jobId) {
+        const poll = async () => {
+            try {
+                // Check status first
+                const statusResponse = await fetch(`/decode/status/${jobId}`);
+                const statusData = await statusResponse.json();
+
+                if (statusData.status === 'complete') {
+                    // Done - redirect to result page
+                    this.updateProgress(100, 'Complete!');
+                    setTimeout(() => {
+                        window.location.href = `/decode/result/${jobId}`;
+                    }, 500);
+                    return;
+                }
+
+                if (statusData.status === 'error') {
+                    // Handle specific error types
+                    const errorType = statusData.error_type;
+                    let errorMsg = statusData.error || 'Decode failed';
+
+                    if (errorType === 'DecryptionError' || errorMsg.toLowerCase().includes('decrypt')) {
+                        errorMsg = 'Wrong credentials. Double-check your reference photo, passphrase, PIN, and channel key.';
+                    }
+
+                    throw new Error(errorMsg);
+                }
+
+                // Get progress
+                const progressResponse = await fetch(`/decode/progress/${jobId}`);
+                const progressData = await progressResponse.json();
+
+                const percent = progressData.percent || 0;
+                const phase = progressData.phase || 'processing';
+
+                this.updateProgress(percent, this.formatDecodePhase(phase));
+
+                // Continue polling
+                setTimeout(poll, 500);
+
+            } catch (error) {
+                this.hideProgressModal();
+                alert(error.message);
+            }
+        };
+
+        await poll();
+    },
+
+    /**
+     * Format decode phase name for display
+     */
+    formatDecodePhase(phase) {
+        const phases = {
+            'starting': 'Starting...',
+            'reading': 'Reading image...',
+            'extracting': 'Extracting data...',
+            'decrypting': 'Decrypting...',
+            'verifying': 'Verifying...',
+            'finalizing': 'Finalizing...',
+            'complete': 'Complete!',
+        };
+        return phases[phase] || phase;
+    },
+
+    // ========================================================================
+    // WEBCAM QR SCANNING (v4.1.5)
+    // ========================================================================
+
+    /**
+     * Active scanner instance
+     */
+    _qrScanner: null,
+    _qrScannerModal: null,
+    _qrScannerCallback: null,
+
+    /**
+     * Show webcam QR scanner modal
+     * @param {Function} onSuccess - Callback with decoded QR text
+     * @param {string} title - Modal title
+     */
+    showQrScanner(onSuccess, title = 'Scan QR Code') {
+        this._qrScannerCallback = onSuccess;
+
+        // Create modal if doesn't exist
+        let modal = document.getElementById('qrScannerModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'qrScannerModal';
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-light">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title">
+                                <i class="bi bi-camera-video me-2"></i>
+                                <span id="qrScannerTitle">${title}</span>
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-0">
+                            <div id="qrScannerReader" style="width: 100%;"></div>
+                            <div id="qrScannerStatus" class="text-center py-3 text-muted">
+                                <i class="bi bi-qr-code-scan me-2"></i>
+                                Point camera at QR code
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-primary" id="qrCaptureBtn">
+                                <i class="bi bi-camera me-1"></i>Capture
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            // Clean up scanner when modal hides
+            modal.addEventListener('hidden.bs.modal', () => {
+                this.stopQrScanner();
+            });
+
+            // Manual capture button
+            modal.querySelector('#qrCaptureBtn')?.addEventListener('click', () => {
+                this.captureQrFrame();
+            });
+        }
+
+        // Update title
+        const titleEl = modal.querySelector('#qrScannerTitle');
+        if (titleEl) titleEl.textContent = title;
+
+        // Reset status
+        const statusEl = modal.querySelector('#qrScannerStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-qr-code-scan me-2"></i>Point camera at QR code';
+            statusEl.className = 'text-center py-3 text-muted';
+        }
+
+        // Show modal
+        this._qrScannerModal = new bootstrap.Modal(modal);
+        this._qrScannerModal.show();
+
+        // Start scanner after modal is shown
+        modal.addEventListener('shown.bs.modal', () => {
+            this.startQrScanner();
+        }, { once: true });
+    },
+
+    /**
+     * Start the QR scanner
+     */
+    startQrScanner() {
+        const readerEl = document.getElementById('qrScannerReader');
+        if (!readerEl) return;
+
+        // Check if Html5Qrcode is available
+        if (typeof Html5Qrcode === 'undefined') {
+            console.error('Html5Qrcode library not loaded');
+            const statusEl = document.getElementById('qrScannerStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-2"></i>QR scanner not available';
+            }
+            return;
+        }
+
+        this._qrScanner = new Html5Qrcode('qrScannerReader');
+
+        const config = {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+        };
+
+        this._qrScanner.start(
+            { facingMode: 'environment' }, // Prefer back camera
+            config,
+            (decodedText, decodedResult) => {
+                // QR code detected
+                this.onQrCodeDetected(decodedText);
+            },
+            (errorMessage) => {
+                // Scan error (ignore, keep scanning)
+            }
+        ).catch((err) => {
+            console.error('Failed to start scanner:', err);
+            const statusEl = document.getElementById('qrScannerStatus');
+            if (statusEl) {
+                if (err.toString().includes('Permission')) {
+                    statusEl.innerHTML = '<i class="bi bi-camera-video-off text-danger me-2"></i>Camera permission denied';
+                } else {
+                    statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-warning me-2"></i>Could not access camera';
+                }
+                statusEl.className = 'text-center py-3';
+            }
+        });
+    },
+
+    /**
+     * Capture a frame with countdown and try to decode
+     */
+    captureQrFrame() {
+        const statusEl = document.getElementById('qrScannerStatus');
+        const captureBtn = document.getElementById('qrCaptureBtn');
+        if (!statusEl || !this._qrScanner) return;
+
+        // Disable button during countdown
+        if (captureBtn) captureBtn.disabled = true;
+
+        let count = 3;
+        const countdown = () => {
+            if (count > 0) {
+                statusEl.innerHTML = `<i class="bi bi-camera me-2"></i><span style="font-size: 1.5rem; font-weight: bold;">${count}</span>`;
+                statusEl.className = 'text-center py-3 text-warning';
+                count--;
+                setTimeout(countdown, 1000);
+            } else {
+                // Capture!
+                statusEl.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Analyzing...';
+                statusEl.className = 'text-center py-3 text-info';
+
+                // Get video element and capture frame
+                const video = document.querySelector('#qrScannerReader video');
+                if (video) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+
+                    // Stop the scanner before file scan (prevents conflicts)
+                    const scanner = this._qrScanner;
+                    scanner.stop().then(() => {
+                        canvas.toBlob((blob) => {
+                            const file = new File([blob], 'capture.png', { type: 'image/png' });
+                            scanner.scanFile(file, true)
+                                .then((decodedText) => {
+                                    this.onQrCodeDetected(decodedText);
+                                })
+                                .catch((err) => {
+                                    statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-2"></i>No QR code found. Try again.';
+                                    statusEl.className = 'text-center py-3 text-danger';
+                                    if (captureBtn) captureBtn.disabled = false;
+                                    // Restart the scanner
+                                    this.startQrScanner();
+                                });
+                        }, 'image/png');
+                    }).catch(() => {
+                        statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-2"></i>Scanner error';
+                        statusEl.className = 'text-center py-3 text-danger';
+                        if (captureBtn) captureBtn.disabled = false;
+                    });
+                } else {
+                    statusEl.innerHTML = '<i class="bi bi-x-circle text-danger me-2"></i>Camera not ready';
+                    statusEl.className = 'text-center py-3 text-danger';
+                    if (captureBtn) captureBtn.disabled = false;
+                }
+            }
+        };
+        countdown();
+    },
+
+    /**
+     * Stop the QR scanner
+     */
+    stopQrScanner() {
+        if (this._qrScanner) {
+            this._qrScanner.stop().then(() => {
+                this._qrScanner.clear();
+                this._qrScanner = null;
+            }).catch((err) => {
+                console.log('Scanner stop error:', err);
+            });
+        }
+    },
+
+    /**
+     * Handle detected QR code
+     * @param {string} text - Decoded QR text
+     */
+    onQrCodeDetected(text) {
+        // Update status
+        const statusEl = document.getElementById('qrScannerStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '<i class="bi bi-check-circle text-success me-2"></i>QR code detected!';
+            statusEl.className = 'text-center py-3 text-success';
+        }
+
+        // Close modal after brief delay
+        setTimeout(() => {
+            this._qrScannerModal?.hide();
+
+            // Call callback
+            if (this._qrScannerCallback) {
+                this._qrScannerCallback(text);
+            }
+        }, 500);
+    },
+
+    /**
+     * Add camera scan button to an input field
+     * @param {string} inputId - ID of the input field
+     * @param {string} title - Modal title
+     * @param {Function} validator - Optional validation function for scanned text
+     */
+    addCameraScanButton(inputId, title = 'Scan QR Code', validator = null) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        // Create button
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-secondary';
+        btn.innerHTML = '<i class="bi bi-camera"></i>';
+        btn.title = 'Scan QR code with camera';
+
+        btn.addEventListener('click', () => {
+            this.showQrScanner((text) => {
+                // Validate if validator provided
+                if (validator && !validator(text)) {
+                    alert('Invalid QR code format');
+                    return;
+                }
+                // Set input value
+                input.value = text;
+                // Trigger input event for formatting
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }, title);
+        });
+
+        // Wrap input in input-group if not already
+        const parent = input.parentElement;
+        if (!parent.classList.contains('input-group')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'input-group';
+            parent.insertBefore(wrapper, input);
+            wrapper.appendChild(input);
+            wrapper.appendChild(btn);
+        } else {
+            parent.appendChild(btn);
+        }
+    },
+
+    // ========================================================================
     // INITIALIZATION HELPERS
     // ========================================================================
 
@@ -1109,6 +1503,39 @@ const Stegasoo = {
             customInputId: 'channelCustomInput',
             keyInputId: 'channelKeyInput',
             generateBtnId: 'channelKeyGenerate'
+        });
+
+        // Webcam QR scanning for channel key (v4.1.5)
+        document.getElementById('channelKeyScan')?.addEventListener('click', () => {
+            this.showQrScanner((text) => {
+                const input = document.getElementById('channelKeyInput');
+                if (input) {
+                    const clean = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    input.value = clean.length === 32 ? clean.match(/.{4}/g).join('-') : text.toUpperCase();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }, 'Scan Channel Key');
+        });
+
+        // Webcam QR scanning for RSA key (v4.1.5)
+        document.getElementById('rsaQrWebcam')?.addEventListener('click', () => {
+            this.showQrScanner((text) => {
+                // Check for raw PEM or compressed format (STEGASOO-Z: prefix)
+                const isRawPem = text.includes('-----BEGIN') && text.includes('KEY-----');
+                const isCompressed = text.startsWith('STEGASOO-Z:');
+                if (isRawPem || isCompressed) {
+                    // Valid RSA key data scanned
+                    document.getElementById('rsaKeyPem').value = text;
+                    // Show success in drop zone
+                    const dropZone = document.getElementById('qrDropZone');
+                    const label = dropZone?.querySelector('.drop-zone-label');
+                    if (label) {
+                        label.innerHTML = '<i class="bi bi-check-circle text-success fs-4 d-block mb-1"></i><span class="text-success small">RSA Key scanned successfully</span>';
+                    }
+                } else {
+                    alert('QR code does not contain a valid RSA key');
+                }
+            }, 'Scan RSA Key QR');
         });
 
         // Form submission with async progress tracking (v4.1.2)
@@ -1136,7 +1563,7 @@ const Stegasoo = {
         this.initRsaMethodToggle();
         this.initDropZones();
         this.initClipboardPaste(['input[name="stego_image"]', 'input[name="reference_photo"]']);
-        this.initQrCropAnimation('rsaKeyQrInput');
+        this.initQrCropAnimation('rsaQrInput');
         this.initCollapseChevrons();
         this.initPassphraseFontResize();
         
@@ -1148,28 +1575,56 @@ const Stegasoo = {
             serverInfoId: 'channelServerInfoDec'
         });
 
-        // Form submission with channel key validation and mode display
+        // Webcam QR scanning for channel key (v4.1.5)
+        document.getElementById('channelKeyScanDec')?.addEventListener('click', () => {
+            this.showQrScanner((text) => {
+                const input = document.getElementById('channelKeyInputDec');
+                if (input) {
+                    const clean = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    input.value = clean.length === 32 ? clean.match(/.{4}/g).join('-') : text.toUpperCase();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }, 'Scan Channel Key');
+        });
+
+        // Webcam QR scanning for RSA key (v4.1.5)
+        document.getElementById('rsaQrWebcam')?.addEventListener('click', () => {
+            this.showQrScanner((text) => {
+                // Check for raw PEM or compressed format (STEGASOO-Z: prefix)
+                const isRawPem = text.includes('-----BEGIN') && text.includes('KEY-----');
+                const isCompressed = text.startsWith('STEGASOO-Z:');
+                if (isRawPem || isCompressed) {
+                    // Valid RSA key data scanned
+                    document.getElementById('rsaKeyPem').value = text;
+                    // Show success in drop zone
+                    const dropZone = document.getElementById('qrDropZone');
+                    const label = dropZone?.querySelector('.drop-zone-label');
+                    if (label) {
+                        label.innerHTML = '<i class="bi bi-check-circle text-success fs-4 d-block mb-1"></i><span class="text-success small">RSA Key scanned successfully</span>';
+                    }
+                } else {
+                    alert('QR code does not contain a valid RSA key');
+                }
+            }, 'Scan RSA Key QR');
+        });
+
+        // Form submission with async progress tracking (v4.1.5)
         const form = document.getElementById('decodeForm');
         const btn = document.getElementById('decodeBtn');
         form?.addEventListener('submit', (e) => {
+            e.preventDefault();
+
             if (!this.validateChannelKeyOnSubmit(form, 'channelSelectDec', 'channelKeyInputDec')) {
-                e.preventDefault();
                 return false;
             }
-            const selectedMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'auto';
+
             if (btn) {
                 btn.disabled = true;
-                const startTime = Date.now();
-                const updateTimer = () => {
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    const mins = Math.floor(elapsed / 60);
-                    const secs = elapsed % 60;
-                    const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Decoding (${selectedMode.toUpperCase()})... ${timeStr}`;
-                };
-                updateTimer();
-                setInterval(updateTimer, 1000);
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
             }
+
+            // Use async submission with progress tracking
+            this.submitDecodeAsync(form, btn);
         });
     },
     
