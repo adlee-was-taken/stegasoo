@@ -31,6 +31,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import temp_storage
 from auth import (
     MAX_CHANNEL_KEYS,
     MAX_USERS,
@@ -83,7 +84,6 @@ from flask import (
 )
 from PIL import Image
 from ssl_utils import ensure_certs
-import temp_storage
 
 os.environ["NUMPY_MADVISE_HUGEPAGE"] = "0"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -2532,7 +2532,8 @@ if __name__ == "__main__":
     # HTTPS configuration
     ssl_context = None
     if app.config.get("HTTPS_ENABLED", False):
-        hostname = os.environ.get("STEGASOO_HOSTNAME", "localhost")
+        import socket
+        hostname = os.environ.get("STEGASOO_HOSTNAME") or socket.gethostname()
         try:
             cert_path, key_path = ensure_certs(base_dir, hostname)
             if cert_path.exists() and key_path.exists():
