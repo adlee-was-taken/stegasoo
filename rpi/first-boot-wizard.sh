@@ -52,7 +52,7 @@ echo -e "\033[1;37m                    First Boot Wizard\033[0m"
 echo -e "\033[38;5;93m══════════════\033[38;5;99m══════════════\033[38;5;105m══════════════\033[38;5;117m══════════════\033[0m"
 
 echo ""
-gum style --foreground 245 "This wizard will help you configure your Stegasoo server."
+gum style --foreground 245 "This wizard will help you configure your Stegasoo server"
 echo ""
 gum style --foreground 245 "You can reconfigure later by editing:"
 gum style --foreground 214 "  /etc/systemd/system/stegasoo.service"
