@@ -53,7 +53,8 @@ echo -e "\033[38;5;93m══════════════\033[38;5;99m═
 
 echo ""
 gum style --foreground 245 "This wizard will help you configure your Stegasoo server."
-gum style --foreground 245 "You can reconfigure later by editing /etc/systemd/system/stegasoo.service"
+gum style --foreground 245 "You can reconfigure later by editing:"
+gum style --foreground 245 "  /etc/systemd/system/stegasoo.service"
 echo ""
 
 gum confirm "Ready to begin setup?" || exit 0
@@ -421,8 +422,8 @@ echo -e "\033[38;5;93m══════════════\033[38;5;99m═
 
 echo ""
 gum style --foreground 82 --bold "Create your admin account:"
-gum style --foreground 226 "  $ACCESS_URL"
-gum style --foreground 245 "  $ACCESS_URL_LOCAL (if mDNS works)"
+gum style --foreground 226 "  $ACCESS_URL_LOCAL"
+gum style --foreground 245 "  $ACCESS_URL (fallback IP)"
 
 if [ -n "$CHANNEL_KEY" ]; then
   echo ""

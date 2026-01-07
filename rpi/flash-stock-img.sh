@@ -316,7 +316,11 @@ echo "  User: $PI_USER"
 echo "  SSH: enabled"
 echo "  WiFi: $WIFI_SSID"
 echo
-echo "Insert into Pi and boot. Find it with: ping $PI_HOSTNAME.local"
+echo "Insert into Pi and boot. Access via:"
+echo "  mDNS:  http://$PI_HOSTNAME.local"
+echo "  Find IP: ping $PI_HOSTNAME.local"
+echo
+echo "Once booted, SSH with: ssh $PI_USER@$PI_HOSTNAME.local"
 
 # If we resized, remind about pull-image.sh
 if [[ ! "$resize_confirm" =~ ^[Nn]$ ]]; then

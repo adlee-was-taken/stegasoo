@@ -613,15 +613,19 @@ echo -e "${BLUE}-------------------------------------------------------${NC}"
 echo ""
 
 PI_IP=$(hostname -I | awk '{print $1}')
+PI_HOST=$(hostname)
 
 echo -e "${GREEN}Create your admin account:${NC}"
 if [ "$ENABLE_HTTPS" = "true" ]; then
     if [ "$USE_PORT_443" = "true" ]; then
+        echo -e "  ${YELLOW}https://$PI_HOST.local/setup${NC}"
         echo -e "  ${YELLOW}https://$PI_IP/setup${NC}"
     else
+        echo -e "  ${YELLOW}https://$PI_HOST.local:5000/setup${NC}"
         echo -e "  ${YELLOW}https://$PI_IP:5000/setup${NC}"
     fi
 else
+    echo -e "  ${YELLOW}http://$PI_HOST.local:5000/setup${NC}"
     echo -e "  ${YELLOW}http://$PI_IP:5000/setup${NC}"
 fi
 
@@ -649,12 +653,12 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         echo -e "${GREEN}✓ Stegasoo is running!${NC}"
         if [ "$ENABLE_HTTPS" = "true" ]; then
             if [ "$USE_PORT_443" = "true" ]; then
-                echo -e "  Create admin: ${YELLOW}https://$PI_IP/setup${NC}"
+                echo -e "  Create admin: ${YELLOW}https://$PI_HOST.local/setup${NC} or ${YELLOW}https://$PI_IP/setup${NC}"
             else
-                echo -e "  Create admin: ${YELLOW}https://$PI_IP:5000/setup${NC}"
+                echo -e "  Create admin: ${YELLOW}https://$PI_HOST.local:5000/setup${NC} or ${YELLOW}https://$PI_IP:5000/setup${NC}"
             fi
         else
-            echo -e "  Create admin: ${YELLOW}http://$PI_IP:5000/setup${NC}"
+            echo -e "  Create admin: ${YELLOW}http://$PI_HOST.local:5000/setup${NC} or ${YELLOW}http://$PI_IP:5000/setup${NC}"
         fi
     else
         echo -e "${RED}✗ Failed to start. Check logs:${NC} journalctl -u stegasoo -f"
