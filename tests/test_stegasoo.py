@@ -5,27 +5,24 @@ Tests core functionality: encode/decode, LSB/DCT modes, channel keys, validation
 """
 
 import io
-import pytest
 from pathlib import Path
+
+import pytest
 from PIL import Image
 
 import stegasoo
 from stegasoo import (
-    encode,
     decode,
     decode_text,
+    encode,
+    generate_channel_key,
     generate_passphrase,
     generate_pin,
-    generate_channel_key,
-    validate_passphrase,
-    validate_pin,
+    has_dct_support,
     validate_image,
     validate_message,
-    has_dct_support,
-    EncodeResult,
-    DecodeResult,
-    ValidationError,
-    CapacityError,
+    validate_passphrase,
+    validate_pin,
 )
 
 # Test data paths

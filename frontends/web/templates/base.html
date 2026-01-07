@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Stegasoo{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/css/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
@@ -23,26 +23,23 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto nav-icons">
                     <li class="nav-item">
-                        <a class="nav-link" href="/"><i class="bi bi-house me-1"></i> Home</a>
+                        <a class="nav-link nav-expand" href="/"><i class="bi bi-house"></i><span>Home</span></a>
                     </li>
                     {% if not auth_enabled or is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/encode"><i class="bi bi-lock me-1"></i> Encode</a>
+                        <a class="nav-link nav-expand" href="/encode"><i class="bi bi-lock"></i><span>Encode</span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/decode"><i class="bi bi-unlock me-1"></i> Decode</a>
+                        <a class="nav-link nav-expand" href="/decode"><i class="bi bi-unlock"></i><span>Decode</span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/generate"><i class="bi bi-key me-1"></i> Generate</a>
+                        <a class="nav-link nav-expand" href="/generate"><i class="bi bi-key"></i><span>Generate</span></a>
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/about"><i class="bi bi-info-circle me-1"></i> About</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/tools"><i class="bi bi-tools me-1"></i> Tools</a>
+                        <a class="nav-link nav-expand" href="/tools"><i class="bi bi-tools"></i><span>Tools</span></a>
                     </li>
                     {% if auth_enabled %}
                         {% if is_authenticated %}
@@ -54,6 +51,7 @@
                                 <li><a class="dropdown-item" href="/account"><i class="bi bi-gear me-2"></i>Account</a></li>
                                 {% if is_admin %}
                                 <li><a class="dropdown-item" href="/admin/users"><i class="bi bi-people me-2"></i>Users</a></li>
+                                <li><a class="dropdown-item" href="/admin/settings"><i class="bi bi-sliders me-2"></i>System Settings</a></li>
                                 {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/logout"><i class="bi bi-box-arrow-left me-2"></i>Logout</a></li>
@@ -96,13 +94,15 @@
             <small>
                 <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" height="16" class="me-1" style="vertical-align: text-bottom;">
                 Stegasoo v{{ version }} — Steganography with Reference Photo + Passphrase + PIN/Key
+                <span class="mx-2">|</span>
+                <a href="/about" class="text-muted text-decoration-none"><i class="bi bi-info-circle me-1"></i>About</a>
             </small>
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- QR Code scanning library (v4.1.5) -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/js/bootstrap.bundle.min.js') }}"></script>
+    <!-- QR Code scanning library (local) -->
+    <script src="{{ url_for('static', filename='vendor/js/html5-qrcode.min.js') }}"></script>
     <script>
     // Initialize toasts (auto-hide after delay)
     document.querySelectorAll('.toast').forEach(el => new bootstrap.Toast(el));

@@ -2105,6 +2105,145 @@ def api_tools_exif_clear():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/tools/rotate", methods=["POST"])
+@login_required
+def api_tools_rotate():
+    """Rotate and/or flip an image."""
+    from PIL import Image
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    rotation = int(request.form.get("rotation", 0))
+    flip_h = request.form.get("flip_h", "false").lower() == "true"
+    flip_v = request.form.get("flip_v", "false").lower() == "true"
+
+    try:
+        img = Image.open(io.BytesIO(image_file.read()))
+
+        # Apply rotation (PIL rotates counter-clockwise, so negate)
+        if rotation:
+            img = img.rotate(-rotation, expand=True)
+
+        # Apply flips
+        if flip_h:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if flip_v:
+            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+
+        # Output as PNG (lossless)
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        stem = (
+            image_file.filename.rsplit(".", 1)[0]
+            if "." in image_file.filename
+            else image_file.filename
+        )
+        return send_file(
+            buffer,
+            mimetype="image/png",
+            as_attachment=True,
+            download_name=f"{stem}_transformed.png",
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tools/compress", methods=["POST"])
+@login_required
+def api_tools_compress():
+    """Compress image to JPEG at specified quality."""
+    from PIL import Image
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    quality = int(request.form.get("quality", 85))
+    quality = max(10, min(100, quality))  # Clamp to valid range
+
+    try:
+        img = Image.open(io.BytesIO(image_file.read()))
+
+        # Convert to RGB if necessary (JPEG doesn't support alpha)
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=quality)
+        buffer.seek(0)
+
+        stem = (
+            image_file.filename.rsplit(".", 1)[0]
+            if "." in image_file.filename
+            else image_file.filename
+        )
+        return send_file(
+            buffer,
+            mimetype="image/jpeg",
+            as_attachment=True,
+            download_name=f"{stem}_q{quality}.jpg",
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tools/convert", methods=["POST"])
+@login_required
+def api_tools_convert():
+    """Convert image to different format."""
+    from PIL import Image
+
+    image_file = request.files.get("image")
+    if not image_file:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+
+    output_format = request.form.get("format", "PNG").upper()
+    quality = int(request.form.get("quality", 90))
+    quality = max(10, min(100, quality))
+
+    # Validate format
+    format_map = {
+        "PNG": ("png", "image/png"),
+        "JPEG": ("jpg", "image/jpeg"),
+        "WEBP": ("webp", "image/webp"),
+    }
+    if output_format not in format_map:
+        return jsonify({"success": False, "error": f"Unsupported format: {output_format}"}), 400
+
+    try:
+        img = Image.open(io.BytesIO(image_file.read()))
+
+        # Convert to RGB for JPEG (no alpha)
+        if output_format == "JPEG" and img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+
+        buffer = io.BytesIO()
+        save_kwargs = {"format": output_format}
+        if output_format in ("JPEG", "WEBP"):
+            save_kwargs["quality"] = quality
+        img.save(buffer, **save_kwargs)
+        buffer.seek(0)
+
+        ext, mimetype = format_map[output_format]
+        stem = (
+            image_file.filename.rsplit(".", 1)[0]
+            if "." in image_file.filename
+            else image_file.filename
+        )
+        return send_file(
+            buffer,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f"{stem}.{ext}",
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # Add these two test routes anywhere in app.py after the app = Flask(...) line:
 
 
@@ -2552,6 +2691,42 @@ def api_channel_key_use(key_id):
 # ============================================================================
 # ADMIN ROUTES (v4.1.0)
 # ============================================================================
+
+
+@app.route("/admin/settings")
+@admin_required
+def admin_settings():
+    """System settings page (admin only)."""
+    import platform
+    import sys
+
+    from stegasoo import __version__
+    from stegasoo.channel import get_channel_status
+
+    channel_status = get_channel_status()
+
+    return render_template(
+        "admin/settings.html",
+        # Channel info
+        channel_configured=channel_status["configured"],
+        channel_fingerprint=channel_status.get("fingerprint"),
+        channel_source=channel_status.get("source"),
+        channel_key_full=channel_status.get("key") if channel_status["configured"] else "",
+        # Server config
+        hostname=os.environ.get("STEGASOO_HOSTNAME") or socket.gethostname(),
+        port=os.environ.get("STEGASOO_PORT", "5000"),
+        https_enabled=app.config.get("HTTPS_ENABLED", False),
+        auth_enabled=app.config.get("AUTH_ENABLED", True),
+        max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
+        max_upload_mb=MAX_FILE_SIZE // (1024 * 1024),
+        dct_available=has_dct_support(),
+        qr_available=HAS_QRCODE_READ,
+        # Environment
+        version=__version__,
+        python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        platform=platform.system(),
+        kdf_type="Argon2id" if has_argon2() else "PBKDF2",
+    )
 
 
 @app.route("/admin/users")

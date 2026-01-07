@@ -250,7 +250,10 @@
             </div>
             <div class="modal-footer justify-content-center">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="qrDownload">
-                    <i class="bi bi-download me-1"></i>Download PNG
+                    <i class="bi bi-download me-1"></i>Download
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="qrPrint">
+                    <i class="bi bi-printer me-1"></i>Print Sheet
                 </button>
             </div>
         </div>
@@ -263,7 +266,7 @@
 <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 {% if is_admin %}
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
 {% endif %}
 <script>
 StegasooAuth.initPasswordConfirmation('accountForm', 'newPasswordInput', 'newPasswordConfirmInput');
@@ -305,20 +308,20 @@ function showKeyQr(channelKey, keyName) {
     document.getElementById('qrKeyName').textContent = keyName;
     document.getElementById('qrKeyDisplay').textContent = formatted;
 
-    // Generate QR code
+    // Generate QR code using QRious
     const canvas = document.getElementById('qrCanvas');
-    if (typeof QRCode !== 'undefined' && canvas) {
-        QRCode.toCanvas(canvas, formatted, {
-            width: 200,
-            margin: 2,
-            color: { dark: '#000', light: '#fff' }
-        }, function(error) {
-            if (error) {
-                console.error('QR generation error:', error);
-                return;
-            }
+    if (typeof QRious !== 'undefined' && canvas) {
+        try {
+            new QRious({
+                element: canvas,
+                value: formatted,
+                size: 200,
+                level: 'M'
+            });
             new bootstrap.Modal(document.getElementById('qrModal')).show();
-        });
+        } catch (error) {
+            console.error('QR generation error:', error);
+        }
     }
 }
 
@@ -333,6 +336,96 @@ document.getElementById('qrDownload')?.addEventListener('click', function() {
         link.click();
     }
 });
+
+// Print tiled QR sheet (US Letter)
+document.getElementById('qrPrint')?.addEventListener('click', function() {
+    const canvas = document.getElementById('qrCanvas');
+    const keyText = document.getElementById('qrKeyDisplay').textContent;
+    const keyName = document.getElementById('qrKeyName').textContent;
+    if (canvas && keyText) {
+        printQrSheet(canvas, keyText, keyName);
+    }
+});
+
+// Print QR codes tiled on US Letter paper (8.5" x 11")
+function printQrSheet(canvas, keyText, title) {
+    const qrDataUrl = canvas.toDataURL('image/png');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Please allow popups to print');
+        return;
+    }
+
+    // US Letter: 8.5" x 11" - create 4x5 grid of QR codes
+    const cols = 4;
+    const rows = 5;
+
+    let qrGrid = '';
+    for (let i = 0; i < rows * cols; i++) {
+        qrGrid += `
+            <div class="qr-tile">
+                <img src="${qrDataUrl}" alt="QR">
+                <div class="key-text">${keyText}</div>
+            </div>
+        `;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Stegasoo ${title} - Print Sheet</title>
+            <style>
+                @page {
+                    size: letter;
+                    margin: 0.2in;
+                }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Courier New', monospace;
+                    background: white;
+                }
+                .grid {
+                    display: grid;
+                    grid-template-columns: repeat(${cols}, 1fr);
+                    gap: 0.08in;
+                    margin-top: 0.20in;
+                }
+                .qr-tile {
+                    border: 1px dashed #ccc;
+                    padding: 0.08in;
+                    text-align: center;
+                    page-break-inside: avoid;
+                }
+                .qr-tile img {
+                    width: 1.4in;
+                    height: 1.4in;
+                }
+                .key-text {
+                    font-size: 6pt;
+                    color: #333;
+                    margin-top: 0.03in;
+                    word-break: break-all;
+                }
+                .footer {
+                    text-align: center;
+                    padding-top: 0.1in;
+                    font-size: 7pt;
+                    color: #999;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="grid">${qrGrid}</div>
+            <div class="footer">Cut along dashed lines</div>
+            <script>
+                window.onload = function() { window.print(); };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
 {% endif %}
 </script>
 {% endblock %}

@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - Stegasoo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Channel Key Configuration -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-broadcast me-2"></i>Channel Key Configuration</h5>
+            </div>
+            <div class="card-body">
+                {% if channel_configured %}
+                <div class="alert alert-success mb-4">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    <strong>Server channel key active:</strong>
+                    <code class="ms-2">{{ channel_fingerprint }}</code>
+                    <span class="text-muted ms-2">({{ channel_source }})</span>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Server running in <strong>public mode</strong>.
+                    Set <code>STEGASOO_CHANNEL_KEY</code> environment variable to enable server-wide channel isolation.
+                </div>
+                {% endif %}
+
+                <!-- QR Code Generator -->
+                <div class="card bg-dark border-secondary">
+                    <div class="card-header">
+                        <i class="bi bi-qr-code me-2"></i>Share Channel Key via QR
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-3">Generate a QR code to share a channel key with others.</p>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label small">Channel Key</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control font-monospace" id="channelKeyQrInput"
+                                           placeholder="Enter or generate a key"
+                                           {% if channel_configured %}value="{{ channel_key_full }}"{% endif %}>
+                                    <button class="btn btn-outline-secondary" type="button" id="channelKeyQrGenerate"
+                                            title="Generate random key">
+                                        <i class="bi bi-shuffle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100" type="button" id="channelKeyQrShow">
+                                    <i class="bi bi-qr-code me-1"></i>Show QR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Configuration -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Server Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-dark table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><i class="bi bi-hdd-network me-2"></i>Hostname</td>
+                                    <td><code>{{ hostname }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-ethernet me-2"></i>Port</td>
+                                    <td><code>{{ port }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-shield-lock me-2"></i>HTTPS</td>
+                                    <td>
+                                        {% if https_enabled %}
+                                        <span class="badge bg-success"><i class="bi bi-lock me-1"></i>Enabled</span>
+                                        {% else %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-unlock me-1"></i>Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-person-lock me-2"></i>Authentication</td>
+                                    <td>
+                                        {% if auth_enabled %}
+                                        <span class="badge bg-success"><i class="bi bi-check me-1"></i>Enabled</span>
+                                        {% else %}
+                                        <span class="badge bg-danger"><i class="bi bi-x me-1"></i>Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-dark table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><i class="bi bi-file-earmark me-2"></i>Max Payload</td>
+                                    <td><code>{{ max_payload_kb }} KB</code></td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-upload me-2"></i>Max Upload</td>
+                                    <td><code>{{ max_upload_mb }} MB</code></td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-soundwave me-2"></i>DCT Mode</td>
+                                    <td>
+                                        {% if dct_available %}
+                                        <span class="badge bg-success"><i class="bi bi-check me-1"></i>Available</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Not Available</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><i class="bi bi-qr-code me-2"></i>QR Support</td>
+                                    <td>
+                                        {% if qr_available %}
+                                        <span class="badge bg-success"><i class="bi bi-check me-1"></i>Available</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Not Available</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="alert alert-secondary small mt-3 mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    To change server settings, edit environment variables or config file and restart the service.
+                    <br>See <code>STEGASOO_HTTPS_ENABLED</code>, <code>STEGASOO_PORT</code>, <code>STEGASOO_CHANNEL_KEY</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Environment Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Environment</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-box text-primary fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Version</div>
+                            <strong>{{ version }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-terminal text-info fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Python</div>
+                            <strong>{{ python_version }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-cpu text-warning fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">Platform</div>
+                            <strong>{{ platform }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3 mb-3">
+                        <div class="p-3 bg-dark rounded h-100">
+                            <i class="bi bi-shield-check text-success fs-3 d-block mb-2"></i>
+                            <div class="small text-muted">KDF</div>
+                            <strong>{{ kdf_type }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div class="modal fade" id="channelKeyQrModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-qr-code me-2"></i>Channel Key</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <canvas id="channelKeyQrCanvas" class="bg-white p-2 rounded"></canvas>
+                <div class="mt-2">
+                    <code class="small" id="channelKeyQrDisplay"></code>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="channelKeyQrDownload">
+                    <i class="bi bi-download me-1"></i>Download
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="channelKeyQrPrint">
+                    <i class="bi bi-printer me-1"></i>Print Sheet
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('channelKeyQrInput');
+    const generateBtn = document.getElementById('channelKeyQrGenerate');
+    const showBtn = document.getElementById('channelKeyQrShow');
+    const canvas = document.getElementById('channelKeyQrCanvas');
+    const displayEl = document.getElementById('channelKeyQrDisplay');
+    const downloadBtn = document.getElementById('channelKeyQrDownload');
+    const modalEl = document.getElementById('channelKeyQrModal');
+    const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+
+    // Generate random key
+    generateBtn?.addEventListener('click', function() {
+        if (!input) return;
+        if (typeof Stegasoo !== 'undefined' && Stegasoo.generateChannelKey) {
+            input.value = Stegasoo.generateChannelKey();
+        } else {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let key = '';
+            for (let i = 0; i < 8; i++) {
+                if (i > 0) key += '-';
+                for (let j = 0; j < 4; j++) {
+                    key += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+            }
+            input.value = key;
+        }
+    });
+
+    // Show QR code in modal
+    showBtn?.addEventListener('click', function() {
+        const key = input?.value?.trim().replace(/-/g, '');
+        if (!key || key.length !== 32) {
+            alert('Please enter a valid 32-character channel key');
+            return;
+        }
+
+        const formatted = key.match(/.{4}/g)?.join('-') || key;
+
+        if (typeof QRious === 'undefined') {
+            alert('QR Code library failed to load.');
+            return;
+        }
+
+        try {
+            new QRious({
+                element: canvas,
+                value: formatted,
+                size: 200,
+                level: 'M'
+            });
+            if (displayEl) displayEl.textContent = formatted;
+            modal?.show();
+        } catch (error) {
+            alert('Failed to generate QR code: ' + error.message);
+        }
+    });
+
+    // Download QR as PNG
+    downloadBtn?.addEventListener('click', function() {
+        if (canvas) {
+            const link = document.createElement('a');
+            link.download = 'stegasoo-channel-key.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    });
+
+    // Print tiled QR sheet (US Letter)
+    document.getElementById('channelKeyQrPrint')?.addEventListener('click', function() {
+        if (canvas && displayEl) {
+            printQrSheet(canvas, displayEl.textContent, 'Channel Key');
+        }
+    });
+});
+
+// Print QR codes tiled on US Letter paper (8.5" x 11")
+function printQrSheet(canvas, keyText, title) {
+    const qrDataUrl = canvas.toDataURL('image/png');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Please allow popups to print');
+        return;
+    }
+
+    // US Letter: 8.5" x 11" - create 4x5 grid of QR codes
+    const cols = 4;
+    const rows = 5;
+
+    let qrGrid = '';
+    for (let i = 0; i < rows * cols; i++) {
+        qrGrid += `
+            <div class="qr-tile">
+                <img src="${qrDataUrl}" alt="QR">
+                <div class="key-text">${keyText}</div>
+            </div>
+        `;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Stegasoo ${title} - Print Sheet</title>
+            <style>
+                @page {
+                    size: letter;
+                    margin: 0.2in;
+                }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Courier New', monospace;
+                    background: white;
+                }
+                .grid {
+                    display: grid;
+                    grid-template-columns: repeat(${cols}, 1fr);
+                    gap: 0.08in;
+                    margin-top: 0.20in;
+                }
+                .qr-tile {
+                    border: 1px dashed #ccc;
+                    padding: 0.08in;
+                    text-align: center;
+                    page-break-inside: avoid;
+                }
+                .qr-tile img {
+                    width: 1.4in;
+                    height: 1.4in;
+                }
+                .key-text {
+                    font-size: 6pt;
+                    color: #333;
+                    margin-top: 0.03in;
+                    word-break: break-all;
+                }
+                .footer {
+                    text-align: center;
+                    padding-top: 0.1in;
+                    font-size: 7pt;
+                    color: #999;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="grid">${qrGrid}</div>
+            <div class="footer">Cut along dashed lines</div>
+            <script>
+                window.onload = function() { window.print(); };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+</script>
+{% endblock %}

@@ -125,6 +125,115 @@ body {
 .navbar {
     background: var(--overlay-dark) !important;
     backdrop-filter: blur(10px);
+    z-index: 1030;  /* Above page content for dropdowns */
+}
+
+/* Ensure navbar dropdown appears above all page content */
+.navbar .dropdown-menu {
+    z-index: 1031;
+}
+
+/* ----------------------------------------------------------------------------
+   Nav Icons - Floating Label on Hover (label floats below, no layout shift)
+   ---------------------------------------------------------------------------- */
+.nav-icons {
+    gap: 0.25rem;
+}
+
+.nav-icons .nav-item {
+    position: relative;
+}
+
+.nav-expand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 0.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+    position: relative;
+}
+
+.nav-expand i {
+    font-size: 1.15rem;
+    transition: all 0.3s ease;
+}
+
+/* Floating label - absolutely positioned below */
+.nav-expand span {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    color: var(--header-gold);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    background: linear-gradient(135deg, rgba(74, 40, 96, 0.95) 0%, rgba(85, 112, 212, 0.9) 100%);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: opacity 0.2s ease,
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1040;
+}
+
+.nav-expand:hover {
+    background: linear-gradient(135deg, rgba(74, 40, 96, 0.5) 0%, rgba(85, 112, 212, 0.4) 100%);
+    box-shadow: 0 0 12px rgba(102, 126, 234, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.nav-expand:hover i {
+    color: var(--header-gold);
+    filter: drop-shadow(0 0 4px rgba(254, 232, 98, 0.4));
+}
+
+.nav-expand:hover span {
+    opacity: 1;
+    transform: translateX(-50%) translateY(2px);
+}
+
+/* Active state for current page */
+.nav-expand.active,
+.nav-item.active .nav-expand {
+    background: linear-gradient(135deg, rgba(74, 40, 96, 0.6) 0%, rgba(85, 112, 212, 0.5) 100%);
+}
+
+.nav-expand.active i,
+.nav-item.active .nav-expand i {
+    color: var(--header-gold);
+}
+
+/* Mobile: Always show labels inline in collapsed menu */
+@media (max-width: 991.98px) {
+    .nav-expand span {
+        position: static;
+        transform: none;
+        opacity: 1;
+        background: none;
+        box-shadow: none;
+        padding: 0;
+        margin-left: 0.5rem;
+        font-size: 0.9rem;
+        text-transform: none;
+        letter-spacing: normal;
+        pointer-events: auto;
+    }
+
+    .nav-expand:hover span {
+        transform: none;
+    }
+
+    .nav-expand:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -893,36 +1002,36 @@ footer {
     opacity: 0;
 }
 
-/* Color variants - 60% opacity */
+/* Color variants - 70% opacity with tighter glow for thin lines */
 .embed-trace.color-yellow {
-    background: rgba(212, 225, 87, 0.6);
-    box-shadow: 0 0 6px rgba(212, 225, 87, 0.5), 0 0 12px rgba(212, 225, 87, 0.3);
+    background: rgba(212, 225, 87, 0.7);
+    box-shadow: 0 0 3px rgba(212, 225, 87, 0.6), 0 0 6px rgba(212, 225, 87, 0.3);
 }
 
 .embed-trace.color-cyan {
-    background: rgba(0, 255, 170, 0.6);
-    box-shadow: 0 0 6px rgba(0, 255, 170, 0.5), 0 0 12px rgba(0, 255, 170, 0.3);
+    background: rgba(0, 255, 170, 0.7);
+    box-shadow: 0 0 3px rgba(0, 255, 170, 0.6), 0 0 6px rgba(0, 255, 170, 0.3);
 }
 
 .embed-trace.color-purple {
-    background: rgba(167, 139, 250, 0.6);
-    box-shadow: 0 0 6px rgba(167, 139, 250, 0.5), 0 0 12px rgba(167, 139, 250, 0.3);
+    background: rgba(167, 139, 250, 0.7);
+    box-shadow: 0 0 3px rgba(167, 139, 250, 0.6), 0 0 6px rgba(167, 139, 250, 0.3);
 }
 
 .embed-trace.color-blue {
-    background: rgba(102, 126, 234, 0.6);
-    box-shadow: 0 0 6px rgba(102, 126, 234, 0.5), 0 0 12px rgba(102, 126, 234, 0.3);
+    background: rgba(102, 126, 234, 0.7);
+    box-shadow: 0 0 3px rgba(102, 126, 234, 0.6), 0 0 6px rgba(102, 126, 234, 0.3);
 }
 
 /* Vertical segments shrink from top */
 .embed-trace.v {
-    width: 2px;
+    width: 1px;
     transform-origin: top center;
 }
 
 /* Horizontal segments shrink from left */
 .embed-trace.h {
-    height: 2px;
+    height: 1px;
     transform-origin: left center;
 }
 
@@ -1697,5 +1806,458 @@ footer {
     /* Result icon - slightly smaller on mobile */
     .result-icon {
         font-size: 3rem;
+    }
+}
+
+/* ============================================================================
+   TOOLS PAGE - Office-style Ribbon + Two-Panel Layout
+   ============================================================================ */
+
+/* Icon Toolbar Ribbon - Purple/Blue Gradient Theme */
+.tools-ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 0.5rem 0.5rem 0 0;
+    flex-wrap: wrap;
+}
+
+.tools-ribbon-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.tools-ribbon-divider {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(180deg, rgba(102, 126, 234, 0.4) 0%, rgba(139, 92, 246, 0.4) 100%);
+    margin: 0 0.75rem;
+    border-radius: 1px;
+}
+
+/* Tool Icon Buttons */
+.tool-icon-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 48px;
+    padding: 0.25rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tool-icon-btn i {
+    font-size: 1.25rem;
+    margin-bottom: 2px;
+}
+
+.tool-icon-btn span {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.tool-icon-btn:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.tool-icon-btn.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #c4b5fd;
+    box-shadow: 0 0 12px rgba(139, 92, 246, 0.2);
+}
+
+/* Two-Panel Layout */
+.tools-panels {
+    display: flex;
+    min-height: 400px;
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+
+/* Left Panel - Input/Dropzone */
+.tools-panel-input {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.15);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Tool Mode Banner - bottom of input panel */
+.tool-mode-banner {
+    margin-top: auto; /* Push to bottom */
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1.25rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+    border-top: 1px solid rgba(139, 92, 246, 0.2);
+    font-size: 0.75rem;
+}
+
+.tool-mode-type {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    background: rgba(139, 92, 246, 0.3);
+    color: #c4b5fd;
+}
+
+.tool-mode-banner.mode-analyze .tool-mode-type {
+    background: rgba(72, 187, 120, 0.3);
+    color: #9ae6b4;
+}
+
+.tool-mode-banner.mode-transform .tool-mode-type {
+    background: rgba(237, 181, 71, 0.3);
+    color: #fbd38d;
+}
+
+.tool-mode-name {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+/* Right Panel - Results */
+.tools-panel-results {
+    width: 280px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* Tool Options Row */
+.tool-options {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-wrap: wrap;
+}
+
+.tool-options:empty {
+    display: none;
+}
+
+.tool-options label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 0;
+}
+
+.tool-options .form-select,
+.tool-options .form-control {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem;
+}
+
+/* Tool Drop Zone */
+.tool-dropzone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.tool-dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.tool-dropzone-label {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-dropzone-label i {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    display: block;
+    opacity: 0.5;
+}
+
+.tool-dropzone.drag-over {
+    border-color: #63b3ed;
+    background: rgba(99, 179, 237, 0.1);
+}
+
+.tool-dropzone.drag-over .tool-dropzone-label i {
+    color: #63b3ed;
+    opacity: 1;
+}
+
+/* Dropzone with preview */
+.tool-dropzone.has-file .tool-dropzone-label {
+    display: none;
+}
+
+.tool-dropzone-preview {
+    display: none;
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+}
+
+.tool-dropzone.has-file .tool-dropzone-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-dropzone-preview img {
+    max-width: 100%;
+    max-height: 180px;
+    object-fit: contain;
+    border-radius: 0.375rem;
+    border: 2px solid rgba(99, 179, 237, 0.3);
+}
+
+/* Rotate preview - smooth transitions for size and transform */
+#rotateThumb {
+    transition: transform 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out;
+}
+
+/* Rotate image container - fixed height to contain rotated images */
+.rotate-img-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+}
+
+/* Rotate file info - separate row below dropzone */
+.rotate-file-info {
+    text-align: center;
+    padding: 0.5rem 0;
+    margin-top: 0.25rem;
+}
+.rotate-file-info .file-name {
+    font-size: 0.85rem;
+    color: #63b3ed;
+    font-weight: 500;
+}
+.rotate-file-info .file-meta {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-dropzone-preview .file-name {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #63b3ed;
+    font-weight: 500;
+}
+
+.tool-dropzone-preview .file-meta {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-dropzone-clear {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 20;
+    opacity: 0.6;
+}
+
+.tool-dropzone-clear:hover {
+    opacity: 1;
+}
+
+/* Results Panel Content */
+.tool-results-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-results-header h6 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.tool-results-header small {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-results-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tool-results-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: rgba(255, 255, 255, 0.3);
+    text-align: center;
+}
+
+.tool-results-empty i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Result Items */
+.tool-result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tool-result-item:last-child {
+    border-bottom: none;
+}
+
+.tool-result-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-result-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #fff;
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.tool-result-value.text-primary { color: #63b3ed !important; }
+.tool-result-value.text-success { color: #48bb78 !important; }
+.tool-result-value.text-warning { color: #edb547 !important; }
+
+/* Results Actions */
+.tool-results-actions {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tool-results-actions .btn {
+    flex: 1;
+    font-size: 0.85rem;
+}
+
+/* Tool Section Visibility */
+.tool-section {
+    display: none;
+    width: 100%;
+    flex: 1;
+    padding: 1.25rem;
+}
+
+.tool-section.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* EXIF Table in Results */
+.tool-exif-table {
+    font-size: 0.8rem;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.tool-exif-table table {
+    width: 100%;
+}
+
+.tool-exif-table th,
+.tool-exif-table td {
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tool-exif-table th {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: left;
+    width: 40%;
+}
+
+.tool-exif-table td {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    word-break: break-all;
+}
+
+/* Loading State */
+.tool-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 30;
+    border-radius: 0.5rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .tools-panels {
+        flex-direction: column;
+    }
+
+    .tools-panel-results {
+        width: 100%;
+        min-width: 100%;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tools-ribbon {
+        justify-content: center;
+    }
+
+    .tool-icon-btn {
+        width: 48px;
+        height: 44px;
+    }
+
+    .tool-icon-btn span {
+        display: none;
     }
 }

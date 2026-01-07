@@ -333,56 +333,68 @@ const Stegasoo = {
     generateEmbedTraces(container, width, height) {
         // Color classes for variety
         const colors = ['color-yellow', 'color-cyan', 'color-purple', 'color-blue'];
-        
-        // Generate 6-8 snake paths spread across the whole image
-        const numPaths = 6 + Math.floor(Math.random() * 3);
-        
-        for (let p = 0; p < numPaths; p++) {
-            // Each path gets a random color
-            const pathColor = colors[Math.floor(Math.random() * colors.length)];
-            
-            // Distribute starting points across the image
-            let x = (width * 0.1) + (Math.random() * width * 0.8);
-            let y = (height * 0.1) + (Math.random() * height * 0.8);
-            let delay = p * 40;
-            
-            // Each path has 3-5 segments for more coverage
-            const numSegments = 3 + Math.floor(Math.random() * 3);
-            let horizontal = Math.random() > 0.5;
-            
-            for (let s = 0; s < numSegments; s++) {
-                const trace = document.createElement('div');
-                trace.className = 'embed-trace ' + (horizontal ? 'h' : 'v') + ' ' + pathColor;
-                
-                const length = 30 + Math.random() * 60;
-                trace.style.left = x + 'px';
-                trace.style.top = y + 'px';
-                trace.style.animationDelay = delay + 'ms';
-                
-                if (horizontal) {
-                    trace.style.width = length + 'px';
-                } else {
-                    trace.style.height = length + 'px';
+
+        // Grid-based distribution: divide image into cells for even coverage
+        const gridCols = 5;
+        const gridRows = 4;
+        const cellWidth = width / gridCols;
+        const cellHeight = height / gridRows;
+
+        let pathIndex = 0;
+
+        // Spawn 1-2 paths from each grid cell for even distribution
+        for (let row = 0; row < gridRows; row++) {
+            for (let col = 0; col < gridCols; col++) {
+                // 1-2 paths per cell
+                const pathsInCell = 1 + Math.floor(Math.random() * 2);
+
+                for (let p = 0; p < pathsInCell; p++) {
+                    const pathColor = colors[Math.floor(Math.random() * colors.length)];
+
+                    // Start within this grid cell (with padding)
+                    let x = (col * cellWidth) + (cellWidth * 0.15) + (Math.random() * cellWidth * 0.7);
+                    let y = (row * cellHeight) + (cellHeight * 0.15) + (Math.random() * cellHeight * 0.7);
+                    let delay = pathIndex * 15;
+
+                    // Each path has 3-5 short segments
+                    const numSegments = 3 + Math.floor(Math.random() * 3);
+                    let horizontal = Math.random() > 0.5;
+
+                    for (let s = 0; s < numSegments; s++) {
+                        const trace = document.createElement('div');
+                        trace.className = 'embed-trace ' + (horizontal ? 'h' : 'v') + ' ' + pathColor;
+
+                        // Shorter segments: 12-30px for denser circuit look
+                        const length = 12 + Math.random() * 18;
+                        trace.style.left = Math.max(0, Math.min(x, width - length)) + 'px';
+                        trace.style.top = Math.max(0, Math.min(y, height - length)) + 'px';
+                        trace.style.animationDelay = delay + 'ms';
+
+                        if (horizontal) {
+                            trace.style.width = length + 'px';
+                        } else {
+                            trace.style.height = length + 'px';
+                        }
+
+                        container.appendChild(trace);
+
+                        // Move position for next segment
+                        if (horizontal) {
+                            x += length * (Math.random() > 0.5 ? 1 : -1);
+                        } else {
+                            y += length * (Math.random() > 0.5 ? 1 : -1);
+                        }
+
+                        // Keep within bounds
+                        x = Math.max(5, Math.min(x, width - 20));
+                        y = Math.max(5, Math.min(y, height - 20));
+
+                        // Alternate direction (90 degree turn)
+                        horizontal = !horizontal;
+                        delay += 20;
+                    }
+                    pathIndex++;
                 }
-                
-                container.appendChild(trace);
-                
-                // Move position for next segment
-                if (horizontal) {
-                    x += length;
-                } else {
-                    y += length;
-                }
-                
-                // Wrap around if out of bounds to keep traces in view
-                if (x > width - 20) x = 10 + Math.random() * 40;
-                if (y > height - 20) y = 10 + Math.random() * 40;
-                if (x < 10) x = width - 60 + Math.random() * 40;
-                if (y < 10) y = height - 60 + Math.random() * 40;
-                
-                // Alternate direction (90 degree turn)
-                horizontal = !horizontal;
-                delay += 30;
             }
         }
     },

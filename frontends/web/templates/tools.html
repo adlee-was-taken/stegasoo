@@ -3,367 +3,459 @@
 {% block title %}Tools - Stegasoo{% endblock %}
 
 {% block content %}
-<style>
-/* Tool drop zone - compact */
-.tool-drop-zone {
-    position: relative;
-    min-height: 120px;
-    border: 2px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    transition: all 0.3s ease;
-    overflow: hidden;
-}
-
-.tool-drop-zone.drag-over {
-    border-color: #63b3ed;
-    background: rgba(99, 179, 237, 0.1);
-}
-
-.tool-drop-zone input[type="file"] {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
-    z-index: 10;
-}
-
-.tool-drop-zone .drop-label {
-    text-align: center;
-    padding: 25px 20px;
-}
-
-.tool-drop-zone .drop-icon {
-    font-size: 2rem;
-    color: rgba(255, 255, 255, 0.3);
-    transition: all 0.3s ease;
-}
-
-.tool-drop-zone.drag-over .drop-icon {
-    color: #63b3ed;
-    transform: scale(1.1);
-}
-
-/* Preview state */
-.tool-drop-zone.has-file .drop-label {
-    display: none;
-}
-
-.tool-drop-zone .preview-container {
-    display: none;
-    padding: 12px;
-}
-
-.tool-drop-zone.has-file .preview-container {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.tool-drop-zone .preview-thumb {
-    width: 70px;
-    height: 70px;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 2px solid rgba(99, 179, 237, 0.5);
-}
-
-.tool-drop-zone .preview-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.tool-drop-zone .preview-name {
-    font-weight: 600;
-    color: #63b3ed;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tool-drop-zone .preview-meta {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.5);
-}
-
-.tool-drop-zone .preview-clear {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 20;
-    opacity: 0.7;
-}
-
-.tool-drop-zone .preview-clear:hover {
-    opacity: 1;
-}
-
-/* Result panels */
-.result-panel {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* EXIF table styling */
-.exif-table {
-    font-size: 0.85rem;
-}
-
-.exif-table th {
-    background: rgba(0, 0, 0, 0.3);
-    position: sticky;
-    top: 0;
-}
-
-.exif-table td {
-    vertical-align: middle;
-}
-
-.exif-input {
-    background: rgba(0, 0, 0, 0.3) !important;
-    border: 1px solid rgba(99, 179, 237, 0.3) !important;
-    color: #63b3ed !important;
-    font-family: monospace;
-    font-size: 0.8rem;
-    padding: 4px 8px;
-}
-
-.exif-input:focus {
-    border-color: #63b3ed !important;
-    box-shadow: 0 0 10px rgba(99, 179, 237, 0.2) !important;
-}
-
-/* Processing state */
-.processing .tool-drop-zone {
-    pointer-events: none;
-    opacity: 0.6;
-}
-
-.processing .btn {
-    pointer-events: none;
-}
-
-/* Tool section visibility */
-.tool-section { display: none; }
-.tool-section.active { display: block; }
-
-/* Green→amber gradient (12.5% lighter) */
-.tool-tabs .btn-outline-primary {
-    background-color: rgba(0, 0, 0, 0.25);
-}
-.tool-tabs .btn-outline-primary:nth-of-type(1) {
-    color: #40d770;
-    border-color: #40d770;
-}
-.tool-tabs .btn-outline-primary:nth-of-type(2) {
-    color: #96da2c;
-    border-color: #96da2c;
-}
-.tool-tabs .btn-outline-primary:nth-of-type(3) {
-    color: #fdda64;
-    border-color: #fdda64;
-}
-
-.tool-tabs .btn-outline-primary:nth-of-type(1):hover {
-    background-color: rgba(64, 215, 112, 0.15);
-}
-.tool-tabs .btn-outline-primary:nth-of-type(2):hover {
-    background-color: rgba(150, 218, 44, 0.15);
-}
-.tool-tabs .btn-outline-primary:nth-of-type(3):hover {
-    background-color: rgba(253, 218, 100, 0.15);
-}
-
-.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(1) {
-    background-color: #40d770;
-    border-color: #40d770;
-    color: #1a1a2e;
-}
-.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(2) {
-    background-color: #96da2c;
-    border-color: #96da2c;
-    color: #1a1a2e;
-}
-.tool-tabs .btn-check:checked + .btn-outline-primary:nth-of-type(3) {
-    background-color: #fdda64;
-    border-color: #fdda64;
-    color: #1a1a2e;
-}
-</style>
-
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-10 col-xl-9">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Image Security Toolkit</h5>
+            <!-- Icon Toolbar Ribbon -->
+            <div class="tools-ribbon">
+                <div class="tools-ribbon-group">
+                    <button class="tool-icon-btn active" data-tool="capacity" title="Capacity Calculator">
+                        <i class="bi bi-rulers"></i>
+                        <span>Capacity</span>
+                    </button>
+                    <button class="tool-icon-btn" data-tool="exif" title="EXIF Viewer">
+                        <i class="bi bi-card-text"></i>
+                        <span>EXIF</span>
+                    </button>
+                </div>
+
+                <div class="tools-ribbon-divider"></div>
+
+                <div class="tools-ribbon-group">
+                    <button class="tool-icon-btn" data-tool="strip" title="Strip Metadata">
+                        <i class="bi bi-eraser"></i>
+                        <span>Strip</span>
+                    </button>
+                    <button class="tool-icon-btn" data-tool="rotate" title="Rotate / Flip">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>Rotate</span>
+                    </button>
+                    <button class="tool-icon-btn" data-tool="compress" title="JPEG Compression">
+                        <i class="bi bi-file-zip"></i>
+                        <span>Compress</span>
+                    </button>
+                    <button class="tool-icon-btn" data-tool="convert" title="Format Convert">
+                        <i class="bi bi-arrow-left-right"></i>
+                        <span>Convert</span>
+                    </button>
+                </div>
             </div>
-            <div class="card-body">
-                <!-- Tool Selector Tabs -->
-                <div class="btn-group tool-tabs w-100 mb-4" role="group">
-                    <input type="radio" class="btn-check" name="tool_type" id="toolCapacity" value="capacity" checked>
-                    <label class="btn btn-outline-primary" for="toolCapacity">
-                        <i class="bi bi-rulers me-1"></i> Capacity
-                    </label>
-                    <input type="radio" class="btn-check" name="tool_type" id="toolExif" value="exif">
-                    <label class="btn btn-outline-primary" for="toolExif">
-                        <i class="bi bi-card-text me-1"></i> EXIF
-                    </label>
-                    <input type="radio" class="btn-check" name="tool_type" id="toolStrip" value="strip">
-                    <label class="btn btn-outline-primary" for="toolStrip">
-                        <i class="bi bi-eraser me-1"></i> Strip
-                    </label>
-                </div>
 
-                <!-- ============================================================ -->
-                <!-- CAPACITY CALCULATOR -->
-                <!-- ============================================================ -->
-                <div class="tool-section active" id="capacitySection">
-                    <p class="text-muted small mb-3">Check how much data can be hidden in an image</p>
-
-                    <div class="tool-drop-zone" id="capacityZone">
-                        <input type="file" accept="image/*" id="capacityFile">
-                        <div class="drop-label">
-                            <i class="bi bi-image drop-icon d-block mb-2"></i>
-                            <span class="text-muted">Drop image or click to browse</span>
+            <!-- Two-Panel Layout -->
+            <div class="tools-panels">
+                <!-- Left Panel - Input/Dropzone -->
+                <div class="tools-panel-input">
+                    <!-- ============================================================ -->
+                    <!-- CAPACITY CALCULATOR -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section active" id="capacitySection">
+                        <div class="tool-options">
+                            <!-- No options for capacity -->
                         </div>
-                        <div class="preview-container">
-                            <img class="preview-thumb" id="capacityThumb">
-                            <div class="preview-info">
-                                <div class="preview-name" id="capacityName">image.jpg</div>
-                                <div class="preview-meta" id="capacityMeta">-- × -- · -- MB</div>
+                        <div class="tool-dropzone" id="capacityZone">
+                            <input type="file" accept="image/*" id="capacityFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-image"></i>
+                                <span>Drop image or click to browse</span>
                             </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary preview-clear d-none" id="capacityClear">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
-
-                    <!-- Results -->
-                    <div class="result-panel p-3 mt-3 d-none" id="capacityResult">
-                        <div class="row text-center">
-                            <div class="col-6 col-md-3 mb-3 mb-md-0">
-                                <div class="text-muted small">Dimensions</div>
-                                <div class="fw-bold" id="capDimensions">--</div>
+                            <div class="tool-dropzone-preview">
+                                <img id="capacityThumb" alt="Preview">
+                                <div class="file-name" id="capacityFileName">image.jpg</div>
+                                <div class="file-meta" id="capacityFileMeta">--</div>
                             </div>
-                            <div class="col-6 col-md-3 mb-3 mb-md-0">
-                                <div class="text-muted small">Megapixels</div>
-                                <div class="fw-bold" id="capMegapixels">--</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">LSB Capacity</div>
-                                <div class="fw-bold text-primary" id="capLsb">--</div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="text-muted small">DCT Capacity</div>
-                                <div class="fw-bold text-warning" id="capDct">--</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ============================================================ -->
-                <!-- EXIF EDITOR -->
-                <!-- ============================================================ -->
-                <div class="tool-section" id="exifSection">
-                    <p class="text-muted small mb-3">View, edit, or remove image metadata</p>
-
-                    <div class="tool-drop-zone" id="exifZone">
-                        <input type="file" accept="image/*" id="exifFile">
-                        <div class="drop-label">
-                            <i class="bi bi-card-image drop-icon d-block mb-2"></i>
-                            <span class="text-muted">Drop image or click to browse</span>
-                        </div>
-                        <div class="preview-container">
-                            <img class="preview-thumb" id="exifThumb">
-                            <div class="preview-info">
-                                <div class="preview-name" id="exifName">image.jpg</div>
-                                <div class="preview-meta"><span id="exifFieldCount">0</span> metadata fields</div>
-                                <div id="exifNotEditable" class="text-warning small d-none">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>Non-JPEG: clear only
-                                </div>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary preview-clear d-none" id="exifClear">
-                            <i class="bi bi-x"></i>
-                        </button>
-                    </div>
-
-                    <!-- EXIF Data Editor -->
-                    <div id="exifEditor" class="d-none mt-3">
-                        <div class="table-responsive result-panel" style="max-height: 250px; overflow-y: auto;">
-                            <table class="table table-sm table-dark table-hover exif-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 35%">Field</th>
-                                        <th>Value</th>
-                                        <th style="width: 40px"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="exifTable"></tbody>
-                            </table>
-                        </div>
-
-                        <div id="exifEmpty" class="result-panel text-muted text-center py-4 d-none">
-                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>No metadata found
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="d-flex gap-2 mt-3 pt-3 border-top border-secondary">
-                            <button type="button" class="btn btn-outline-danger" id="exifClearAll">
-                                <i class="bi bi-trash me-1"></i>Clear All
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="capacityClear">
+                                <i class="bi bi-x"></i>
                             </button>
-                            <div class="ms-auto d-flex gap-2">
-                                <button type="button" class="btn btn-outline-secondary" id="exifDiscard">
-                                    Discard
-                                </button>
-                                <button type="button" class="btn btn-primary" id="exifSave" disabled>
-                                    <i class="bi bi-download me-1"></i>Save
-                                </button>
-                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ============================================================ -->
-                <!-- STRIP METADATA -->
-                <!-- ============================================================ -->
-                <div class="tool-section" id="stripSection">
-                    <p class="text-muted small mb-3">Remove all EXIF data and get a clean image</p>
-
-                    <div class="tool-drop-zone" id="stripZone">
-                        <input type="file" accept="image/*" id="stripFile">
-                        <div class="drop-label">
-                            <i class="bi bi-file-earmark-x drop-icon d-block mb-2"></i>
-                            <span class="text-muted">Drop image or click to browse</span>
+                    <!-- ============================================================ -->
+                    <!-- EXIF VIEWER -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="exifSection">
+                        <div class="tool-options">
+                            <!-- No options for EXIF view -->
                         </div>
-                        <div class="preview-container">
-                            <img class="preview-thumb" id="stripThumb">
-                            <div class="preview-info">
-                                <div class="preview-name" id="stripName">image.jpg</div>
-                                <div class="preview-meta" id="stripMeta">--</div>
+                        <div class="tool-dropzone" id="exifZone">
+                            <input type="file" accept="image/*" id="exifFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-card-image"></i>
+                                <span>Drop image or click to browse</span>
                             </div>
+                            <div class="tool-dropzone-preview">
+                                <img id="exifThumb" alt="Preview">
+                                <div class="file-name" id="exifFileName">image.jpg</div>
+                                <div class="file-meta" id="exifFileMeta">--</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="exifClear">
+                                <i class="bi bi-x"></i>
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary preview-clear d-none" id="stripClearBtn">
-                            <i class="bi bi-x"></i>
-                        </button>
                     </div>
 
-                    <!-- Format selector and action -->
-                    <div id="stripOptions" class="d-none mt-3">
-                        <div class="d-flex align-items-center gap-3">
-                            <label class="form-label mb-0 small text-muted">Output:</label>
+                    <!-- ============================================================ -->
+                    <!-- STRIP METADATA -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="stripSection">
+                        <div class="tool-options">
+                            <label class="me-2">Output:</label>
                             <select class="form-select form-select-sm" id="stripFormat" style="width: auto;">
                                 <option value="PNG" selected>PNG (lossless)</option>
                                 <option value="JPEG">JPEG</option>
                             </select>
-                            <button type="button" class="btn btn-danger ms-auto" id="stripAction">
-                                <i class="bi bi-eraser me-1"></i>Strip & Download
+                        </div>
+                        <div class="tool-dropzone" id="stripZone">
+                            <input type="file" accept="image/*" id="stripFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-file-earmark-x"></i>
+                                <span>Drop image or click to browse</span>
+                            </div>
+                            <div class="tool-dropzone-preview">
+                                <img id="stripThumb" alt="Preview">
+                                <div class="file-name" id="stripFileName">image.jpg</div>
+                                <div class="file-meta" id="stripFileMeta">--</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="stripClear">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- ROTATE / FLIP -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="rotateSection">
+                        <div class="tool-options">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary" id="rotateLeft" title="Rotate 90° Left">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="rotateRight" title="Rotate 90° Right">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="flipH" title="Flip Horizontal">
+                                    <i class="bi bi-symmetry-vertical"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="flipV" title="Flip Vertical">
+                                    <i class="bi bi-symmetry-horizontal"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="tool-dropzone" id="rotateZone">
+                            <input type="file" accept="image/*" id="rotateFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-arrow-repeat"></i>
+                                <span>Drop image or click to browse</span>
+                            </div>
+                            <div class="tool-dropzone-preview">
+                                <div class="rotate-img-container">
+                                    <img id="rotateThumb" alt="Preview">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="rotateClear">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                        <!-- File info separate from dropzone to avoid rotation overlap -->
+                        <div class="rotate-file-info d-none" id="rotateFileInfo">
+                            <div class="file-name" id="rotateFileName">image.jpg</div>
+                            <div class="file-meta" id="rotateFileMeta">--</div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- JPEG COMPRESSION TESTER -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="compressSection">
+                        <div class="tool-options">
+                            <label class="me-2">Quality:</label>
+                            <input type="range" class="form-range" id="compressQuality" min="10" max="100" value="85" style="width: 120px;">
+                            <span class="ms-2 small text-muted" id="compressQualityVal">85%</span>
+                        </div>
+                        <div class="tool-dropzone" id="compressZone">
+                            <input type="file" accept="image/*" id="compressFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-file-zip"></i>
+                                <span>Drop image or click to browse</span>
+                            </div>
+                            <div class="tool-dropzone-preview">
+                                <img id="compressThumb" alt="Preview">
+                                <div class="file-name" id="compressFileName">image.jpg</div>
+                                <div class="file-meta" id="compressFileMeta">--</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="compressClear">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- FORMAT CONVERT -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="convertSection">
+                        <div class="tool-options">
+                            <label class="me-2">Convert to:</label>
+                            <select class="form-select form-select-sm" id="convertFormat" style="width: auto;">
+                                <option value="PNG">PNG</option>
+                                <option value="JPEG">JPEG</option>
+                                <option value="WEBP">WebP</option>
+                            </select>
+                            <label class="ms-3 me-2" id="convertQualityLabel">Quality:</label>
+                            <input type="range" class="form-range" id="convertQuality" min="10" max="100" value="90" style="width: 80px;">
+                            <span class="ms-2 small text-muted" id="convertQualityVal">90%</span>
+                        </div>
+                        <div class="tool-dropzone" id="convertZone">
+                            <input type="file" accept="image/*" id="convertFile">
+                            <div class="tool-dropzone-label">
+                                <i class="bi bi-arrow-left-right"></i>
+                                <span>Drop image or click to browse</span>
+                            </div>
+                            <div class="tool-dropzone-preview">
+                                <img id="convertThumb" alt="Preview">
+                                <div class="file-name" id="convertFileName">image.jpg</div>
+                                <div class="file-meta" id="convertFileMeta">--</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tool-dropzone-clear d-none" id="convertClear">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tool Mode Banner - pushed to bottom via flexbox -->
+                    <div class="tool-mode-banner mode-analyze" id="toolModeBanner">
+                        <span class="tool-mode-type" id="toolModeType">Analyze</span>
+                        <span class="tool-mode-name" id="toolModeName">Capacity Calculator</span>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Results -->
+                <div class="tools-panel-results">
+                    <!-- ============================================================ -->
+                    <!-- CAPACITY RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section active" id="capacityResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-rulers me-2"></i>Capacity Calculator</h6>
+                            <small>Check how much data can be hidden</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="capacityEmpty">
+                                <i class="bi bi-image"></i>
+                                <span>Drop an image to analyze</span>
+                            </div>
+                            <div id="capacityData" class="d-none">
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Dimensions</span>
+                                    <span class="tool-result-value" id="capDimensions">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Megapixels</span>
+                                    <span class="tool-result-value" id="capMegapixels">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">LSB Capacity</span>
+                                    <span class="tool-result-value text-success" id="capLsb">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">DCT Capacity</span>
+                                    <span class="tool-result-value text-warning" id="capDct">--</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="capacityActions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="capacityClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- EXIF RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="exifResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-card-text me-2"></i>EXIF Viewer</h6>
+                            <small>View image metadata</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="exifEmpty">
+                                <i class="bi bi-card-image"></i>
+                                <span>Drop an image to view metadata</span>
+                            </div>
+                            <div id="exifData" class="d-none">
+                                <div class="tool-exif-table">
+                                    <table>
+                                        <tbody id="exifTable"></tbody>
+                                    </table>
+                                </div>
+                                <div id="exifNoData" class="text-muted text-center py-3 d-none">
+                                    <i class="bi bi-inbox d-block mb-2"></i>
+                                    No metadata found
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="exifActions">
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="exifClearAll">
+                                <i class="bi bi-trash me-1"></i>Clear All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="exifClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- STRIP RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="stripResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-eraser me-2"></i>Strip Metadata</h6>
+                            <small>Remove all EXIF data</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="stripEmpty">
+                                <i class="bi bi-file-earmark-x"></i>
+                                <span>Drop an image to strip</span>
+                            </div>
+                            <div id="stripData" class="d-none">
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Original Size</span>
+                                    <span class="tool-result-value" id="stripOrigSize">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Output Format</span>
+                                    <span class="tool-result-value" id="stripOutFormat">PNG</span>
+                                </div>
+                                <div class="alert alert-info small mt-3 mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    All metadata will be removed from the image.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="stripActions">
+                            <button type="button" class="btn btn-danger btn-sm" id="stripAction">
+                                <i class="bi bi-download me-1"></i>Strip & Download
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="stripClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- ROTATE RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="rotateResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-arrow-repeat me-2"></i>Rotate / Flip</h6>
+                            <small>Transform image orientation</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="rotateEmpty">
+                                <i class="bi bi-arrow-repeat"></i>
+                                <span>Drop an image to transform</span>
+                            </div>
+                            <div id="rotateData" class="d-none">
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Original</span>
+                                    <span class="tool-result-value" id="rotateOrigDims">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Rotation</span>
+                                    <span class="tool-result-value" id="rotateAngle">0°</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Flipped</span>
+                                    <span class="tool-result-value" id="rotateFlip">None</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="rotateActions">
+                            <button type="button" class="btn btn-primary btn-sm" id="rotateDownload">
+                                <i class="bi bi-download me-1"></i>Download
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="rotateClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- COMPRESS RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="compressResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-file-zip me-2"></i>JPEG Compression</h6>
+                            <small>Test compression quality</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="compressEmpty">
+                                <i class="bi bi-file-zip"></i>
+                                <span>Drop an image to compress</span>
+                            </div>
+                            <div id="compressData" class="d-none">
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Original</span>
+                                    <span class="tool-result-value" id="compressOrigSize">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Compressed</span>
+                                    <span class="tool-result-value text-success" id="compressNewSize">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Reduction</span>
+                                    <span class="tool-result-value text-warning" id="compressReduction">--</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="compressActions">
+                            <button type="button" class="btn btn-primary btn-sm" id="compressDownload">
+                                <i class="bi bi-download me-1"></i>Download
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="compressClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- CONVERT RESULTS -->
+                    <!-- ============================================================ -->
+                    <div class="tool-section" id="convertResults">
+                        <div class="tool-results-header">
+                            <h6><i class="bi bi-arrow-left-right me-2"></i>Format Convert</h6>
+                            <small>Convert between formats</small>
+                        </div>
+                        <div class="tool-results-body">
+                            <div class="tool-results-empty" id="convertEmpty">
+                                <i class="bi bi-arrow-left-right"></i>
+                                <span>Drop an image to convert</span>
+                            </div>
+                            <div id="convertData" class="d-none">
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Original</span>
+                                    <span class="tool-result-value" id="convertOrigInfo">--</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">Output</span>
+                                    <span class="tool-result-value text-primary" id="convertOutFormat">PNG</span>
+                                </div>
+                                <div class="tool-result-item">
+                                    <span class="tool-result-label">New Size</span>
+                                    <span class="tool-result-value" id="convertNewSize">--</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tool-results-actions d-none" id="convertActions">
+                            <button type="button" class="btn btn-primary btn-sm" id="convertDownload">
+                                <i class="bi bi-download me-1"></i>Download
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="convertClearBtn">
+                                <i class="bi bi-x-circle me-1"></i>Clear
                             </button>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -373,27 +465,61 @@
 {% block scripts %}
 <script>
 // ============================================================================
-// TAB SWITCHING
+// TOOL SWITCHING
 // ============================================================================
 
-const toolRadios = document.querySelectorAll('input[name="tool_type"]');
+const toolButtons = document.querySelectorAll('.tool-icon-btn');
 const toolSections = {
-    capacity: document.getElementById('capacitySection'),
-    exif: document.getElementById('exifSection'),
-    strip: document.getElementById('stripSection')
+    capacity: { input: document.getElementById('capacitySection'), results: document.getElementById('capacityResults') },
+    exif: { input: document.getElementById('exifSection'), results: document.getElementById('exifResults') },
+    strip: { input: document.getElementById('stripSection'), results: document.getElementById('stripResults') },
+    rotate: { input: document.getElementById('rotateSection'), results: document.getElementById('rotateResults') },
+    compress: { input: document.getElementById('compressSection'), results: document.getElementById('compressResults') },
+    convert: { input: document.getElementById('convertSection'), results: document.getElementById('convertResults') }
 };
 
-function switchTool() {
-    const selected = document.querySelector('input[name="tool_type"]:checked').value;
-    Object.entries(toolSections).forEach(([key, section]) => {
-        section.classList.toggle('active', key === selected);
+const toolMeta = {
+    capacity: { type: 'Analyze', name: 'Capacity Calculator' },
+    exif: { type: 'Analyze', name: 'EXIF Viewer' },
+    strip: { type: 'Transform', name: 'Strip Metadata' },
+    rotate: { type: 'Transform', name: 'Rotate / Flip' },
+    compress: { type: 'Transform', name: 'JPEG Compression' },
+    convert: { type: 'Transform', name: 'Format Convert' }
+};
+
+function switchTool(toolName) {
+    // Update button states
+    toolButtons.forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`[data-tool="${toolName}"]`)?.classList.add('active');
+
+    // Update section visibility
+    Object.entries(toolSections).forEach(([key, sections]) => {
+        const isActive = key === toolName;
+        sections.input.classList.toggle('active', isActive);
+        sections.results.classList.toggle('active', isActive);
     });
+
+    // Update mode banner
+    const meta = toolMeta[toolName];
+    if (meta) {
+        const banner = document.getElementById('toolModeBanner');
+        const typeEl = document.getElementById('toolModeType');
+        const nameEl = document.getElementById('toolModeName');
+
+        typeEl.textContent = meta.type;
+        nameEl.textContent = meta.name;
+
+        banner.classList.remove('mode-analyze', 'mode-transform');
+        banner.classList.add(meta.type === 'Analyze' ? 'mode-analyze' : 'mode-transform');
+    }
 }
 
-toolRadios.forEach(radio => radio.addEventListener('change', switchTool));
+toolButtons.forEach(btn => {
+    btn.addEventListener('click', () => switchTool(btn.dataset.tool));
+});
 
 // ============================================================================
-// SHARED - Drop zone helpers
+// SHARED HELPERS
 // ============================================================================
 
 function setupDropZone(zoneId, fileInputId, onFile) {
@@ -417,19 +543,16 @@ function setupDropZone(zoneId, fileInputId, onFile) {
     });
 }
 
-function showPreview(zoneId, file, thumbId, nameId, metaText, clearBtnId) {
+function showPreview(zoneId, file, thumbId, nameId, metaId, clearBtnId) {
     const zone = document.getElementById(zoneId);
     const thumb = document.getElementById(thumbId);
     const name = document.getElementById(nameId);
+    const meta = document.getElementById(metaId);
     const clearBtn = document.getElementById(clearBtnId);
 
     zone.classList.add('has-file');
     name.textContent = file.name;
-
-    if (metaText) {
-        const metaEl = name.nextElementSibling;
-        if (metaEl) metaEl.textContent = metaText;
-    }
+    if (meta) meta.textContent = formatBytes(file.size);
 
     const reader = new FileReader();
     reader.onload = e => thumb.src = e.target.result;
@@ -460,7 +583,7 @@ function formatBytes(bytes) {
 // ============================================================================
 
 setupDropZone('capacityZone', 'capacityFile', async (file) => {
-    showPreview('capacityZone', file, 'capacityThumb', 'capacityName', formatBytes(file.size), 'capacityClear');
+    showPreview('capacityZone', file, 'capacityThumb', 'capacityFileName', 'capacityFileMeta', 'capacityClear');
 
     const formData = new FormData();
     formData.append('image', file);
@@ -470,39 +593,41 @@ setupDropZone('capacityZone', 'capacityFile', async (file) => {
         const data = await res.json();
 
         if (data.success) {
-            document.getElementById('capacityMeta').textContent =
-                `${data.width} × ${data.height} · ${formatBytes(file.size)}`;
             document.getElementById('capDimensions').textContent = `${data.width} × ${data.height}`;
             document.getElementById('capMegapixels').textContent = data.megapixels + ' MP';
             document.getElementById('capLsb').textContent = data.lsb.capacity_kb.toFixed(1) + ' KB';
             document.getElementById('capDct').textContent = data.dct.available
                 ? data.dct.capacity_kb.toFixed(1) + ' KB'
                 : 'N/A';
-            document.getElementById('capacityResult').classList.remove('d-none');
+            document.getElementById('capacityEmpty').classList.add('d-none');
+            document.getElementById('capacityData').classList.remove('d-none');
+            document.getElementById('capacityActions').classList.remove('d-none');
         }
     } catch (err) {
         console.error(err);
     }
 });
 
-document.getElementById('capacityClear')?.addEventListener('click', () => {
+document.getElementById('capacityClear')?.addEventListener('click', clearCapacity);
+document.getElementById('capacityClearBtn')?.addEventListener('click', clearCapacity);
+
+function clearCapacity() {
     clearDropZone('capacityZone', 'capacityFile', 'capacityClear', () => {
-        document.getElementById('capacityResult').classList.add('d-none');
+        document.getElementById('capacityEmpty').classList.remove('d-none');
+        document.getElementById('capacityData').classList.add('d-none');
+        document.getElementById('capacityActions').classList.add('d-none');
     });
-});
+}
 
 // ============================================================================
-// EXIF EDITOR
+// EXIF VIEWER
 // ============================================================================
 
-let exifOriginalData = {};
-let exifCurrentData = {};
-let exifEditable = false;
 let exifCurrentFile = null;
 
 setupDropZone('exifZone', 'exifFile', async (file) => {
     exifCurrentFile = file;
-    showPreview('exifZone', file, 'exifThumb', 'exifName', '', 'exifClear');
+    showPreview('exifZone', file, 'exifThumb', 'exifFileName', 'exifFileMeta', 'exifClear');
 
     const formData = new FormData();
     formData.append('image', file);
@@ -512,98 +637,45 @@ setupDropZone('exifZone', 'exifFile', async (file) => {
         const data = await res.json();
 
         if (data.success) {
-            exifOriginalData = JSON.parse(JSON.stringify(data.exif));
-            exifCurrentData = JSON.parse(JSON.stringify(data.exif));
-            exifEditable = data.editable;
+            const tbody = document.getElementById('exifTable');
+            const entries = Object.entries(data.exif).sort((a, b) => a[0].localeCompare(b[0]));
 
-            document.getElementById('exifFieldCount').textContent = data.field_count;
-            document.getElementById('exifNotEditable').classList.toggle('d-none', data.editable);
-            document.getElementById('exifEditor').classList.remove('d-none');
+            if (entries.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('exifNoData').classList.remove('d-none');
+            } else {
+                document.getElementById('exifNoData').classList.add('d-none');
+                tbody.innerHTML = entries.map(([key, value]) => {
+                    let displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                    if (displayVal.length > 40) displayVal = displayVal.substring(0, 37) + '...';
+                    return `<tr><th>${key}</th><td title="${String(value)}">${displayVal}</td></tr>`;
+                }).join('');
+            }
 
-            renderExifTable();
-            updateSaveButton();
+            document.getElementById('exifEmpty').classList.add('d-none');
+            document.getElementById('exifData').classList.remove('d-none');
+            document.getElementById('exifActions').classList.remove('d-none');
         }
     } catch (err) {
         console.error(err);
     }
 });
 
-document.getElementById('exifClear')?.addEventListener('click', () => {
+document.getElementById('exifClear')?.addEventListener('click', clearExif);
+document.getElementById('exifClearBtn')?.addEventListener('click', clearExif);
+
+function clearExif() {
     clearDropZone('exifZone', 'exifFile', 'exifClear', () => {
-        document.getElementById('exifEditor').classList.add('d-none');
+        document.getElementById('exifEmpty').classList.remove('d-none');
+        document.getElementById('exifData').classList.add('d-none');
+        document.getElementById('exifActions').classList.add('d-none');
         exifCurrentFile = null;
-        exifOriginalData = {};
-        exifCurrentData = {};
     });
-});
-
-function renderExifTable() {
-    const tbody = document.getElementById('exifTable');
-    const empty = document.getElementById('exifEmpty');
-    const entries = Object.entries(exifCurrentData).sort((a, b) => a[0].localeCompare(b[0]));
-
-    if (entries.length === 0) {
-        tbody.innerHTML = '';
-        empty.classList.remove('d-none');
-        return;
-    }
-
-    empty.classList.add('d-none');
-    tbody.innerHTML = entries.map(([key, value]) => {
-        let displayVal = typeof value === 'object' ? JSON.stringify(value) : value;
-        if (typeof displayVal === 'string' && displayVal.length > 50) {
-            displayVal = displayVal.substring(0, 47) + '...';
-        }
-
-        const editableFields = ['Make', 'Model', 'Software', 'Artist', 'Copyright', 'ImageDescription', 'DateTime', 'DateTimeOriginal', 'DateTimeDigitized', 'UserComment', 'LensMake', 'LensModel'];
-        const canEdit = exifEditable && editableFields.includes(key) && typeof value === 'string';
-
-        return `
-            <tr data-field="${key}">
-                <td class="text-muted small">${key}</td>
-                <td class="font-monospace small">
-                    ${canEdit
-                        ? `<input type="text" class="form-control form-control-sm exif-input"
-                             value="${String(value).replace(/"/g, '&quot;')}" data-field="${key}">`
-                        : `<span title="${String(displayVal)}">${displayVal}</span>`
-                    }
-                </td>
-                <td>
-                    ${canEdit
-                        ? `<button class="btn btn-sm btn-outline-danger border-0 exif-delete" data-field="${key}" title="Remove">
-                             <i class="bi bi-x"></i>
-                           </button>`
-                        : ''
-                    }
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    tbody.querySelectorAll('.exif-input').forEach(input => {
-        input.addEventListener('input', function() {
-            exifCurrentData[this.dataset.field] = this.value;
-            updateSaveButton();
-        });
-    });
-
-    tbody.querySelectorAll('.exif-delete').forEach(btn => {
-        btn.addEventListener('click', function() {
-            delete exifCurrentData[this.dataset.field];
-            renderExifTable();
-            updateSaveButton();
-        });
-    });
-}
-
-function updateSaveButton() {
-    const changed = JSON.stringify(exifCurrentData) !== JSON.stringify(exifOriginalData);
-    document.getElementById('exifSave').disabled = !changed;
 }
 
 document.getElementById('exifClearAll')?.addEventListener('click', async function() {
     if (!exifCurrentFile) return;
-    if (!confirm('Remove all metadata from this image?')) return;
+    if (!confirm('Remove all metadata and download clean image?')) return;
 
     const formData = new FormData();
     formData.append('image', exifCurrentFile);
@@ -611,7 +683,7 @@ document.getElementById('exifClearAll')?.addEventListener('click', async functio
 
     const btn = this;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Clearing...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>...';
 
     try {
         const res = await fetch('/api/tools/exif/clear', { method: 'POST', body: formData });
@@ -625,75 +697,12 @@ document.getElementById('exifClearAll')?.addEventListener('click', async functio
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            exifCurrentData = {};
-            exifOriginalData = {};
-            renderExifTable();
-        } else {
-            alert('Failed to clear metadata');
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to clear metadata: ' + err.message);
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-trash me-1"></i>Clear All';
-    }
-});
-
-document.getElementById('exifDiscard')?.addEventListener('click', function() {
-    exifCurrentData = JSON.parse(JSON.stringify(exifOriginalData));
-    renderExifTable();
-    updateSaveButton();
-});
-
-document.getElementById('exifSave')?.addEventListener('click', async function() {
-    if (!exifCurrentFile || !exifEditable) return;
-
-    const updates = {};
-    for (const [key, val] of Object.entries(exifCurrentData)) {
-        if (exifOriginalData[key] !== val) updates[key] = val;
-    }
-    for (const key of Object.keys(exifOriginalData)) {
-        if (!(key in exifCurrentData)) updates[key] = null;
-    }
-
-    if (Object.keys(updates).length === 0) return;
-
-    const formData = new FormData();
-    formData.append('image', exifCurrentFile);
-    formData.append('updates', JSON.stringify(updates));
-
-    const btn = this;
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
-
-    try {
-        const res = await fetch('/api/tools/exif/update', { method: 'POST', body: formData });
-        if (res.ok) {
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'updated.jpg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            exifOriginalData = JSON.parse(JSON.stringify(exifCurrentData));
-            updateSaveButton();
-        } else {
-            alert('Failed to save');
-        }
-    } catch (err) {
-        console.error(err);
-        alert('Failed to save changes: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-        updateSaveButton();
     }
 });
 
@@ -705,17 +714,30 @@ let stripCurrentFile = null;
 
 setupDropZone('stripZone', 'stripFile', (file) => {
     stripCurrentFile = file;
-    showPreview('stripZone', file, 'stripThumb', 'stripName', formatBytes(file.size), 'stripClearBtn');
-    document.getElementById('stripMeta').textContent = formatBytes(file.size);
-    document.getElementById('stripOptions').classList.remove('d-none');
+    showPreview('stripZone', file, 'stripThumb', 'stripFileName', 'stripFileMeta', 'stripClear');
+
+    document.getElementById('stripOrigSize').textContent = formatBytes(file.size);
+    document.getElementById('stripOutFormat').textContent = document.getElementById('stripFormat').value;
+    document.getElementById('stripEmpty').classList.add('d-none');
+    document.getElementById('stripData').classList.remove('d-none');
+    document.getElementById('stripActions').classList.remove('d-none');
 });
 
-document.getElementById('stripClearBtn')?.addEventListener('click', () => {
-    clearDropZone('stripZone', 'stripFile', 'stripClearBtn', () => {
-        document.getElementById('stripOptions').classList.add('d-none');
+document.getElementById('stripFormat')?.addEventListener('change', function() {
+    document.getElementById('stripOutFormat').textContent = this.value;
+});
+
+document.getElementById('stripClear')?.addEventListener('click', clearStrip);
+document.getElementById('stripClearBtn')?.addEventListener('click', clearStrip);
+
+function clearStrip() {
+    clearDropZone('stripZone', 'stripFile', 'stripClear', () => {
+        document.getElementById('stripEmpty').classList.remove('d-none');
+        document.getElementById('stripData').classList.add('d-none');
+        document.getElementById('stripActions').classList.add('d-none');
         stripCurrentFile = null;
     });
-});
+}
 
 document.getElementById('stripAction')?.addEventListener('click', async function() {
     if (!stripCurrentFile) return;
@@ -741,15 +763,358 @@ document.getElementById('stripAction')?.addEventListener('click', async function
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        } else {
-            alert('Failed to strip metadata');
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to strip metadata: ' + err.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-eraser me-1"></i>Strip & Download';
+        btn.innerHTML = '<i class="bi bi-download me-1"></i>Strip & Download';
+    }
+});
+
+// ============================================================================
+// ROTATE / FLIP (CSS transforms for instant preview)
+// ============================================================================
+
+let rotateCurrentFile = null;
+let rotateState = { rotation: 0, flipH: false, flipV: false };
+let rotateImgDims = { width: 0, height: 0 };  // Original image dimensions
+
+const ROTATE_MAX_WIDTH = 280;   // Max preview width
+const ROTATE_MAX_HEIGHT = 180;  // Max preview height
+
+setupDropZone('rotateZone', 'rotateFile', async (file) => {
+    rotateCurrentFile = file;
+    rotateState = { rotation: 0, flipH: false, flipV: false };
+    rotateImgDims = { width: 0, height: 0 };
+
+    // Show UI immediately
+    document.getElementById('rotateAngle').textContent = '0°';
+    document.getElementById('rotateFlip').textContent = 'None';
+    document.getElementById('rotateOrigDims').textContent = '...';
+    document.getElementById('rotateEmpty').classList.add('d-none');
+    document.getElementById('rotateData').classList.remove('d-none');
+    document.getElementById('rotateActions').classList.remove('d-none');
+
+    // Load image to get dimensions, then show preview
+    const thumb = document.getElementById('rotateThumb');
+    const objectUrl = URL.createObjectURL(file);
+
+    thumb.onload = () => {
+        rotateImgDims = { width: thumb.naturalWidth, height: thumb.naturalHeight };
+        document.getElementById('rotateOrigDims').textContent = `${rotateImgDims.width} × ${rotateImgDims.height}`;
+        applyRotateCSSTransform();
+    };
+    thumb.src = objectUrl;
+
+    // Show the preview area and file info
+    const zone = document.getElementById('rotateZone');
+    zone.classList.add('has-file');
+    document.getElementById('rotateFileName').textContent = file.name;
+    document.getElementById('rotateFileMeta').textContent = formatBytes(file.size);
+    document.getElementById('rotateFileInfo').classList.remove('d-none');
+    document.getElementById('rotateClear').classList.remove('d-none');
+});
+
+function updateRotateDisplay() {
+    document.getElementById('rotateAngle').textContent = rotateState.rotation + '°';
+    const flips = [];
+    if (rotateState.flipH) flips.push('H');
+    if (rotateState.flipV) flips.push('V');
+    document.getElementById('rotateFlip').textContent = flips.length ? flips.join(' + ') : 'None';
+}
+
+function applyRotateCSSTransform() {
+    const thumb = document.getElementById('rotateThumb');
+    const scaleX = rotateState.flipH ? -1 : 1;
+    const scaleY = rotateState.flipV ? -1 : 1;
+
+    // Calculate effective dimensions after rotation
+    const isSideways = rotateState.rotation === 90 || rotateState.rotation === 270;
+    const effectiveW = isSideways ? rotateImgDims.height : rotateImgDims.width;
+    const effectiveH = isSideways ? rotateImgDims.width : rotateImgDims.height;
+
+    // Calculate scale to fit within max bounds
+    let displayW, displayH;
+    if (effectiveW > 0 && effectiveH > 0) {
+        const scaleToFit = Math.min(ROTATE_MAX_WIDTH / effectiveW, ROTATE_MAX_HEIGHT / effectiveH, 1);
+        displayW = effectiveW * scaleToFit;
+        displayH = effectiveH * scaleToFit;
+
+        // For sideways rotation, we need to set the img size to what it will appear as after rotation
+        if (isSideways) {
+            // Image is rotated, so we swap back for the actual img element sizing
+            thumb.style.width = displayH + 'px';
+            thumb.style.height = displayW + 'px';
+        } else {
+            thumb.style.width = displayW + 'px';
+            thumb.style.height = displayH + 'px';
+        }
+    }
+
+    // Apply transform
+    thumb.style.transform = `rotate(${rotateState.rotation}deg) scale(${scaleX}, ${scaleY})`;
+}
+
+document.getElementById('rotateLeft')?.addEventListener('click', () => {
+    rotateState.rotation = (rotateState.rotation - 90 + 360) % 360;
+    updateRotateDisplay();
+    applyRotateCSSTransform();
+});
+
+document.getElementById('rotateRight')?.addEventListener('click', () => {
+    rotateState.rotation = (rotateState.rotation + 90) % 360;
+    updateRotateDisplay();
+    applyRotateCSSTransform();
+});
+
+document.getElementById('flipH')?.addEventListener('click', () => {
+    rotateState.flipH = !rotateState.flipH;
+    updateRotateDisplay();
+    applyRotateCSSTransform();
+});
+
+document.getElementById('flipV')?.addEventListener('click', () => {
+    rotateState.flipV = !rotateState.flipV;
+    updateRotateDisplay();
+    applyRotateCSSTransform();
+});
+
+document.getElementById('rotateClear')?.addEventListener('click', clearRotate);
+document.getElementById('rotateClearBtn')?.addEventListener('click', clearRotate);
+
+function clearRotate() {
+    clearDropZone('rotateZone', 'rotateFile', 'rotateClear', () => {
+        document.getElementById('rotateEmpty').classList.remove('d-none');
+        document.getElementById('rotateData').classList.add('d-none');
+        document.getElementById('rotateActions').classList.add('d-none');
+        document.getElementById('rotateFileInfo').classList.add('d-none');
+        const thumb = document.getElementById('rotateThumb');
+        thumb.style.transform = '';
+        thumb.style.width = '';
+        thumb.style.height = '';
+        rotateCurrentFile = null;
+        rotateState = { rotation: 0, flipH: false, flipV: false };
+        rotateImgDims = { width: 0, height: 0 };
+    });
+}
+
+document.getElementById('rotateDownload')?.addEventListener('click', async function() {
+    if (!rotateCurrentFile) return;
+
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>...';
+
+    // Use server for high-quality PNG output
+    const formData = new FormData();
+    formData.append('image', rotateCurrentFile);
+    formData.append('rotation', rotateState.rotation);
+    formData.append('flip_h', rotateState.flipH);
+    formData.append('flip_v', rotateState.flipV);
+
+    try {
+        const res = await fetch('/api/tools/rotate', { method: 'POST', body: formData });
+        if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const baseName = rotateCurrentFile?.name?.replace(/\.[^.]+$/, '') || 'rotated';
+            a.download = `${baseName}_transformed.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-download me-1"></i>Download';
+    }
+});
+
+// ============================================================================
+// JPEG COMPRESSION TESTER
+// ============================================================================
+
+let compressCurrentFile = null;
+let compressResultBlob = null;
+let compressDebounce = null;
+
+// Quality slider display update
+document.getElementById('compressQuality')?.addEventListener('input', function() {
+    document.getElementById('compressQualityVal').textContent = this.value + '%';
+    // Debounce the compression
+    clearTimeout(compressDebounce);
+    compressDebounce = setTimeout(() => applyCompression(), 300);
+});
+
+setupDropZone('compressZone', 'compressFile', async (file) => {
+    compressCurrentFile = file;
+    showPreview('compressZone', file, 'compressThumb', 'compressFileName', 'compressFileMeta', 'compressClear');
+
+    document.getElementById('compressOrigSize').textContent = formatBytes(file.size);
+    document.getElementById('compressEmpty').classList.add('d-none');
+    document.getElementById('compressData').classList.remove('d-none');
+    document.getElementById('compressActions').classList.remove('d-none');
+
+    // Apply initial compression
+    applyCompression();
+});
+
+async function applyCompression() {
+    if (!compressCurrentFile) return;
+
+    const quality = parseInt(document.getElementById('compressQuality').value);
+    const formData = new FormData();
+    formData.append('image', compressCurrentFile);
+    formData.append('quality', quality);
+
+    try {
+        const res = await fetch('/api/tools/compress', { method: 'POST', body: formData });
+        if (res.ok) {
+            compressResultBlob = await res.blob();
+            const newSize = compressResultBlob.size;
+            const origSize = compressCurrentFile.size;
+            const reduction = ((origSize - newSize) / origSize * 100).toFixed(1);
+
+            document.getElementById('compressNewSize').textContent = formatBytes(newSize);
+            document.getElementById('compressReduction').textContent =
+                reduction > 0 ? `-${reduction}%` : `+${Math.abs(reduction)}%`;
+            document.getElementById('compressReduction').className =
+                'tool-result-value ' + (reduction > 0 ? 'text-success' : 'text-danger');
+
+            // Update preview
+            document.getElementById('compressThumb').src = URL.createObjectURL(compressResultBlob);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+document.getElementById('compressClear')?.addEventListener('click', clearCompress);
+document.getElementById('compressClearBtn')?.addEventListener('click', clearCompress);
+
+function clearCompress() {
+    clearDropZone('compressZone', 'compressFile', 'compressClear', () => {
+        document.getElementById('compressEmpty').classList.remove('d-none');
+        document.getElementById('compressData').classList.add('d-none');
+        document.getElementById('compressActions').classList.add('d-none');
+        compressCurrentFile = null;
+        compressResultBlob = null;
+    });
+}
+
+document.getElementById('compressDownload')?.addEventListener('click', () => {
+    if (!compressResultBlob) return;
+
+    const url = URL.createObjectURL(compressResultBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    const baseName = compressCurrentFile?.name?.replace(/\.[^.]+$/, '') || 'compressed';
+    const quality = document.getElementById('compressQuality').value;
+    a.download = `${baseName}_q${quality}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
+
+// ============================================================================
+// FORMAT CONVERT
+// ============================================================================
+
+let convertCurrentFile = null;
+let convertResultBlob = null;
+
+// Quality controls visibility
+document.getElementById('convertFormat')?.addEventListener('change', function() {
+    const format = this.value;
+    const qualityLabel = document.getElementById('convertQualityLabel');
+    const qualitySlider = document.getElementById('convertQuality');
+    const qualityVal = document.getElementById('convertQualityVal');
+
+    // Quality only applies to JPEG and WebP
+    const showQuality = format === 'JPEG' || format === 'WEBP';
+    qualityLabel.style.display = showQuality ? '' : 'none';
+    qualitySlider.style.display = showQuality ? '' : 'none';
+    qualityVal.style.display = showQuality ? '' : 'none';
+
+    // Update result panel
+    document.getElementById('convertOutFormat').textContent = format;
+});
+
+document.getElementById('convertQuality')?.addEventListener('input', function() {
+    document.getElementById('convertQualityVal').textContent = this.value + '%';
+});
+
+setupDropZone('convertZone', 'convertFile', async (file) => {
+    convertCurrentFile = file;
+    showPreview('convertZone', file, 'convertThumb', 'convertFileName', 'convertFileMeta', 'convertClear');
+
+    // Detect original format from extension
+    const ext = file.name.split('.').pop()?.toUpperCase() || '?';
+    document.getElementById('convertOrigInfo').textContent = `${ext} · ${formatBytes(file.size)}`;
+    document.getElementById('convertOutFormat').textContent = document.getElementById('convertFormat').value;
+    document.getElementById('convertNewSize').textContent = '--';
+
+    document.getElementById('convertEmpty').classList.add('d-none');
+    document.getElementById('convertData').classList.remove('d-none');
+    document.getElementById('convertActions').classList.remove('d-none');
+});
+
+document.getElementById('convertClear')?.addEventListener('click', clearConvert);
+document.getElementById('convertClearBtn')?.addEventListener('click', clearConvert);
+
+function clearConvert() {
+    clearDropZone('convertZone', 'convertFile', 'convertClear', () => {
+        document.getElementById('convertEmpty').classList.remove('d-none');
+        document.getElementById('convertData').classList.add('d-none');
+        document.getElementById('convertActions').classList.add('d-none');
+        convertCurrentFile = null;
+        convertResultBlob = null;
+    });
+}
+
+document.getElementById('convertDownload')?.addEventListener('click', async function() {
+    if (!convertCurrentFile) return;
+
+    const format = document.getElementById('convertFormat').value;
+    const quality = parseInt(document.getElementById('convertQuality').value);
+
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Converting...';
+
+    const formData = new FormData();
+    formData.append('image', convertCurrentFile);
+    formData.append('format', format);
+    formData.append('quality', quality);
+
+    try {
+        const res = await fetch('/api/tools/convert', { method: 'POST', body: formData });
+        if (res.ok) {
+            convertResultBlob = await res.blob();
+            document.getElementById('convertNewSize').textContent = formatBytes(convertResultBlob.size);
+
+            // Download
+            const url = URL.createObjectURL(convertResultBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            const baseName = convertCurrentFile?.name?.replace(/\.[^.]+$/, '') || 'converted';
+            a.download = `${baseName}.${format.toLowerCase()}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    } catch (err) {
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-download me-1"></i>Download';
     }
 });
 </script>

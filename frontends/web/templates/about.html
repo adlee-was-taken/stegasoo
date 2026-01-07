@@ -317,56 +317,17 @@
                 </div>
                 
                 {% if channel_configured %}
-                <div class="alert alert-success mt-3 mb-3">
+                <div class="alert alert-success mt-3 mb-0">
                     <i class="bi bi-shield-lock me-2"></i>
                     <strong>This server has a channel key configured:</strong>
                     <code class="ms-2">{{ channel_fingerprint }}</code>
                     <span class="text-muted ms-2">({{ channel_source }})</span>
                 </div>
                 {% else %}
-                <div class="alert alert-info mt-3 mb-3">
+                <div class="alert alert-info mt-3 mb-0">
                     <i class="bi bi-info-circle me-2"></i>
                     This server is running in <strong>public mode</strong>.
                     Set <code>STEGASOO_CHANNEL_KEY</code> to enable server-wide channel isolation.
-                </div>
-                {% endif %}
-
-                <!-- Channel Key QR Generator (Admin only) -->
-                {% if is_admin %}
-                <div class="card bg-dark border-secondary">
-                    <div class="card-header">
-                        <i class="bi bi-qr-code me-2"></i>Share Channel Key via QR
-                        <span class="badge bg-warning text-dark ms-2"><i class="bi bi-shield-check me-1"></i>Admin</span>
-                    </div>
-                    <div class="card-body">
-                        <p class="small text-muted mb-3">Generate a QR code to share a channel key with others.</p>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-8">
-                                <label class="form-label small">Channel Key</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control font-monospace" id="channelKeyQrInput"
-                                           placeholder="Enter or generate a key">
-                                    <button class="btn btn-outline-secondary" type="button" id="channelKeyQrGenerate"
-                                            title="Generate random key">
-                                        <i class="bi bi-shuffle"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <button class="btn btn-primary w-100" type="button" id="channelKeyQrShow">
-                                    <i class="bi bi-qr-code me-1"></i>Show QR
-                                </button>
-                            </div>
-                        </div>
-                        <div class="text-center mt-3 d-none" id="channelKeyQrContainer">
-                            <canvas id="channelKeyQrCanvas" class="bg-white p-2 rounded"></canvas>
-                            <div class="mt-2">
-                                <button class="btn btn-sm btn-outline-secondary" type="button" id="channelKeyQrDownload">
-                                    <i class="bi bi-download me-1"></i>Download PNG
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -635,62 +596,3 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-<!-- QR Code library for channel key sharing -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('channelKeyQrInput');
-    const generateBtn = document.getElementById('channelKeyQrGenerate');
-    const showBtn = document.getElementById('channelKeyQrShow');
-    const container = document.getElementById('channelKeyQrContainer');
-    const canvas = document.getElementById('channelKeyQrCanvas');
-    const downloadBtn = document.getElementById('channelKeyQrDownload');
-
-    // Generate random key
-    generateBtn?.addEventListener('click', function() {
-        if (input && typeof Stegasoo !== 'undefined') {
-            input.value = Stegasoo.generateChannelKey();
-        }
-    });
-
-    // Show QR code
-    showBtn?.addEventListener('click', function() {
-        const key = input?.value?.trim().replace(/-/g, '');
-        if (!key || key.length !== 32) {
-            alert('Please enter a valid 32-character channel key');
-            return;
-        }
-
-        // Format key with dashes for QR
-        const formatted = key.match(/.{4}/g)?.join('-') || key;
-
-        // Generate QR code
-        if (typeof QRCode !== 'undefined' && canvas) {
-            QRCode.toCanvas(canvas, formatted, {
-                width: 200,
-                margin: 2,
-                color: { dark: '#000', light: '#fff' }
-            }, function(error) {
-                if (error) {
-                    console.error('QR generation error:', error);
-                    return;
-                }
-                container?.classList.remove('d-none');
-            });
-        }
-    });
-
-    // Download QR as PNG
-    downloadBtn?.addEventListener('click', function() {
-        if (canvas) {
-            const link = document.createElement('a');
-            link.download = 'stegasoo-channel-key.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
-    });
-});
-</script>
-{% endblock %}
