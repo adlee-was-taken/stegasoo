@@ -49,6 +49,25 @@ If using a pre-built image from GitHub Releases:
 
 > **Security note**: Change the default password after setup with `passwd`
 
+## Updating an Existing Installation
+
+To update to the latest version:
+
+```bash
+cd /opt/stegasoo
+git pull origin main
+sudo systemctl restart stegasoo
+```
+
+That's it - the editable install means Python uses the source directly.
+
+**If dependencies changed** (check release notes), also run:
+```bash
+source venv/bin/activate
+pip install -e ".[web]"
+sudo systemctl restart stegasoo
+```
+
 ## After Installation
 
 ### Start the Service
