@@ -2,23 +2,76 @@
 """
 Stegasoo Web Frontend (v4.0.0)
 
-Flask-based web UI for steganography operations.
-Supports both text messages and file embedding.
+A production Flask application demonstrating proper web architecture patterns.
+This isn't just a quick demo - it's built to run on a Raspberry Pi 24/7.
+
+ARCHITECTURE OVERVIEW
+=====================
+
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │                         FLASK APPLICATION                            │
+    ├─────────────────────────────────────────────────────────────────────┤
+    │                                                                      │
+    │   Routes (/encode, /decode, /api/*)                                  │
+    │       │                                                              │
+    │       ├── auth.py           # Session management, user accounts      │
+    │       ├── temp_storage.py   # File-based temp storage with expiry    │
+    │       ├── subprocess_stego.py  # Isolated encode/decode workers      │
+    │       └── ssl_utils.py      # Self-signed cert generation            │
+    │                                                                      │
+    │   Templates (Jinja2)                                                 │
+    │       └── base.html → encode.html, decode.html, etc.                │
+    │                                                                      │
+    │   Static assets (CSS, JS)                                           │
+    │       └── Vanilla JS, no framework (keeps it simple)                │
+    │                                                                      │
+    └─────────────────────────────────────────────────────────────────────┘
+
+KEY PATTERNS
+============
+
+1. SUBPROCESS ISOLATION
+   Stegasoo's DCT mode uses scipy/jpegio which can crash on malformed input.
+   We run encode/decode in subprocesses so crashes don't take down the server:
+
+       subprocess_stego = SubprocessStego(timeout=180)
+       result = subprocess_stego.encode(carrier, ref, message, ...)
+
+   If the subprocess crashes, we catch it and return an error gracefully.
+
+2. ASYNC JOBS WITH PROGRESS
+   Encoding large images can take 30+ seconds. We use ThreadPoolExecutor
+   to run jobs in background threads with progress reporting:
+
+       job_id = generate_job_id()
+       _executor.submit(_run_encode_job, job_id, params)
+       # Client polls /api/encode/progress/<job_id> for updates
+
+3. CONTEXT PROCESSORS
+   @app.context_processor injects variables into ALL templates:
+
+       return {"version": __version__, "has_dct": has_dct_support()}
+
+   Now every template can use {{ version }} without passing it explicitly.
+
+4. BEFORE_REQUEST HOOKS
+   @app.before_request runs before every request. We use it for:
+   - First-run setup redirect (no users → /setup)
+   - Session validation
+   - Cleanup of old temp files
+
+5. SECURE SECRET KEY
+   Flask sessions need a secret key. We persist it to a file so sessions
+   survive server restarts (otherwise everyone gets logged out).
 
 CHANGES in v4.0.0:
 - Added channel key support for deployment/group isolation
 - New /api/channel/status endpoint
 - Channel key selector on encode/decode pages
-- Messages encoded with channel key require same key to decode
 
 CHANGES in v3.2.0:
 - Removed date dependency from all operations
-- Renamed day_phrase → passphrase
-- No date selection or tracking needed
 - Simplified user experience for asynchronous communications
-
-NEW in v3.0: LSB and DCT embedding modes with advanced options.
-NEW in v3.0.1: DCT output format selection (PNG or JPEG) and color mode (grayscale or color).
 """
 
 import io
@@ -157,8 +210,35 @@ except ImportError:
 # ============================================================================
 # SUBPROCESS ISOLATION FOR STEGASOO OPERATIONS
 # ============================================================================
-# Runs encode/decode/compare in subprocesses to prevent jpegio/scipy crashes
-# from taking down the Flask server.
+#
+# This is a critical reliability pattern. Here's the problem:
+#
+# scipy's DCT and jpegio can crash (segfault) on:
+# - Malformed JPEG files
+# - Very large images that exhaust memory
+# - Certain edge cases in coefficient manipulation
+#
+# If these crash in the main Flask process, your whole server dies.
+# Users get a connection reset, and the service goes down.
+#
+# The solution: Run stegasoo operations in separate Python processes.
+#
+#     Main Flask process                 Worker subprocess
+#     ┌─────────────────┐               ┌─────────────────┐
+#     │                 │   spawn       │                 │
+#     │  /api/encode    │──────────────>│  encode()       │
+#     │                 │               │                 │
+#     │  wait for       │<──────────────│  return result  │
+#     │  result         │    or crash   │  (or crash)     │
+#     │                 │               │                 │
+#     │  handle error   │               │  (process dies) │
+#     └─────────────────┘               └─────────────────┘
+#
+# If the subprocess crashes, we catch the error and return a friendly message.
+# The main server keeps running. Users can try again with different input.
+#
+# The subprocess_stego module handles all the pickling/unpickling of data.
+
 from subprocess_stego import (
     SubprocessStego,
     cleanup_progress_file,
@@ -182,38 +262,89 @@ subprocess_stego = SubprocessStego(timeout=180)  # 3 minute timeout for large im
 # ============================================================================
 # FLASK APP CONFIGURATION
 # ============================================================================
+#
+# Flask configuration demonstrates several production patterns:
+#
+# 1. SECRET KEY PERSISTENCE
+#    Flask uses secret_key to sign session cookies. If it changes, all users
+#    get logged out. We save it to a file so it survives restarts.
+#
+# 2. CONTENT LENGTH LIMITS
+#    MAX_CONTENT_LENGTH prevents DoS via huge uploads. Flask will reject
+#    requests that exceed this before loading them into memory.
+#
+# 3. ENVIRONMENT-BASED CONFIG
+#    Settings come from environment variables, allowing:
+#    - Different settings per deployment (dev/staging/prod)
+#    - Docker/systemd to inject config without code changes
+#    - 12-factor app compliance
+#
+# 4. INSTANCE FOLDER
+#    Flask's instance_path is for per-deployment data (databases, keys).
+#    It's .gitignored by default - perfect for secrets.
 
 app = Flask(__name__)
 
 # Persist secret key so sessions survive restarts
+# Without this, every restart = everyone gets logged out
 _instance_path = Path(app.instance_path)
 _instance_path.mkdir(parents=True, exist_ok=True)
 _secret_key_file = _instance_path / ".secret_key"
 if _secret_key_file.exists():
     app.secret_key = _secret_key_file.read_text().strip()
 else:
-    app.secret_key = secrets.token_hex(32)
+    # First run: generate a new key and save it
+    app.secret_key = secrets.token_hex(32)  # 256 bits of randomness
     _secret_key_file.write_text(app.secret_key)
-    _secret_key_file.chmod(0o600)
+    _secret_key_file.chmod(0o600)  # Only owner can read
 
+# Reject uploads larger than this (prevents memory exhaustion)
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
 
 # Auth configuration from environment
+# STEGASOO_AUTH_ENABLED=false disables login (for local/dev use)
 app.config["AUTH_ENABLED"] = os.environ.get("STEGASOO_AUTH_ENABLED", "true").lower() == "true"
 app.config["HTTPS_ENABLED"] = os.environ.get("STEGASOO_HTTPS_ENABLED", "false").lower() == "true"
 
-# Initialize auth module
+# Initialize auth module (sets up session handling, user DB)
 init_auth(app)
 
 # ============================================================================
 # ASYNC JOB MANAGEMENT (v4.1.2)
 # ============================================================================
-# Encode operations can run in background threads with progress reporting
+#
+# Problem: DCT encoding a large image can take 30-60 seconds.
+# Solution: Run it in a background thread, let the client poll for progress.
+#
+# The flow:
+#
+#     Client                          Server
+#     ──────                          ──────
+#     POST /api/encode/async ──────>  Start background job
+#                            <──────  Return job_id
+#
+#     GET /api/encode/progress/123 ─>  Check job status
+#                            <──────  {"progress": 45, "phase": "embedding"}
+#
+#     GET /api/encode/progress/123 ─>  Check again
+#                            <──────  {"status": "complete", "file_id": "abc"}
+#
+#     GET /api/download/abc ────────>  Download result
+#                            <──────  Encoded image
+#
+# Why ThreadPoolExecutor instead of Celery/Redis?
+# - This runs on a Raspberry Pi with 1GB RAM
+# - We don't need distributed workers
+# - Keep it simple - threads are fine for 2 concurrent jobs
+#
+# The thread pool is limited to 2 workers because:
+# - Each encode loads the full image into memory
+# - Too many concurrent jobs = OOM on the Pi
 
-# Thread pool for background encode/decode operations
 _executor = ThreadPoolExecutor(max_workers=2)
 
-# Job storage: job_id -> {status, result, error, file_id, ...}
+# Job storage: job_id -> {status, result, error, file_id, created, ...}
+# We use a dict with a lock because threads access it concurrently
 _jobs = {}
 _jobs_lock = threading.Lock()
 
@@ -268,6 +399,27 @@ THUMBNAIL_FILES: dict[str, bytes] = {}  # Not used - see temp_storage.py
 # ============================================================================
 # TEMPLATE CONTEXT PROCESSOR
 # ============================================================================
+#
+# Context processors inject variables into EVERY template automatically.
+# Instead of passing the same data to every render_template() call:
+#
+#     # Bad: repetitive and error-prone
+#     return render_template("page.html", version=__version__, has_dct=...)
+#
+# We define it once here and it's available everywhere:
+#
+#     # In any template:
+#     <p>Version: {{ version }}</p>
+#     {% if has_dct %}DCT mode available{% endif %}
+#
+# This is great for:
+# - Version numbers (show in footer)
+# - Feature flags (has_dct, auth_enabled)
+# - User info (username, is_admin)
+# - Global config (max sizes, limits)
+#
+# The function runs on EVERY request, so keep it fast.
+# Don't do expensive database queries here.
 
 
 @app.context_processor

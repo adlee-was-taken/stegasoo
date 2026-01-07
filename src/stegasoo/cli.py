@@ -1,7 +1,69 @@
 """
 Stegasoo CLI Module (v3.2.0)
 
-Command-line interface with batch processing and compression support.
+A proper CLI architecture using Click. This module demonstrates several
+important patterns for building production-quality command-line tools:
+
+PATTERN: COMMAND GROUPS
+=======================
+Click's @group decorator creates a hierarchy of commands:
+
+    stegasoo                     <- Main entry point
+    ├── encode                   <- Simple commands at root level
+    ├── decode
+    ├── generate
+    ├── info
+    ├── batch/                   <- Group for related commands
+    │   ├── encode
+    │   ├── decode
+    │   └── check
+    ├── channel/                 <- Another group
+    │   ├── generate
+    │   ├── show
+    │   ├── status
+    │   ├── qr
+    │   └── clear
+    ├── tools/                   <- Utility group
+    │   ├── capacity
+    │   ├── strip
+    │   ├── peek
+    │   └── exif
+    └── admin/                   <- Administration group
+        ├── recover
+        └── generate-key
+
+PATTERN: JSON OUTPUT MODE
+=========================
+Every command supports --json for machine-readable output. The pattern:
+
+    @click.pass_context
+    def my_command(ctx, ...):
+        if ctx.obj.get("json"):
+            click.echo(json.dumps(result, indent=2))
+        else:
+            # Human-readable output with colors/formatting
+            click.echo(f"✓ Success: {result}")
+
+This makes the CLI scriptable - you can pipe to jq, use in shell scripts, etc.
+
+PATTERN: SENSITIVE INPUT
+========================
+Passwords/secrets use Click's secure prompts:
+
+    @click.option("--passphrase", prompt=True, hide_input=True,
+                  confirmation_prompt=True, help="Passphrase")
+
+- prompt=True: Asks if not provided
+- hide_input=True: No echo (like sudo)
+- confirmation_prompt=True: "Repeat for confirmation"
+
+PATTERN: DRY-RUN MODE
+=====================
+For destructive or slow operations, --dry-run shows what WOULD happen:
+
+    if dry_run:
+        click.echo(f"Would encode to {output}")
+        return
 
 Changes in v3.2.0:
 - Updated to use DEFAULT_PASSPHRASE_WORDS (consistency with v3.2.0 naming)
@@ -32,8 +94,21 @@ from .constants import (
     __version__,
 )
 
-# Click context settings
+# Click context settings - these apply to all commands
+# help_option_names lets users use either -h or --help
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+
+
+# =============================================================================
+# ROOT GROUP - The main entry point
+# =============================================================================
+#
+# @click.group() creates a command group. The function becomes both:
+# 1. A callable that sets up shared state (ctx.obj)
+# 2. A container for subcommands via @cli.command() decorators
+#
+# The context object (ctx.obj) is passed down to all subcommands.
+# We use it to share the --json flag across the entire CLI.
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -46,6 +121,8 @@ def cli(ctx, json_output):
 
     Hide messages in images using PIN + passphrase security.
     """
+    # ensure_object(dict) creates ctx.obj if it doesn't exist
+    # This prevents "NoneType has no attribute" errors
     ctx.ensure_object(dict)
     ctx.obj["json"] = json_output
 
@@ -53,6 +130,31 @@ def cli(ctx, json_output):
 # =============================================================================
 # ENCODE COMMANDS
 # =============================================================================
+#
+# The encode command demonstrates several Click patterns:
+#
+# 1. ARGUMENT vs OPTION
+#    - Arguments are positional: `stegasoo encode photo.png`
+#    - Options have flags: `stegasoo encode -m "message" --pin 1234`
+#    Rule of thumb: required inputs → arguments, optional/secret → options
+#
+# 2. MUTUAL EXCLUSIVITY
+#    We need either --message OR --file, not both. Click doesn't have built-in
+#    mutual exclusivity, so we check manually:
+#
+#        if not message and not file_payload:
+#            raise click.UsageError("Either --message or --file is required")
+#
+# 3. TYPE VALIDATION
+#    Click validates types automatically:
+#    - type=click.Path(exists=True) → file must exist
+#    - type=click.Choice(["a", "b"]) → must be one of these values
+#    - type=int → must be an integer
+#
+# 4. DEFAULT VALUES
+#    Options can have smart defaults:
+#    - default="zlib" → use this if not specified
+#    - default=True with is_flag=True → boolean flag defaults to on
 
 
 @cli.command()
@@ -320,6 +422,32 @@ def decode(ctx, image, reference, passphrase, pin, output):
 # =============================================================================
 # BATCH COMMANDS
 # =============================================================================
+#
+# Batch processing demonstrates:
+#
+# 1. SUBGROUPS
+#    @cli.group() creates a nested command group:
+#        stegasoo batch encode *.png
+#        stegasoo batch decode *.png
+#        stegasoo batch check *.png
+#
+# 2. VARIADIC ARGUMENTS
+#    nargs=-1 accepts multiple arguments:
+#        @click.argument("images", nargs=-1, required=True)
+#    This lets users do: `stegasoo batch encode img1.png img2.png img3.png`
+#    Or with shell expansion: `stegasoo batch encode *.png`
+#
+# 3. PROGRESS CALLBACKS
+#    We pass a callback to the BatchProcessor for real-time updates:
+#
+#        def progress(current, total, item):
+#            click.echo(f"[{current}/{total}] {item.input_path.name}")
+#
+#        processor.batch_encode(..., progress_callback=progress)
+#
+# 4. PARALLEL PROCESSING
+#    --jobs/-j controls worker count. Default is 4 for good balance between
+#    speed and memory usage. Each worker loads images into memory.
 
 
 @cli.group()
