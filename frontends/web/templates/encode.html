@@ -691,18 +691,18 @@ const pngFormatInput = document.getElementById('pngFormat');
 
 function updateOutputOptions(mode) {
     const isLsb = mode === 'lsb';
-    // LSB only supports Color + PNG
     if (isLsb) {
-        // Force Color and PNG selection
+        // LSB only supports Color + PNG
         colorModeInput.checked = true;
         pngFormatInput.checked = true;
-        // Disable Gray and JPEG
         grayModeInput.disabled = true;
         jpegFormatInput.disabled = true;
         grayModeLabel?.classList.add('disabled', 'text-muted');
         jpegFormatLabel?.classList.add('disabled', 'text-muted');
     } else {
-        // DCT: enable all options
+        // DCT: reset to defaults (Color + JPEG) and enable all
+        colorModeInput.checked = true;
+        jpegFormatInput.checked = true;
         grayModeInput.disabled = false;
         jpegFormatInput.disabled = false;
         grayModeLabel?.classList.remove('disabled', 'text-muted');
