@@ -278,29 +278,16 @@ echo ""
 echo -e "${GREEN}Flashing image to $SELECTED...${NC}"
 echo ""
 
-# Flash with dd (optionally with pv for progress)
-if [ "$HAS_PV" = true ]; then
-    echo -e "${YELLOW}Flashing with progress...${NC}"
-    if [ "$COMPRESSED" = true ]; then
-        case "$COMP_TYPE" in
-            xz)  pv "$IMAGE" | xzcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-            zst) pv "$IMAGE" | zstdcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-            gz)  pv "$IMAGE" | zcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-        esac
-    else
-        pv "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
-    fi
+# Flash with dd (status=progress shows actual write progress)
+echo -e "${YELLOW}Flashing (this may take several minutes for SD cards)...${NC}"
+if [ "$COMPRESSED" = true ]; then
+    case "$COMP_TYPE" in
+        xz)  xzcat "$IMAGE" | sudo dd of="$SELECTED" bs=1M status=progress ;;
+        zst) zstdcat "$IMAGE" | sudo dd of="$SELECTED" bs=1M status=progress ;;
+        gz)  zcat "$IMAGE" | sudo dd of="$SELECTED" bs=1M status=progress ;;
+    esac
 else
-    echo -e "${YELLOW}Flashing (install pv for progress bar)...${NC}"
-    if [ "$COMPRESSED" = true ]; then
-        case "$COMP_TYPE" in
-            xz)  xzcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-            zst) zstdcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-            gz)  zcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-        esac
-    else
-        sudo dd if="$IMAGE" of="$SELECTED" bs=4M conv=fsync status=progress
-    fi
+    sudo dd if="$IMAGE" of="$SELECTED" bs=1M status=progress
 fi
 
 echo ""
