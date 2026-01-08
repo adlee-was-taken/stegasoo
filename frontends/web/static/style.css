@@ -122,23 +122,19 @@
 .card .form-label {
     background: linear-gradient(
         90deg,
-        #ffe699 0%,
-        #ffe699 35%,
-        #fff8e0 50%,
-        #ffe699 65%,
+        #fff4c0 0%,
+        #ffe699 50%,
         #ffe699 100%
     );
-    background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: gold-shimmer 4s ease-in-out infinite;
+    animation: gold-shimmer 3s ease-in-out infinite;
 }
 
 @keyframes gold-shimmer {
-    0%, 20% { background-position: 100% 0; }
-    50%, 70% { background-position: 0% 0; }
-    100% { background-position: 100% 0; }
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
 }
 
 /* ----------------------------------------------------------------------------
