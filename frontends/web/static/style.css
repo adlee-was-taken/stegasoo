@@ -130,23 +130,9 @@
         1px 2px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* Payload type toggle - gold styling */
-.btn-check + .btn-outline-primary {
-    color: #ffe699 !important;
-    border-color: #b8860b !important;
-    background: transparent !important;
-}
-
-.btn-check + .btn-outline-primary:hover {
-    color: #fff2c4 !important;
-    border-color: #ffe699 !important;
-    background: rgba(255, 230, 153, 0.1) !important;
-}
-
+/* Payload type toggle - gold text when selected */
 .btn-check:checked + .btn-outline-primary {
-    color: #1a1a2e !important;
-    background: #ffe699 !important;
-    border-color: #ffe699 !important;
+    color: #ffe699 !important;
 }
 
 
