@@ -208,9 +208,9 @@
                                     <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <input type="radio" class="btn-check" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
-                                            <label class="btn btn-outline-secondary btn-sm" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
+                                            <label class="btn btn-outline-secondary btn-sm text-nowrap" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
                                             <input type="radio" class="btn-check" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
-                                            <label class="btn btn-outline-secondary btn-sm" for="modeLsb"><i class="bi bi-grid-3x3-gap me-1"></i>LSB</label>
+                                            <label class="btn btn-outline-secondary btn-sm text-nowrap" for="modeLsb"><i class="bi bi-grid-3x3-gap me-1"></i>LSB</label>
                                         </div>
                                         <span class="text-muted d-none d-sm-inline">|</span>
                                         <span class="d-flex gap-2 align-items-center" id="outputOptions">
