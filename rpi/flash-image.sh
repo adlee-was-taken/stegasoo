@@ -268,10 +268,9 @@ fi
 # Now wipe if requested
 if [[ "$wipe_confirm" =~ ^[Yy]$ ]]; then
     echo "Wiping partition table..."
-    sudo wipefs -a "$SELECTED"
-    sudo dd if=/dev/zero of="$SELECTED" bs=1M count=10 status=none
+    sudo wipefs -af "$SELECTED" 2>/dev/null || true
     sync
-    echo "  Wiped clean"
+    echo "  Wiped"
 fi
 
 echo ""
