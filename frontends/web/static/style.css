@@ -117,27 +117,34 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Form Labels - Gold with Moving Shine
+   Form Labels - Gold with Top Shine
    ---------------------------------------------------------------------------- */
 .card .form-label {
-    color: transparent;
-    background: linear-gradient(
-        90deg,
-        #ffe699 0%,
-        #ffe699 40%,
-        #fffef0 50%,
-        #ffe699 60%,
-        #ffe699 100%
-    );
-    background-size: 200% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    animation: label-shine 4s linear infinite;
+    color: #ffe699;
+    position: relative;
+    display: inline-block;
 }
 
-@keyframes label-shine {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
+.card .form-label::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 40%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 240, 0.7) 50%,
+        transparent 100%
+    );
+    animation: top-shine 4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes top-shine {
+    0%, 100% { left: -100%; }
+    50% { left: 140%; }
 }
 
 /* ----------------------------------------------------------------------------
