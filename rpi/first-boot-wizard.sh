@@ -60,19 +60,28 @@ gum confirm "Ready to begin setup?" || exit 0
 clear
 gum style \
   --foreground 212 --bold \
-  "Expanding filesystem..."
+  "Step 0: Expand Filesystem"
 echo ""
 
 # Get current and total size
 ROOT_DEV=$(findmnt -n -o SOURCE /)
 CURRENT_SIZE=$(df -h / | awk 'NR==2 {print $2}')
-gum style --foreground 245 "Current size: $CURRENT_SIZE"
+TOTAL_SIZE=$(lsblk -b -d -o SIZE $(echo "$ROOT_DEV" | sed 's/[0-9]*$//') 2>/dev/null | tail -1 | awk '{printf "%.0fG", $1/1024/1024/1024}')
 
-# Run resize2fs with a spinner
-gum spin --spinner dot --title "Expanding to fill SD card..." -- sudo resize2fs "$ROOT_DEV" 2>/dev/null
+gum style --foreground 245 "\
+The filesystem is currently $CURRENT_SIZE but your SD card may be larger.
+Expanding will use all available space on the SD card."
+echo ""
+gum style --foreground 245 "Current: $CURRENT_SIZE"
+echo ""
 
-NEW_SIZE=$(df -h / | awk 'NR==2 {print $2}')
-gum style --foreground 82 "✓ Expanded to: $NEW_SIZE"
+if gum confirm "Expand filesystem to fill SD card?" --default=true; then
+  gum spin --spinner dot --title "Expanding filesystem..." -- sudo resize2fs "$ROOT_DEV" 2>/dev/null
+  NEW_SIZE=$(df -h / | awk 'NR==2 {print $2}')
+  gum style --foreground 82 "✓ Expanded to: $NEW_SIZE"
+else
+  gum style --foreground 214 "→ Skipped (you can run 'sudo resize2fs $ROOT_DEV' later)"
+fi
 sleep 1
 
 # =============================================================================
