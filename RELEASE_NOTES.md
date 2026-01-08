@@ -9,8 +9,8 @@
 
 ### Raspberry Pi Improvements
 - **Streamlined Image Creation**: `pull-image.sh` now handles everything
-  - Auto-resizes rootfs to exactly 16GB (consistent images from any SD card)
-  - Disables Pi OS auto-expand
+  - Auto-resizes rootfs to exactly 16GB (for smaller download)
+  - Preserves auto-expand (image fills SD card on first boot)
   - Compresses with zstd
   - Optional .zst.zip wrapper for GitHub releases
 - **16GB Minimum**: Pre-built images are now 16GB (was variable)

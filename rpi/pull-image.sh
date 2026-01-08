@@ -124,25 +124,6 @@ else
 fi
 
 # ============================================================================
-# Disable auto-expand on first boot
-# ============================================================================
-echo
-echo -e "${YELLOW}Disabling auto-expand...${NC}"
-TEMP_ROOT=$(mktemp -d)
-mount "$ROOT_PART" "$TEMP_ROOT"
-
-# Remove resize2fs_once service if it exists
-rm -f "$TEMP_ROOT/etc/init.d/resize2fs_once"
-rm -f "$TEMP_ROOT/etc/rc3.d/S01resize2fs_once"
-
-# Disable the systemd resize service
-rm -f "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
-
-umount "$TEMP_ROOT"
-rmdir "$TEMP_ROOT"
-echo -e "${GREEN}  Auto-expand disabled${NC}"
-
-# ============================================================================
 # Pull image
 # ============================================================================
 echo

@@ -110,7 +110,7 @@ lsblk
 sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
 ```
 
-The script automatically resizes rootfs to 16GB, disables auto-expand, and compresses.
+The script automatically resizes rootfs to 16GB (for smaller download), preserves auto-expand, and compresses.
 
 ## Step 10: Distribute
 

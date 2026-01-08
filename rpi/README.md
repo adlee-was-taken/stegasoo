@@ -204,8 +204,8 @@ sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
 ```
 
 The `pull-image.sh` script automatically:
-- Resizes rootfs to exactly 16GB (consistent image size)
-- Disables Pi OS auto-expand
+- Resizes rootfs to exactly 16GB (for smaller download)
+- Preserves auto-expand (image fills SD card on first boot)
 - Compresses with zstd for fast decompression
 
 ### 6. Distribute
