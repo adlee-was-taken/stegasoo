@@ -117,17 +117,27 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Form Labels - Pale Gold with Shimmer
+   Form Labels - Gold with Moving Shine
    ---------------------------------------------------------------------------- */
 .card .form-label {
-    color: #fff8dc; /* Pale cornsilk gold */
-    text-shadow: 0 0 8px rgba(254, 232, 98, 0.3);
-    animation: label-shimmer 3s ease-in-out infinite;
+    color: transparent;
+    background: linear-gradient(
+        90deg,
+        #ffe699 0%,
+        #ffe699 40%,
+        #fffef0 50%,
+        #ffe699 60%,
+        #ffe699 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: label-shine 4s linear infinite;
 }
 
-@keyframes label-shimmer {
-    0%, 100% { text-shadow: 0 0 8px rgba(254, 232, 98, 0.2); }
-    50% { text-shadow: 0 0 12px rgba(254, 232, 98, 0.5), 0 0 4px rgba(255, 255, 255, 0.3); }
+@keyframes label-shine {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 /* ----------------------------------------------------------------------------
