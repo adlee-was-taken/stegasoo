@@ -117,10 +117,17 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Form Labels - Stegasoo Gold
+   Form Labels - Pale Gold with Shimmer
    ---------------------------------------------------------------------------- */
 .card .form-label {
-    color: var(--header-gold);
+    color: #fff8dc; /* Pale cornsilk gold */
+    text-shadow: 0 0 8px rgba(254, 232, 98, 0.3);
+    animation: label-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes label-shimmer {
+    0%, 100% { text-shadow: 0 0 8px rgba(254, 232, 98, 0.2); }
+    50% { text-shadow: 0 0 12px rgba(254, 232, 98, 0.5), 0 0 4px rgba(255, 255, 255, 0.3); }
 }
 
 /* ----------------------------------------------------------------------------
