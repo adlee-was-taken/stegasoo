@@ -273,27 +273,23 @@
                                         </div>
                                     </div>
 
-                                    <!-- Extraction Mode -->
-                                    <label class="form-label"><i class="bi bi-cpu me-1"></i> Extraction Mode</label>
-                                    <div class="d-flex gap-2 mb-2">
-                                        <label class="mode-btn flex-fill active" id="autoModeCard" for="modeAuto">
+                                    <!-- Extraction Mode (compact inline) -->
+                                    <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                                        <label class="mode-btn mode-btn-sm active" id="autoModeCard" for="modeAuto">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
-                                            <i class="bi bi-magic text-success ms-2"></i>
-                                            <span class="ms-2"><strong>Auto</strong> <span class="text-muted d-none d-sm-inline">· Try both</span></span>
+                                            <i class="bi bi-magic text-success"></i> Auto
                                         </label>
-                                        <label class="mode-btn flex-fill" id="lsbModeCard" for="modeLsb">
+                                        <label class="mode-btn mode-btn-sm" id="lsbModeCard" for="modeLsb">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb">
-                                            <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
-                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Email</span></span>
+                                            <i class="bi bi-grid-3x3-gap text-primary"></i> LSB
                                         </label>
-                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard" for="modeDct">
+                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard" for="modeDct">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                            <i class="bi bi-soundwave text-warning ms-2"></i>
-                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Social</span></span>
+                                            <i class="bi bi-soundwave text-warning"></i> DCT
                                         </label>
                                     </div>
-                                    <div class="form-text">
-                                        <i class="bi bi-lightbulb me-1"></i><strong>Auto</strong> tries LSB first, then DCT.
+                                    <div class="form-text" id="modeHint">
+                                        <i class="bi bi-lightning me-1"></i>Tries LSB first, then DCT
                                     </div>
 
                                 </div>
@@ -461,6 +457,25 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
+// ============================================================================
+// MODE HINT - Dynamic text based on selected extraction mode
+// ============================================================================
+const modeHints = {
+    auto: { icon: 'lightning', text: 'Tries LSB first, then DCT' },
+    lsb: { icon: 'hdd', text: 'For email and direct transfers' },
+    dct: { icon: 'phone', text: 'For social media images' }
+};
+
+document.querySelectorAll('input[name="embed_mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const hint = document.getElementById('modeHint');
+        const data = modeHints[this.value];
+        if (hint && data) {
+            hint.innerHTML = `<i class="bi bi-${data.icon} me-1"></i>${data.text}`;
+        }
+    });
+});
+
 // ============================================================================
 // ACCORDION SUMMARY UPDATES
 // ============================================================================

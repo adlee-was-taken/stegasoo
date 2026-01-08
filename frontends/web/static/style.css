@@ -91,6 +91,31 @@
     min-width: 0;
 }
 
+/* Compact inline mode buttons */
+.mode-btn.mode-btn-sm {
+    padding: 0.35rem 0.6rem;
+    padding-left: 1.75rem;
+    font-size: 0.8rem;
+    border-radius: 0.375rem;
+    border-width: 1px;
+}
+
+.mode-btn.mode-btn-sm .form-check-input {
+    left: 8px;
+    width: 14px;
+    height: 14px;
+}
+
+.mode-btn.mode-btn-sm i {
+    font-size: 0.85rem;
+}
+
+/* Disabled button labels for btn-check groups */
+.btn-check:disabled + .btn {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 /* ----------------------------------------------------------------------------
    Security Factor Boxes - Matches drop-zone dashed border style
    ---------------------------------------------------------------------------- */

@@ -238,37 +238,35 @@
                                         </div>
                                     </div>
 
-                                    <!-- Embedding Mode -->
-                                    <label class="form-label"><i class="bi bi-cpu me-1"></i> Embedding Mode</label>
-                                    <div class="d-flex gap-2 mb-2">
-                                        <label class="mode-btn flex-fill {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
+                                    <!-- Embedding Mode (compact inline) -->
+                                    <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
-                                            <i class="bi bi-soundwave text-warning ms-2"></i>
-                                            <span class="ms-2"><strong>DCT</strong> <span class="text-muted d-none d-sm-inline">· Social</span></span>
+                                            <i class="bi bi-soundwave text-warning"></i> DCT
                                         </label>
-                                        <label class="mode-btn flex-fill {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
+                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
                                             <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
-                                            <i class="bi bi-grid-3x3-gap text-primary ms-2"></i>
-                                            <span class="ms-2"><strong>LSB</strong> <span class="text-muted d-none d-sm-inline">· Email</span></span>
+                                            <i class="bi bi-grid-3x3-gap text-primary"></i> LSB
                                         </label>
+                                        <span class="d-flex gap-2 align-items-center" id="outputOptions">
+                                            <span class="text-muted">|</span>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <input type="radio" class="btn-check" name="dct_color_mode" id="colorMode" value="color" checked>
+                                                <label class="btn btn-outline-secondary btn-sm" for="colorMode">Color</label>
+                                                <input type="radio" class="btn-check" name="dct_color_mode" id="grayMode" value="grayscale">
+                                                <label class="btn btn-outline-secondary btn-sm" for="grayMode" id="grayModeLabel">Gray</label>
+                                            </div>
+                                            <span class="text-muted">|</span>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <input type="radio" class="btn-check" name="dct_output_format" id="jpegFormat" value="jpeg" checked>
+                                                <label class="btn btn-outline-secondary btn-sm" for="jpegFormat" id="jpegFormatLabel">JPEG</label>
+                                                <input type="radio" class="btn-check" name="dct_output_format" id="pngFormat" value="png">
+                                                <label class="btn btn-outline-secondary btn-sm" for="pngFormat">PNG</label>
+                                            </div>
+                                        </span>
                                     </div>
-
-                                    <!-- DCT Options (inline, compact) -->
-                                    <div class="{% if not has_dct %}d-none{% endif %}" id="dctOptionsInline">
-                                        <div class="row g-2 mt-2" id="dctOptionsRow">
-                                            <div class="col-6">
-                                                <select class="form-select form-select-sm" name="dct_color_mode" id="dctColorSelect">
-                                                    <option value="color" selected>Color</option>
-                                                    <option value="grayscale">Grayscale</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-6">
-                                                <select class="form-select form-select-sm" name="dct_output_format" id="dctFormatSelect">
-                                                    <option value="jpeg" selected>JPEG</option>
-                                                    <option value="png">PNG</option>
-                                                </select>
-                                            </div>
-                                        </div>
+                                    <div class="form-text" id="modeHint">
+                                        <i class="bi bi-{% if has_dct %}phone{% else %}hdd{% endif %} me-1"></i>{% if has_dct %}Survives social media compression{% else %}Higher capacity for direct transfers{% endif %}
                                     </div>
 
                                 </div>
@@ -484,6 +482,24 @@
 <script src="{{ url_for('static', filename='js/stegasoo.js') }}"></script>
 <script>
 // ============================================================================
+// MODE HINT - Dynamic text based on selected embedding mode
+// ============================================================================
+const modeHints = {
+    dct: { icon: 'phone', text: 'Survives social media compression' },
+    lsb: { icon: 'hdd', text: 'Higher capacity, outputs Color PNG' }
+};
+
+document.querySelectorAll('input[name="embed_mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const hint = document.getElementById('modeHint');
+        const data = modeHints[this.value];
+        if (hint && data) {
+            hint.innerHTML = `<i class="bi bi-${data.icon} me-1"></i>${data.text}`;
+        }
+    });
+});
+
+// ============================================================================
 // ACCORDION SUMMARY UPDATES
 // ============================================================================
 
@@ -666,20 +682,45 @@ carrierInput?.addEventListener('change', function() {
 
 const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
 const modeBtns = { 'dct': document.getElementById('dctModeCard'), 'lsb': document.getElementById('lsbModeCard') };
-const dctOptionsRow = document.getElementById('dctOptionsRow');
+const grayModeInput = document.getElementById('grayMode');
+const grayModeLabel = document.getElementById('grayModeLabel');
+const jpegFormatInput = document.getElementById('jpegFormat');
+const jpegFormatLabel = document.getElementById('jpegFormatLabel');
+const colorModeInput = document.getElementById('colorMode');
+const pngFormatInput = document.getElementById('pngFormat');
+
+function updateOutputOptions(mode) {
+    const isLsb = mode === 'lsb';
+    // LSB only supports Color + PNG
+    if (isLsb) {
+        // Force Color and PNG selection
+        colorModeInput.checked = true;
+        pngFormatInput.checked = true;
+        // Disable Gray and JPEG
+        grayModeInput.disabled = true;
+        jpegFormatInput.disabled = true;
+        grayModeLabel?.classList.add('disabled', 'text-muted');
+        jpegFormatLabel?.classList.add('disabled', 'text-muted');
+    } else {
+        // DCT: enable all options
+        grayModeInput.disabled = false;
+        jpegFormatInput.disabled = false;
+        grayModeLabel?.classList.remove('disabled', 'text-muted');
+        jpegFormatLabel?.classList.remove('disabled', 'text-muted');
+    }
+}
 
 modeRadios.forEach(radio => {
     radio.addEventListener('change', () => {
         Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
         modeBtns[radio.value]?.classList.add('active');
-        dctOptionsRow?.classList.toggle('d-none', radio.value !== 'dct');
+        updateOutputOptions(radio.value);
     });
 });
 
-// Show DCT options if DCT selected initially
-if (document.getElementById('modeDct')?.checked) {
-    dctOptionsRow?.classList.remove('d-none');
-}
+// Initialize output options based on initial mode
+const initialMode = document.querySelector('input[name="embed_mode"]:checked')?.value || 'lsb';
+updateOutputOptions(initialMode);
 
 // ============================================================================
 // DUPLICATE FILE CHECK
