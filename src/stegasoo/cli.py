@@ -857,10 +857,9 @@ def info(ctx, full):
         # Channel
         if channel_fingerprint:
             masked = f"{channel_fingerprint[:4]}••••••••{channel_fingerprint[-4:]}"
-            colored_masked = click.style(masked, fg='bright_yellow', bold=True)
-            click.echo(f"  Channel:     {colored_masked}", color=True)
+            click.echo(f"  Channel:     {masked}")
         else:
-            click.echo(f"  Channel:     {click.style('public', fg='yellow')}", color=True)
+            click.echo("  Channel:     public")
 
         # DCT
         dct_status = "\033[32m✓ enabled\033[0m" if has_dct else "\033[31m✗ disabled\033[0m"
