@@ -130,13 +130,13 @@
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
-    width: 60%;
+    left: -30%;
+    width: 25%;
     height: 45%;
     background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(255, 255, 255, 0.4) 50%,
+        rgba(255, 255, 255, 0.25) 50%,
         transparent 100%
     );
     animation: top-shine 4s ease-in-out infinite;
@@ -144,8 +144,9 @@
 }
 
 @keyframes top-shine {
-    0%, 100% { left: -100%; }
-    50% { left: 140%; }
+    0%, 15% { left: -30%; }
+    40%, 60% { left: 105%; }
+    85%, 100% { left: -30%; }
 }
 
 /* ----------------------------------------------------------------------------
