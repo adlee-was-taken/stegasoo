@@ -179,52 +179,100 @@ This is useful if you want to share encoded images only with
 specific people (family, team, etc)."
 echo ""
 
-if gum confirm "Generate a private channel key?" --default=false; then
-  echo ""
-  # Generate key to temp file (gum spin doesn't capture stdout well)
-  KEY_FILE=$(mktemp)
-  ERR_FILE=$(mktemp)
-  VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
-  gum spin --spinner dot --title "Generating channel key..." -- \
-    bash -c "'$VENV_PYTHON' -c 'from stegasoo.channel import generate_channel_key; print(generate_channel_key())' > '$KEY_FILE' 2>'$ERR_FILE'"
+CHANNEL_CHOICE=$(gum choose \
+  "Skip (public mode)" \
+  "Generate new key" \
+  "Enter existing key")
 
-  CHANNEL_KEY=$(cat "$KEY_FILE" 2>/dev/null | head -1)
-  KEY_ERROR=$(cat "$ERR_FILE" 2>/dev/null)
-  rm -f "$KEY_FILE" "$ERR_FILE"
+case "$CHANNEL_CHOICE" in
+  "Generate new key")
+    echo ""
+    # Generate key to temp file (gum spin doesn't capture stdout well)
+    KEY_FILE=$(mktemp)
+    ERR_FILE=$(mktemp)
+    VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
+    gum spin --spinner dot --title "Generating channel key..." -- \
+      bash -c "'$VENV_PYTHON' -c 'from stegasoo.channel import generate_channel_key; print(generate_channel_key())' > '$KEY_FILE' 2>'$ERR_FILE'"
 
-  if [ -n "$CHANNEL_KEY" ] && [[ "$CHANNEL_KEY" =~ ^[A-Za-z0-9] ]]; then
-    echo ""
-    gum style --foreground 82 "✓ Channel key generated!"
-    echo ""
-    gum style \
-      --border rounded \
-      --border-foreground 226 \
-      --padding "1 2" \
-      --foreground 226 --bold \
-      "$CHANNEL_KEY"
-    echo ""
-    gum style --foreground 196 --bold \
-      "*** IMPORTANT: Write down or copy this key NOW! ***"
-    gum style --foreground 196 \
-      "You'll need to share it with anyone who should decode" \
-      "your images. This key won't be shown again."
-    echo ""
-    gum confirm "I've saved the key" --default=true --affirmative="Continue" --negative=""
-  else
-    gum style --foreground 196 "Failed to generate key. Using public mode."
-    if [ -n "$KEY_ERROR" ]; then
+    CHANNEL_KEY=$(cat "$KEY_FILE" 2>/dev/null | head -1)
+    KEY_ERROR=$(cat "$ERR_FILE" 2>/dev/null)
+    rm -f "$KEY_FILE" "$ERR_FILE"
+
+    if [ -n "$CHANNEL_KEY" ] && [[ "$CHANNEL_KEY" =~ ^[A-Za-z0-9] ]]; then
       echo ""
-      gum style --foreground 245 "Error details:"
-      echo "$KEY_ERROR"
+      gum style --foreground 82 "✓ Channel key generated!"
+      echo ""
+      gum style \
+        --border rounded \
+        --border-foreground 226 \
+        --padding "1 2" \
+        --foreground 226 --bold \
+        "$CHANNEL_KEY"
+      echo ""
+      gum style --foreground 196 --bold \
+        "*** IMPORTANT: Write down or copy this key NOW! ***"
+      gum style --foreground 196 \
+        "You'll need to share it with anyone who should decode" \
+        "your images. This key won't be shown again."
+      echo ""
+      gum confirm "I've saved the key" --default=true --affirmative="Continue" --negative=""
+    else
+      gum style --foreground 196 "Failed to generate key. Using public mode."
+      if [ -n "$KEY_ERROR" ]; then
+        echo ""
+        gum style --foreground 245 "Error details:"
+        echo "$KEY_ERROR"
+      fi
+      CHANNEL_KEY=""
+      echo ""
+      gum confirm "Continue" --default=true --affirmative="OK" --negative=""
     fi
-    CHANNEL_KEY=""
+    ;;
+
+  "Enter existing key")
     echo ""
-    gum confirm "Continue" --default=true --affirmative="OK" --negative=""
-  fi
-else
-  gum style --foreground 214 "→ Using public mode"
-  sleep 0.5
-fi
+    gum style --foreground 245 "Enter the channel key from your team/deployment."
+    gum style --foreground 245 "Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+    echo ""
+
+    while true; do
+      ENTERED_KEY=$(gum input --placeholder "ABCD-1234-EFGH-5678-IJKL-9012-MNOP-3456" --width 50)
+
+      if [ -z "$ENTERED_KEY" ]; then
+        gum style --foreground 214 "→ Cancelled, using public mode"
+        CHANNEL_KEY=""
+        break
+      fi
+
+      # Validate the key using Python
+      VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
+      if "$VENV_PYTHON" -c "from stegasoo.channel import validate_channel_key, format_channel_key; k='$ENTERED_KEY'; exit(0 if validate_channel_key(k) else 1)" 2>/dev/null; then
+        # Get formatted key
+        CHANNEL_KEY=$("$VENV_PYTHON" -c "from stegasoo.channel import format_channel_key; print(format_channel_key('$ENTERED_KEY'))" 2>/dev/null)
+        echo ""
+        gum style --foreground 82 "✓ Channel key accepted!"
+        gum style --foreground 245 "Key: $CHANNEL_KEY"
+        break
+      else
+        echo ""
+        gum style --foreground 196 "Invalid key format. Please check and try again."
+        gum style --foreground 245 "Expected: 32 alphanumeric characters (with or without dashes)"
+        echo ""
+        if ! gum confirm "Try again?" --default=true; then
+          gum style --foreground 214 "→ Using public mode"
+          CHANNEL_KEY=""
+          break
+        fi
+      fi
+    done
+    ;;
+
+  *)
+    gum style --foreground 214 "→ Using public mode"
+    CHANNEL_KEY=""
+    sleep 0.5
+    ;;
+esac
 
 # =============================================================================
 # Step 4: Overclock Configuration
