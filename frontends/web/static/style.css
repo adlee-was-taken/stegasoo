@@ -121,6 +121,7 @@
    ---------------------------------------------------------------------------- */
 .card .form-label {
     color: #ffe699;
+    font-weight: 300;
     animation: gold-shimmer 1.5s ease-in-out infinite;
 }
 
