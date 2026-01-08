@@ -64,6 +64,18 @@ python -c "from stegasoo import has_dct_support; print('DCT:', 'available' if ha
 stegasoo channel show
 ```
 
+### Man Page
+
+```bash
+# Install man page
+sudo mkdir -p /usr/local/share/man/man1
+sudo cp docs/stegasoo.1 /usr/local/share/man/man1/
+sudo mandb
+
+# View
+man stegasoo
+```
+
 ---
 
 ## What's New in v4.1.0

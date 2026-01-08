@@ -428,6 +428,14 @@ if [ -f "$INSTALL_DIR/rpi/skel/.bashrc" ]; then
     fi
 fi
 
+# Install man page
+if [ -f "$INSTALL_DIR/docs/stegasoo.1" ]; then
+    sudo mkdir -p /usr/local/share/man/man1
+    sudo cp "$INSTALL_DIR/docs/stegasoo.1" /usr/local/share/man/man1/
+    sudo mandb -q 2>/dev/null || true
+    echo "  Installed man page (man stegasoo)"
+fi
+
 echo -e "${GREEN}[12/12]${NC} Setting up login banner..."
 
 # Create dynamic MOTD script

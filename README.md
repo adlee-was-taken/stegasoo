@@ -146,6 +146,7 @@ See [rpi/README.md](rpi/README.md) for manual installation.
 - [UNDER_THE_HOOD.md](UNDER_THE_HOOD.md) - Technical deep-dive
 - [CHANGELOG.md](CHANGELOG.md) - Version history
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contributor guide
+- `man stegasoo` - Man page (install: `sudo cp docs/stegasoo.1 /usr/local/share/man/man1/ && sudo mandb`)
 
 ## License
 

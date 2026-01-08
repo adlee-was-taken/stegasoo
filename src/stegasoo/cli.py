@@ -80,12 +80,6 @@ from .batch import (
     batch_capacity_check,
     print_batch_result,
 )
-from .compression import (
-    HAS_LZ4,
-    CompressionAlgorithm,
-    algorithm_name,
-    get_available_algorithms,
-)
 from .constants import (
     DEFAULT_PASSPHRASE_WORDS,  # v3.2.0: renamed from DEFAULT_PHRASE_WORDS
     DEFAULT_PIN_LENGTH,
@@ -183,19 +177,10 @@ def cli(ctx, json_output):
     help="Passphrase (recommend 4+ words)",
 )
 @click.option("--pin", prompt=True, hide_input=True, confirmation_prompt=True, help="PIN code")
-@click.option(
-    "--compress/--no-compress", default=True, help="Enable/disable compression (default: enabled)"
-)
-@click.option(
-    "--algorithm",
-    type=click.Choice(["zlib", "lz4", "none"]),
-    default="zlib",
-    help="Compression algorithm",
-)
 @click.option("--dry-run", is_flag=True, help="Show capacity usage without encoding")
 @click.pass_context
 def encode(
-    ctx, carrier, reference, message, file_payload, output, passphrase, pin, compress, algorithm, dry_run
+    ctx, carrier, reference, message, file_payload, output, passphrase, pin, dry_run
 ):
     """
     Encode a message or file into an image.
@@ -213,18 +198,6 @@ def encode(
 
     if not message and not file_payload:
         raise click.UsageError("Either --message or --file is required")
-
-    # Parse compression algorithm
-    algo_map = {
-        "zlib": CompressionAlgorithm.ZLIB,
-        "lz4": CompressionAlgorithm.LZ4,
-        "none": CompressionAlgorithm.NONE,
-    }
-    compression_algo = algo_map[algorithm] if compress else CompressionAlgorithm.NONE
-
-    if algorithm == "lz4" and not HAS_LZ4:
-        click.echo("Warning: LZ4 not available, falling back to zlib", err=True)
-        compression_algo = CompressionAlgorithm.ZLIB
 
     # Calculate payload size
     if file_payload:
@@ -247,7 +220,6 @@ def encode(
             "capacity_bytes": capacity_bytes,
             "payload_type": payload_type,
             "payload_size": payload_size,
-            "compression": algorithm_name(compression_algo),
             "usage_percent": round(payload_size / capacity_bytes * 100, 1),
             "fits": payload_size < capacity_bytes,
         }
@@ -259,7 +231,6 @@ def encode(
             click.echo(f"Reference: {reference}")
             click.echo(f"Capacity: {capacity_bytes:,} bytes ({capacity_bytes//1024} KB)")
             click.echo(f"Payload: {payload_size:,} bytes ({payload_type})")
-            click.echo(f"Compression: {algorithm_name(compression_algo)}")
             click.echo(f"Usage: {result['usage_percent']}%")
             click.echo(f"Status: {'✓ Fits' if result['fits'] else '✗ Too large'}")
         return
@@ -306,7 +277,6 @@ def encode(
                         "reference": reference,
                         "output": output,
                         "payload_type": payload_type,
-                        "compression": algorithm_name(compression_algo),
                     },
                     indent=2,
                 )
@@ -314,7 +284,6 @@ def encode(
         else:
             click.echo(f"✓ Encoded {payload_type} to {output}")
             click.echo(f"  Reference: {reference}")
-            click.echo(f"  Compression: {algorithm_name(compression_algo)}")
 
     except Exception as e:
         if ctx.obj.get("json"):
@@ -474,13 +443,6 @@ def batch():
     help="Passphrase (recommend 4+ words)",
 )
 @click.option("--pin", prompt=True, hide_input=True, confirmation_prompt=True, help="PIN code")
-@click.option("--compress/--no-compress", default=True, help="Enable/disable compression")
-@click.option(
-    "--algorithm",
-    type=click.Choice(["zlib", "lz4", "none"]),
-    default="zlib",
-    help="Compression algorithm",
-)
 @click.option("-r", "--recursive", is_flag=True, help="Search directories recursively")
 @click.option("-j", "--jobs", default=4, help="Parallel workers (default: 4)")
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed output")
@@ -494,8 +456,6 @@ def batch_encode(
     suffix,
     passphrase,
     pin,
-    compress,
-    algorithm,
     recursive,
     jobs,
     verbose,
@@ -530,7 +490,6 @@ def batch_encode(
         output_dir=Path(output_dir) if output_dir else None,
         output_suffix=suffix,
         credentials=credentials,
-        compress=compress,
         recursive=recursive,
         progress_callback=progress if not ctx.obj.get("json") else None,
     )
@@ -821,10 +780,6 @@ def info(ctx, full):
             "fingerprint": channel_fingerprint,
             "source": channel_source,
         } if channel_fingerprint else None,
-        "compression": {
-            "available": [algorithm_name(a) for a in get_available_algorithms()],
-            "lz4_installed": HAS_LZ4,
-        },
         "limits": {
             "max_message_bytes": MAX_MESSAGE_SIZE,
             "max_file_payload_bytes": MAX_FILE_PAYLOAD_SIZE,
