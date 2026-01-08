@@ -42,9 +42,11 @@
 
     {% if channel_configured %}
     <!-- Channel Status -->
-    <div class="d-flex align-items-center justify-content-between w-100 mb-2 px-2" style="max-width: 280px;">
-        <small class="text-success"><i class="bi bi-shield-lock me-1"></i>Private Channel</small>
-        <code class="small text-muted">{{ channel_fingerprint }}</code>
+    <div class="alert alert-success mb-4 py-2 px-3" style="max-width: 320px;">
+        <div class="d-flex align-items-center justify-content-between small">
+            <span><i class="bi bi-shield-lock me-2"></i><strong>Private Channel</strong></span>
+            <code>{{ channel_fingerprint }}</code>
+        </div>
     </div>
     {% endif %}
 
