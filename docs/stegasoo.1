@@ -1,0 +1,346 @@
+.\" Stegasoo man page
+.\" Generate with: groff -man -Tascii stegasoo.1
+.TH STEGASOO 1 "January 2026" "Stegasoo 4.1.7" "User Commands"
+.SH NAME
+stegasoo \- steganography with hybrid authentication
+.SH SYNOPSIS
+.B stegasoo
+[\fB\-v\fR|\fB\-\-version\fR]
+[\fB\-\-json\fR]
+[\fB\-h\fR|\fB\-\-help\fR]
+.I command
+[\fIargs\fR]
+.SH DESCRIPTION
+.B stegasoo
+hides messages and files in images using PIN + passphrase security.
+It uses LSB (Least Significant Bit) steganography with optional DCT
+(Discrete Cosine Transform) encoding for JPEG resilience.
+.PP
+Messages are encrypted using a hybrid authentication scheme that combines
+a reference photo (shared secret), passphrase, and PIN code.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-v ", " \-\-version
+Show version and exit.
+.TP
+.B \-\-json
+Output results as JSON (where supported).
+.TP
+.BR \-h ", " \-\-help
+Show help message and exit.
+.SH COMMANDS
+.SS encode
+Encode a message or file into an image.
+.PP
+.B stegasoo encode
+.I carrier
+.B \-r
+.I reference
+[\fB\-m\fR \fImessage\fR | \fB\-f\fR \fIfile\fR]
+[\fIoptions\fR]
+.TP
+.BR \-r ", " \-\-reference " " \fIPATH\fR
+Reference photo (shared secret). Required.
+.TP
+.BR \-m ", " \-\-message " " \fITEXT\fR
+Message to encode.
+.TP
+.BR \-f ", " \-\-file " " \fIPATH\fR
+File to embed instead of message.
+.TP
+.BR \-o ", " \-\-output " " \fIPATH\fR
+Output image path.
+.TP
+.B \-\-passphrase " " \fITEXT\fR
+Passphrase (recommend 4+ words). Prompts if not provided.
+.TP
+.B \-\-pin " " \fITEXT\fR
+PIN code. Prompts if not provided.
+.TP
+.B \-\-compress\fR/\fB\-\-no\-compress
+Enable/disable compression (default: enabled).
+.TP
+.B \-\-algorithm " " [\fIzlib\fR|\fIlz4\fR|\fInone\fR]
+Compression algorithm.
+.TP
+.B \-\-dry\-run
+Show capacity usage without encoding.
+.PP
+.B Examples:
+.nf
+    stegasoo encode photo.png -r ref.jpg -m "Secret" --passphrase --pin
+    stegasoo encode photo.png -r ref.jpg -f doc.pdf -o encoded.png
+.fi
+.SS decode
+Decode a message or file from an image.
+.PP
+.B stegasoo decode
+.I image
+.B \-r
+.I reference
+[\fIoptions\fR]
+.TP
+.BR \-r ", " \-\-reference " " \fIPATH\fR
+Reference photo (shared secret). Required.
+.TP
+.B \-\-passphrase " " \fITEXT\fR
+Passphrase. Prompts if not provided.
+.TP
+.B \-\-pin " " \fITEXT\fR
+PIN code. Prompts if not provided.
+.TP
+.BR \-o ", " \-\-output " " \fIPATH\fR
+Output path for file payloads.
+.PP
+.B Examples:
+.nf
+    stegasoo decode encoded.png -r ref.jpg --passphrase --pin
+    stegasoo decode encoded.png -r ref.jpg -o ./extracted/
+.fi
+.SS generate
+Generate random credentials (passphrase + PIN + optional channel key).
+.PP
+.B stegasoo generate
+[\fIoptions\fR]
+.TP
+.B \-\-words " " \fIINTEGER\fR
+Number of words in passphrase (default: 4).
+.TP
+.B \-\-pin\-length " " \fIINTEGER\fR
+PIN length (default: 6).
+.TP
+.B \-\-channel\-key
+Also generate a 256-bit channel key.
+.PP
+.B Examples:
+.nf
+    stegasoo generate
+    stegasoo generate --words 6 --pin-length 8
+    stegasoo generate --channel-key
+.fi
+.SS info
+Show version, features, and system information.
+.PP
+.B stegasoo info
+[\fB\-\-full\fR]
+.TP
+.B \-\-full
+Show full system information (CPU, temperature, disk on Pi).
+.SS batch
+Batch operations on multiple images.
+.PP
+.B stegasoo batch
+.I subcommand
+[\fIargs\fR]
+.TP
+.B batch encode
+Encode message into multiple images.
+.RS
+.PP
+.B stegasoo batch encode
+.I images...
+[\fB\-m\fR \fImessage\fR | \fB\-f\fR \fIfile\fR]
+[\fIoptions\fR]
+.PP
+Options: \fB\-m\fR, \fB\-f\fR, \fB\-o\fR/\fB\-\-output\-dir\fR, \fB\-\-suffix\fR, \fB\-\-passphrase\fR, \fB\-\-pin\fR,
+\fB\-\-compress\fR, \fB\-\-algorithm\fR, \fB\-r\fR/\fB\-\-recursive\fR, \fB\-j\fR/\fB\-\-jobs\fR, \fB\-v\fR/\fB\-\-verbose\fR.
+.RE
+.TP
+.B batch decode
+Decode messages from multiple images.
+.RS
+.PP
+.B stegasoo batch decode
+.I images...
+[\fIoptions\fR]
+.PP
+Options: \fB\-o\fR/\fB\-\-output\-dir\fR, \fB\-\-passphrase\fR, \fB\-\-pin\fR, \fB\-r\fR/\fB\-\-recursive\fR,
+\fB\-j\fR/\fB\-\-jobs\fR, \fB\-v\fR/\fB\-\-verbose\fR.
+.RE
+.TP
+.B batch check
+Check capacity of multiple images.
+.RS
+.PP
+.B stegasoo batch check
+.I images...
+[\fB\-r\fR/\fB\-\-recursive\fR]
+.RE
+.SS channel
+Manage channel keys for deployment isolation.
+.PP
+Channel keys bind encode/decode operations to a specific group or deployment.
+Messages encoded with one channel key can only be decoded by systems with
+the same channel key.
+.PP
+.B stegasoo channel
+.I subcommand
+[\fIargs\fR]
+.TP
+.B channel generate
+Generate a new random channel key.
+.RS
+.PP
+Options: \fB\-\-save\fR (project config), \fB\-\-save\-user\fR (user config).
+.RE
+.TP
+.B channel show
+Show the current channel key.
+.RS
+.PP
+Options: \fB\-\-key\fR \fITEXT\fR (show specific key instead).
+.RE
+.TP
+.B channel qr
+Display channel key as QR code.
+.RS
+.PP
+Options: \fB\-\-key\fR \fITEXT\fR, \fB\-\-format\fR [\fIascii\fR|\fIpng\fR], \fB\-o\fR/\fB\-\-output\fR \fIPATH\fR.
+.RE
+.TP
+.B channel status
+Show channel key status and configuration.
+.TP
+.B channel clear
+Remove channel key configuration.
+.RS
+.PP
+Options: \fB\-\-project\fR, \fB\-\-user\fR.
+.RE
+.SS admin
+Web UI administration commands.
+.PP
+.B stegasoo admin
+.I subcommand
+[\fIargs\fR]
+.TP
+.B admin generate\-key
+Generate a new recovery key (for reference only).
+.RS
+.PP
+Options: \fB\-\-qr\fR (show QR code in terminal).
+.RE
+.TP
+.B admin recover
+Reset admin password using recovery key.
+.RS
+.PP
+Options: \fB\-\-db\fR \fIPATH\fR (path to stegasoo.db), \fB\-\-password\fR \fITEXT\fR.
+.RE
+.SS tools
+Image security tools.
+.PP
+.B stegasoo tools
+.I subcommand
+[\fIargs\fR]
+.TP
+.B tools capacity
+Show steganography capacity for an image.
+.RS
+.PP
+.B stegasoo tools capacity
+.I image
+[\fB\-\-json\fR]
+.RE
+.TP
+.B tools exif
+View or edit EXIF metadata.
+.RS
+.PP
+.B stegasoo tools exif
+.I image
+[\fB\-\-clear\fR] [\fB\-\-set\fR \fIFIELD=VALUE\fR] [\fB\-o\fR \fIPATH\fR] [\fB\-\-json\fR]
+.RE
+.TP
+.B tools peek
+Check if image contains Stegasoo hidden data.
+.RS
+.PP
+.B stegasoo tools peek
+.I image
+[\fB\-\-json\fR]
+.RE
+.TP
+.B tools strip
+Strip EXIF/metadata from an image.
+.RS
+.PP
+.B stegasoo tools strip
+.I image
+[\fB\-o\fR \fIPATH\fR] [\fB\-\-format\fR [\fIpng\fR|\fIbmp\fR]]
+.RE
+.SH ENVIRONMENT
+.TP
+.B STEGASOO_CHANNEL_KEY
+Channel key for encode/decode operations. Overrides config file settings.
+.TP
+.B STEGASOO_HTTPS_ENABLED
+Enable HTTPS for web UI (Docker/service mode).
+.TP
+.B STEGASOO_HOSTNAME
+Hostname for SSL certificate generation.
+.SH FILES
+.TP
+.I ~/.stegasoo/channel.key
+User's channel key configuration (encrypted).
+.TP
+.I .stegasoo.toml
+Project-level configuration file.
+.TP
+.I frontends/web/instance/stegasoo.db
+Web UI SQLite database (accounts, settings).
+.SH EXAMPLES
+.SS Basic encode/decode workflow
+.nf
+# Generate credentials
+stegasoo generate
+
+# Encode a secret message
+stegasoo encode vacation.png -r selfie.jpg -m "Meet at noon"
+
+# Decode the message (on another system with same reference photo)
+stegasoo decode vacation_steg.png -r selfie.jpg
+.fi
+.SS Using channel keys for team isolation
+.nf
+# Generate and save a channel key
+stegasoo channel generate --save-user
+
+# Share the key with your team
+stegasoo channel qr -o team-key.png
+
+# Now all encode/decode operations use this channel
+stegasoo encode photo.png -r ref.jpg -m "Team secret"
+.fi
+.SS Batch processing
+.nf
+# Check capacity of all PNGs in a directory
+stegasoo batch check ./photos/*.png
+
+# Encode same message into multiple images
+stegasoo batch encode ./photos/ -r ref.jpg -m "Secret" -o ./encoded/
+.fi
+.SH SECURITY
+Stegasoo uses multiple layers of security:
+.IP \(bu 2
+Reference photo provides a visual shared secret
+.IP \(bu 2
+Passphrase (recommend 4+ words) for strong encryption
+.IP \(bu 2
+PIN code adds additional entropy
+.IP \(bu 2
+Channel keys isolate different deployments
+.IP \(bu 2
+AES-256 encryption for payload data
+.PP
+For maximum security, share the reference photo out-of-band (in person,
+secure messenger) and use a strong passphrase.
+.SH SEE ALSO
+.BR openssl (1),
+.BR qrencode (1)
+.SH BUGS
+Report bugs at: https://github.com/adlee-was-taken/stegasoo/issues
+.SH AUTHOR
+Written by the Stegasoo contributors.
+.SH COPYRIGHT
+Copyright \(co 2024-2026. MIT License.
