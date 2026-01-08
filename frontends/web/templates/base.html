@@ -16,7 +16,7 @@
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="28">
             </a>
             {% if channel_configured %}
-            <span class="badge bg-success bg-opacity-25 small" title="Private Channel: {{ channel_fingerprint }}">
+            <span class="badge bg-success bg-opacity-25 small" style="padding-left: 0.35rem;" title="Private Channel: {{ channel_fingerprint }}">
                 <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #f0c674;">{{ channel_fingerprint }}</code>
             </span>
             {% endif %}
