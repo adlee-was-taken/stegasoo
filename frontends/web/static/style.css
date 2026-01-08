@@ -117,33 +117,17 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Form Labels - Shimmering Gold
+   Form Labels - Gold
    ---------------------------------------------------------------------------- */
 .card .form-label {
     color: #ffe699;
     font-weight: 400;
-    animation: gold-shimmer 1.5s ease-in-out infinite;
-}
-
-@keyframes gold-shimmer {
-    0%, 100% {
-        color: #ffe699;
-        text-shadow:
-            -0.3px -0.3px 0 #b8860b,
-            0.3px -0.3px 0 #b8860b,
-            -0.3px 0.3px 0 #b8860b,
-            0.3px 0.3px 0 #b8860b,
-            1px 2px 2px rgba(0, 0, 0, 0.4);
-    }
-    50% {
-        color: #fff2c4;
-        text-shadow:
-            -0.3px -0.3px 0 #cc9a0c,
-            0.3px -0.3px 0 #cc9a0c,
-            -0.3px 0.3px 0 #cc9a0c,
-            0.3px 0.3px 0 #cc9a0c,
-            1px 2px 3px rgba(0, 0, 0, 0.6);
-    }
+    text-shadow:
+        -0.3px -0.3px 0 #b8860b,
+        0.3px -0.3px 0 #b8860b,
+        -0.3px 0.3px 0 #b8860b,
+        0.3px 0.3px 0 #b8860b,
+        1px 2px 2px rgba(0, 0, 0, 0.4);
 }
 
 
