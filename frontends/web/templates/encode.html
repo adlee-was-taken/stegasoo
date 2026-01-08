@@ -206,16 +206,13 @@
 
                                     <!-- Embedding Mode (compact inline) -->
                                     <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
-                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}opacity-50{% endif %} {% if has_dct %}active{% endif %}" id="dctModeCard" for="modeDct">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
-                                            <i class="bi bi-soundwave text-warning"></i> DCT
-                                        </label>
-                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}active{% endif %}" id="lsbModeCard" for="modeLsb">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
-                                            <i class="bi bi-grid-3x3-gap text-primary"></i> LSB
-                                        </label>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <input type="radio" class="btn-check" name="embed_mode" id="modeDct" value="dct" {% if has_dct %}checked{% endif %} {% if not has_dct %}disabled{% endif %}>
+                                            <label class="btn btn-outline-secondary btn-sm" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
+                                            <input type="radio" class="btn-check" name="embed_mode" id="modeLsb" value="lsb" {% if not has_dct %}checked{% endif %}>
+                                            <label class="btn btn-outline-secondary btn-sm" for="modeLsb">LSB</label>
+                                        </div>
                                         <span class="d-flex gap-2 align-items-center" id="outputOptions">
-                                            <span class="text-muted">|</span>
                                             <div class="btn-group btn-group-sm" role="group">
                                                 <input type="radio" class="btn-check" name="dct_color_mode" id="colorMode" value="color" checked>
                                                 <label class="btn btn-outline-secondary btn-sm" for="colorMode">Color</label>
@@ -646,13 +643,18 @@ carrierInput?.addEventListener('change', function() {
 // ============================================================================
 
 const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
-const modeBtns = { 'dct': document.getElementById('dctModeCard'), 'lsb': document.getElementById('lsbModeCard') };
+const dctModeLabel = document.getElementById('dctModeLabel');
 const grayModeInput = document.getElementById('grayMode');
 const grayModeLabel = document.getElementById('grayModeLabel');
 const jpegFormatInput = document.getElementById('jpegFormat');
 const jpegFormatLabel = document.getElementById('jpegFormatLabel');
 const colorModeInput = document.getElementById('colorMode');
 const pngFormatInput = document.getElementById('pngFormat');
+
+// Apply disabled styling to DCT if not available
+if (document.getElementById('modeDct')?.disabled) {
+    dctModeLabel?.classList.add('disabled', 'text-muted');
+}
 
 function updateOutputOptions(mode) {
     const isLsb = mode === 'lsb';
@@ -676,11 +678,7 @@ function updateOutputOptions(mode) {
 }
 
 modeRadios.forEach(radio => {
-    radio.addEventListener('change', () => {
-        Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
-        modeBtns[radio.value]?.classList.add('active');
-        updateOutputOptions(radio.value);
-    });
+    radio.addEventListener('change', () => updateOutputOptions(radio.value));
 });
 
 // Initialize output options based on initial mode

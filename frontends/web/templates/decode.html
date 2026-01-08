@@ -241,18 +241,14 @@
 
                                     <!-- Extraction Mode (compact inline) -->
                                     <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
-                                        <label class="mode-btn mode-btn-sm active" id="autoModeCard" for="modeAuto">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeAuto" value="auto" checked>
-                                            <i class="bi bi-magic text-success"></i> Auto
-                                        </label>
-                                        <label class="mode-btn mode-btn-sm" id="lsbModeCard" for="modeLsb">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeLsb" value="lsb">
-                                            <i class="bi bi-grid-3x3-gap text-primary"></i> LSB
-                                        </label>
-                                        <label class="mode-btn mode-btn-sm {% if not has_dct %}opacity-50{% endif %}" id="dctModeCard" for="modeDct">
-                                            <input class="form-check-input" type="radio" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                            <i class="bi bi-soundwave text-warning"></i> DCT
-                                        </label>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <input type="radio" class="btn-check" name="embed_mode" id="modeAuto" value="auto" checked>
+                                            <label class="btn btn-outline-secondary btn-sm" for="modeAuto"><i class="bi bi-magic me-1"></i>Auto</label>
+                                            <input type="radio" class="btn-check" name="embed_mode" id="modeLsb" value="lsb">
+                                            <label class="btn btn-outline-secondary btn-sm" for="modeLsb">LSB</label>
+                                            <input type="radio" class="btn-check" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
+                                            <label class="btn btn-outline-secondary btn-sm" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
+                                        </div>
                                     </div>
                                     <div class="form-text" id="modeHint">
                                         <i class="bi bi-lightning me-1"></i>Tries LSB first, then DCT
@@ -514,15 +510,10 @@ document.querySelector('input[name="rsa_key"]')?.addEventListener('change', upda
 // MODE SWITCHING
 // ============================================================================
 
-const modeRadios = document.querySelectorAll('input[name="embed_mode"]');
-const modeBtns = { 'auto': document.getElementById('autoModeCard'), 'lsb': document.getElementById('lsbModeCard'), 'dct': document.getElementById('dctModeCard') };
-
-modeRadios.forEach(radio => {
-    radio.addEventListener('change', () => {
-        Object.values(modeBtns).forEach(btn => btn?.classList.remove('active'));
-        modeBtns[radio.value]?.classList.add('active');
-    });
-});
+// Apply disabled styling to DCT if not available
+if (document.getElementById('modeDct')?.disabled) {
+    document.getElementById('dctModeLabel')?.classList.add('disabled', 'text-muted');
+}
 
 // ============================================================================
 // LOADING STATE
