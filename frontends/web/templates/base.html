@@ -19,6 +19,10 @@
             <span class="badge bg-success bg-opacity-25 small" style="padding-left: 0.35rem;" title="Private Channel: {{ channel_fingerprint }}">
                 <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #f0c674;">{{ channel_fingerprint }}</code>
             </span>
+            {% else %}
+            <span class="badge bg-secondary bg-opacity-25 small text-muted" style="padding-left: 0.35rem;" title="No channel key configured">
+                <i class="bi bi-globe me-1"></i>Public Channel
+            </span>
             {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
