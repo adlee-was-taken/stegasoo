@@ -80,13 +80,15 @@ if gum confirm "Expand filesystem to fill SD card?" --default=true; then
   DISK_DEV=$(echo "$ROOT_DEV" | sed 's/p\?[0-9]*$//')
   PART_NUM=$(echo "$ROOT_DEV" | grep -o '[0-9]*$')
 
-  # Step 1: Grow partition to fill disk
-  gum spin --spinner dot --title "Expanding partition..." -- sudo growpart "$DISK_DEV" "$PART_NUM" 2>/dev/null || true
+  echo ""
+  gum style --foreground 245 "Expanding partition..."
+  sudo growpart "$DISK_DEV" "$PART_NUM" 2>&1 || true
 
-  # Step 2: Resize filesystem to fill partition
-  gum spin --spinner dot --title "Expanding filesystem..." -- sudo resize2fs "$ROOT_DEV" 2>/dev/null
+  gum style --foreground 245 "Expanding filesystem..."
+  sudo resize2fs "$ROOT_DEV" 2>&1
 
   NEW_SIZE=$(df -h / | awk 'NR==2 {print $2}')
+  echo ""
   gum style --foreground 82 "✓ Expanded to: $NEW_SIZE"
 else
   gum style --foreground 214 "→ Skipped (run 'sudo growpart /dev/sdX 2 && sudo resize2fs /dev/sdX2' later)"
