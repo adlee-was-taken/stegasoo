@@ -120,29 +120,22 @@
    Form Labels - Shimmering Gold
    ---------------------------------------------------------------------------- */
 .card .form-label {
-    background: linear-gradient(
-        90deg,
-        #fff4c0 0%,
-        #ffe699 50%,
-        #ffe699 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    animation: gold-shimmer 3s ease-in-out infinite;
+    color: #ffe699;
+    text-shadow: 0 0 8px rgba(255, 230, 150, 0.4);
+    animation: gold-shimmer 2.5s ease-in-out infinite;
 }
 
 @keyframes gold-shimmer {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.15); }
+    0%, 100% {
+        color: #ffe699;
+        text-shadow: 0 0 8px rgba(255, 230, 150, 0.3);
+    }
+    50% {
+        color: #fffbe8;
+        text-shadow: 0 0 16px rgba(255, 240, 180, 0.7), 0 0 4px rgba(255, 255, 255, 0.5);
+    }
 }
 
-.card .form-label i {
-    -webkit-background-clip: unset;
-    background-clip: unset;
-    background: none;
-    color: #ffe699;
-}
 
 /* ----------------------------------------------------------------------------
    Security Factor Boxes - Matches drop-zone dashed border style
