@@ -278,45 +278,28 @@ echo ""
 echo -e "${GREEN}Flashing image to $SELECTED...${NC}"
 echo ""
 
-# Try rpi-imager first (faster, native support for compressed images)
-if command -v rpi-imager &> /dev/null; then
-    echo -e "${YELLOW}Using rpi-imager...${NC}"
-    if rpi-imager --cli --disable-verify "$IMAGE" "$SELECTED"; then
-        # rpi-imager succeeded
-        :
+# Flash with dd (optionally with pv for progress)
+if [ "$HAS_PV" = true ]; then
+    echo -e "${YELLOW}Flashing with progress...${NC}"
+    if [ "$COMPRESSED" = true ]; then
+        case "$COMP_TYPE" in
+            xz)  pv "$IMAGE" | xzcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+            zst) pv "$IMAGE" | zstdcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+            gz)  pv "$IMAGE" | zcat | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
+        esac
     else
-        echo -e "${YELLOW}rpi-imager failed, falling back to dd...${NC}"
-        # Fall through to dd
-        USE_DD=true
+        pv "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
     fi
 else
-    USE_DD=true
-fi
-
-# Fallback to dd
-if [ "$USE_DD" = true ]; then
-    if [ "$HAS_PV" = true ]; then
-        echo -e "${YELLOW}Using dd with progress...${NC}"
-        if [ "$COMPRESSED" = true ]; then
-            case "$COMP_TYPE" in
-                xz)  pv "$IMAGE" | xzcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-                zst) pv "$IMAGE" | zstdcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-                gz)  pv "$IMAGE" | zcat | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null ;;
-            esac
-        else
-            pv "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync 2>/dev/null
-        fi
+    echo -e "${YELLOW}Flashing (install pv for progress bar)...${NC}"
+    if [ "$COMPRESSED" = true ]; then
+        case "$COMP_TYPE" in
+            xz)  xzcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+            zst) zstdcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+            gz)  zcat "$IMAGE" | sudo dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
+        esac
     else
-        echo -e "${YELLOW}Using dd (no progress - install pv for progress bar)...${NC}"
-        if [ "$COMPRESSED" = true ]; then
-            case "$COMP_TYPE" in
-                xz)  xzcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-                zst) zstdcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-                gz)  zcat "$IMAGE" | dd of="$SELECTED" bs=4M conv=fsync status=progress ;;
-            esac
-        else
-            dd if="$IMAGE" of="$SELECTED" bs=4M conv=fsync status=progress
-        fi
+        sudo dd if="$IMAGE" of="$SELECTED" bs=4M conv=fsync status=progress
     fi
 fi
 
