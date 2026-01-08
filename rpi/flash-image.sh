@@ -307,22 +307,36 @@ echo ""
 echo -e "${GREEN}Syncing...${NC}"
 sync
 
+# Wait for partitions to appear
+sleep 2
+partprobe "$SELECTED" 2>/dev/null || true
+sleep 1
+
+# Determine partition names
+if [[ "$SELECTED" == *"nvme"* ]] || [[ "$SELECTED" == *"mmcblk"* ]]; then
+    BOOT_PART="${SELECTED}p1"
+    ROOT_PART="${SELECTED}p2"
+else
+    BOOT_PART="${SELECTED}1"
+    ROOT_PART="${SELECTED}2"
+fi
+
+# Validate and repair filesystems
+echo ""
+echo -e "${YELLOW}Validating filesystems...${NC}"
+
+echo "  Checking boot partition ($BOOT_PART)..."
+sudo fsck.vfat -a "$BOOT_PART" 2>&1 | grep -v "^$" || true
+
+echo "  Checking root partition ($ROOT_PART)..."
+sudo e2fsck -f -y "$ROOT_PART" 2>&1 | tail -5 || true
+
+echo -e "${GREEN}  ✓ Filesystems validated${NC}"
+
 # Inject WiFi config if config.json was loaded
 if [ "$HAS_CONFIG" = true ]; then
     echo ""
     echo -e "${GREEN}Configuring WiFi from config.json...${NC}"
-
-    # Wait for partitions to appear
-    sleep 2
-    partprobe "$SELECTED" 2>/dev/null || true
-    sleep 1
-
-    # Determine boot partition
-    if [[ "$SELECTED" == *"nvme"* ]] || [[ "$SELECTED" == *"mmcblk"* ]]; then
-        BOOT_PART="${SELECTED}p1"
-    else
-        BOOT_PART="${SELECTED}1"
-    fi
 
     if [ -b "$BOOT_PART" ]; then
         MOUNT_DIR=$(mktemp -d)
