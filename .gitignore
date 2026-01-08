@@ -68,6 +68,7 @@ test_data/*.png
 scripts/*
 !scripts/validate-release.sh
 !scripts/smoke-test.sh
+!scripts/setup-trusted-certs.sh
 
 # Web UI auth database and SSL certs
 instance/

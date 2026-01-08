@@ -184,6 +184,20 @@ else
     echo "  gum already installed"
 fi
 
+# Install mkcert for browser-trusted certificates (no warning screen!)
+echo "  Installing mkcert for trusted HTTPS certificates..."
+if ! command -v mkcert &>/dev/null; then
+    sudo apt-get install -y libnss3-tools
+    # Download mkcert for ARM64
+    sudo curl -sL "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-arm64" -o /usr/local/bin/mkcert
+    sudo chmod +x /usr/local/bin/mkcert
+    # Install local CA (makes certs trusted on this Pi)
+    mkcert -install 2>/dev/null || true
+    echo "  mkcert installed"
+else
+    echo "  mkcert already installed"
+fi
+
 echo -e "${GREEN}[4/12]${NC} Cloning Stegasoo..."
 
 # Clone Stegasoo first (needed to check for pre-built tarball)
@@ -593,19 +607,40 @@ if [ "$ENABLE_HTTPS" = "true" ]; then
     LOCAL_IP=$(hostname -I | awk '{print $1}')
     PI_HOSTNAME=$(hostname)
 
-    # Generate cert with SANs for IP, hostname, and localhost
-    openssl req -x509 -newkey rsa:2048 \
-      -keyout "$CERT_DIR/server.key" \
-      -out "$CERT_DIR/server.crt" \
-      -days 365 -nodes \
-      -subj "/O=Stegasoo/CN=$PI_HOSTNAME" \
-      -addext "subjectAltName=DNS:$PI_HOSTNAME,DNS:$PI_HOSTNAME.local,DNS:localhost,IP:$LOCAL_IP,IP:127.0.0.1" \
-      2>/dev/null
+    # Try mkcert first (creates browser-trusted certs - no warning screen!)
+    if command -v mkcert &> /dev/null; then
+        echo "  Using mkcert for browser-trusted certificates..."
+        cd "$CERT_DIR"
+        mkcert -key-file server.key -cert-file server.crt \
+            "$PI_HOSTNAME" "$PI_HOSTNAME.local" localhost "$LOCAL_IP" 127.0.0.1 ::1
+
+        # Copy CA to web-accessible location for easy device setup
+        CA_ROOT=$(mkcert -CAROOT)
+        CA_DIR="$INSTALL_DIR/frontends/web/static/ca"
+        mkdir -p "$CA_DIR"
+        cp "$CA_ROOT/rootCA.pem" "$CA_DIR/"
+
+        echo -e "  ${GREEN}✓${NC} Trusted certificates generated with mkcert"
+        echo -e "  ${CYAN}Tip:${NC} New devices can get the CA from: http://$PI_HOSTNAME.local/static/ca/rootCA.pem"
+    else
+        # Fallback to self-signed (shows browser warning)
+        echo "  Using self-signed certificate (browser will show warning)"
+        echo "  Tip: Install mkcert for trusted certs without warnings"
+
+        openssl req -x509 -newkey rsa:2048 \
+          -keyout "$CERT_DIR/server.key" \
+          -out "$CERT_DIR/server.crt" \
+          -days 365 -nodes \
+          -subj "/O=Stegasoo/CN=$PI_HOSTNAME" \
+          -addext "subjectAltName=DNS:$PI_HOSTNAME,DNS:$PI_HOSTNAME.local,DNS:localhost,IP:$LOCAL_IP,IP:127.0.0.1" \
+          2>/dev/null
+
+        echo -e "  ${GREEN}✓${NC} Self-signed certificates generated"
+    fi
 
     # Fix permissions
     chmod 600 "$CERT_DIR/server.key"
     chown -R "$USER:$USER" "$CERT_DIR"
-    echo -e "  ${GREEN}✓${NC} SSL certificates generated"
 fi
 
 # Setup port 443 redirect if requested
