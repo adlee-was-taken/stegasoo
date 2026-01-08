@@ -3,65 +3,62 @@
 {% block title %}Stegasoo - Secure Steganography{% endblock %}
 
 {% block content %}
+<style>
+.home-icon {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+.home-icon i {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+}
+.home-icon span {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.2s ease;
+}
+.home-icon:hover {
+    color: var(--header-gold);
+}
+.home-icon:hover i {
+    transform: scale(1.1);
+}
+.home-icon:hover span {
+    opacity: 1;
+    transform: translateY(0);
+}
+</style>
 
-<div class="row justify-content-center">
-    <div class="col-lg-8 col-xl-7">
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
 
-        <!-- Hero -->
-        <div class="text-center mb-5">
-            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="120" class="mb-3">
-            <h1 class="display-5 fw-bold title-gold mb-2">Stegasoo</h1>
-            <p class="lead text-muted">Hide encrypted data in plain sight.</p>
+    <!-- Hero -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="80">
+        <div>
+            <h1 class="h3 fw-bold title-gold mb-0">Stegasoo</h1>
+            <p class="text-muted mb-0 small">Hide encrypted data in plain sight.</p>
         </div>
-
-        <!-- Channel Status -->
-        {% if channel_configured %}
-        <div class="alert alert-success mb-4 small">
-            <div class="d-flex align-items-center justify-content-between">
-                <span><i class="bi bi-shield-lock me-2"></i><strong>Private Channel</strong></span>
-                <code>{{ channel_fingerprint }}</code>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Action Cards -->
-        <div class="row g-3 mb-4">
-            <div class="col-4">
-                <a href="/encode" class="text-decoration-none card-link">
-                    <div class="card feature-card text-center py-4">
-                        <i class="bi bi-lock-fill fs-2 embossed-icon mb-2"></i>
-                        <h6 class="mb-0">Encode</h6>
-                    </div>
-                </a>
-            </div>
-            <div class="col-4">
-                <a href="/decode" class="text-decoration-none card-link">
-                    <div class="card feature-card text-center py-4">
-                        <i class="bi bi-unlock-fill fs-2 embossed-icon mb-2"></i>
-                        <h6 class="mb-0">Decode</h6>
-                    </div>
-                </a>
-            </div>
-            <div class="col-4">
-                <a href="/generate" class="text-decoration-none card-link">
-                    <div class="card feature-card text-center py-4">
-                        <i class="bi bi-key-fill fs-2 embossed-icon mb-2"></i>
-                        <h6 class="mb-0">Generate</h6>
-                    </div>
-                </a>
-            </div>
-        </div>
-
-        <!-- Quick Info -->
-        <div class="text-center text-muted small">
-            <p class="mb-2">
-                <i class="bi bi-shield-check text-success me-1"></i>AES-256 &nbsp;
-                <i class="bi bi-image text-info me-1"></i>Reference Photo &nbsp;
-                <i class="bi bi-soundwave text-warning me-1"></i>DCT/LSB
-            </p>
-            <a href="/about" class="text-muted"><i class="bi bi-info-circle me-1"></i>Learn more</a>
-        </div>
-
     </div>
+
+    {% if channel_configured %}
+    <span class="badge bg-success mb-3"><i class="bi bi-shield-lock me-1"></i>{{ channel_fingerprint }}</span>
+    {% endif %}
+
+    <!-- Action Icons -->
+    <div class="d-flex gap-4">
+        <a href="/encode" class="home-icon"><i class="bi bi-lock-fill"></i><span>Encode</span></a>
+        <a href="/decode" class="home-icon"><i class="bi bi-unlock-fill"></i><span>Decode</span></a>
+        <a href="/generate" class="home-icon"><i class="bi bi-key-fill"></i><span>Generate</span></a>
+    </div>
+
 </div>
 {% endblock %}
