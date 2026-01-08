@@ -271,8 +271,7 @@
                             <div class="card-body">
                                 <p class="small mb-2">Uses server-configured key if available, otherwise public mode.</p>
                                 <ul class="small mb-0">
-                                    <li>Set via <code>STEGASOO_CHANNEL_KEY</code> env var</li>
-                                    <li>Or <code>channel_key</code> in config file</li>
+                                    <li>Server admin configures the shared key</li>
                                     <li>All users share the same channel</li>
                                 </ul>
                             </div>
@@ -321,7 +320,6 @@
                     <i class="bi bi-shield-lock me-2"></i>
                     <strong>This server has a channel key configured:</strong>
                     <code class="ms-2">{{ channel_fingerprint }}</code>
-                    <span class="text-muted ms-2">({{ channel_source }})</span>
                 </div>
                 {% else %}
                 <div class="alert alert-info mt-3 mb-0">
