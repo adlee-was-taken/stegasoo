@@ -17,7 +17,7 @@
             </a>
             {% if channel_configured %}
             <span class="badge bg-success bg-opacity-25 small" style="padding-left: 0.35rem;" title="Private Channel Key Fingerprint: Messages encoded on this server use this shared channel key for additional encryption. Recipients must have the same channel key to decode.">
-                <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #f0c674;">{{ channel_fingerprint }}</code>
+                <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #c9a860;">{{ channel_fingerprint }}</code>
             </span>
             {% else %}
             <span class="badge bg-secondary bg-opacity-25 small text-muted" style="padding-left: 0.35rem;" title="Public Channel: No shared channel key configured. Messages use only passphrase and PIN for encryption.">

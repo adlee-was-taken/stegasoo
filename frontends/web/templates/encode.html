@@ -111,46 +111,7 @@
     box-shadow: 0 0 20px rgba(246, 173, 85, 0.4) !important;
 }
 
-/* QR Crop Animation */
-.qr-crop-container {
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.3);
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 120px;
-}
-.qr-crop-container img {
-    display: block;
-    max-height: 180px;
-    max-width: 180px;
-    width: auto;
-    margin: 0 auto;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.qr-crop-container .qr-original { opacity: 1; }
-.qr-crop-container .qr-cropped {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.3);
-    opacity: 0;
-    max-height: 160px;
-    min-width: 140px;
-    min-height: 140px;
-    object-fit: contain;
-}
-.qr-crop-container.scan-complete .qr-original {
-    opacity: 0;
-    transform: scale(1.1);
-    filter: blur(4px);
-}
-.qr-crop-container.scan-complete .qr-cropped {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-}
+/* QR Crop Animation - uses .qr-scan-container from style.css */
 </style>
 
 <div class="row justify-content-center">
@@ -431,7 +392,7 @@
                                                         <i class="bi bi-qr-code-scan fs-5 d-block text-muted mb-1"></i>
                                                         <span class="text-muted small">Drop QR image</span>
                                                     </div>
-                                                    <div class="qr-scan-container qr-crop-container d-none" id="qrCropContainer">
+                                                    <div class="qr-scan-container d-none" id="qrCropContainer">
                                                         <img class="qr-original" id="qrOriginal" alt="Original">
                                                         <img class="qr-cropped" id="qrCropped" alt="Cropped">
                                                     </div>
