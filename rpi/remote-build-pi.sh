@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# Stegasoo Pi Test Kickoff Script
-# Automates: flash -> wait for boot -> setup -> test
+# Stegasoo Remote Pi Build Script
+# Waits for Pi to be reachable, then sets up Stegasoo
 #
-# Usage: ./kickoff-pi-test.sh <image.img.zst> </dev/sdX>
+# Usage: ./remote-build-pi.sh [host] [user] [pass]
 #
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Pi connection settings
-PI_HOST="stegasoo.local"
-PI_USER="admin"
-PI_PASS="stegasoo"
+# Pi connection settings (defaults)
+PI_HOST="${1:-stegasoo.local}"
+PI_USER="${2:-admin}"
+PI_PASS="${3:-stegasoo}"
 
 # Colors
 RED='\033[0;31m'
@@ -26,10 +26,9 @@ NC='\033[0m'
 # Helper functions
 # -----------------------------------------------------------------------------
 
-# Wait for Pi to be reachable
 wait_for_pi() {
     local attempt=1
-    ssh-keygen -R "$PI_HOST" 2>/dev/null
+    ssh-keygen -R "$PI_HOST" 2>/dev/null || true
 
     echo "Waiting for $PI_USER@$PI_HOST..."
     while ! sshpass -p "$PI_PASS" ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no -o BatchMode=no -o UserKnownHostsFile=/dev/null "$PI_USER@$PI_HOST" "exit" 2>/dev/null; do
@@ -39,29 +38,25 @@ wait_for_pi() {
     done
 
     printf "\r${GREEN}✓ Ready after %d attempts${NC}\n" "$attempt"
-    printf '\a'  # Terminal bell
+    printf '\a'
 }
 
-# Run command on Pi (non-interactive)
 run_on_pi() {
     sshpass -p "$PI_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$PI_USER@$PI_HOST" "$@"
 }
 
-# Run command on Pi (interactive/PTY)
 run_on_pi_interactive() {
     sshpass -p "$PI_PASS" ssh -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$PI_USER@$PI_HOST" "$@"
 }
 
-# Copy file to Pi
 scp_to_pi() {
     local src="$1"
     local dst="$2"
     sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$src" "$PI_USER@$PI_HOST:$dst"
 }
 
-# Interactive SSH session
 ssh_pi() {
-    ssh-keygen -R "$PI_HOST" 2>/dev/null
+    ssh-keygen -R "$PI_HOST" 2>/dev/null || true
     sshpass -p "$PI_PASS" ssh -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$PI_USER@$PI_HOST" "$@"
 }
 
@@ -69,89 +64,45 @@ ssh_pi() {
 # Main
 # -----------------------------------------------------------------------------
 
-if [[ $# -lt 2 ]]; then
-    echo "Usage: $0 <image.img.zst> </dev/sdX>"
-    echo ""
-    echo "Example: $0 stegasoo-v4.1.img.zst /dev/sda"
-    exit 1
-fi
-
-IMAGE="$1"
-DEVICE="$2"
-
-if [[ ! -f "$IMAGE" ]]; then
-    echo -e "${RED}Error: Image file not found: $IMAGE${NC}"
-    exit 1
-fi
-
-if [[ ! -b "$DEVICE" ]]; then
-    echo -e "${RED}Error: Device not found: $DEVICE${NC}"
-    exit 1
-fi
-
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║              Stegasoo Pi Test Kickoff                         ║${NC}"
+echo -e "${CYAN}║              Stegasoo Remote Pi Build                         ║${NC}"
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "Image:  ${YELLOW}$IMAGE${NC}"
-echo -e "Device: ${YELLOW}$DEVICE${NC}"
+echo -e "Host: ${YELLOW}$PI_HOST${NC}"
+echo -e "User: ${YELLOW}$PI_USER${NC}"
 echo ""
 
 # -----------------------------------------------------------------------------
-# Step 1: Flash the image
+# Step 1: Wait for Pi to be ready
 # -----------------------------------------------------------------------------
-echo -e "${GREEN}[1/8]${NC} Flashing image..."
-echo ""
-
-# Auto-answer: "yes" for confirm, "y" for wipe, "y" for resize
-printf 'yes\ny\ny\n' | "$SCRIPT_DIR/flash-stock-img.sh" "$IMAGE" "$DEVICE"
-
-echo ""
-echo -e "${GREEN}[2/8]${NC} Flash complete! Waiting for SD card insertion..."
-echo ""
-
-# -----------------------------------------------------------------------------
-# Step 2: Wait for user to insert SD card
-# -----------------------------------------------------------------------------
-echo -e "${YELLOW}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${YELLOW}  Insert SD card into Pi and power on${NC}"
-echo -e "${YELLOW}════════════════════════════════════════════════════════════════${NC}"
-echo ""
-read -p "Press ENTER when Pi is booting..."
-
-echo ""
-
-# -----------------------------------------------------------------------------
-# Step 3: Wait for Pi to be ready
-# -----------------------------------------------------------------------------
-echo -e "${GREEN}[3/8]${NC} Waiting for Pi to boot..."
+echo -e "${GREEN}[1/6]${NC} Waiting for Pi..."
 echo ""
 
 wait_for_pi
 
 # -----------------------------------------------------------------------------
-# Step 4: Pre-setup (install dependencies)
+# Step 2: Install dependencies
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}[4/8]${NC} Installing dependencies on Pi..."
-echo ""
-
-run_on_pi "sudo chown admin:admin /opt && sudo apt-get update && sudo apt-get install -y git zstd jq"
-
-# -----------------------------------------------------------------------------
-# Step 5: Clone repo
-# -----------------------------------------------------------------------------
-echo ""
-echo -e "${GREEN}[5/8]${NC} Cloning Stegasoo repo..."
+echo -e "${GREEN}[2/6]${NC} Installing dependencies on Pi..."
 echo ""
 
-run_on_pi "cd /opt && git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo"
+run_on_pi "sudo chown admin:admin /opt && sudo apt-get update && sudo apt-get install -y git zstd jq ca-certificates"
 
 # -----------------------------------------------------------------------------
-# Step 6: Copy pre-built tarball
+# Step 3: Clone repo
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}[6/8]${NC} Copying pre-built tarball to Pi..."
+echo -e "${GREEN}[3/6]${NC} Cloning Stegasoo repo..."
+echo ""
+
+run_on_pi "cd /opt && rm -rf stegasoo && git clone https://github.com/adlee-was-taken/stegasoo.git stegasoo"
+
+# -----------------------------------------------------------------------------
+# Step 4: Copy pre-built tarball
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${GREEN}[4/6]${NC} Copying pre-built tarball to Pi..."
 echo ""
 
 TARBALL="$SCRIPT_DIR/stegasoo-rpi-runtime-env-arm64.tar.zst"
@@ -164,19 +115,19 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# Step 7: Run setup
+# Step 5: Run setup
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}[7/8]${NC} Running setup.sh on Pi..."
+echo -e "${GREEN}[5/6]${NC} Running setup.sh on Pi..."
 echo ""
 
 run_on_pi_interactive "cd /opt/stegasoo && ./rpi/setup.sh"
 
 # -----------------------------------------------------------------------------
-# Step 8: Test it works
+# Step 6: Test it works
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}[8/8]${NC} Testing Stegasoo..."
+echo -e "${GREEN}[6/6]${NC} Testing Stegasoo..."
 echo ""
 
 run_on_pi "sudo systemctl start stegasoo && sleep 2 && curl -sk https://localhost:5000 | head -5"
@@ -186,7 +137,7 @@ echo -e "${GREEN}═════════════════════
 echo -e "${GREEN}  Build complete! Pi is ready for testing.${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo ""
-echo -e "Access: ${YELLOW}https://stegasoo.local:5000${NC}"
+echo -e "Access: ${YELLOW}https://$PI_HOST:5000${NC}"
 echo ""
 read -p "Press ENTER to SSH into Pi for manual testing..."
 
