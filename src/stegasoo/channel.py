@@ -411,11 +411,12 @@ def get_channel_status() -> dict:
             for config_path in CONFIG_LOCATIONS:
                 if config_path.exists():
                     try:
-                        file_key = config_path.read_text().strip()
-                        if file_key and format_channel_key(file_key) == key:
+                        stored = config_path.read_text().strip()
+                        file_key = _decrypt_from_storage(stored)
+                        if file_key and validate_channel_key(file_key) and format_channel_key(file_key) == key:
                             source = str(config_path)
                             break
-                    except (OSError, PermissionError):
+                    except (OSError, PermissionError, ValueError):
                         continue
 
         return {
