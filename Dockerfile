@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzbar0 \
     libjpeg-dev \
     zlib1g-dev \
+    curl \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ALL dependencies (slow path)
@@ -57,6 +59,12 @@ FROM base AS web
 
 WORKDIR /app
 
+# Install runtime dependencies (curl for healthcheck, openssl for cert generation)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy application files (this is all that rebuilds normally!)
 COPY src/ src/
 COPY data/ data/
@@ -65,6 +73,10 @@ COPY frontends/web/ frontends/web/
 # Create upload directory and instance directories (for volumes)
 # temp_files is for multi-worker temp file sharing
 RUN mkdir -p /tmp/stego_uploads /app/frontends/web/instance /app/frontends/web/certs /app/frontends/web/temp_files
+
+# Copy and set up entrypoint (before switching to non-root user)
+COPY frontends/web/docker-entrypoint.sh /app/frontends/web/
+RUN chmod +x /app/frontends/web/docker-entrypoint.sh
 
 # Create non-root user
 RUN useradd -m -u 1000 stego && chown -R stego:stego /app /tmp/stego_uploads
@@ -77,12 +89,12 @@ ENV PYTHONPATH=/app/src
 EXPOSE 5000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/')" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -fsk https://localhost:5000/ || curl -fs http://localhost:5000/ || exit 1
 
-# Run with gunicorn
+# Run with entrypoint (handles HTTPS/HTTP mode)
 WORKDIR /app/frontends/web
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]
+ENTRYPOINT ["/app/frontends/web/docker-entrypoint.sh"]
 
 # ============================================================================
 # API stage - REST API

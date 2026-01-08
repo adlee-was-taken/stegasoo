@@ -105,12 +105,15 @@ ruff check src/ tests/ frontends/
 ## Docker
 
 ```bash
-# Quick start
+# Quick start (HTTPS enabled by default)
 docker-compose up -d
 
 # Access
-# Web UI:   http://localhost:5000
+# Web UI:   https://localhost:5000  (self-signed cert)
 # REST API: http://localhost:8000
+
+# Disable HTTPS if needed:
+STEGASOO_HTTPS_ENABLED=false docker-compose up -d
 ```
 
 See [DOCKER.md](DOCKER.md) for full documentation.

@@ -18,7 +18,9 @@ services:
       FLASK_ENV: production
       # Authentication (v4.0.2)
       STEGASOO_AUTH_ENABLED: ${STEGASOO_AUTH_ENABLED:-true}
-      STEGASOO_HTTPS_ENABLED: ${STEGASOO_HTTPS_ENABLED:-false}
+      # HTTPS enabled by default - generates self-signed cert if none provided
+      # To disable: STEGASOO_HTTPS_ENABLED=false docker-compose up
+      STEGASOO_HTTPS_ENABLED: ${STEGASOO_HTTPS_ENABLED:-true}
       STEGASOO_HOSTNAME: ${STEGASOO_HOSTNAME:-localhost}
     volumes:
       # Persist auth database and SSL certs (v4.0.2)

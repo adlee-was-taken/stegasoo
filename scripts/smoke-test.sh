@@ -1,9 +1,14 @@
 #!/bin/bash
 #
-# Stegasoo Pi Smoke Test
-# Tests all core functionality against a running Pi instance
+# Stegasoo Smoke Test
+# Tests all core functionality against a running instance (Pi, Docker, or dev)
 #
 # Usage: ./smoke-test.sh [host] [port] [user] [pass]
+#
+# Examples:
+#   ./smoke-test.sh                          # Pi default (stegasoo.local:443)
+#   ./smoke-test.sh localhost 5000           # Docker default
+#   ./smoke-test.sh 192.168.1.100 5000       # Custom host
 #
 
 set -e
@@ -296,7 +301,7 @@ test_tools() {
 
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║              Stegasoo Pi Smoke Test                           ║${NC}"
+echo -e "${CYAN}║              Stegasoo Smoke Test                              ║${NC}"
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "Target: ${YELLOW}$BASE_URL${NC}"

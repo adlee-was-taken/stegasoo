@@ -13,7 +13,7 @@ docker-compose ps
 ```
 
 Access:
-- **Web UI**: http://localhost:5000
+- **Web UI**: https://localhost:5000 (HTTPS with self-signed cert)
 - **REST API**: http://localhost:8000
 
 ## Services
@@ -36,9 +36,12 @@ STEGASOO_CHANNEL_KEY=XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
 # Web UI authentication (default: enabled)
 STEGASOO_AUTH_ENABLED=true
 
-# HTTPS support (default: disabled)
-STEGASOO_HTTPS_ENABLED=false
+# HTTPS support (default: enabled, generates self-signed cert)
+STEGASOO_HTTPS_ENABLED=true
 STEGASOO_HOSTNAME=localhost
+
+# To disable HTTPS:
+# STEGASOO_HTTPS_ENABLED=false
 ```
 
 ### Volume Mounts

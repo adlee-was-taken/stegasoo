@@ -64,9 +64,10 @@ htmlcov/
 # Output test files.
 test_data/*.png
 
-# Dev scripts (local convenience scripts - except validate-release.sh)
+# Dev scripts (local convenience scripts - except these)
 scripts/*
 !scripts/validate-release.sh
+!scripts/smoke-test.sh
 
 # Web UI auth database and SSL certs
 instance/
