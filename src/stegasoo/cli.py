@@ -857,7 +857,7 @@ def info(ctx, full):
         # Channel
         if channel_fingerprint:
             masked = f"{channel_fingerprint[:4]}••••••••{channel_fingerprint[-4:]}"
-            click.echo(f"  Channel:     {masked}")
+            click.echo(f"  Channel:     \033[36m{masked}\033[0m")  # Cyan for private channel
         else:
             click.echo("  Channel:     \033[33mpublic\033[0m")
 
