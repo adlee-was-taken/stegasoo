@@ -16,8 +16,8 @@
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="28">
             </a>
             {% if channel_configured %}
-            <span class="badge bg-success bg-opacity-25 text-success small" title="Private Channel: {{ channel_fingerprint }}">
-                <i class="bi bi-shield-lock me-1"></i><code style="font-size: 0.7rem; color: #f0c674;">{{ channel_fingerprint }}</code>
+            <span class="badge bg-success bg-opacity-25 small" title="Private Channel: {{ channel_fingerprint }}">
+                <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #f0c674;">{{ channel_fingerprint }}</code>
             </span>
             {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
