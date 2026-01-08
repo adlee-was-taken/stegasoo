@@ -87,7 +87,7 @@ echo ""
 echo -e "${GREEN}[2/6]${NC} Installing dependencies on Pi..."
 echo ""
 
-run_on_pi "sudo chown admin:admin /opt && sudo apt-get update && sudo apt-get install -y git zstd jq ca-certificates"
+run_on_pi "sudo chown admin:admin /opt && sudo apt-get update && sudo apt-get install -y git zstd jq ca-certificates && sudo update-ca-certificates"
 
 # -----------------------------------------------------------------------------
 # Step 3: Clone repo
