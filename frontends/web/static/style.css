@@ -137,6 +137,13 @@
     50% { filter: brightness(1.15); }
 }
 
+.card .form-label i {
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    background: none;
+    color: #ffe699;
+}
+
 /* ----------------------------------------------------------------------------
    Security Factor Boxes - Matches drop-zone dashed border style
    ---------------------------------------------------------------------------- */
