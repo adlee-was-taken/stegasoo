@@ -243,11 +243,11 @@
                                     <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <input type="radio" class="btn-check" name="embed_mode" id="modeAuto" value="auto" checked>
-                                            <label class="btn btn-outline-secondary btn-sm" for="modeAuto"><i class="bi bi-magic me-1"></i>Auto</label>
+                                            <label class="btn btn-outline-secondary btn-sm text-nowrap" for="modeAuto"><i class="bi bi-magic me-1"></i>Auto</label>
                                             <input type="radio" class="btn-check" name="embed_mode" id="modeLsb" value="lsb">
-                                            <label class="btn btn-outline-secondary btn-sm" for="modeLsb">LSB</label>
+                                            <label class="btn btn-outline-secondary btn-sm text-nowrap" for="modeLsb"><i class="bi bi-grid-3x3-gap me-1"></i>LSB</label>
                                             <input type="radio" class="btn-check" name="embed_mode" id="modeDct" value="dct" {% if not has_dct %}disabled{% endif %}>
-                                            <label class="btn btn-outline-secondary btn-sm" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
+                                            <label class="btn btn-outline-secondary btn-sm text-nowrap" for="modeDct" id="dctModeLabel"><i class="bi bi-soundwave me-1"></i>DCT</label>
                                         </div>
                                     </div>
                                     <div class="form-text" id="modeHint">
