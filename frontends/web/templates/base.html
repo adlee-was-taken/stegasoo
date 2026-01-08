@@ -12,16 +12,12 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="/">
-                <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="36" class="me-2">
-                <span style="position: relative; display: inline-block; margin-top: -14px;">
-                    <span class="fw-bold title-gold">Stegasoo</span>
-                    <span class="badge bg-success" style="position: absolute; font-size: 0.45rem; bottom: -8px; right: 6px;">v4.1</span>
-                </span>
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="28">
             </a>
             {% if channel_configured %}
-            <span class="badge bg-success bg-opacity-25 text-success ms-2 small" title="Private Channel: {{ channel_fingerprint }}">
-                <i class="bi bi-shield-lock me-1"></i><code class="text-success" style="font-size: 0.7rem;">{{ channel_fingerprint }}</code>
+            <span class="badge bg-success bg-opacity-25 text-success small" title="Private Channel: {{ channel_fingerprint }}">
+                <i class="bi bi-shield-lock me-1"></i><code style="font-size: 0.7rem; color: #f0c674;">{{ channel_fingerprint }}</code>
             </span>
             {% endif %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
