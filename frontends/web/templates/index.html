@@ -4,169 +4,64 @@
 
 {% block content %}
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex align-items-end justify-content-center gap-4">
-            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="155">
-            <div style="margin-bottom: 40px;">
-                <h1 class="display-4 fw-bold mb-2 title-gold">
-                    Stegasoo
-                    <span class="badge bg-success fs-6 ms-2">v4.1</span>
-                </h1>
-                <p class="lead text-muted mb-0">Hide encrypted data in plain sight.</p>
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+
+        <!-- Hero -->
+        <div class="text-center mb-5">
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="120" class="mb-3">
+            <h1 class="display-5 fw-bold title-gold mb-2">Stegasoo</h1>
+            <p class="lead text-muted">Hide encrypted data in plain sight.</p>
+        </div>
+
+        <!-- Channel Status -->
+        {% if channel_configured %}
+        <div class="alert alert-success mb-4 small">
+            <div class="d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-shield-lock me-2"></i><strong>Private Channel</strong></span>
+                <code>{{ channel_fingerprint }}</code>
             </div>
         </div>
-    </div>
-</div>
+        {% endif %}
 
-<!-- Channel Status Banner (v4.0.0) -->
-{% if channel_configured %}
-<div class="alert alert-success mb-4">
-    <div class="d-flex align-items-center justify-content-between">
-        <div>
-            <i class="bi bi-shield-lock me-2"></i>
-            <strong>Private Channel Mode</strong>
-        </div>
-        <div class="key-capsule">
-            <span class="badge led-badge-yellow"><span class="led-indicator led-yellow me-1"></span>Key Loaded</span>
-            <code class="small ms-2">{{ channel_fingerprint }}</code>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<div class="row g-4 mb-5">
-    <!-- Encode Card -->
-    <div class="col-md-4">
-        <a href="/encode" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-lock-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Encode</h5>
-                    <p class="card-text text-muted">
-                        Hide encrypted messages or files inside images
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!-- Decode Card -->
-    <div class="col-md-4">
-        <a href="/decode" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-unlock-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Decode</h5>
-                    <p class="card-text text-muted">
-                        Extract and decrypt hidden data from stego images
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
- 
-    <!-- Generate Card -->
-    <div class="col-md-4">
-        <a href="/generate" class="text-decoration-none card-link">
-            <div class="card h-100 feature-card">
-                <div class="card-header text-center py-3">
-                    <i class="bi bi-key-fill fs-1 embossed-icon"></i>
-                </div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Generate</h5>
-                    <p class="card-text text-muted">
-                        Create passphrases, PINs, and RSA keys
-                    </p>
-                </div>
-            </div>
-        </a>
-    </div>
-</div>
-
-<!-- Embedding Modes -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Embedding Modes</h5>
-    </div>
-    <div class="card-body">
-        <div class="row text-center">
-            <div class="col-md-6 mb-3 mb-md-0">
-                <div class="p-3 bg-dark rounded h-100">
-                    <i class="bi bi-soundwave text-warning fs-2 d-block mb-2"></i>
-                    <strong>DCT Mode</strong>
-                    <span class="badge bg-success ms-1">Default</span>
-                    <div class="small text-muted mt-2">
-                        Survives JPEG recompression<br>
-                        Best for social media
+        <!-- Action Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-4">
+                <a href="/encode" class="text-decoration-none card-link">
+                    <div class="card feature-card text-center py-4">
+                        <i class="bi bi-lock-fill fs-2 embossed-icon mb-2"></i>
+                        <h6 class="mb-0">Encode</h6>
                     </div>
-                </div>
+                </a>
             </div>
-            <div class="col-md-6">
-                <div class="p-3 bg-dark rounded h-100">
-                    <i class="bi bi-grid-3x3-gap text-primary fs-2 d-block mb-2"></i>
-                    <strong>LSB Mode</strong>
-                    <div class="small text-muted mt-2">
-                        Higher capacity (~375 KB/MP)<br>
-                        Best for email &amp; file transfer
+            <div class="col-4">
+                <a href="/decode" class="text-decoration-none card-link">
+                    <div class="card feature-card text-center py-4">
+                        <i class="bi bi-unlock-fill fs-2 embossed-icon mb-2"></i>
+                        <h6 class="mb-0">Decode</h6>
                     </div>
-                </div>
+                </a>
+            </div>
+            <div class="col-4">
+                <a href="/generate" class="text-decoration-none card-link">
+                    <div class="card feature-card text-center py-4">
+                        <i class="bi bi-key-fill fs-2 embossed-icon mb-2"></i>
+                        <h6 class="mb-0">Generate</h6>
+                    </div>
+                </a>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>How It Works</h5>
-        <a href="/about" class="btn btn-sm btn-outline-light">Learn More</a>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-primary"><i class="bi bi-key me-2"></i>You Provide</h6>
-                <ul class="list-unstyled small">
-                    <li class="mb-1">
-                        <i class="bi bi-image text-info me-2"></i>
-                        <strong>Reference Photo</strong>: shared secret
-                    </li>
-                    <li class="mb-1">
-                        <i class="bi bi-chat-quote text-info me-2"></i>
-                        <strong>Passphrase</strong>: 4+ words
-                    </li>
-                    <li class="mb-1">
-                        <i class="bi bi-123 text-info me-2"></i>
-                        <strong>PIN</strong>: 6-9 digits (or RSA key)
-                    </li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-primary"><i class="bi bi-shield-check me-2"></i>Security</h6>
-                <ul class="list-unstyled small">
-                    <li class="mb-1">
-                        <i class="bi bi-lock text-success me-2"></i>
-                        AES-256-GCM encryption
-                    </li>
-                    <li class="mb-1">
-                        <i class="bi bi-memory text-success me-2"></i>
-                        Argon2id key derivation (256MB)
-                    </li>
-                    <li class="mb-1">
-                        <i class="bi bi-shuffle text-success me-2"></i>
-                        Pseudo-random embedding
-                    </li>
-                    <li class="mb-1">
-                        <i class="bi bi-broadcast text-success me-2"></i>
-                        <strong>Channel keys</strong> for group isolation
-                        <span class="badge bg-info ms-1">v4.1</span>
-                    </li>
-                </ul>
-            </div>
+        <!-- Quick Info -->
+        <div class="text-center text-muted small">
+            <p class="mb-2">
+                <i class="bi bi-shield-check text-success me-1"></i>AES-256 &nbsp;
+                <i class="bi bi-image text-info me-1"></i>Reference Photo &nbsp;
+                <i class="bi bi-soundwave text-warning me-1"></i>DCT/LSB
+            </p>
+            <a href="/about" class="text-muted"><i class="bi bi-info-circle me-1"></i>Learn more</a>
         </div>
+
     </div>
 </div>
 {% endblock %}
