@@ -47,6 +47,80 @@ CONFIG_LOCATIONS = [
     Path.home() / ".stegasoo" / "channel.key",  # User config
 ]
 
+# Encrypted config marker
+ENCRYPTED_PREFIX = "ENC:"
+
+
+def _get_machine_key() -> bytes:
+    """
+    Get a machine-specific key for encrypting stored channel keys.
+
+    Uses /etc/machine-id on Linux, falls back to hostname hash.
+    This ties the encrypted key to this specific machine.
+    """
+    machine_id = None
+
+    # Try Linux machine-id
+    try:
+        machine_id = Path("/etc/machine-id").read_text().strip()
+    except (OSError, FileNotFoundError):
+        pass
+
+    # Fallback to hostname
+    if not machine_id:
+        import socket
+        machine_id = socket.gethostname()
+
+    # Hash to get consistent 32 bytes
+    return hashlib.sha256(machine_id.encode()).digest()
+
+
+def _encrypt_for_storage(plaintext: str) -> str:
+    """
+    Encrypt a channel key for storage using machine-specific key.
+
+    Returns ENC: prefixed base64 string.
+    """
+    import base64
+
+    key = _get_machine_key()
+    plaintext_bytes = plaintext.encode()
+
+    # XOR with key (cycling if needed)
+    encrypted = bytes(
+        pb ^ key[i % len(key)]
+        for i, pb in enumerate(plaintext_bytes)
+    )
+
+    return ENCRYPTED_PREFIX + base64.b64encode(encrypted).decode()
+
+
+def _decrypt_from_storage(stored: str) -> str | None:
+    """
+    Decrypt a stored channel key.
+
+    Returns None if decryption fails or format is invalid.
+    """
+    import base64
+
+    if not stored.startswith(ENCRYPTED_PREFIX):
+        # Not encrypted, return as-is (legacy plaintext)
+        return stored
+
+    try:
+        encrypted = base64.b64decode(stored[len(ENCRYPTED_PREFIX):])
+        key = _get_machine_key()
+
+        # XOR to decrypt
+        decrypted = bytes(
+            eb ^ key[i % len(key)]
+            for i, eb in enumerate(encrypted)
+        )
+
+        return decrypted.decode()
+    except Exception:
+        return None
+
 
 def generate_channel_key() -> str:
     """
@@ -154,11 +228,13 @@ def get_channel_key() -> str | None:
         else:
             debug.print(f"Warning: Invalid {CHANNEL_KEY_ENV_VAR} format, ignoring")
 
-    # 2. Check config files
+    # 2. Check config files (may be encrypted)
     for config_path in CONFIG_LOCATIONS:
         if config_path.exists():
             try:
-                key = config_path.read_text().strip()
+                stored = config_path.read_text().strip()
+                # Decrypt if encrypted, otherwise use as-is (legacy)
+                key = _decrypt_from_storage(stored)
                 if key and validate_channel_key(key):
                     debug.print(f"Channel key from {config_path}: {get_channel_fingerprint(key)}")
                     return format_channel_key(key)
@@ -200,8 +276,9 @@ def set_channel_key(key: str, location: str = "project") -> Path:
     # Create directory if needed
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write key with newline
-    config_path.write_text(formatted + "\n")
+    # Encrypt and write (tied to this machine's identity)
+    encrypted = _encrypt_for_storage(formatted)
+    config_path.write_text(encrypted + "\n")
 
     # Set restrictive permissions (owner read/write only)
     try:

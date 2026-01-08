@@ -557,9 +557,15 @@ echo ""
 read -p "Generate a private channel key? [y/N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    # Generate channel key using the CLI
-    CHANNEL_KEY=$($INSTALL_DIR/venv/bin/python -c "from stegasoo.channel import generate_channel_key; print(generate_channel_key())")
+    # Generate channel key and save encrypted to config
+    CHANNEL_KEY=$($INSTALL_DIR/venv/bin/python -c "
+from stegasoo.channel import generate_channel_key, set_channel_key
+key = generate_channel_key()
+set_channel_key(key, 'user')  # Saves encrypted to ~/.stegasoo/channel.key
+print(key)
+")
     echo -e "  ${GREEN}✓${NC} Channel key generated: ${YELLOW}$CHANNEL_KEY${NC}"
+    echo -e "  ${GREEN}✓${NC} Key saved (encrypted) to ~/.stegasoo/channel.key"
     echo ""
     echo -e "  ${RED}IMPORTANT: Save this key!${NC} You'll need to share it with anyone"
     echo "  who should be able to decode your images."
