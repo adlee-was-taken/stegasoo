@@ -249,16 +249,9 @@ if [ -n "$MOUNTED" ]; then
     done
 fi
 
-# Ask about wiping
+# Ask about wiping (defer actual wipe until after final confirmation)
 echo
 read -p "Wipe partition table first? (recommended if having issues) [y/N] " wipe_confirm
-if [[ "$wipe_confirm" =~ ^[Yy]$ ]]; then
-    echo "Wiping partition table..."
-    sudo wipefs -a "$SELECTED"
-    sudo dd if=/dev/zero of="$SELECTED" bs=1M count=10 status=none
-    sync
-    echo "  Wiped clean"
-fi
 
 # Final confirmation
 echo -e "${RED}╔═══════════════════════════════════════════════════════════════╗${NC}"
@@ -270,6 +263,15 @@ read -p "Type 'yes' to continue: " -r
 if [[ ! $REPLY == "yes" ]]; then
     echo "Aborted."
     exit 1
+fi
+
+# Now wipe if requested
+if [[ "$wipe_confirm" =~ ^[Yy]$ ]]; then
+    echo "Wiping partition table..."
+    sudo wipefs -a "$SELECTED"
+    sudo dd if=/dev/zero of="$SELECTED" bs=1M count=10 status=none
+    sync
+    echo "  Wiped clean"
 fi
 
 echo ""
