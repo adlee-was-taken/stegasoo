@@ -129,10 +129,10 @@ fi
 echo
 echo -e "${YELLOW}Re-enabling auto-expand for release...${NC}"
 TEMP_ROOT=$(mktemp -d)
-mount "$ROOT_PART" "$TEMP_ROOT"
+sudo mount "$ROOT_PART" "$TEMP_ROOT"
 
 # Create the resize service that runs on first boot
-cat > "$TEMP_ROOT/etc/systemd/system/rpi-resizerootfs.service" <<'RESIZE_EOF'
+sudo tee "$TEMP_ROOT/etc/systemd/system/rpi-resizerootfs.service" > /dev/null <<'RESIZE_EOF'
 [Unit]
 Description=Resize root filesystem to fill SD card
 After=local-fs.target
@@ -147,10 +147,10 @@ WantedBy=multi-user.target
 RESIZE_EOF
 
 # Enable the service
-mkdir -p "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants"
-ln -sf /etc/systemd/system/rpi-resizerootfs.service "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
+sudo mkdir -p "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants"
+sudo ln -sf /etc/systemd/system/rpi-resizerootfs.service "$TEMP_ROOT/etc/systemd/system/multi-user.target.wants/rpi-resizerootfs.service"
 
-umount "$TEMP_ROOT"
+sudo umount "$TEMP_ROOT"
 rmdir "$TEMP_ROOT"
 echo -e "${GREEN}  Auto-expand service installed${NC}"
 
