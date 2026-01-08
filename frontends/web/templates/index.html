@@ -38,17 +38,17 @@
 }
 </style>
 
-<div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
-
-    {% if channel_configured %}
-    <!-- Channel Status -->
-    <div class="alert alert-success mb-4 py-2 px-3" style="max-width: 320px;">
-        <div class="d-flex align-items-center justify-content-between small">
-            <span><i class="bi bi-shield-lock me-2"></i><strong>Private Channel</strong></span>
-            <code>{{ channel_fingerprint }}</code>
-        </div>
+{% if channel_configured %}
+<!-- Channel Status - pinned under nav -->
+<div class="alert alert-success mb-0 py-2 rounded-0">
+    <div class="d-flex align-items-center justify-content-between small container">
+        <span><i class="bi bi-shield-lock me-2"></i><strong>Private Channel</strong></span>
+        <code>{{ channel_fingerprint }}</code>
     </div>
-    {% endif %}
+</div>
+{% endif %}
+
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
 
     <!-- Hero -->
     <div class="d-flex align-items-center gap-3 mb-4">
