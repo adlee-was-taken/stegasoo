@@ -2707,11 +2707,10 @@ def admin_settings():
 
     return render_template(
         "admin/settings.html",
-        # Channel info
+        # Channel info (key hidden until password verified)
         channel_configured=channel_status["configured"],
         channel_fingerprint=channel_status.get("fingerprint"),
         channel_source=channel_status.get("source"),
-        channel_key_full=channel_status.get("key") if channel_status["configured"] else "",
         # Server config
         hostname=os.environ.get("STEGASOO_HOSTNAME") or socket.gethostname(),
         port=os.environ.get("STEGASOO_PORT", "5000"),
@@ -2727,6 +2726,35 @@ def admin_settings():
         platform=platform.system(),
         kdf_type="Argon2id" if has_argon2() else "PBKDF2",
     )
+
+
+@app.route("/admin/settings/unlock", methods=["POST"])
+@admin_required
+def admin_settings_unlock():
+    """Verify password and return channel key (AJAX)."""
+    from stegasoo.channel import get_channel_status
+
+    data = request.get_json() or {}
+    password = data.get("password", "")
+
+    if not password:
+        return jsonify({"success": False, "error": "Password required"})
+
+    # Get current user and verify password
+    username = get_username()
+    user = verify_user_password(username, password)
+
+    if not user:
+        return jsonify({"success": False, "error": "Incorrect password"})
+
+    # Password verified - return channel key
+    channel_status = get_channel_status()
+    channel_key = channel_status.get("key") if channel_status["configured"] else ""
+
+    return jsonify({
+        "success": True,
+        "channel_key": channel_key
+    })
 
 
 @app.route("/admin/users")

@@ -360,12 +360,18 @@ function printQrSheet(canvas, keyText, title) {
     const cols = 4;
     const rows = 5;
 
+    // Split key into two lines (4 groups each)
+    const keyParts = keyText.split('-');
+    const keyLine1 = keyParts.slice(0, 4).join('-');
+    const keyLine2 = keyParts.slice(4).join('-');
+
     let qrGrid = '';
     for (let i = 0; i < rows * cols; i++) {
         qrGrid += `
             <div class="qr-tile">
+                <div class="key-text">${keyLine1}</div>
                 <img src="${qrDataUrl}" alt="QR">
-                <div class="key-text">${keyText}</div>
+                <div class="key-text">${keyLine2}</div>
             </div>
         `;
     }
@@ -374,11 +380,17 @@ function printQrSheet(canvas, keyText, title) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Stegasoo ${title} - Print Sheet</title>
+            <title></title>
             <style>
                 @page {
                     size: letter;
                     margin: 0.2in;
+                    margin-top: 0.1in;
+                    margin-bottom: 0.1in;
+                }
+                @media print {
+                    @page { margin: 0.15in; }
+                    html, body { margin: 0; padding: 0; }
                 }
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body {
@@ -388,30 +400,27 @@ function printQrSheet(canvas, keyText, title) {
                 .grid {
                     display: grid;
                     grid-template-columns: repeat(${cols}, 1fr);
-                    gap: 0.08in;
-                    margin-top: 0.20in;
+                    gap: 0;
+                    margin-top: 0.09in;
                 }
                 .qr-tile {
                     border: 1px dashed #ccc;
-                    padding: 0.08in;
+                    padding: 0.04in;
                     text-align: center;
                     page-break-inside: avoid;
                 }
                 .qr-tile img {
-                    width: 1.4in;
-                    height: 1.4in;
+                    width: 1.6in;
+                    height: 1.6in;
                 }
                 .key-text {
-                    font-size: 6pt;
+                    font-size: 10pt;
+                    font-weight: bold;
                     color: #333;
-                    margin-top: 0.03in;
-                    word-break: break-all;
+                    line-height: 1.2;
                 }
                 .footer {
-                    text-align: center;
-                    padding-top: 0.1in;
-                    font-size: 7pt;
-                    color: #999;
+                    display: none;
                 }
             </style>
         </head>

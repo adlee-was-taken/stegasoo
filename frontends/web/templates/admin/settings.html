@@ -33,24 +33,52 @@
                     </div>
                     <div class="card-body">
                         <p class="small text-muted mb-3">Generate a QR code to share a channel key with others.</p>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-8">
-                                <label class="form-label small">Channel Key</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control font-monospace" id="channelKeyQrInput"
-                                           placeholder="Enter or generate a key"
-                                           {% if channel_configured %}value="{{ channel_key_full }}"{% endif %}>
-                                    <button class="btn btn-outline-secondary" type="button" id="channelKeyQrGenerate"
-                                            title="Generate random key">
-                                        <i class="bi bi-shuffle"></i>
+
+                        <!-- Locked state - requires password -->
+                        <div id="channelKeyLocked">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label small">Channel Key</label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control font-monospace"
+                                               value="********************************" disabled>
+                                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-warning w-100" type="button" id="channelKeyUnlock">
+                                        <i class="bi bi-unlock me-1"></i>Unlock
                                     </button>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <button class="btn btn-primary w-100" type="button" id="channelKeyQrShow">
-                                    <i class="bi bi-qr-code me-1"></i>Show QR
-                                </button>
+                            <small class="text-muted mt-2 d-block">
+                                <i class="bi bi-shield-lock me-1"></i>Re-enter your password to view or export the channel key.
+                            </small>
+                        </div>
+
+                        <!-- Unlocked state - shows key and QR options -->
+                        <div id="channelKeyUnlocked" style="display: none;">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label small">Channel Key</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control font-monospace" id="channelKeyQrInput"
+                                               placeholder="Enter or generate a key">
+                                        <button class="btn btn-outline-secondary" type="button" id="channelKeyQrGenerate"
+                                                title="Generate random key">
+                                            <i class="bi bi-shuffle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-primary w-100" type="button" id="channelKeyQrShow">
+                                        <i class="bi bi-qr-code me-1"></i>Show QR
+                                    </button>
+                                </div>
                             </div>
+                            <small class="text-success mt-2 d-block">
+                                <i class="bi bi-unlock me-1"></i>Unlocked for this session.
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -183,6 +211,32 @@
     </div>
 </div>
 
+<!-- Password Verification Modal -->
+<div class="modal fade" id="passwordModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Verify Password</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Re-enter your password to access sensitive data.</p>
+                <div class="mb-3">
+                    <label class="form-label small">Password</label>
+                    <input type="password" class="form-control" id="verifyPassword" autocomplete="current-password">
+                    <div class="invalid-feedback" id="passwordError">Incorrect password</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning btn-sm" id="verifyPasswordBtn">
+                    <i class="bi bi-unlock me-1"></i>Unlock
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- QR Code Modal -->
 <div class="modal fade" id="channelKeyQrModal" tabindex="-1">
     <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -223,6 +277,77 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadBtn = document.getElementById('channelKeyQrDownload');
     const modalEl = document.getElementById('channelKeyQrModal');
     const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+
+    // Password verification elements
+    const lockedDiv = document.getElementById('channelKeyLocked');
+    const unlockedDiv = document.getElementById('channelKeyUnlocked');
+    const unlockBtn = document.getElementById('channelKeyUnlock');
+    const passwordModalEl = document.getElementById('passwordModal');
+    const passwordModal = passwordModalEl ? new bootstrap.Modal(passwordModalEl) : null;
+    const verifyPasswordInput = document.getElementById('verifyPassword');
+    const verifyPasswordBtn = document.getElementById('verifyPasswordBtn');
+    const passwordError = document.getElementById('passwordError');
+
+    // Unlock button shows password modal
+    unlockBtn?.addEventListener('click', function() {
+        verifyPasswordInput.value = '';
+        verifyPasswordInput.classList.remove('is-invalid');
+        passwordModal?.show();
+        setTimeout(() => verifyPasswordInput.focus(), 300);
+    });
+
+    // Handle Enter key in password field
+    verifyPasswordInput?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            verifyPasswordBtn?.click();
+        }
+    });
+
+    // Verify password and unlock
+    verifyPasswordBtn?.addEventListener('click', async function() {
+        const password = verifyPasswordInput.value;
+        if (!password) {
+            verifyPasswordInput.classList.add('is-invalid');
+            return;
+        }
+
+        verifyPasswordBtn.disabled = true;
+        verifyPasswordBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Verifying...';
+
+        try {
+            const response = await fetch('/admin/settings/unlock', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Unlock successful
+                passwordModal?.hide();
+                lockedDiv.style.display = 'none';
+                unlockedDiv.style.display = 'block';
+                if (data.channel_key && input) {
+                    input.value = data.channel_key;
+                }
+            } else {
+                // Password incorrect
+                verifyPasswordInput.classList.add('is-invalid');
+                passwordError.textContent = data.error || 'Incorrect password';
+            }
+        } catch (error) {
+            verifyPasswordInput.classList.add('is-invalid');
+            passwordError.textContent = 'Verification failed';
+        } finally {
+            verifyPasswordBtn.disabled = false;
+            verifyPasswordBtn.innerHTML = '<i class="bi bi-unlock me-1"></i>Unlock';
+        }
+    });
 
     // Generate random key
     generateBtn?.addEventListener('click', function() {
@@ -302,12 +427,18 @@ function printQrSheet(canvas, keyText, title) {
     const cols = 4;
     const rows = 5;
 
+    // Split key into two lines (4 groups each)
+    const keyParts = keyText.split('-');
+    const keyLine1 = keyParts.slice(0, 4).join('-');
+    const keyLine2 = keyParts.slice(4).join('-');
+
     let qrGrid = '';
     for (let i = 0; i < rows * cols; i++) {
         qrGrid += `
             <div class="qr-tile">
+                <div class="key-text">${keyLine1}</div>
                 <img src="${qrDataUrl}" alt="QR">
-                <div class="key-text">${keyText}</div>
+                <div class="key-text">${keyLine2}</div>
             </div>
         `;
     }
@@ -316,11 +447,17 @@ function printQrSheet(canvas, keyText, title) {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Stegasoo ${title} - Print Sheet</title>
+            <title></title>
             <style>
                 @page {
                     size: letter;
                     margin: 0.2in;
+                    margin-top: 0.1in;
+                    margin-bottom: 0.1in;
+                }
+                @media print {
+                    @page { margin: 0.15in; }
+                    html, body { margin: 0; padding: 0; }
                 }
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body {
@@ -330,30 +467,27 @@ function printQrSheet(canvas, keyText, title) {
                 .grid {
                     display: grid;
                     grid-template-columns: repeat(${cols}, 1fr);
-                    gap: 0.08in;
-                    margin-top: 0.20in;
+                    gap: 0;
+                    margin-top: 0.09in;
                 }
                 .qr-tile {
                     border: 1px dashed #ccc;
-                    padding: 0.08in;
+                    padding: 0.04in;
                     text-align: center;
                     page-break-inside: avoid;
                 }
                 .qr-tile img {
-                    width: 1.4in;
-                    height: 1.4in;
+                    width: 1.6in;
+                    height: 1.6in;
                 }
                 .key-text {
-                    font-size: 6pt;
+                    font-size: 10pt;
+                    font-weight: bold;
                     color: #333;
-                    margin-top: 0.03in;
-                    word-break: break-all;
+                    line-height: 1.2;
                 }
                 .footer {
-                    text-align: center;
-                    padding-top: 0.1in;
-                    font-size: 7pt;
-                    color: #999;
+                    display: none;
                 }
             </style>
         </head>
