@@ -40,6 +40,14 @@
 
 <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
 
+    {% if channel_configured %}
+    <!-- Channel Status -->
+    <div class="d-flex align-items-center justify-content-between w-100 mb-2 px-2" style="max-width: 280px;">
+        <small class="text-success"><i class="bi bi-shield-lock me-1"></i>Private Channel</small>
+        <code class="small text-muted">{{ channel_fingerprint }}</code>
+    </div>
+    {% endif %}
+
     <!-- Hero -->
     <div class="d-flex align-items-center gap-3 mb-4">
         <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="80">
@@ -48,10 +56,6 @@
             <p class="text-muted mb-0 small">Hide encrypted data in plain sight.</p>
         </div>
     </div>
-
-    {% if channel_configured %}
-    <span class="badge bg-success mb-3"><i class="bi bi-shield-lock me-1"></i>{{ channel_fingerprint }}</span>
-    {% endif %}
 
     <!-- Action Icons -->
     <div class="d-flex gap-4">
