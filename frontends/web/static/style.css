@@ -187,6 +187,13 @@ body {
     z-index: 1031;
 }
 
+/* Left-align collapsed navbar menu on mobile */
+@media (max-width: 991.98px) {
+    .navbar-collapse .navbar-nav {
+        align-items: flex-start !important;
+    }
+}
+
 /* ----------------------------------------------------------------------------
    Nav Icons - Floating Label on Hover (label floats below, no layout shift)
    ---------------------------------------------------------------------------- */
