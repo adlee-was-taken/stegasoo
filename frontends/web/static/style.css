@@ -121,19 +121,12 @@
    ---------------------------------------------------------------------------- */
 .card .form-label {
     color: #ffe699;
-    text-shadow: 0 0 8px rgba(255, 230, 150, 0.4);
     animation: gold-shimmer 2.5s ease-in-out infinite;
 }
 
 @keyframes gold-shimmer {
-    0%, 100% {
-        color: #ffe699;
-        text-shadow: 0 0 8px rgba(255, 230, 150, 0.3);
-    }
-    50% {
-        color: #fffbe8;
-        text-shadow: 0 0 16px rgba(255, 240, 180, 0.7), 0 0 4px rgba(255, 255, 255, 0.5);
-    }
+    0%, 100% { color: #ffe699; }
+    50% { color: #fffef5; }
 }
 
 
