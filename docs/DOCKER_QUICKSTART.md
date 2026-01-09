@@ -5,12 +5,17 @@ Get Stegasoo running in Docker in under 5 minutes.
 ## Build
 
 ```bash
+# From project root:
+
 # Build web UI image
-sudo docker build -t stegasoo-web --target web .
+sudo docker build -t stegasoo-web --target web -f docker/Dockerfile .
 
 # Or build all targets
-sudo docker build -t stegasoo-api --target api .
-sudo docker build -t stegasoo-cli --target cli .
+sudo docker build -t stegasoo-api --target api -f docker/Dockerfile .
+sudo docker build -t stegasoo-cli --target cli -f docker/Dockerfile .
+
+# Or use docker-compose
+sudo docker-compose -f docker/docker-compose.yml build
 ```
 
 ## Run (Basic)
@@ -55,7 +60,7 @@ Visit https://localhost:5000 (accept self-signed cert warning)
 
 ## Docker Compose
 
-Create `.env` file:
+Create `.env` file in project root:
 ```bash
 STEGASOO_AUTH_ENABLED=true
 STEGASOO_HTTPS_ENABLED=true
@@ -65,7 +70,7 @@ STEGASOO_CHANNEL_KEY=
 
 Run:
 ```bash
-sudo docker-compose up -d web
+sudo docker-compose -f docker/docker-compose.yml up -d web
 ```
 
 ## Custom SSL Certificates

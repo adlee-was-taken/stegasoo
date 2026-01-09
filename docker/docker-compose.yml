@@ -8,7 +8,8 @@ services:
   # ============================================================================
   web:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: web
     container_name: stegasoo-web
     ports:
@@ -39,7 +40,8 @@ services:
   # ============================================================================
   api:
     build:
-      context: .
+      context: ..
+      dockerfile: docker/Dockerfile
       target: api
     container_name: stegasoo-api
     ports:
