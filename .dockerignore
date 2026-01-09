@@ -25,7 +25,6 @@ rpi/
 *.img.xz
 *.img.zst
 *.img.zst.zip
-pishrink.sh
 
 # Docs
 *.md

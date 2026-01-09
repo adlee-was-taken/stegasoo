@@ -84,8 +84,8 @@ tests/
 *.img
 *.img.xz
 *.img.zst
-pishrink.sh
 *.img.zst.zip
+rpi/tools/pishrink.sh
 
 # Temp file storage
 frontends/web/temp_files/
