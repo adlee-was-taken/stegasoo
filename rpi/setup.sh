@@ -373,9 +373,9 @@ else
     STEP_OFFSET=0
 fi
 
-echo -e "${GREEN}[9/12]${NC} Creating systemd service..."
+echo -e "${GREEN}[9/12]${NC} Creating systemd services..."
 
-# Create systemd service file
+# Create systemd service file for Web UI
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
 [Unit]
 Description=Stegasoo Web UI
@@ -397,10 +397,51 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[10/12]${NC} Enabling service..."
+# Create systemd service file for REST API (optional)
+sudo tee /etc/systemd/system/stegasoo-api.service > /dev/null <<EOF
+[Unit]
+Description=Stegasoo REST API
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$INSTALL_DIR/frontends/api
+Environment="PATH=$INSTALL_DIR/venv/bin:/usr/bin"
+Environment="PYTHONPATH=$INSTALL_DIR/src"
+ExecStart=$INSTALL_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo -e "${GREEN}[10/12]${NC} Enabling services..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
+
+# Prompt for REST API service (optional, with security warning)
+echo ""
+echo -e "${CYAN}Would you like to enable the REST API service? (port 8000)${NC}"
+echo ""
+echo -e "  ${RED}⚠ WARNING: The REST API has NO AUTHENTICATION${NC}"
+echo "  Anyone on your network can use it to encode/decode messages."
+echo "  Only enable if you understand the security implications."
+echo ""
+echo "  The Web UI (port 5000) has authentication and works independently."
+echo ""
+read -p "Enable REST API (no auth)? [y/N]: " ENABLE_API
+if [[ "$ENABLE_API" =~ ^[Yy]$ ]]; then
+    sudo systemctl enable stegasoo-api.service
+    STEGASOO_API_ENABLED=true
+    echo -e "  ${YELLOW}⚠${NC} REST API enabled on port 8000 ${RED}(no authentication)${NC}"
+else
+    STEGASOO_API_ENABLED=false
+    echo -e "  ${GREEN}✓${NC} REST API not enabled (recommended)"
+    echo "    Can enable later with: sudo systemctl enable --now stegasoo-api"
+fi
 
 echo -e "${GREEN}[11/12]${NC} Setting up user environment..."
 
@@ -727,6 +768,14 @@ echo "  Start:   sudo systemctl start stegasoo"
 echo "  Stop:    sudo systemctl stop stegasoo"
 echo "  Status:  sudo systemctl status stegasoo"
 echo "  Logs:    journalctl -u stegasoo -f"
+if [ "$STEGASOO_API_ENABLED" = "true" ]; then
+    echo ""
+    echo -e "${GREEN}REST API Commands:${NC}"
+    echo "  Start:   sudo systemctl start stegasoo-api"
+    echo "  Stop:    sudo systemctl stop stegasoo-api"
+    echo "  Status:  sudo systemctl status stegasoo-api"
+    echo "  Logs:    journalctl -u stegasoo-api -f"
+fi
 echo ""
 
 # Offer to start now
@@ -734,9 +783,12 @@ read -p "Start Stegasoo now? [Y/n] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     sudo systemctl start stegasoo
+    if [ "$STEGASOO_API_ENABLED" = "true" ]; then
+        sudo systemctl start stegasoo-api
+    fi
     sleep 2
     if systemctl is-active --quiet stegasoo; then
-        echo -e "${GREEN}✓ Stegasoo is running!${NC}"
+        echo -e "${GREEN}✓ Stegasoo Web UI is running!${NC}"
         if [ "$ENABLE_HTTPS" = "true" ]; then
             if [ "$USE_PORT_443" = "true" ]; then
                 echo -e "  Create admin: ${YELLOW}https://$PI_HOST.local/setup${NC} or ${YELLOW}https://$PI_IP/setup${NC}"
@@ -745,6 +797,13 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
             fi
         else
             echo -e "  Create admin: ${YELLOW}http://$PI_HOST.local:5000/setup${NC} or ${YELLOW}http://$PI_IP:5000/setup${NC}"
+        fi
+        if [ "$STEGASOO_API_ENABLED" = "true" ]; then
+            if systemctl is-active --quiet stegasoo-api; then
+                echo -e "${GREEN}✓ Stegasoo REST API is running on port 8000${NC}"
+            else
+                echo -e "${YELLOW}⚠ REST API failed to start. Check logs:${NC} journalctl -u stegasoo-api -f"
+            fi
         fi
     else
         echo -e "${RED}✗ Failed to start. Check logs:${NC} journalctl -u stegasoo -f"
