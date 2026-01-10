@@ -65,11 +65,7 @@
                                 <select name="rsa_bits" class="form-select form-select-sm" id="rsaBitsSelect">
                                     <option value="2048" selected>2048 bits (~128 bits entropy)</option>
                                     <option value="3072">3072 bits (~128 bits entropy)</option>
-                                    <option value="4096">4096 bits (~128 bits entropy)</option>
                                 </select>
-                                <div class="form-text text-warning d-none" id="rsaQrWarning">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>QR code unavailable for keys &gt;3072 bits
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -286,12 +282,6 @@
                                     <i class="bi bi-shield-exclamation me-1"></i>
                                     <strong>Security note:</strong> The QR code contains your unencrypted private key.
                                     Only scan in a secure environment. Consider using the password-protected download instead.
-                                    {% if rsa_bits >= 4096 %}
-                                    <br><br>
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    <strong>4096-bit keys</strong> produce very dense QR codes. If scanning fails, 
-                                    use the PEM text or download options instead.
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>

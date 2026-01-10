@@ -136,7 +136,7 @@ def generate_rsa_key(bits: int = DEFAULT_RSA_BITS) -> rsa.RSAPrivateKey:
     Generate an RSA private key.
 
     Args:
-        bits: Key size (2048, 3072, or 4096)
+        bits: Key size (2048 or 3072)
 
     Returns:
         RSA private key object

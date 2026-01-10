@@ -8,6 +8,7 @@ IMPROVEMENTS IN THIS VERSION:
 - Much more robust PEM normalization
 - Better handling of QR code extraction edge cases
 - Improved error messages
+- v4.2.0: Added zstd compression (better ratio than zlib)
 """
 
 import base64
@@ -15,6 +16,14 @@ import io
 import zlib
 
 from PIL import Image
+
+# Optional ZSTD support (better compression ratio)
+try:
+    import zstandard as zstd
+
+    HAS_ZSTD = True
+except ImportError:
+    HAS_ZSTD = False
 
 # QR code generation
 try:
@@ -42,30 +51,46 @@ from .constants import (
 )
 
 # Constants
-COMPRESSION_PREFIX = "STEGASOO-Z:"
+COMPRESSION_PREFIX_ZLIB = "STEGASOO-Z:"  # Legacy zlib compression
+COMPRESSION_PREFIX_ZSTD = "STEGASOO-ZS:"  # v4.2.0: New zstd compression (better ratio)
+COMPRESSION_PREFIX = COMPRESSION_PREFIX_ZSTD if HAS_ZSTD else COMPRESSION_PREFIX_ZLIB
 
 
 def compress_data(data: str) -> str:
     """
     Compress string data for QR code storage.
 
+    Uses zstd if available (better ratio), falls back to zlib.
+
     Args:
         data: String to compress
 
     Returns:
-        Compressed string with STEGASOO-Z: prefix
+        Compressed string with STEGASOO-ZS: (zstd) or STEGASOO-Z: (zlib) prefix
     """
-    compressed = zlib.compress(data.encode("utf-8"), level=9)
-    encoded = base64.b64encode(compressed).decode("ascii")
-    return COMPRESSION_PREFIX + encoded
+    data_bytes = data.encode("utf-8")
+
+    if HAS_ZSTD:
+        # Use zstd (better compression ratio)
+        cctx = zstd.ZstdCompressor(level=19)
+        compressed = cctx.compress(data_bytes)
+        encoded = base64.b64encode(compressed).decode("ascii")
+        return COMPRESSION_PREFIX_ZSTD + encoded
+    else:
+        # Fall back to zlib
+        compressed = zlib.compress(data_bytes, level=9)
+        encoded = base64.b64encode(compressed).decode("ascii")
+        return COMPRESSION_PREFIX_ZLIB + encoded
 
 
 def decompress_data(data: str) -> str:
     """
     Decompress data from QR code.
 
+    Supports both zstd (STEGASOO-ZS:) and zlib (STEGASOO-Z:) formats.
+
     Args:
-        data: Compressed string with STEGASOO-Z: prefix
+        data: Compressed string with STEGASOO-ZS: or STEGASOO-Z: prefix
 
     Returns:
         Original uncompressed string
@@ -73,12 +98,26 @@ def decompress_data(data: str) -> str:
     Raises:
         ValueError: If data is not valid compressed format
     """
-    if not data.startswith(COMPRESSION_PREFIX):
-        raise ValueError("Data is not in compressed format")
+    if data.startswith(COMPRESSION_PREFIX_ZSTD):
+        # v4.2.0: ZSTD compression
+        if not HAS_ZSTD:
+            raise ValueError(
+                "Data compressed with zstd but zstandard package not installed. "
+                "Run: pip install zstandard"
+            )
+        encoded = data[len(COMPRESSION_PREFIX_ZSTD):]
+        compressed = base64.b64decode(encoded)
+        dctx = zstd.ZstdDecompressor()
+        return dctx.decompress(compressed).decode("utf-8")
 
-    encoded = data[len(COMPRESSION_PREFIX) :]
-    compressed = base64.b64decode(encoded)
-    return zlib.decompress(compressed).decode("utf-8")
+    elif data.startswith(COMPRESSION_PREFIX_ZLIB):
+        # Legacy zlib compression
+        encoded = data[len(COMPRESSION_PREFIX_ZLIB):]
+        compressed = base64.b64decode(encoded)
+        return zlib.decompress(compressed).decode("utf-8")
+
+    else:
+        raise ValueError("Data is not in compressed format")
 
 
 def normalize_pem(pem_data: str) -> str:
@@ -166,8 +205,8 @@ def normalize_pem(pem_data: str) -> str:
 
 
 def is_compressed(data: str) -> bool:
-    """Check if data has compression prefix."""
-    return data.startswith(COMPRESSION_PREFIX)
+    """Check if data has compression prefix (zstd or zlib)."""
+    return data.startswith(COMPRESSION_PREFIX_ZSTD) or data.startswith(COMPRESSION_PREFIX_ZLIB)
 
 
 def auto_decompress(data: str) -> str:

@@ -164,7 +164,7 @@ stegasoo generate [OPTIONS]
 | `--pin/--no-pin` | | flag | `--pin` | Generate a PIN |
 | `--rsa/--no-rsa` | | flag | `--no-rsa` | Generate an RSA key |
 | `--pin-length` | | 6-9 | 6 | PIN length in digits |
-| `--rsa-bits` | | choice | 2048 | RSA key size (2048, 3072, 4096) |
+| `--rsa-bits` | | choice | 2048 | RSA key size (2048, 3072) |
 | `--words` | | 3-12 | 4 | Words in passphrase |
 | `--output` | `-o` | path | | Save RSA key to file |
 | `--password` | `-p` | string | | Password for RSA key file |
@@ -180,7 +180,7 @@ stegasoo generate
 stegasoo generate --words 6
 
 # Generate with RSA key
-stegasoo generate --rsa --rsa-bits 4096
+stegasoo generate --rsa --rsa-bits 3072
 
 # Save RSA key to encrypted file
 stegasoo generate --rsa -o mykey.pem -p "mysecretpassword"

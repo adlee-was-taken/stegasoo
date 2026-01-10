@@ -253,6 +253,7 @@ from stegasoo.qr_utils import (
     detect_and_crop_qr,
     extract_key_from_qr,
     generate_qr_code,
+    is_compressed,
 )
 
 # Initialize subprocess wrapper (worker script must be in same directory)
@@ -1209,8 +1210,8 @@ def encode_page():
             rsa_key_from_qr = False
 
             if rsa_key_pem:
-                # Webcam-scanned PEM key (v4.1.5) - may be compressed
-                if rsa_key_pem.startswith("STEGASOO-Z:"):
+                # Webcam-scanned PEM key (v4.1.5+) - may be compressed (zlib or zstd)
+                if is_compressed(rsa_key_pem):
                     rsa_key_pem = decompress_data(rsa_key_pem)
                 rsa_key_data = rsa_key_pem.encode("utf-8")
                 rsa_key_from_qr = True
@@ -1648,8 +1649,8 @@ def decode_page():
             rsa_key_from_qr = False
 
             if rsa_key_pem:
-                # Webcam-scanned PEM key (v4.1.5) - may be compressed
-                if rsa_key_pem.startswith("STEGASOO-Z:"):
+                # Webcam-scanned PEM key (v4.1.5+) - may be compressed (zlib or zstd)
+                if is_compressed(rsa_key_pem):
                     rsa_key_pem = decompress_data(rsa_key_pem)
                 rsa_key_data = rsa_key_pem.encode("utf-8")
                 rsa_key_from_qr = True

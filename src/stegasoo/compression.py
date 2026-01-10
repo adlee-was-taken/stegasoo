@@ -17,6 +17,14 @@ try:
 except ImportError:
     HAS_LZ4 = False
 
+# Optional ZSTD support (best ratio, fast)
+try:
+    import zstandard as zstd
+
+    HAS_ZSTD = True
+except ImportError:
+    HAS_ZSTD = False
+
 
 class CompressionAlgorithm(IntEnum):
     """Supported compression algorithms."""
@@ -24,6 +32,7 @@ class CompressionAlgorithm(IntEnum):
     NONE = 0
     ZLIB = 1
     LZ4 = 2
+    ZSTD = 3  # v4.2.0: Best ratio, fast compression
 
 
 # Magic bytes for compressed payloads
@@ -72,6 +81,15 @@ def compress(data: bytes, algorithm: CompressionAlgorithm = CompressionAlgorithm
             algorithm = CompressionAlgorithm.ZLIB
         else:
             compressed = lz4.frame.compress(data)
+
+    elif algorithm == CompressionAlgorithm.ZSTD:
+        if not HAS_ZSTD:
+            # Fall back to zlib if ZSTD not available
+            compressed = zlib.compress(data, level=ZLIB_LEVEL)
+            algorithm = CompressionAlgorithm.ZLIB
+        else:
+            cctx = zstd.ZstdCompressor(level=19)  # High compression level
+            compressed = cctx.compress(data)
     else:
         raise CompressionError(f"Unknown compression algorithm: {algorithm}")
 
@@ -123,6 +141,15 @@ def decompress(data: bytes) -> bytes:
             result = lz4.frame.decompress(compressed_data)
         except Exception as e:
             raise CompressionError(f"LZ4 decompression failed: {e}")
+
+    elif algorithm == CompressionAlgorithm.ZSTD:
+        if not HAS_ZSTD:
+            raise CompressionError("ZSTD compression used but zstandard package not installed")
+        try:
+            dctx = zstd.ZstdDecompressor()
+            result = dctx.decompress(compressed_data)
+        except Exception as e:
+            raise CompressionError(f"ZSTD decompression failed: {e}")
     else:
         raise CompressionError(f"Unknown compression algorithm: {algorithm}")
 
@@ -181,6 +208,9 @@ def estimate_compressed_size(
         compressed_sample = zlib.compress(sample, level=ZLIB_LEVEL)
     elif algorithm == CompressionAlgorithm.LZ4 and HAS_LZ4:
         compressed_sample = lz4.frame.compress(sample)
+    elif algorithm == CompressionAlgorithm.ZSTD and HAS_ZSTD:
+        cctx = zstd.ZstdCompressor(level=19)
+        compressed_sample = cctx.compress(sample)
     else:
         compressed_sample = zlib.compress(sample, level=ZLIB_LEVEL)
 
@@ -195,7 +225,16 @@ def get_available_algorithms() -> list[CompressionAlgorithm]:
     algorithms = [CompressionAlgorithm.NONE, CompressionAlgorithm.ZLIB]
     if HAS_LZ4:
         algorithms.append(CompressionAlgorithm.LZ4)
+    if HAS_ZSTD:
+        algorithms.append(CompressionAlgorithm.ZSTD)
     return algorithms
+
+
+def get_best_algorithm() -> CompressionAlgorithm:
+    """Get the best available compression algorithm (prefer ZSTD > ZLIB > LZ4)."""
+    if HAS_ZSTD:
+        return CompressionAlgorithm.ZSTD
+    return CompressionAlgorithm.ZLIB
 
 
 def algorithm_name(algo: CompressionAlgorithm) -> str:
@@ -204,5 +243,6 @@ def algorithm_name(algo: CompressionAlgorithm) -> str:
         CompressionAlgorithm.NONE: "None",
         CompressionAlgorithm.ZLIB: "Zlib (deflate)",
         CompressionAlgorithm.LZ4: "LZ4 (fast)",
+        CompressionAlgorithm.ZSTD: "Zstd (best)",
     }
     return names.get(algo, "Unknown")

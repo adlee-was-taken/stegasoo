@@ -411,7 +411,7 @@ Create a new set of credentials for steganography operations.
 | Use PIN | on/off | on | Generate a numeric PIN |
 | PIN length | 6-9 | 6 | Digits in the PIN |
 | Use RSA Key | on/off | off | Generate an RSA key pair |
-| RSA key size | 2048/3072/4096 | 2048 | Key size in bits |
+| RSA key size | 2048/3072 | 2048 | Key size in bits |
 
 #### Entropy Calculator
 

@@ -126,7 +126,7 @@ Quick reference for all Jinja2 templates in `frontends/web/templates/`.
 - `use_pin` - checkbox
 - `pin_length` - PIN digits (6-9)
 - `use_rsa` - checkbox
-- `rsa_bits` - key size (2048/3072/4096)
+- `rsa_bits` - key size (2048/3072)
 
 **Output panels:**
 - Passphrase display

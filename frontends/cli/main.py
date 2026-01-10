@@ -236,7 +236,7 @@ def format_channel_status_line(quiet: bool = False) -> str | None:
     help=f"PIN length (6-9, default: {DEFAULT_PIN_LENGTH})",
 )
 @click.option(
-    "--rsa-bits", type=click.Choice(["2048", "3072", "4096"]), default="2048", help="RSA key size"
+    "--rsa-bits", type=click.Choice(["2048", "3072"]), default="2048", help="RSA key size"
 )
 @click.option(
     "--words",
@@ -261,7 +261,7 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
     Examples:
         stegasoo generate
         stegasoo generate --words 5
-        stegasoo generate --rsa --rsa-bits 4096
+        stegasoo generate --rsa --rsa-bits 3072
         stegasoo generate --rsa -o mykey.pem -p "secretpassword"
         stegasoo generate --no-pin --rsa
     """

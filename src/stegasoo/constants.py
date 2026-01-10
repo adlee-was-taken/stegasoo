@@ -1,8 +1,14 @@
 """
-Stegasoo Constants and Configuration (v4.0.2 - Web UI Authentication)
+Stegasoo Constants and Configuration (v4.2.0 - Performance & Compression)
 
 Central location for all magic numbers, limits, and crypto parameters.
 All version numbers, limits, and configuration values should be defined here.
+
+CHANGES in v4.2.0:
+- Added zstd compression for QR codes (better ratio than zlib)
+- RSA key size capped at 3072 bits (4096 too large for QR codes)
+- Progress bar improvements for encode/decode operations
+- File auto-expire increased to 10 minutes
 
 CHANGES in v4.0.2:
 - Added Web UI authentication with SQLite3 user storage
@@ -25,7 +31,7 @@ from pathlib import Path
 # VERSION
 # ============================================================================
 
-__version__ = "4.1.5"
+__version__ = "4.2.0"
 
 # ============================================================================
 # FILE FORMAT
@@ -98,7 +104,7 @@ DEFAULT_PHRASE_WORDS = DEFAULT_PASSPHRASE_WORDS
 
 # RSA configuration
 MIN_RSA_BITS = 2048
-VALID_RSA_SIZES = (2048, 3072, 4096)
+VALID_RSA_SIZES = (2048, 3072)  # 4096 removed - too large for QR codes
 DEFAULT_RSA_BITS = 2048
 
 MIN_KEY_PASSWORD_LENGTH = 8

@@ -82,7 +82,7 @@ def generate_rsa_key(bits: int = DEFAULT_RSA_BITS, password: str | None = None) 
     Generate an RSA private key in PEM format.
 
     Args:
-        bits: Key size (2048, 3072, or 4096, default 2048)
+        bits: Key size (2048 or 3072, default 2048)
         password: Optional password to encrypt the key
 
     Returns:
