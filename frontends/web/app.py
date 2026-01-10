@@ -1116,6 +1116,13 @@ def encode_page():
         # Check if async mode requested
         is_async = request.form.get("async") == "true" or request.headers.get("X-Async") == "true"
 
+        def _error_response(msg):
+            """Return error as JSON (async) or HTML flash (sync)."""
+            if is_async:
+                return jsonify({"error": msg}), 400
+            flash(msg, "error")
+            return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+
         try:
             # Get files
             ref_photo = request.files.get("reference_photo")
@@ -1124,12 +1131,10 @@ def encode_page():
             payload_file = request.files.get("payload_file")
 
             if not ref_photo or not carrier:
-                flash("Both reference photo and carrier image are required", "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response("Both reference photo and carrier image are required")
 
             if not allowed_image(ref_photo.filename) or not allowed_image(carrier.filename):
-                flash("Invalid file type. Use PNG, JPG, or BMP", "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response("Invalid file type. Use PNG, JPG, or BMP")
 
             # Get form data - v3.2.0: renamed from day_phrase to passphrase
             message = request.form.get("message", "")
@@ -1158,8 +1163,7 @@ def encode_page():
 
             # Check DCT availability
             if embed_mode == "dct" and not has_dct_support():
-                flash("DCT mode requires scipy. Install with: pip install scipy", "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response("DCT mode requires scipy. Install with: pip install scipy")
 
             # Determine payload
             if payload_type == "file" and payload_file and payload_file.filename:
@@ -1168,8 +1172,7 @@ def encode_page():
 
                 result = validate_file_payload(file_data, payload_file.filename)
                 if not result.is_valid:
-                    flash(result.error_message, "error")
-                    return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                    return _error_response(result.error_message)
 
                 mime_type, _ = mimetypes.guess_type(payload_file.filename)
                 payload = FilePayload(
@@ -1179,20 +1182,17 @@ def encode_page():
                 # Text message
                 result = validate_message(message)
                 if not result.is_valid:
-                    flash(result.error_message, "error")
-                    return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                    return _error_response(result.error_message)
                 payload = message
 
             # v3.2.0: Renamed from day_phrase
             if not passphrase:
-                flash("Passphrase is required", "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response("Passphrase is required")
 
             # v3.2.0: Validate passphrase
             result = validate_passphrase(passphrase)
             if not result.is_valid:
-                flash(result.error_message, "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response(result.error_message)
 
             # Show warning if passphrase is short
             if result.warning:
@@ -1223,21 +1223,18 @@ def encode_page():
                     rsa_key_data = key_pem.encode("utf-8")
                     rsa_key_from_qr = True
                 else:
-                    flash("Could not extract RSA key from QR code image.", "error")
-                    return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                    return _error_response("Could not extract RSA key from QR code image.")
 
             # Validate security factors
             result = validate_security_factors(pin, rsa_key_data)
             if not result.is_valid:
-                flash(result.error_message, "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response(result.error_message)
 
             # Validate PIN if provided
             if pin:
                 result = validate_pin(pin)
                 if not result.is_valid:
-                    flash(result.error_message, "error")
-                    return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                    return _error_response(result.error_message)
 
             # Determine key password
             key_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
@@ -1246,14 +1243,12 @@ def encode_page():
             if rsa_key_data:
                 result = validate_rsa_key(rsa_key_data, key_password)
                 if not result.is_valid:
-                    flash(result.error_message, "error")
-                    return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                    return _error_response(result.error_message)
 
             # Validate carrier image
             result = validate_image(carrier_data, "Carrier image")
             if not result.is_valid:
-                flash(result.error_message, "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response(result.error_message)
 
             # Pre-check payload capacity BEFORE encode (fail fast)
             from stegasoo.steganography import will_fit_by_mode
@@ -1273,8 +1268,7 @@ def encode_page():
                     alt_check = will_fit_by_mode(payload_size, carrier_data, embed_mode="lsb")
                     if alt_check.get("fits"):
                         error_msg += " - Try LSB mode instead."
-                flash(error_msg, "error")
-                return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+                return _error_response(error_msg)
 
             # Build encode params for either sync or async
             encode_params = {
@@ -1375,14 +1369,11 @@ def encode_page():
             return redirect(url_for("encode_result", file_id=file_id))
 
         except CapacityError as e:
-            flash(str(e), "error")
-            return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+            return _error_response(str(e))
         except StegasooError as e:
-            flash(str(e), "error")
-            return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+            return _error_response(str(e))
         except Exception as e:
-            flash(f"Error: {e}", "error")
-            return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
+            return _error_response(f"Error: {e}")
 
     return render_template("encode.html", has_qrcode_read=HAS_QRCODE_READ)
 
