@@ -33,7 +33,8 @@ RUN pip install --no-cache-dir \
     argon2-cffi>=23.0.0 \
     pillow>=10.0.0 \
     cryptography>=41.0.0 \
-    reedsolo>=1.7.0
+    reedsolo>=1.7.0 \
+    zstandard>=0.22.0
 
 # Install web/api framework packages (also stable)
 RUN pip install --no-cache-dir \
@@ -48,9 +49,9 @@ RUN pip install --no-cache-dir \
     lz4>=4.0.0
 
 # Verify key packages work
-RUN python -c "import jpegio; import scipy; import numpy; print('jpegio + scipy + numpy OK')"
+RUN python -c "import jpegio; import scipy; import numpy; import zstandard; print('jpegio + scipy + numpy + zstd OK')"
 
 # Label for tracking
 LABEL org.opencontainers.image.title="Stegasoo Base"
 LABEL org.opencontainers.image.description="Pre-compiled dependencies for Stegasoo"
-LABEL org.opencontainers.image.version="4.0.0"
+LABEL org.opencontainers.image.version="4.2.0"
