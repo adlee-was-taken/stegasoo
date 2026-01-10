@@ -40,6 +40,7 @@ dependencies = [
     "pillow>=10.0.0",
     "cryptography>=41.0.0",
     "argon2-cffi>=23.0.0",
+    "zstandard>=0.22.0",  # v4.2.0: Default compression algorithm
 ]
 
 [project.optional-dependencies]
@@ -57,8 +58,7 @@ cli = [
     "rich>=13.0.0",
 ]
 compression = [
-    "lz4>=4.0.0",
-    "zstandard>=0.22.0",
+    "lz4>=4.0.0",  # Optional: faster but slightly worse ratio than zstd
 ]
 web = [
     "flask>=3.0.0",
@@ -66,7 +66,6 @@ web = [
     "qrcode>=7.3.0",
     "pyzbar>=0.1.9",
     "piexif>=1.1.0",
-    "zstandard>=0.22.0",  # v4.2.0: Better compression for QR keys
     # Include DCT support for web UI
     "numpy>=2.0.0",
     "scipy>=1.10.0",
@@ -79,7 +78,6 @@ api = [
     "python-multipart>=0.0.6",
     "qrcode>=7.30",
     "pyzbar>=0.1.9",
-    "zstandard>=0.22.0",  # v4.2.0: Better compression for QR keys
     # Include DCT support for API
     "numpy>=2.0.0",
     "scipy>=1.10.0",
