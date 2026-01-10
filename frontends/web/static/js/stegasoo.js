@@ -1031,7 +1031,7 @@ const Stegasoo = {
     formatPhase(phase) {
         const phases = {
             'starting': 'Starting...',
-            'initializing': 'Initializing...',
+            'initializing': 'Deriving keys (may take a moment)...',
             'embedding': 'Embedding data...',
             'saving': 'Saving image...',
             'finalizing': 'Finalizing...',
@@ -1243,8 +1243,11 @@ const Stegasoo = {
     formatDecodePhase(phase) {
         const phases = {
             'starting': 'Starting...',
+            'initializing': 'Deriving keys (may take a moment)...',
+            'loading': 'Deriving keys (may take a moment)...',
             'reading': 'Reading image...',
             'extracting': 'Extracting data...',
+            'decoding': 'Decoding data...',
             'decrypting': 'Decrypting...',
             'verifying': 'Verifying...',
             'finalizing': 'Finalizing...',
