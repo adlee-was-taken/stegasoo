@@ -6,10 +6,10 @@ Stegasoo provides Docker images for both the Web UI and REST API.
 
 ```bash
 # Build and start all services
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # Check status
-docker-compose ps
+docker-compose -f docker/docker-compose.yml ps
 ```
 
 Access:
@@ -61,10 +61,10 @@ Uses a pre-built base image with all dependencies:
 
 ```bash
 # First time only: build the base image
-docker build -f Dockerfile.base -t stegasoo-base:latest .
+docker build -f docker/Dockerfile.base -t stegasoo-base:latest .
 
 # Build services (fast - only copies app code)
-docker-compose build
+docker-compose -f docker/docker-compose.yml build
 ```
 
 ### Full Build (No Base Image)
@@ -72,26 +72,26 @@ docker-compose build
 If you don't have the base image, the Dockerfile will build all dependencies (slower):
 
 ```bash
-docker-compose build
+docker-compose -f docker/docker-compose.yml build
 ```
 
 ## Commands
 
 ```bash
 # Start services
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker/docker-compose.yml logs -f
 
 # Stop services
-docker-compose down
+docker-compose -f docker/docker-compose.yml down
 
 # Rebuild after code changes
-docker-compose build && docker-compose up -d
+docker-compose -f docker/docker-compose.yml build && docker-compose -f docker/docker-compose.yml up -d
 
 # Full rebuild (no cache)
-docker-compose build --no-cache
+docker-compose -f docker/docker-compose.yml build --no-cache
 ```
 
 ## Resource Limits
@@ -112,7 +112,7 @@ Both services include health checks:
 
 Check health status:
 ```bash
-docker-compose ps
+docker-compose -f docker/docker-compose.yml ps
 ```
 
 ## Production Deployment
@@ -129,7 +129,7 @@ For production, consider:
    ```bash
    # Don't commit .env files with secrets
    export STEGASOO_CHANNEL_KEY=your-key
-   docker-compose up -d
+   docker-compose -f docker/docker-compose.yml up -d
    ```
 
 3. **Reverse proxy**: Put behind nginx/traefik for TLS termination
@@ -145,12 +145,12 @@ For production, consider:
 ### Container won't start
 ```bash
 # Check logs
-docker-compose logs web
-docker-compose logs api
+docker-compose -f docker/docker-compose.yml logs web
+docker-compose -f docker/docker-compose.yml logs api
 ```
 
 ### Out of memory
-Increase Docker's memory allocation or reduce worker count in Dockerfile.
+Increase Docker's memory allocation or reduce worker count in `docker/Dockerfile`.
 
 ### Permission errors
 The containers run as non-root user `stego` (UID 1000). Ensure volume permissions match.

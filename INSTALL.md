@@ -154,10 +154,10 @@ Build and run individual containers.
 #### Build Images
 
 ```bash
-# Build all targets
-docker build -t stegasoo-web --target web .
-docker build -t stegasoo-api --target api .
-docker build -t stegasoo-cli --target cli .
+# From project root - build all targets
+docker build -t stegasoo-web --target web -f docker/Dockerfile .
+docker build -t stegasoo-api --target api -f docker/Dockerfile .
+docker build -t stegasoo-cli --target cli -f docker/Dockerfile .
 ```
 
 #### Run Web UI
@@ -214,17 +214,17 @@ The easiest way to run all services.
 
 ```bash
 # Start in background
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # Start specific service
-docker-compose up -d web
-docker-compose up -d api
+docker-compose -f docker/docker-compose.yml up -d web
+docker-compose -f docker/docker-compose.yml up -d api
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker/docker-compose.yml logs -f
 
 # Stop all
-docker-compose down
+docker-compose -f docker/docker-compose.yml down
 ```
 
 #### Authentication Configuration (v4.0.2)
@@ -239,7 +239,7 @@ STEGASOO_HOSTNAME=localhost     # Hostname for SSL cert
 STEGASOO_CHANNEL_KEY=           # Optional channel key
 
 # Then run
-docker-compose up -d web
+docker-compose -f docker/docker-compose.yml up -d web
 ```
 
 On first access, you'll be prompted to create an admin account. The database and SSL certs are persisted in Docker volumes.
@@ -255,16 +255,16 @@ On first access, you'll be prompted to create an admin account. The database and
 
 ```bash
 # Build images and start
-docker-compose up -d --build
+docker-compose -f docker/docker-compose.yml up -d --build
 
 # Force rebuild (no cache)
-docker-compose build --no-cache
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml build --no-cache
+docker-compose -f docker/docker-compose.yml up -d
 ```
 
 #### Resource Configuration
 
-The `docker-compose.yml` includes resource limits:
+The `docker/docker-compose.yml` includes resource limits:
 
 ```yaml
 services:
@@ -852,7 +852,7 @@ Argon2 needs 256MB per operation. Increase container memory:
 # Docker run
 docker run --memory=768m ...
 
-# Docker Compose - edit docker-compose.yml
+# Docker Compose - edit docker/docker-compose.yml
 deploy:
   resources:
     limits:

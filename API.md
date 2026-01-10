@@ -88,7 +88,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 **Docker with channel key:**
 ```bash
-STEGASOO_CHANNEL_KEY=XXXX-XXXX-... docker-compose up api
+STEGASOO_CHANNEL_KEY=XXXX-XXXX-... docker-compose -f docker/docker-compose.yml up api
 ```
 
 ---
@@ -843,7 +843,7 @@ curl -s -X POST "$BASE_URL/decode/multipart" \
 
 ## Docker Configuration
 
-### docker-compose.yml
+### docker/docker-compose.yml
 
 ```yaml
 x-common-env: &common-env

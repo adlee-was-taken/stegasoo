@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir \
     cython numpy scipy>=1.10.0 jpegio>=0.2.0 \
     argon2-cffi>=23.0.0 pillow>=10.0.0 cryptography>=41.0.0 \
+    reedsolo>=1.7.0 \
     flask>=3.0.0 gunicorn>=21.0.0 \
     fastapi>=0.100.0 "uvicorn[standard]>=0.20.0" python-multipart>=0.0.6 \
     qrcode>=7.3.0 pyzbar>=0.1.9 click>=8.0.0 lz4>=4.0.0

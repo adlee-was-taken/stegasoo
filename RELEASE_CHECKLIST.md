@@ -21,12 +21,12 @@ Pre-release validation checklist. Complete all items before tagging a release.
 
 ## Docker Validation
 
-- [ ] Base image builds: `docker build -f Dockerfile.base -t stegasoo-base:latest .`
-- [ ] Web image builds: `docker-compose build web`
-- [ ] Container starts: `docker-compose up -d web`
+- [ ] Base image builds: `docker build -f docker/Dockerfile.base -t stegasoo-base:latest .`
+- [ ] Web image builds: `docker-compose -f docker/docker-compose.yml build web`
+- [ ] Container starts: `docker-compose -f docker/docker-compose.yml up -d web`
 - [ ] Web UI accessible at http://localhost:5000
 - [ ] Encode/decode works in container
-- [ ] Container stops cleanly: `docker-compose down`
+- [ ] Container stops cleanly: `docker-compose -f docker/docker-compose.yml down`
 
 ## Release Process
 

@@ -810,7 +810,7 @@ stegasoo decode -r ref.jpg -s stego.png -p "phrase" --pin 123456
 
 ### Docker Deployment
 
-**docker-compose.yml:**
+**docker/docker-compose.yml:**
 ```yaml
 x-common-env: &common-env
   STEGASOO_CHANNEL_KEY: ${STEGASOO_CHANNEL_KEY:-}

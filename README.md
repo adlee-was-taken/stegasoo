@@ -106,17 +106,17 @@ ruff check src/ tests/ frontends/
 
 ```bash
 # Quick start (HTTPS enabled by default)
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # Access
 # Web UI:   https://localhost:5000  (self-signed cert)
 # REST API: http://localhost:8000
 
 # Disable HTTPS if needed:
-STEGASOO_HTTPS_ENABLED=false docker-compose up -d
+STEGASOO_HTTPS_ENABLED=false docker-compose -f docker/docker-compose.yml up -d
 ```
 
-See [DOCKER.md](DOCKER.md) for full documentation.
+See [DOCKER.md](DOCKER.md) and [docs/DOCKER_QUICKSTART.md](docs/DOCKER_QUICKSTART.md) for full documentation.
 
 ## Raspberry Pi
 

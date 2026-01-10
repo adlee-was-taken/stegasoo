@@ -177,7 +177,7 @@ python app.py
 ### Docker Configuration
 
 ```yaml
-# docker-compose.yml
+# docker/docker-compose.yml
 services:
   web:
     environment:
@@ -360,7 +360,7 @@ gunicorn --bind 0.0.0.0:5000 --workers 2 --threads 4 --timeout 60 app:app
 
 **Docker:**
 ```bash
-docker-compose up web
+docker-compose -f docker/docker-compose.yml up web
 ```
 
 ### First-Time Setup
@@ -1245,7 +1245,7 @@ volumes:
 ```bash
 pip install scipy
 # Or rebuild Docker image
-docker-compose build --no-cache
+docker-compose -f docker/docker-compose.yml build --no-cache
 ```
 
 ### Browser Compatibility

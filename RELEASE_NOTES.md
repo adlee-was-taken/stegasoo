@@ -39,8 +39,8 @@ First boot runs the setup wizard for WiFi, HTTPS, and channel key configuration.
 
 ### Docker
 ```bash
-docker-compose up -d web  # Web UI on :5000
-docker-compose up -d api  # REST API on :8000
+docker-compose -f docker/docker-compose.yml up -d web  # Web UI on :5000
+docker-compose -f docker/docker-compose.yml up -d api  # REST API on :8000
 ```
 
 ### Full Changelog
