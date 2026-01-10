@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API (v4.0.0)
+Stegasoo REST API (v4.2.0)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v4.2.0:
+- Async encode/decode operations (run in thread pool)
+- Server can handle concurrent requests without blocking
 
 CHANGES in v4.0.0:
 - Added channel key support for deployment/group isolation
@@ -21,8 +25,10 @@ NEW in v3.0: LSB and DCT embedding modes.
 NEW in v3.0.1: DCT color mode and JPEG output format.
 """
 
+import asyncio
 import base64
 import sys
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
@@ -434,6 +440,27 @@ def _get_channel_info(channel_key: str | None) -> tuple[str, str | None]:
 
     info = get_channel_response_info(channel_key)
     return info["mode"], info.get("fingerprint")
+
+
+# ============================================================================
+# HELPER: ASYNC EXECUTION
+# ============================================================================
+
+
+async def run_in_thread(func, *args, **kwargs):
+    """
+    Run a CPU-bound function in a thread pool.
+
+    This allows the FastAPI server to handle other requests while
+    encode/decode operations are running. Essential for Pi deployments
+    where operations can take several seconds.
+
+    Usage:
+        result = await run_in_thread(encode, message=msg, carrier_image=carrier, ...)
+    """
+    if kwargs:
+        func = partial(func, **kwargs)
+    return await asyncio.to_thread(func, *args)
 
 
 # ============================================================================
@@ -874,8 +901,9 @@ async def api_encode(request: EncodeRequest):
             request.embed_mode, request.dct_output_format, request.dct_color_mode
         )
 
-        # v4.0.0: Include channel_key
-        result = encode(
+        # v4.2.0: Run CPU-bound encode in thread pool
+        result = await run_in_thread(
+            encode,
             message=request.message,
             reference_photo=ref_photo,
             carrier_image=carrier,
@@ -950,8 +978,9 @@ async def api_encode_file(request: EncodeFileRequest):
             request.embed_mode, request.dct_output_format, request.dct_color_mode
         )
 
-        # v4.0.0: Include channel_key
-        result = encode(
+        # v4.2.0: Run CPU-bound encode in thread pool
+        result = await run_in_thread(
+            encode,
             message=payload,
             reference_photo=ref_photo,
             carrier_image=carrier,
@@ -1021,8 +1050,9 @@ async def api_decode(request: DecodeRequest):
         ref_photo = base64.b64decode(request.reference_photo_base64)
         rsa_key = base64.b64decode(request.rsa_key_base64) if request.rsa_key_base64 else None
 
-        # v4.0.0: Include channel_key
-        result = decode(
+        # v4.2.0: Run CPU-bound decode in thread pool
+        result = await run_in_thread(
+            decode,
             stego_image=stego,
             reference_photo=ref_photo,
             passphrase=request.passphrase,
@@ -1150,8 +1180,9 @@ async def api_encode_multipart(
         # Get DCT parameters
         dct_params = _get_dct_params(embed_mode, dct_output_format, dct_color_mode)
 
-        # v4.0.0: Include channel_key
-        result = encode(
+        # v4.2.0: Run CPU-bound encode in thread pool
+        result = await run_in_thread(
+            encode,
             message=payload,
             reference_photo=ref_data,
             carrier_image=carrier_data,
@@ -1264,8 +1295,9 @@ async def api_decode_multipart(
         # QR code keys are never password-protected
         effective_password = None if rsa_key_from_qr else (rsa_password if rsa_password else None)
 
-        # v4.0.0: Include channel_key
-        result = decode(
+        # v4.2.0: Run CPU-bound decode in thread pool
+        result = await run_in_thread(
+            decode,
             stego_image=stego_data,
             reference_photo=ref_data,
             passphrase=passphrase,
