@@ -1,36 +1,41 @@
-## Stegasoo v4.1.5
+## Stegasoo v4.1.7
 
-### Developer Experience
-- **Educational Code Comments**: Core modules now include detailed explanations
-  - DCT: zig-zag coefficient diagrams, QIM embedding math, Reed-Solomon "Voyager" reference
-  - LSB: visual bit manipulation examples, ChaCha20 pixel selection
-  - Crypto: multi-factor KDF flow diagrams, Argon2id memory-hardness reasoning
-  - CLI/Web: architectural patterns for future contributors
+### Mobile UI Polish
+- **PIN Entry**: Shrunk digit boxes for 9-digit PIN support on mobile
+- **Mode Selectors**: DCT/LSB buttons now use consistent button-group styling with icons
+- **Navbar**: Left-aligned collapsed menu, shortened channel fingerprint display (`ABCD-••••-3456`)
+- **Text Wrapping**: Fixed button text wrapping issues on narrow screens
 
-### Raspberry Pi Improvements
-- **Streamlined Image Creation**: `pull-image.sh` now handles everything
-  - Auto-resizes rootfs to exactly 16GB (for smaller download)
-  - Preserves auto-expand (image fills SD card on first boot)
-  - Compresses with zstd
-  - Optional .zst.zip wrapper for GitHub releases
-- **16GB Minimum**: Pre-built images are now 16GB (was variable)
-- **Host Requirements**: `rpi/host-requirements.txt` documents all dependencies
-- **Test Automation**: `kickoff-pi-test.sh` for one-command flash+test cycles
+### Docker Improvements
+- **Reorganized**: Docker files moved to `docker/` directory
+  - `docker/Dockerfile`
+  - `docker/Dockerfile.base`
+  - `docker/docker-compose.yml`
+- **DCT Fix**: Added Reed-Solomon (`reedsolo`) to Docker images - fixes DCT decode failures
+- **Quick Start**: New `docs/DOCKER_QUICKSTART.md` guide
 
-### MOTD Polish
-- Dynamic temperature emoji (ice/cool/fire based on CPU temp)
-- Rocket emoji for service status
-- Cleaner formatting
+```bash
+# Build and run
+docker build -f docker/Dockerfile.base -t stegasoo-base:latest .
+docker-compose -f docker/docker-compose.yml up -d
+```
+
+### Raspberry Pi
+- **First-Boot Wizard**: Can now load existing channel key (for joining team deployments)
+- **Project Cleanup**: Moved `pishrink.sh` to `rpi/tools/`
+
+### UI Copy
+- Changed "Undetectable" to "Covertly Embedded" on encode page (more accurate)
 
 ### Raspberry Pi Image
-Download `stegasoo-rpi-4.1.5.img.zst.zip` from Releases.
+Download `stegasoo-rpi-4.1.7.img.zst.zip` from Releases.
 
 ```bash
 # Flash (auto-detects SD card)
-sudo ./rpi/flash-image.sh stegasoo-rpi-4.1.5.img.zst.zip
+sudo ./rpi/flash-image.sh stegasoo-rpi-4.1.7.img.zst.zip
 
 # Or manual
-zstdcat stegasoo-rpi-4.1.5.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
+unzip -p stegasoo-rpi-4.1.7.img.zst.zip | zstdcat | sudo dd of=/dev/sdX bs=4M status=progress
 ```
 
 Default login: `admin` / `stegasoo`
