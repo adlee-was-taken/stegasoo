@@ -8,6 +8,7 @@ Changes in v4.0.0:
 - Improved error messages for channel key mismatches
 """
 
+import json
 from pathlib import Path
 
 from .constants import EMBED_MODE_AUTO
@@ -22,6 +23,22 @@ from .validation import (
     require_valid_pin,
     require_valid_rsa_key,
 )
+
+
+def _write_progress(progress_file: str | None, current: int, total: int, phase: str) -> None:
+    """Write progress to file for UI polling."""
+    if progress_file is None:
+        return
+    try:
+        with open(progress_file, "w") as f:
+            json.dump({
+                "current": current,
+                "total": total,
+                "percent": (current / total * 100) if total > 0 else 0,
+                "phase": phase,
+            }, f)
+    except OSError:
+        pass
 
 
 def decode(
@@ -93,10 +110,16 @@ def decode(
     if rsa_key_data:
         require_valid_rsa_key(rsa_key_data, rsa_password)
 
+    # Progress: starting key derivation (Argon2 - slow on Pi)
+    _write_progress(progress_file, 20, 100, "initializing")
+
     # Derive pixel/coefficient selection key (with channel key)
     from .crypto import derive_pixel_key
 
     pixel_key = derive_pixel_key(reference_photo, passphrase, pin, rsa_key_data, channel_key)
+
+    # Progress: key derivation done, starting extraction
+    _write_progress(progress_file, 25, 100, "extracting")
 
     # Extract encrypted data
     encrypted = extract_from_image(

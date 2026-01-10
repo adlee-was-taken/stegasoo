@@ -1198,7 +1198,7 @@ def _extract_scipy_dct_safe(
     progress_file: str | None = None,
 ) -> bytes:
     """Extract using safe DCT operations with vectorized processing."""
-    _write_progress(progress_file, 0, 100, "loading")
+    # Progress starts at 25% (decode.py writes 20% for Argon2, 25% before extraction)
 
     img = Image.open(io.BytesIO(stego_image))
     width, height = img.size
@@ -1264,9 +1264,10 @@ def _extract_scipy_dct_safe(
         del blocks, dct_blocks, coeffs, quantized
         block_idx = batch_end
 
-        # Report progress (scale to 5-70% range, RS decode gets 70-100%)
+        # Report progress (scale to 25-70% range, RS decode gets 70-100%)
+        # Starts at 25% because decode.py writes 25% before calling extraction
         if progress_file and block_idx % PROGRESS_INTERVAL < BATCH_SIZE:
-            extract_pct = 5 + int(65 * block_idx / num_blocks)
+            extract_pct = 25 + int(45 * block_idx / num_blocks)
             _write_progress(progress_file, extract_pct, 100, "extracting")
 
         # Check if we have enough bits (early exit)
@@ -1382,7 +1383,7 @@ def _extract_jpegio(
     """Extract using jpegio for JPEG images."""
     import os
 
-    _write_progress(progress_file, 0, 100, "loading")
+    # Progress starts at 25% (decode.py writes 20% for Argon2, 25% before extraction)
 
     # Normalize JPEG to avoid crashes with quality=100 images
     # (shouldn't happen with stego images, but be defensive)
@@ -1397,7 +1398,7 @@ def _extract_jpegio(
         all_positions = _jpegio_get_usable_positions(coef_array)
         order = _jpegio_generate_order(len(all_positions), seed)
 
-        _write_progress(progress_file, 20, 100, "extracting")
+        _write_progress(progress_file, 30, 100, "extracting")
 
         # Try RS-protected format first (has 24-byte length prefix: 3 copies for majority voting)
         if HAS_REEDSOLO and len(all_positions) >= RS_LENGTH_PREFIX_SIZE * 8:
