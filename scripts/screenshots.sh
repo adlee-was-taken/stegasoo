@@ -33,8 +33,8 @@ for cmd in chromium magick curl; do
     fi
 done
 
-# Check if server is running
-if ! curl -s "$BASE_URL" > /dev/null 2>&1; then
+# Check if server is running (-k for self-signed certs)
+if ! curl -sk "$BASE_URL" > /dev/null 2>&1; then
     echo "Error: Server not responding at $BASE_URL"
     echo "Start with: STEGASOO_AUTH_ENABLED=false python frontends/web/app.py"
     exit 1
@@ -49,7 +49,7 @@ capture() {
     printf "  %-20s <- %s\n" "$name" "$route"
     chromium --headless --screenshot="$OUTPUT_DIR/$name.png" \
         --window-size="$WINDOW_SIZE" --hide-scrollbars \
-        --disable-gpu --no-sandbox \
+        --disable-gpu --no-sandbox --ignore-certificate-errors \
         "$url" 2>/dev/null
 }
 
