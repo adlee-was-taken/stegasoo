@@ -1157,7 +1157,11 @@ def _embed_jpegio(
                 pass
 
 
-def extract_from_dct(stego_image: bytes, seed: bytes) -> bytes:
+def extract_from_dct(
+    stego_image: bytes,
+    seed: bytes,
+    progress_file: str | None = None,
+) -> bytes:
     """Extract data from DCT stego image."""
     img = Image.open(io.BytesIO(stego_image))
     fmt = img.format
@@ -1165,16 +1169,22 @@ def extract_from_dct(stego_image: bytes, seed: bytes) -> bytes:
 
     if fmt == "JPEG" and HAS_JPEGIO:
         try:
-            return _extract_jpegio(stego_image, seed)
+            return _extract_jpegio(stego_image, seed, progress_file)
         except ValueError:
             pass
 
     _check_scipy()
-    return _extract_scipy_dct_safe(stego_image, seed)
+    return _extract_scipy_dct_safe(stego_image, seed, progress_file)
 
 
-def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
+def _extract_scipy_dct_safe(
+    stego_image: bytes,
+    seed: bytes,
+    progress_file: str | None = None,
+) -> bytes:
     """Extract using safe DCT operations with vectorized processing."""
+    _write_progress(progress_file, 0, 100, "loading")
+
     img = Image.open(io.BytesIO(stego_image))
     width, height = img.size
     mode = img.mode
@@ -1207,6 +1217,9 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
     embed_rows = np.array([pos[0] for pos in DEFAULT_EMBED_POSITIONS])
     embed_cols = np.array([pos[1] for pos in DEFAULT_EMBED_POSITIONS])
 
+    # Progress reporting interval
+    PROGRESS_INTERVAL = 2000  # Report every N blocks
+
     block_idx = 0
     while block_idx < len(block_order):
         # Determine batch size (may be smaller at end)
@@ -1236,6 +1249,10 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
         del blocks, dct_blocks, coeffs, quantized
         block_idx = batch_end
 
+        # Report progress
+        if progress_file and block_idx % PROGRESS_INTERVAL < BATCH_SIZE:
+            _write_progress(progress_file, block_idx, num_blocks, "extracting")
+
         # Check if we have enough bits (early exit)
         if len(all_bits) >= HEADER_SIZE * 8:
             try:
@@ -1248,6 +1265,8 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
 
     del padded
     gc.collect()
+
+    _write_progress(progress_file, 80, 100, "decoding")
 
     # Try RS-protected format first (has 24-byte length prefix: 3 copies of 8-byte header)
     if HAS_REEDSOLO and len(all_bits) >= RS_LENGTH_PREFIX_SIZE * 8:
@@ -1312,6 +1331,7 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
 
                     # Extract data
                     data = raw_payload[HEADER_SIZE : HEADER_SIZE + data_length]
+                    _write_progress(progress_file, 100, 100, "complete")
                     return data
                 except (ValueError, struct.error):
                     pass  # Fall through to legacy format
@@ -1327,12 +1347,19 @@ def _extract_scipy_dct_safe(stego_image: bytes, seed: bytes) -> bytes:
         ]
     )
 
+    _write_progress(progress_file, 100, 100, "complete")
     return data
 
 
-def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
+def _extract_jpegio(
+    stego_image: bytes,
+    seed: bytes,
+    progress_file: str | None = None,
+) -> bytes:
     """Extract using jpegio for JPEG images."""
     import os
+
+    _write_progress(progress_file, 0, 100, "loading")
 
     # Normalize JPEG to avoid crashes with quality=100 images
     # (shouldn't happen with stego images, but be defensive)
@@ -1346,6 +1373,8 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
 
         all_positions = _jpegio_get_usable_positions(coef_array)
         order = _jpegio_generate_order(len(all_positions), seed)
+
+        _write_progress(progress_file, 20, 100, "extracting")
 
         # Try RS-protected format first (has 24-byte length prefix: 3 copies for majority voting)
         if HAS_REEDSOLO and len(all_positions) >= RS_LENGTH_PREFIX_SIZE * 8:
@@ -1410,9 +1439,11 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
                     )
 
                     try:
+                        _write_progress(progress_file, 70, 100, "decoding")
                         raw_payload = _rs_decode(rs_encoded)
                         _, flags, data_length = _jpegio_parse_header(raw_payload[:HEADER_SIZE])
                         data = raw_payload[HEADER_SIZE : HEADER_SIZE + data_length]
+                        _write_progress(progress_file, 100, 100, "complete")
                         return data
                     except (ValueError, struct.error):
                         pass  # Fall through to legacy format
@@ -1450,6 +1481,7 @@ def _extract_jpegio(stego_image: bytes, seed: bytes) -> bytes:
             ]
         )
 
+        _write_progress(progress_file, 100, 100, "complete")
         return data
 
     finally:

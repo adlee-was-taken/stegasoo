@@ -33,6 +33,7 @@ def decode(
     rsa_password: str | None = None,
     embed_mode: str = EMBED_MODE_AUTO,
     channel_key: str | bool | None = None,
+    progress_file: str | None = None,
 ) -> DecodeResult:
     """
     Decode a message or file from a stego image.
@@ -45,6 +46,7 @@ def decode(
         rsa_key_data: Optional RSA key bytes (if used during encoding)
         rsa_password: Optional RSA key password
         embed_mode: 'auto' (default), 'lsb', or 'dct'
+        progress_file: Optional path to write progress JSON for UI polling
         channel_key: Channel key for deployment/group isolation:
             - None or "auto": Use server's configured key
             - str: Use this specific channel key
@@ -101,6 +103,7 @@ def decode(
         stego_image,
         pixel_key,
         embed_mode=embed_mode,
+        progress_file=progress_file,
     )
 
     if not encrypted:
@@ -126,6 +129,7 @@ def decode_file(
     rsa_password: str | None = None,
     embed_mode: str = EMBED_MODE_AUTO,
     channel_key: str | bool | None = None,
+    progress_file: str | None = None,
 ) -> Path:
     """
     Decode a file from a stego image and save it.
@@ -140,6 +144,7 @@ def decode_file(
         rsa_password: Optional RSA key password
         embed_mode: 'auto', 'lsb', or 'dct'
         channel_key: Channel key parameter (see decode())
+        progress_file: Optional path to write progress JSON for UI polling
 
     Returns:
         Path where file was saved
@@ -156,6 +161,7 @@ def decode_file(
         rsa_password,
         embed_mode,
         channel_key,
+        progress_file,
     )
 
     if not result.is_file:
@@ -184,6 +190,7 @@ def decode_text(
     rsa_password: str | None = None,
     embed_mode: str = EMBED_MODE_AUTO,
     channel_key: str | bool | None = None,
+    progress_file: str | None = None,
 ) -> str:
     """
     Decode a text message from a stego image.
@@ -199,6 +206,7 @@ def decode_text(
         rsa_password: Optional RSA key password
         embed_mode: 'auto', 'lsb', or 'dct'
         channel_key: Channel key parameter (see decode())
+        progress_file: Optional path to write progress JSON for UI polling
 
     Returns:
         Decoded message string
@@ -215,6 +223,7 @@ def decode_text(
         rsa_password,
         embed_mode,
         channel_key,
+        progress_file,
     )
 
     if result.is_file:

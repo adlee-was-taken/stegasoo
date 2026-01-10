@@ -839,6 +839,7 @@ def extract_from_image(
     pixel_key: bytes,
     bits_per_channel: int = 1,
     embed_mode: str = EMBED_MODE_AUTO,
+    progress_file: str | None = None,
 ) -> bytes | None:
     """
     Extract hidden data from a stego image.
@@ -848,6 +849,7 @@ def extract_from_image(
         pixel_key: Key for pixel/coefficient selection (must match encoding)
         bits_per_channel: Bits per channel (LSB mode only)
         embed_mode: 'auto' (try both), 'lsb', or 'dct'
+        progress_file: Optional path to write progress JSON for UI polling
 
     Returns:
         Extracted data bytes, or None if extraction fails
@@ -863,7 +865,7 @@ def extract_from_image(
 
         if has_dct_support():
             debug.print("Auto-detect: LSB failed, trying DCT")
-            result = _extract_dct(image_data, pixel_key)
+            result = _extract_dct(image_data, pixel_key, progress_file)
             if result is not None:
                 debug.print("Auto-detect: DCT extraction succeeded")
                 return result
@@ -875,18 +877,22 @@ def extract_from_image(
     elif embed_mode == EMBED_MODE_DCT:
         if not has_dct_support():
             raise ImportError("scipy required for DCT mode")
-        return _extract_dct(image_data, pixel_key)
+        return _extract_dct(image_data, pixel_key, progress_file)
 
     # EXPLICIT LSB MODE
     else:
         return _extract_lsb(image_data, pixel_key, bits_per_channel)
 
 
-def _extract_dct(image_data: bytes, pixel_key: bytes) -> bytes | None:
+def _extract_dct(
+    image_data: bytes,
+    pixel_key: bytes,
+    progress_file: str | None = None,
+) -> bytes | None:
     """Extract using DCT mode."""
     try:
         dct_mod = _get_dct_module()
-        return dct_mod.extract_from_dct(image_data, pixel_key)
+        return dct_mod.extract_from_dct(image_data, pixel_key, progress_file)
     except Exception as e:
         debug.print(f"DCT extraction failed: {e}")
         return None
