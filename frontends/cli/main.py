@@ -120,6 +120,7 @@ try:
     from stegasoo.qr_utils import (  # noqa: F401
         can_fit_in_qr,
         extract_key_from_qr_file,
+        generate_qr_ascii,
         generate_qr_code,
         has_qr_read,
         has_qr_write,
@@ -135,6 +136,9 @@ except ImportError:
 
     def has_qr_write() -> bool:
         return False
+
+    def generate_qr_ascii(*args, **kwargs):
+        raise RuntimeError("QR code generation not available")
 
 
 # ============================================================================
@@ -247,7 +251,13 @@ def format_channel_status_line(quiet: bool = False) -> str | None:
 @click.option("--output", "-o", type=click.Path(), help="Save RSA key to file (requires password)")
 @click.option("--password", "-p", help="Password for RSA key file")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
+@click.option(
+    "--qr",
+    type=click.Path(),
+    help="Save RSA key QR code to file (png/jpg, uses zstd compression)",
+)
+@click.option("--qr-ascii", is_flag=True, help="Print RSA key as ASCII QR code to terminal")
+def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json, qr, qr_ascii):
     """
     Generate credentials for encoding/decoding.
 
@@ -263,10 +273,15 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
         stegasoo generate --words 5
         stegasoo generate --rsa --rsa-bits 3072
         stegasoo generate --rsa -o mykey.pem -p "secretpassword"
+        stegasoo generate --rsa --qr key.png
+        stegasoo generate --rsa --qr-ascii
         stegasoo generate --no-pin --rsa
     """
     if not pin and not rsa:
         raise click.UsageError("Must enable at least one of --pin or --rsa")
+
+    if (qr or qr_ascii) and not rsa:
+        raise click.UsageError("QR output requires --rsa to generate an RSA key")
 
     if output and not password:
         raise click.UsageError("--password is required when saving RSA key to file")
@@ -333,6 +348,33 @@ def generate(pin, rsa, pin_length, rsa_bits, words, output, password, as_json):
             else:
                 click.echo(creds.rsa_key_pem)
             click.echo()
+
+            # QR code output (v4.2.0)
+            if qr:
+                if not HAS_QR:
+                    click.secho("    ⚠️  QR code library not available", fg="yellow")
+                else:
+                    # Determine format from extension
+                    qr_path = Path(qr)
+                    ext = qr_path.suffix.lower()
+                    fmt = "jpeg" if ext in (".jpg", ".jpeg") else "png"
+
+                    qr_bytes = generate_qr_code(creds.rsa_key_pem, compress=True, output_format=fmt)
+                    qr_path.write_bytes(qr_bytes)
+                    click.secho(f"─── RSA KEY QR CODE ───", fg="green")
+                    click.secho(f"    Saved to: {qr}", fg="bright_white")
+                    click.secho("    ⚠️  Contains unencrypted private key!", fg="yellow")
+                    click.echo()
+
+            if qr_ascii:
+                if not HAS_QR:
+                    click.secho("    ⚠️  QR code library not available", fg="yellow")
+                else:
+                    click.secho("─── RSA KEY QR CODE (ASCII) ───", fg="green")
+                    click.secho("    ⚠️  Contains unencrypted private key!", fg="yellow")
+                    click.echo()
+                    ascii_qr = generate_qr_ascii(creds.rsa_key_pem, compress=True, invert=True)
+                    click.echo(ascii_qr)
 
         click.secho("─── SECURITY ───", fg="green")
         click.echo(f"    Passphrase entropy: {creds.passphrase_entropy} bits ({words} words)")

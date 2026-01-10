@@ -74,13 +74,20 @@ from stegasoo.constants import (
 try:
     from stegasoo.qr_utils import (
         extract_key_from_qr,
+        generate_qr_ascii,
+        generate_qr_code,
         has_qr_read,
+        has_qr_write,
     )
 
     HAS_QR_READ = has_qr_read()
+    HAS_QR_WRITE = has_qr_write()
 except ImportError:
     HAS_QR_READ = False
+    HAS_QR_WRITE = False
     extract_key_from_qr = None
+    generate_qr_code = None
+    generate_qr_ascii = None
 
 
 # ============================================================================
@@ -363,6 +370,7 @@ class StatusResponse(BaseModel):
     version: str
     has_argon2: bool
     has_qrcode_read: bool
+    has_qrcode_write: bool  # v4.2.0: QR generation capability
     has_dct: bool
     max_payload_kb: int
     available_modes: list[str]
@@ -375,6 +383,32 @@ class StatusResponse(BaseModel):
 class QrExtractResponse(BaseModel):
     success: bool
     key_pem: str | None = None
+    error: str | None = None
+
+
+class QrGenerateRequest(BaseModel):
+    """Request to generate QR code from RSA key."""
+
+    key_pem: str = Field(..., description="RSA private key in PEM format")
+    output_format: str = Field(
+        default="png",
+        description="Output format: 'png', 'jpg', or 'ascii'",
+    )
+    compress: bool = Field(
+        default=True,
+        description="Compress key data with zstd (recommended for larger keys)",
+    )
+
+
+class QrGenerateResponse(BaseModel):
+    """Response containing generated QR code."""
+
+    success: bool
+    format: str | None = None
+    qr_data: str | None = Field(
+        default=None,
+        description="Base64-encoded image data (for png/jpg) or ASCII string",
+    )
     error: str | None = None
 
 
@@ -496,6 +530,7 @@ async def root():
         version=__version__,
         has_argon2=has_argon2(),
         has_qrcode_read=HAS_QR_READ,
+        has_qrcode_write=HAS_QR_WRITE,
         has_dct=has_dct_support(),
         max_payload_kb=MAX_FILE_PAYLOAD_SIZE // 1024,
         available_modes=available_modes,
@@ -785,6 +820,51 @@ async def api_extract_key_from_qr(
             return QrExtractResponse(success=False, error="No valid RSA key found in QR code")
     except Exception as e:
         return QrExtractResponse(success=False, error=str(e))
+
+
+@app.post("/generate-key-qr", response_model=QrGenerateResponse)
+async def api_generate_key_qr(request: QrGenerateRequest):
+    """
+    Generate QR code from an RSA private key.
+
+    Supports PNG, JPG, and ASCII output formats.
+    Uses zstd compression by default for better QR code density.
+    """
+    if not HAS_QR_WRITE:
+        raise HTTPException(501, "QR code generation not available. Install qrcode library.")
+
+    try:
+        fmt = request.output_format.lower()
+
+        if fmt == "ascii":
+            ascii_qr = generate_qr_ascii(
+                request.key_pem,
+                compress=request.compress,
+                invert=False,
+            )
+            return QrGenerateResponse(success=True, format="ascii", qr_data=ascii_qr)
+
+        elif fmt in ("png", "jpg", "jpeg"):
+            import base64
+
+            qr_bytes = generate_qr_code(
+                request.key_pem,
+                compress=request.compress,
+                output_format=fmt,
+            )
+            qr_b64 = base64.b64encode(qr_bytes).decode("ascii")
+            return QrGenerateResponse(success=True, format=fmt, qr_data=qr_b64)
+
+        else:
+            return QrGenerateResponse(
+                success=False,
+                error=f"Unsupported format: {fmt}. Use 'png', 'jpg', or 'ascii'",
+            )
+
+    except ValueError as e:
+        return QrGenerateResponse(success=False, error=str(e))
+    except Exception as e:
+        return QrGenerateResponse(success=False, error=f"QR generation failed: {e}")
 
 
 # ============================================================================

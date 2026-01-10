@@ -252,17 +252,23 @@ def needs_compression(data: str) -> bool:
     return not can_fit_in_qr(data, compress=False) and can_fit_in_qr(data, compress=True)
 
 
-def generate_qr_code(data: str, compress: bool = False, error_correction=None) -> bytes:
+def generate_qr_code(
+    data: str,
+    compress: bool = False,
+    error_correction=None,
+    output_format: str = "png",
+) -> bytes:
     """
-    Generate a QR code PNG from string data.
+    Generate a QR code image from string data.
 
     Args:
         data: String data to encode
         compress: Whether to compress data first
         error_correction: QR error correction level (default: auto)
+        output_format: Image format - 'png' or 'jpg'/'jpeg'
 
     Returns:
-        PNG image bytes
+        Image bytes in requested format
 
     Raises:
         RuntimeError: If qrcode library not available
@@ -299,9 +305,77 @@ def generate_qr_code(data: str, compress: bool = False, error_correction=None) -
     img = qr.make_image(fill_color="black", back_color="white")
 
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    fmt = output_format.lower()
+    if fmt in ("jpg", "jpeg"):
+        # Convert to RGB for JPEG (no alpha channel)
+        img = img.convert("RGB")
+        img.save(buf, format="JPEG", quality=95)
+    else:
+        img.save(buf, format="PNG")
     buf.seek(0)
     return buf.getvalue()
+
+
+def generate_qr_ascii(
+    data: str,
+    compress: bool = False,
+    invert: bool = False,
+) -> str:
+    """
+    Generate an ASCII representation of a QR code.
+
+    Uses Unicode block characters for compact display.
+
+    Args:
+        data: String data to encode
+        compress: Whether to compress data first
+        invert: Invert colors (white on black for dark terminals)
+
+    Returns:
+        ASCII string representation of QR code
+
+    Raises:
+        RuntimeError: If qrcode library not available
+        ValueError: If data too large for QR code
+    """
+    if not HAS_QRCODE_WRITE:
+        raise RuntimeError("qrcode library not installed. Run: pip install qrcode[pil]")
+
+    qr_data = data
+
+    # Compress if requested
+    if compress:
+        qr_data = compress_data(data)
+
+    # Check size
+    if len(qr_data.encode("utf-8")) > QR_MAX_BINARY:
+        raise ValueError(
+            f"Data too large for QR code ({len(qr_data)} bytes). " f"Maximum: {QR_MAX_BINARY} bytes"
+        )
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=ERROR_CORRECT_L,
+        box_size=1,
+        border=2,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+
+    # Get the QR matrix
+    # Use print_ascii to a StringIO to capture output
+    import sys
+    from io import StringIO
+
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        qr.print_ascii(invert=invert)
+        ascii_qr = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+
+    return ascii_qr
 
 
 def read_qr_code(image_data: bytes) -> str | None:
