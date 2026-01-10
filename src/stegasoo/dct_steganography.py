@@ -919,6 +919,10 @@ def _embed_in_channel_safe(
     blocks_needed = (total_bits + bits_per_block - 1) // bits_per_block
     blocks_to_process = min(blocks_needed, len(block_order))
 
+    # Initial progress write - signals Argon2/prep is done, embedding starting
+    if progress_file:
+        _write_progress(progress_file, 5, 100, "embedding")
+
     # Vectorized embedding: process blocks in batches
     BATCH_SIZE = 500
     bit_idx = 0
@@ -1112,6 +1116,10 @@ def _embed_jpegio(
         coefs_used = 0
         total_bits = len(bits)
         progress_interval = max(total_bits // 20, 100)  # Report ~20 times or every 100 bits
+
+        # Initial progress write - signals prep is done, embedding starting
+        if progress_file:
+            _write_progress(progress_file, 5, 100, "embedding")
 
         for bit_idx, pos_idx in enumerate(order):
             if bit_idx >= len(bits):

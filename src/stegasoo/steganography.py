@@ -746,6 +746,10 @@ def _embed_lsb(
         modified_pixels = 0
         total_pixels_to_process = len(selected_indices)
 
+        # Initial progress write - signals prep is done, embedding starting
+        if progress_file:
+            _write_progress(progress_file, 5, 100, "embedding")
+
         for progress_idx, pixel_idx in enumerate(selected_indices):
             if bit_idx >= len(binary_data):
                 break

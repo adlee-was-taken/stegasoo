@@ -1009,7 +1009,9 @@ const Stegasoo = {
                 const percent = progressData.percent || 0;
                 const phase = progressData.phase || 'processing';
 
-                this.updateProgress(percent, this.formatPhase(phase));
+                // Use indeterminate mode for initializing/starting phases
+                const isIndeterminate = (phase === 'initializing' || phase === 'starting');
+                this.updateProgress(percent, this.formatPhase(phase), isIndeterminate);
 
                 // Continue polling
                 setTimeout(poll, 500);
@@ -1070,8 +1072,9 @@ const Stegasoo = {
             document.body.appendChild(modal);
         }
 
-        // Reset progress
-        this.updateProgress(0, 'Initializing...');
+        // Reset progress tracking and start with indeterminate state
+        this.resetProgressTracking();
+        this.updateProgress(0, 'Initializing...', true);
 
         // Show modal
         const bsModal = new bootstrap.Modal(modal);
@@ -1090,16 +1093,47 @@ const Stegasoo = {
     },
 
     /**
-     * Update progress bar and text
+     * Track max progress to prevent backwards jumps
      */
-    updateProgress(percent, phase) {
+    _maxProgress: 0,
+
+    /**
+     * Reset progress tracking (call when starting new operation)
+     */
+    resetProgressTracking() {
+        this._maxProgress = 0;
+    },
+
+    /**
+     * Update progress bar and text
+     * Supports indeterminate mode for initializing phase (barber pole at full width)
+     */
+    updateProgress(percent, phase, indeterminate = false) {
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
         const phaseText = document.getElementById('progressPhase');
 
-        if (progressBar) progressBar.style.width = percent + '%';
-        if (progressText) progressText.textContent = Math.round(percent) + '%';
-        if (phaseText) phaseText.textContent = phase;
+        if (indeterminate) {
+            // Barber pole animation at full width, no percentage
+            if (progressBar) {
+                progressBar.style.width = '100%';
+                progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+            }
+            if (progressText) progressText.textContent = '';
+            if (phaseText) phaseText.textContent = phase;
+        } else {
+            // Determinate progress - never go backwards
+            const safePercent = Math.max(percent, this._maxProgress);
+            this._maxProgress = safePercent;
+
+            if (progressBar) {
+                progressBar.style.width = safePercent + '%';
+                // Keep animation but show actual progress
+                progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+            }
+            if (progressText) progressText.textContent = Math.round(safePercent) + '%';
+            if (phaseText) phaseText.textContent = phase;
+        }
     },
 
     // ========================================================================
@@ -1187,7 +1221,9 @@ const Stegasoo = {
                 const percent = progressData.percent || 0;
                 const phase = progressData.phase || 'processing';
 
-                this.updateProgress(percent, this.formatDecodePhase(phase));
+                // Use indeterminate mode for initializing/starting/loading phases
+                const isIndeterminate = (phase === 'initializing' || phase === 'starting' || phase === 'loading');
+                this.updateProgress(percent, this.formatDecodePhase(phase), isIndeterminate);
 
                 // Continue polling
                 setTimeout(poll, 500);
