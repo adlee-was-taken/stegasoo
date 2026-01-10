@@ -340,11 +340,13 @@
                 <!-- Current Version - Prominent -->
                 <div class="alert alert-success mb-4">
                     <div class="d-flex align-items-center">
-                        <span class="badge bg-success fs-6 me-3">v4.1.2</span>
+                        <span class="badge bg-success fs-6 me-3">v4.2.0</span>
                         <div>
-                            <strong>Progress bars</strong> for encode operations,
-                            <strong>mobile-responsive polish</strong>,
-                            DCT decode bug fix, release validation script
+                            <strong>Performance optimizations:</strong>
+                            ~70% faster decode (vectorized DCT),
+                            50% less RAM (float32),
+                            async API endpoints,
+                            decode progress callbacks
                         </div>
                     </div>
                 </div>
@@ -362,6 +364,10 @@
                             <div class="accordion-body p-0">
                                 <table class="table table-dark table-sm small mb-0">
                                     <tbody>
+                                        <tr>
+                                            <td width="80"><strong>4.1.7</strong></td>
+                                            <td>Progress bars for encode, mobile polish, release validation</td>
+                                        </tr>
                                         <tr>
                                             <td width="80"><strong>4.1.1</strong></td>
                                             <td>DCT RS format stability, Docker cleanup, first-boot wizard</td>
