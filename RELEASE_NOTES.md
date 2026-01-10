@@ -24,6 +24,31 @@ Major performance improvements for Raspberry Pi and resource-constrained deploym
 - API server can handle concurrent requests without blocking
 - Essential for multi-user Pi deployments
 
+### Compression
+
+#### Zstd Default Compression
+- `zstandard` is now a core dependency (always installed)
+- Better compression ratio than zlib for QR code RSA keys
+- New `STEGASOO-ZS:` prefix for zstd, backward compatible with `STEGASOO-Z:` (zlib)
+
+### QR Code Generation
+
+#### CLI Support
+- `stegasoo generate --rsa --qr key.png` - save RSA key as QR image (PNG/JPG)
+- `stegasoo generate --rsa --qr-ascii` - print ASCII QR to terminal
+
+#### API Support
+- `POST /generate-key-qr` - generate QR from RSA key
+- Supports `png`, `jpg`, and `ascii` output formats
+- Uses zstd compression by default
+
+### Other Changes
+
+- RSA key size capped at 3072 bits (4096 too large for QR codes)
+- File auto-expire increased to 10 minutes
+- Progress bar "candy cane" animation during Argon2 key derivation
+- Optional API service in Pi setup (with security warning)
+
 ### Summary
 
 | Metric | v4.1.7 | v4.2.0 | Improvement |
@@ -31,6 +56,7 @@ Major performance improvements for Raspberry Pi and resource-constrained deploym
 | Decode (1MB) | ~2.6s | ~0.8s | **70% faster** |
 | Peak RAM | 211 MB | 107 MB | **50% less** |
 | Concurrent API | No | Yes | ✓ |
+| QR Compression | zlib | zstd | **~15% smaller** |
 
 ### Raspberry Pi Image
 Download `stegasoo-rpi-4.2.0_final.img.zst` from Releases.
