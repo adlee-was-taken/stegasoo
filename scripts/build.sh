@@ -68,20 +68,31 @@ case "${1:-fast}" in
         echo -e "${GREEN}Cleaned!${NC}"
         ;;
 
+    rebuild)
+        echo -e "${YELLOW}Full rebuild from scratch (no cache)...${NC}"
+        $SUDO $COMPOSE_CMD -f "$COMPOSE_FILE" down --rmi local -v 2>/dev/null || true
+        $SUDO docker rmi stegasoo-base:latest 2>/dev/null || true
+        $SUDO docker build --no-cache -f "$DOCKER_DIR/Dockerfile.base" -t stegasoo-base:latest .
+        $SUDO $COMPOSE_CMD -f "$COMPOSE_FILE" build --no-cache
+        echo -e "${GREEN}Done! Start with: $COMPOSE_CMD -f docker/docker-compose.yml up -d${NC}"
+        ;;
+
     *)
         echo -e "${CYAN}Stegasoo Build Script${NC}"
         echo ""
         echo "Usage: $0 [command]"
         echo ""
         echo "Commands:"
-        echo "  base   Build the base image (one-time, 5-10 min)"
-        echo "  fast   Fast build using base image (default, ~10 sec)"
-        echo "  full   Full rebuild from scratch (slow, no base needed)"
-        echo "  clean  Remove all images and volumes"
+        echo "  base    Build the base image (one-time, 5-10 min)"
+        echo "  fast    Fast build using base image (default, ~10 sec)"
+        echo "  full    Rebuild services without cache (uses existing base)"
+        echo "  rebuild Complete rebuild with no cache (base + services)"
+        echo "  clean   Remove all images and volumes"
         echo ""
         echo "Typical workflow:"
-        echo "  1. First time:  $0 base"
-        echo "  2. Daily dev:   $0 fast"
-        echo "  3. Deps change: $0 base"
+        echo "  1. First time:   $0 base"
+        echo "  2. Daily dev:    $0 fast"
+        echo "  3. Deps change:  $0 base"
+        echo "  4. Nuclear:      $0 rebuild"
         ;;
 esac
