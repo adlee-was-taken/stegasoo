@@ -108,8 +108,8 @@ MIN_KEY_PASSWORD_LENGTH = 8
 # ============================================================================
 
 # Temporary file storage
-TEMP_FILE_EXPIRY = 300  # 5 minutes in seconds
-TEMP_FILE_EXPIRY_MINUTES = 5
+TEMP_FILE_EXPIRY = 600  # 10 minutes in seconds
+TEMP_FILE_EXPIRY_MINUTES = 10
 
 # Thumbnail settings
 THUMBNAIL_SIZE = (250, 250)  # Maximum dimensions for thumbnails
