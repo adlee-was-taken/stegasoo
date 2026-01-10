@@ -1232,8 +1232,8 @@ def _extract_scipy_dct_safe(
     embed_rows = np.array([pos[0] for pos in DEFAULT_EMBED_POSITIONS])
     embed_cols = np.array([pos[1] for pos in DEFAULT_EMBED_POSITIONS])
 
-    # Progress reporting interval
-    PROGRESS_INTERVAL = 2000  # Report every N blocks
+    # Progress reporting interval - report frequently for responsive UI
+    PROGRESS_INTERVAL = 500  # Report every N blocks (matches BATCH_SIZE)
 
     block_idx = 0
     while block_idx < len(block_order):
@@ -1264,9 +1264,10 @@ def _extract_scipy_dct_safe(
         del blocks, dct_blocks, coeffs, quantized
         block_idx = batch_end
 
-        # Report progress
+        # Report progress (scale to 5-70% range, RS decode gets 70-100%)
         if progress_file and block_idx % PROGRESS_INTERVAL < BATCH_SIZE:
-            _write_progress(progress_file, block_idx, num_blocks, "extracting")
+            extract_pct = 5 + int(65 * block_idx / num_blocks)
+            _write_progress(progress_file, extract_pct, 100, "extracting")
 
         # Check if we have enough bits (early exit)
         if len(all_bits) >= HEADER_SIZE * 8:
@@ -1281,7 +1282,8 @@ def _extract_scipy_dct_safe(
     del padded
     gc.collect()
 
-    _write_progress(progress_file, 80, 100, "decoding")
+    # Extraction done, RS decode starts at 70%
+    _write_progress(progress_file, 70, 100, "decoding")
 
     # Try RS-protected format first (has 24-byte length prefix: 3 copies of 8-byte header)
     if HAS_REEDSOLO and len(all_bits) >= RS_LENGTH_PREFIX_SIZE * 8:
@@ -1335,9 +1337,15 @@ def _extract_scipy_dct_safe(
                     ]
                 )
 
+                # 75% - bits converted, starting RS decode (slow part)
+                _write_progress(progress_file, 75, 100, "decoding")
+
                 try:
                     # RS decode to get header + data
                     raw_payload = _rs_decode(rs_encoded)
+
+                    # 95% - RS decode done
+                    _write_progress(progress_file, 95, 100, "decoding")
 
                     # Parse header from decoded payload
                     _, flags, data_length = _parse_header(
@@ -1454,8 +1462,9 @@ def _extract_jpegio(
                     )
 
                     try:
-                        _write_progress(progress_file, 70, 100, "decoding")
+                        _write_progress(progress_file, 75, 100, "decoding")
                         raw_payload = _rs_decode(rs_encoded)
+                        _write_progress(progress_file, 95, 100, "decoding")
                         _, flags, data_length = _jpegio_parse_header(raw_payload[:HEADER_SIZE])
                         data = raw_payload[HEADER_SIZE : HEADER_SIZE + data_length]
                         _write_progress(progress_file, 100, 100, "complete")
