@@ -1,15 +1,15 @@
 # Maintainer: Aaron D. Lee <your-email@example.com>
 pkgname=stegasoo-git
-pkgver=4.2.0.r0.g0000000
+pkgver=4.1.7.r0.g1acb5a3
 pkgrel=1
 pkgdesc="Secure steganography with hybrid photo + passphrase + PIN authentication"
 arch=('x86_64')
 url="https://github.com/adlee-was-taken/stegasoo"
 license=('MIT')
 
-# Use python312 from AUR to future-proof against 3.13 (jpegio compatibility)
+# NOTE: Requires Python 3.12 (jpegio not compatible with 3.13 yet)
 depends=(
-    'python312'
+    'python312'  # AUR package - jpegio requires 3.12
 )
 makedepends=(
     'git'
@@ -23,6 +23,9 @@ conflicts=('stegasoo')
 source=("${pkgname}::git+https://github.com/adlee-was-taken/stegasoo.git#branch=main")
 sha256sums=('SKIP')
 
+# Python 3.12 from AUR package
+_python="/usr/bin/python3.12"
+
 pkgver() {
     cd "$pkgname"
     git describe --long --tags 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' || \
@@ -32,15 +35,16 @@ pkgver() {
 build() {
     cd "$pkgname"
 
-    # Create venv with python3.12
-    python3.12 -m venv --system-site-packages "$srcdir/venv"
-    source "$srcdir/venv/bin/activate"
+    echo "Using Python: $_python ($($_python --version))"
 
-    # Install build deps
-    pip install --upgrade pip wheel hatchling build
+    # Bootstrap pip for python312
+    $_python -m ensurepip --user --upgrade
+
+    # Install build dependencies
+    $_python -m pip install --user build hatchling
 
     # Build wheel
-    python -m build --wheel --no-isolation
+    $_python -m build --wheel --no-isolation
 }
 
 package() {
@@ -50,10 +54,11 @@ package() {
     install -dm755 "$pkgdir/opt/stegasoo"
 
     # Create fresh venv in package
-    python3.12 -m venv "$pkgdir/opt/stegasoo/venv"
+    $_python -m venv "$pkgdir/opt/stegasoo/venv"
 
     # Install the wheel with all extras
-    "$pkgdir/opt/stegasoo/venv/bin/pip" install --no-cache-dir dist/*.whl[all]
+    local wheel=$(ls dist/*.whl | head -1)
+    "$pkgdir/opt/stegasoo/venv/bin/pip" install --no-cache-dir "${wheel}[all]"
 
     # Create symlinks to /usr/bin
     install -dm755 "$pkgdir/usr/bin"
@@ -65,7 +70,7 @@ package() {
     # Install docs
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 
-    # Install systemd service files (optional)
+    # Install systemd service files
     install -Dm644 /dev/stdin "$pkgdir/usr/lib/systemd/system/stegasoo-web.service" <<EOF
 [Unit]
 Description=Stegasoo Web UI
@@ -75,7 +80,6 @@ After=network.target
 Type=simple
 User=stegasoo
 Environment="PATH=/opt/stegasoo/venv/bin"
-WorkingDirectory=/opt/stegasoo/venv/lib/python3.12/site-packages/frontends/web
 ExecStart=/opt/stegasoo/venv/bin/gunicorn -b 127.0.0.1:5000 app:app
 Restart=on-failure
 RestartSec=5
@@ -93,7 +97,6 @@ After=network.target
 Type=simple
 User=stegasoo
 Environment="PATH=/opt/stegasoo/venv/bin"
-WorkingDirectory=/opt/stegasoo/venv/lib/python3.12/site-packages/frontends/api
 ExecStart=/opt/stegasoo/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
