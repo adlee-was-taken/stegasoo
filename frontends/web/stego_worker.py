@@ -171,8 +171,7 @@ def decode_operation(params: dict) -> dict:
     # Resolve channel key (v4.0.0)
     resolved_channel_key = _resolve_channel_key(params.get("channel_key", "auto"))
 
-    _write_decode_progress(progress_file, 25, "extracting")
-
+    # Library handles progress internally via progress_file parameter
     # Call decode with correct parameter names
     result = decode(
         stego_image=stego_data,
@@ -183,9 +182,9 @@ def decode_operation(params: dict) -> dict:
         rsa_password=params.get("rsa_password"),
         embed_mode=params.get("embed_mode", "auto"),
         channel_key=resolved_channel_key,  # v4.0.0
+        progress_file=progress_file,  # v4.2.0: pass through for real-time progress
     )
-
-    _write_decode_progress(progress_file, 90, "finalizing")
+    # Library writes 100% "complete" - no need for worker to write again
 
     if result.is_file:
         return {
