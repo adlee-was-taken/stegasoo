@@ -408,28 +408,30 @@ def _safe_idct2(block: np.ndarray) -> np.ndarray:
 def _to_grayscale(image_data: bytes) -> np.ndarray:
     img = Image.open(io.BytesIO(image_data))
     gray = img.convert("L")
-    return np.array(gray, dtype=np.float64, copy=True, order="C")
+    return np.array(gray, dtype=np.float32, copy=True, order="C")
 
 
 def _extract_y_channel(image_data: bytes) -> np.ndarray:
+    """Extract Y (luminance) channel - float32 for memory efficiency."""
     img = Image.open(io.BytesIO(image_data))
     if img.mode != "RGB":
         img = img.convert("RGB")
 
-    rgb = np.array(img, dtype=np.float64, copy=True, order="C")
+    rgb = np.array(img, dtype=np.float32, copy=True, order="C")
     Y = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
-    return np.array(Y, dtype=np.float64, copy=True, order="C")
+    return np.array(Y, dtype=np.float32, copy=True, order="C")
 
 
 def _pad_to_blocks(image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
+    """Pad image to block boundaries - uses float32 for memory efficiency."""
     h, w = image.shape
     new_h = ((h + BLOCK_SIZE - 1) // BLOCK_SIZE) * BLOCK_SIZE
     new_w = ((w + BLOCK_SIZE - 1) // BLOCK_SIZE) * BLOCK_SIZE
 
     if new_h == h and new_w == w:
-        return np.array(image, dtype=np.float64, copy=True, order="C"), (h, w)
+        return np.array(image, dtype=np.float32, copy=True, order="C"), (h, w)
 
-    padded = np.zeros((new_h, new_w), dtype=np.float64, order="C")
+    padded = np.zeros((new_h, new_w), dtype=np.float32, order="C")
     padded[:h, :w] = image
 
     # Simple edge replication for padding
@@ -446,8 +448,9 @@ def _pad_to_blocks(image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
 
 
 def _unpad_image(image: np.ndarray, original_size: tuple[int, int]) -> np.ndarray:
+    """Remove padding - uses float32 for memory efficiency."""
     h, w = original_size
-    return np.array(image[:h, :w], dtype=np.float64, copy=True, order="C")
+    return np.array(image[:h, :w], dtype=np.float32, copy=True, order="C")
 
 
 def _embed_bit_in_coeff(coef: float, bit: int, quant_step: int = QUANT_STEP) -> float:
@@ -545,20 +548,23 @@ def _rgb_to_ycbcr(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     - Cb/Cr are often subsampled (4:2:0) so Y has more capacity anyway
 
     The coefficients here are from ITU-R BT.601 - the standard for video.
+
+    Uses float32 to reduce memory usage (~50% savings vs float64).
     """
-    R = rgb[:, :, 0].astype(np.float64)
-    G = rgb[:, :, 1].astype(np.float64)
-    B = rgb[:, :, 2].astype(np.float64)
+    # Use float32 - sufficient precision for 8-bit images, halves memory
+    R = rgb[:, :, 0].astype(np.float32)
+    G = rgb[:, :, 1].astype(np.float32)
+    B = rgb[:, :, 2].astype(np.float32)
 
     # Y = luminance (brightness). Green contributes most because eyes are most sensitive to it.
-    Y = np.array(0.299 * R + 0.587 * G + 0.114 * B, dtype=np.float64, copy=True, order="C")
+    Y = np.array(0.299 * R + 0.587 * G + 0.114 * B, dtype=np.float32, copy=True, order="C")
     # Cb = blue-difference chroma (centered at 128)
     Cb = np.array(
-        128 - 0.168736 * R - 0.331264 * G + 0.5 * B, dtype=np.float64, copy=True, order="C"
+        128 - 0.168736 * R - 0.331264 * G + 0.5 * B, dtype=np.float32, copy=True, order="C"
     )
     # Cr = red-difference chroma (centered at 128)
     Cr = np.array(
-        128 + 0.5 * R - 0.418688 * G - 0.081312 * B, dtype=np.float64, copy=True, order="C"
+        128 + 0.5 * R - 0.418688 * G - 0.081312 * B, dtype=np.float32, copy=True, order="C"
     )
 
     return Y, Cb, Cr
@@ -571,11 +577,12 @@ def _ycbcr_to_rgb(Y: np.ndarray, Cb: np.ndarray, Cr: np.ndarray) -> np.ndarray:
     After embedding in the Y channel, we need to reconstruct RGB for display.
     The Cb/Cr channels are unchanged - we only touched luminance.
     """
+    # Use float32 for memory efficiency
     R = Y + 1.402 * (Cr - 128)
     G = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128)
     B = Y + 1.772 * (Cb - 128)
 
-    rgb = np.zeros((Y.shape[0], Y.shape[1], 3), dtype=np.float64, order="C")
+    rgb = np.zeros((Y.shape[0], Y.shape[1], 3), dtype=np.float32, order="C")
     rgb[:, :, 0] = R
     rgb[:, :, 1] = G
     rgb[:, :, 2] = B
@@ -820,8 +827,8 @@ def _embed_scipy_dct_safe(
         if img.mode == "RGBA":
             img = img.convert("RGB")
 
-        # Process color image
-        rgb = np.array(img, dtype=np.float64, copy=True, order="C")
+        # Process color image (float32 for memory efficiency)
+        rgb = np.array(img, dtype=np.float32, copy=True, order="C")
         img.close()
 
         Y, Cb, Cr = _rgb_to_ycbcr(rgb)
@@ -899,8 +906,8 @@ def _embed_in_channel_safe(
     """
     h, w = channel.shape
 
-    # Create result with explicit new memory
-    result = np.array(channel, dtype=np.float64, copy=True, order="C")
+    # Create result with explicit new memory (float32 for memory efficiency)
+    result = np.array(channel, dtype=np.float32, copy=True, order="C")
 
     # Pre-compute embed positions as numpy indices
     embed_rows = np.array([pos[0] for pos in DEFAULT_EMBED_POSITIONS])
@@ -923,8 +930,8 @@ def _embed_in_channel_safe(
         batch_order = block_order[block_idx:batch_end]
         batch_count = len(batch_order)
 
-        # Extract blocks into 3D array
-        blocks = np.zeros((batch_count, BLOCK_SIZE, BLOCK_SIZE), dtype=np.float64)
+        # Extract blocks into 3D array (float32 for memory efficiency)
+        blocks = np.zeros((batch_count, BLOCK_SIZE, BLOCK_SIZE), dtype=np.float32)
         block_positions = []
         for i, block_num in enumerate(batch_order):
             by = (block_num // blocks_x) * BLOCK_SIZE
@@ -1227,8 +1234,8 @@ def _extract_scipy_dct_safe(
         batch_order = block_order[block_idx:batch_end]
         batch_count = len(batch_order)
 
-        # Extract blocks into 3D array (batch_count, 8, 8)
-        blocks = np.zeros((batch_count, BLOCK_SIZE, BLOCK_SIZE), dtype=np.float64)
+        # Extract blocks into 3D array (batch_count, 8, 8) - float32 for memory efficiency
+        blocks = np.zeros((batch_count, BLOCK_SIZE, BLOCK_SIZE), dtype=np.float32)
         for i, block_num in enumerate(batch_order):
             by = (block_num // blocks_x) * BLOCK_SIZE
             bx = (block_num % blocks_x) * BLOCK_SIZE
