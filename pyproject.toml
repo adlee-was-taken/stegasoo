@@ -111,7 +111,7 @@ include = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/stegasoo"]
+packages = ["src/stegasoo", "frontends"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
