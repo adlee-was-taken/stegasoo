@@ -351,6 +351,9 @@ else
     cd jpeglib
     CJPEGLIB="src/jpeglib/cjpeglib"
 
+    # Fix broken include paths in setup.py (uses jpeglib/ but files are in src/jpeglib/)
+    ln -s src/jpeglib jpeglib
+
     # Download libjpeg headers (not included in repo either)
     echo "    Downloading libjpeg 6b headers..."
     curl -sL "https://www.ijg.org/files/jpegsrc.v6b.tar.gz" | tar -xzf -
