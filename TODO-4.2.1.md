@@ -25,7 +25,10 @@
   - Rotate uses jpegtran for JPEGs, supports flip-only operations
 
 ## AUR Packages
-- [ ] `stegasoo-cli` - standalone CLI package (no web dependencies)
+- [x] `stegasoo-cli` - standalone CLI package (no web dependencies)
+  - Created aur-cli/PKGBUILD with [cli,dct,compression] extras only
+  - No flask/gunicorn/fastapi/uvicorn/pyzbar deps
+  - 68MB vs 79MB for full package
 - [ ] `stegasoo-api` - REST API package (needs auth overhaul first)
 
 ## API Auth Work (blocking stegasoo-api)
