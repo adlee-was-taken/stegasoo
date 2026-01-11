@@ -4,14 +4,14 @@
 # Tested on: Raspberry Pi 4/5 with Raspberry Pi OS (64-bit)
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.2/rpi/setup.sh | bash
 #   # or
-#   wget -qO- https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.1/rpi/setup.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/adlee-was-taken/stegasoo/4.2/rpi/setup.sh | bash
 #
 # What this script does:
 #   1. Installs system dependencies
-#   2. Installs Python 3.12 via pyenv (Pi OS ships with 3.13 which is incompatible)
-#   3. Patches and builds jpegio for ARM
+#   2. Installs Python 3.11+ (uses system Python or pyenv)
+#   3. Installs jpeglib for DCT steganography (Python 3.13+ compatible)
 #   4. Installs Stegasoo with web UI
 #   5. Creates systemd service for auto-start
 #   6. Enables the service
@@ -77,7 +77,7 @@ show_help() {
     echo "    INSTALL_DIR       Install location (default: /opt/stegasoo)"
     echo "    PYTHON_VERSION    Python version (default: 3.12)"
     echo "    STEGASOO_REPO     Git repo URL"
-    echo "    STEGASOO_BRANCH   Git branch (default: 4.1)"
+    echo "    STEGASOO_BRANCH   Git branch (default: 4.2)"
     echo ""
     echo "  Example:"
     echo "    export INSTALL_DIR=\"/home/pi/stegasoo\""
@@ -97,8 +97,7 @@ done
 INSTALL_DIR="${INSTALL_DIR:-/opt/stegasoo}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 STEGASOO_REPO="${STEGASOO_REPO:-https://github.com/adlee-was-taken/stegasoo.git}"
-STEGASOO_BRANCH="${STEGASOO_BRANCH:-4.1}"
-JPEGIO_REPO="https://github.com/dwgoon/jpegio.git"
+STEGASOO_BRANCH="${STEGASOO_BRANCH:-4.2}"
 
 # Load config files (system, then user - user overrides system)
 for config_file in "/etc/stegasoo.conf" "$HOME/.config/stegasoo/stegasoo.conf"; do
@@ -212,10 +211,10 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Pre-built environment tarball (skips 20+ min compile time)
-# Includes both pyenv Python 3.12 AND venv with all dependencies
+# Pre-built environment tarball (skips compile time)
+# Includes venv with all dependencies
 PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-rpi-runtime-env-arm64.tar.zst"
-PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.1.5/stegasoo-rpi-runtime-env-arm64.tar.zst}"
+PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.2.0/stegasoo-rpi-runtime-env-arm64.tar.zst}"
 USE_PREBUILT=true
 
 # Use local tarball if present, otherwise will download

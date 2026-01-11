@@ -13,7 +13,7 @@ sudo apt-get update && sudo apt-get install -y git
 
 # Clone and run setup
 cd /opt
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 cd stegasoo
 ./rpi/setup.sh
 ```
@@ -159,7 +159,7 @@ sudo apt-get update && sudo apt-get install -y git
 
 # Clone and run setup
 cd /opt
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 cd stegasoo
 ./rpi/setup.sh
 ```
@@ -200,7 +200,7 @@ After Pi shuts down, remove SD card and on another Linux machine:
 lsblk
 
 # Pull image (auto-resizes to 16GB, compresses with zstd)
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
 ```
 
 The `pull-image.sh` script automatically:

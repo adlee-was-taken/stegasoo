@@ -37,7 +37,7 @@ sudo apt-get update && sudo apt-get install -y git zstd jq
 
 ```bash
 cd /opt
-git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 ```
 
 ## Step 5: Copy Pre-built Tarball (from host)
@@ -107,7 +107,7 @@ Remove SD card, insert into your Linux machine:
 lsblk
 
 # Pull image (auto-resizes to 16GB, compresses with zstd)
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
 ```
 
 The script automatically resizes rootfs to 16GB (for smaller download), preserves auto-expand, and compresses.
@@ -170,7 +170,7 @@ scp admin@stegasoo.local:/tmp/stegasoo-rpi-runtime-env-arm64.tar.zst ./
 # On Pi (after SSH):
 sudo chown admin:admin /opt
 sudo apt-get update && sudo apt-get install -y git zstd jq
-cd /opt && git clone -b 4.1 https://github.com/adlee-was-taken/stegasoo.git stegasoo
+cd /opt && git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 
 # On host (copy tarball):
 scp rpi/stegasoo-rpi-runtime-env-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
@@ -182,5 +182,5 @@ curl -k https://localhost:5000
 sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
 # On host (pull image - auto-resizes to 16GB):
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.1.5.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
 ```
