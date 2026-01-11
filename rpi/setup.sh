@@ -347,7 +347,7 @@ else
 
     # Clone from GitHub (PyPI source tarball is missing .h files)
     echo "    Cloning jpeglib from GitHub..."
-    git clone --depth 1 --branch v1.0.2 https://github.com/martinbenes1996/jpeglib.git
+    git clone --depth 1 --branch 1.0.2 https://github.com/martinbenes1996/jpeglib.git
     cd jpeglib
     CJPEGLIB="src/jpeglib/cjpeglib"
 
