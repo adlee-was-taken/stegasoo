@@ -207,7 +207,7 @@ After Pi shuts down, remove SD card and on another Linux machine:
 lsblk
 
 # Pull image (auto-resizes to 16GB, compresses with zstd)
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.1.img.zst
 ```
 
 The `pull-image.sh` script automatically:

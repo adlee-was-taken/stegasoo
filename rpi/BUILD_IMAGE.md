@@ -106,7 +106,7 @@ Remove SD card, insert into your Linux machine:
 lsblk
 
 # Pull image (auto-resizes to 16GB, compresses with zstd)
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.1.img.zst
 ```
 
 The script automatically resizes rootfs to 16GB (for smaller download), preserves auto-expand, and compresses.
@@ -173,5 +173,5 @@ curl -k https://localhost:5000
 sudo /opt/stegasoo/rpi/sanitize-for-image.sh
 
 # On host (pull image - auto-resizes to 16GB):
-sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
+sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.1.img.zst
 ```

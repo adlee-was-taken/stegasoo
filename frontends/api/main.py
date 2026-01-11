@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Stegasoo REST API (v4.2.0)
+Stegasoo REST API (v4.2.1)
 
 FastAPI-based REST API for steganography operations.
 Supports both text messages and file embedding.
+
+CHANGES in v4.2.1:
+- API key authentication (X-API-Key header)
+- TLS support with self-signed certificates
+- /auth/* endpoints for key management
 
 CHANGES in v4.2.0:
 - Async encode/decode operations (run in thread pool)

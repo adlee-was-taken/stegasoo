@@ -54,4 +54,4 @@ RUN python -c "import jpegio; import scipy; import numpy; import zstandard; prin
 # Label for tracking
 LABEL org.opencontainers.image.title="Stegasoo Base"
 LABEL org.opencontainers.image.description="Pre-compiled dependencies for Stegasoo"
-LABEL org.opencontainers.image.version="4.2.0"
+LABEL org.opencontainers.image.version="4.2.1"

@@ -7,7 +7,7 @@ Changes in v4.0.0:
 - encode() and decode() now accept channel_key parameter
 """
 
-__version__ = "4.2.0"
+__version__ = "4.2.1"
 
 # Core functionality
 # Channel key management (v4.0.0)

@@ -3,7 +3,7 @@
 # Resizes rootfs to 16GB for consistent image size, then pulls
 #
 # Usage: ./pull-image.sh <device> <output.img.zst>
-# Example: ./pull-image.sh /dev/sdb stegasoo-rpi-4.2.0.img.zst
+# Example: ./pull-image.sh /dev/sdb stegasoo-rpi-4.2.1.img.zst
 
 set -e
 
@@ -15,7 +15,7 @@ NC='\033[0m'
 
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <device> <output.img.zst>"
-    echo "Example: $0 /dev/sdb stegasoo-rpi-4.2.0.img.zst"
+    echo "Example: $0 /dev/sdb stegasoo-rpi-4.2.1.img.zst"
     exit 1
 fi
 

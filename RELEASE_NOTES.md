@@ -1,3 +1,86 @@
+## Stegasoo v4.2.1
+
+### API Security
+
+#### API Key Authentication
+- All protected endpoints now require `X-API-Key` header
+- Keys stored hashed (SHA-256) in `~/.stegasoo/api_keys.json`
+- Auth disabled when no keys configured (easy onboarding)
+- Public endpoints remain open: `/`, `/docs`, `/modes`, `/auth/status`
+
+#### TLS Support
+- Self-signed certificates auto-generated on first run
+- Certs valid for localhost, all local IPs, hostname.local
+- Stored in `~/.stegasoo/certs/`
+- CLI: `stegasoo api tls generate` to pre-generate
+
+### CLI Improvements
+
+#### New API Management Commands
+```bash
+stegasoo api keys list           # List API keys
+stegasoo api keys create NAME    # Create new key (shown once!)
+stegasoo api keys delete NAME    # Delete key
+stegasoo api tls generate        # Generate TLS cert
+stegasoo api tls info            # Show cert info
+stegasoo api serve               # Start with TLS (default)
+```
+
+#### New Image Tools
+```bash
+stegasoo tools compress IMG -q 75   # JPEG compression
+stegasoo tools rotate IMG -r 90     # Rotation (jpegtran for JPEGs)
+stegasoo tools rotate IMG --flip-h  # Flip-only
+stegasoo tools convert IMG -f png   # Format conversion
+```
+
+### Bug Fixes
+
+- **DCT rotation**: Portrait photos no longer export rotated 90 degrees
+- **jpegtran**: Removed `-trim` flag that destroyed DCT stego data
+- **CLI encode**: Now outputs JPEG when carrier is JPEG (was always PNG)
+- **EXIF viewer**: Redesigned with card-based grid layout
+
+### AUR Packages
+
+Three package options now available:
+
+| Package | Size | Contents |
+|---------|------|----------|
+| `stegasoo-git` | 79MB | Full (Web UI + API + CLI) |
+| `stegasoo-api-git` | 74MB | REST API + CLI only |
+| `stegasoo-cli-git` | 68MB | CLI only |
+
+### Quick Start
+
+```bash
+# Create API key
+stegasoo api keys create mykey
+
+# Start API server (TLS by default)
+stegasoo api serve
+
+# Use API
+curl -k -H "X-API-Key: stegasoo_xxxx_..." https://localhost:8000/
+```
+
+### Raspberry Pi Image
+Download `stegasoo-rpi-4.2.1.img.zst` from Releases.
+
+```bash
+# Flash (auto-detects SD card)
+sudo ./rpi/flash-image.sh stegasoo-rpi-4.2.1.img.zst
+```
+
+Default login: `admin` / `stegasoo`
+
+### Docker
+```bash
+docker-compose -f docker/docker-compose.yml up -d
+```
+
+---
+
 ## Stegasoo v4.2.0
 
 ### Performance Optimizations
@@ -55,32 +138,8 @@ Major performance improvements for Raspberry Pi and resource-constrained deploym
 |--------|--------|--------|-------------|
 | Decode (1MB) | ~2.6s | ~0.8s | **70% faster** |
 | Peak RAM | 211 MB | 107 MB | **50% less** |
-| Concurrent API | No | Yes | ✓ |
+| Concurrent API | No | Yes | check |
 | QR Compression | zlib | zstd | **~15% smaller** |
-
-### Raspberry Pi Image
-Download `stegasoo-rpi-4.2.0_final.img.zst` from Releases.
-
-```bash
-# Flash (auto-detects SD card)
-sudo ./rpi/flash-image.sh stegasoo-rpi-4.2.0_final.img.zst
-
-# Or manual
-zstdcat stegasoo-rpi-4.2.0_final.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
-```
-
-Default login: `admin` / `stegasoo`
-
-### Docker
-```bash
-# Build and run
-docker build -f docker/Dockerfile.base -t stegasoo-base:latest .
-docker-compose -f docker/docker-compose.yml up -d
-
-# Or individual services
-docker-compose -f docker/docker-compose.yml up -d web  # Web UI on :5000
-docker-compose -f docker/docker-compose.yml up -d api  # REST API on :8000
-```
 
 ### Full Changelog
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.

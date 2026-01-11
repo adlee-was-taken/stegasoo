@@ -273,7 +273,7 @@ fi
 
 # Pre-built venv tarball (skips pip compile time)
 PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-rpi-venv-arm64.tar.zst"
-PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.2.0/stegasoo-rpi-venv-arm64.tar.zst}"
+PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.2.1/stegasoo-rpi-venv-arm64.tar.zst}"
 USE_PREBUILT=true
 
 # Use local tarball if present, otherwise will download

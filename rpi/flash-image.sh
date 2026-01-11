@@ -80,9 +80,9 @@ if [ -z "$1" ]; then
     echo "Supported formats: .img, .img.zst, .img.xz, .img.gz, .img.zst.zip"
     echo ""
     echo "Examples:"
-    echo "  $0 stegasoo-rpi-4.2.0.img.zst             # auto-detect SD card"
-    echo "  $0 stegasoo-rpi-4.2.0.img.zst.zip         # from GitHub release"
-    echo "  $0 stegasoo-rpi-4.2.0.img.zst /dev/sdb    # specify device"
+    echo "  $0 stegasoo-rpi-4.2.1.img.zst             # auto-detect SD card"
+    echo "  $0 stegasoo-rpi-4.2.1.img.zst.zip         # from GitHub release"
+    echo "  $0 stegasoo-rpi-4.2.1.img.zst /dev/sdb    # specify device"
     exit 1
 fi
 
