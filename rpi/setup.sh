@@ -365,17 +365,12 @@ else
         cp jpeg-${v}/*.h "$CJPEGLIB/$v/" 2>/dev/null || cp jpeg-${v//.}/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
     done
 
-    echo "    Downloading libjpeg-turbo headers..."
-    curl -sL "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz" | tar -xzf -
-    for v in turbo120 turbo130 turbo140 turbo150 turbo200 turbo210; do
-        cp libjpeg-turbo-2.1.0/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
-    done
-
-    echo "    Downloading mozjpeg headers..."
-    curl -sL "https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.0.3.tar.gz" | tar -xzf -
-    for v in mozjpeg101 mozjpeg201 mozjpeg300 mozjpeg403; do
-        cp mozjpeg-4.0.3/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
-    done
+    # Skip turbo/mozjpeg - they need cmake-generated headers
+    # Patch setup.py to only build standard libjpeg versions
+    echo "    Patching setup.py to skip turbo/mozjpeg (need cmake)..."
+    sed -i "s/libjpeg_versions = {/libjpeg_versions = {\n    # turbo\/mozjpeg disabled - need cmake\n/g" setup.py
+    sed -i "/turbo/d" setup.py
+    sed -i "/mozjpeg/d" setup.py
 
     # Build and install
     echo "    Building jpeglib (this takes a few minutes)..."
