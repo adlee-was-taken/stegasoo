@@ -10,15 +10,13 @@ license=('MIT')
 # Python 3.11-3.14 supported (uses jpeglib for modern Python compatibility)
 depends=(
     'python>=3.11'
+    'zbar'  # QR code reading for Web UI
 )
 makedepends=(
     'git'
     'python'
     'python-build'
     'python-hatchling'
-)
-optdepends=(
-    'zbar: QR code reading from webcam/images'
 )
 provides=('stegasoo')
 conflicts=('stegasoo')
@@ -57,8 +55,10 @@ package() {
     local site_packages="$pkgdir/opt/stegasoo/venv/lib/python${pyver}/site-packages"
     cp -r frontends "$site_packages/"
 
-    # Create instance directory for Flask (writable by stegasoo user)
+    # Create writable directories for stegasoo user
     install -dm755 "$pkgdir/opt/stegasoo/venv/var/app-instance"
+    install -dm755 "$site_packages/frontends/web/temp_files"
+    install -dm755 "$site_packages/frontends/api/temp_files"
 
     # Fix shebangs - replace build-time paths with installed paths
     find "$pkgdir/opt/stegasoo/venv/bin" -type f -exec \
