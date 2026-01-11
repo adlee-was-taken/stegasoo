@@ -2136,7 +2136,7 @@ def api_tools_rotate():
                 output_path = tempfile.mktemp(suffix=".jpg")
                 try:
                     result = subprocess.run(
-                        ["jpegtran", "-rotate", str(rotation), "-copy", "all", "-trim",
+                        ["jpegtran", "-rotate", str(rotation), "-copy", "all",
                          "-outfile", output_path, input_path],
                         capture_output=True, timeout=30
                     )
@@ -2158,7 +2158,7 @@ def api_tools_rotate():
                 output_path = tempfile.mktemp(suffix=".jpg")
                 try:
                     result = subprocess.run(
-                        ["jpegtran", "-flip", "horizontal", "-copy", "all", "-trim",
+                        ["jpegtran", "-flip", "horizontal", "-copy", "all",
                          "-outfile", output_path, input_path],
                         capture_output=True, timeout=30
                     )
@@ -2180,7 +2180,7 @@ def api_tools_rotate():
                 output_path = tempfile.mktemp(suffix=".jpg")
                 try:
                     result = subprocess.run(
-                        ["jpegtran", "-flip", "vertical", "-copy", "all", "-trim",
+                        ["jpegtran", "-flip", "vertical", "-copy", "all",
                          "-outfile", output_path, input_path],
                         capture_output=True, timeout=30
                     )

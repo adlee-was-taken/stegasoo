@@ -1252,24 +1252,16 @@ def _jpegtran_rotate(image_data: bytes, rotation: int) -> bytes:
     output_path = tempfile.mktemp(suffix=".jpg")
 
     try:
-        # jpegtran -rotate 90|180|270 -copy all -perfect
+        # jpegtran -rotate 90|180|270 -copy all
         # -copy all: preserve all metadata
-        # -perfect: fail if there are non-transformable edge blocks (rare)
+        # NOTE: Don't use -trim as it drops edge blocks and destroys stego data
+        # NOTE: Don't use -perfect as it fails on images with non-MCU-aligned edges
         result = subprocess.run(
-            ["jpegtran", "-rotate", str(rotation), "-copy", "all", "-perfect",
+            ["jpegtran", "-rotate", str(rotation), "-copy", "all",
              "-outfile", output_path, input_path],
             capture_output=True,
             timeout=30
         )
-
-        # If -perfect fails (edge blocks), retry without it
-        if result.returncode != 0:
-            result = subprocess.run(
-                ["jpegtran", "-rotate", str(rotation), "-copy", "all", "-trim",
-                 "-outfile", output_path, input_path],
-                capture_output=True,
-                timeout=30
-            )
 
         if result.returncode != 0:
             raise RuntimeError(f"jpegtran failed: {result.stderr.decode()}")

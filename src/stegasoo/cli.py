@@ -241,8 +241,20 @@ def encode(
     with open(carrier, "rb") as f:
         carrier_data = f.read()
 
-    # Determine output path
-    output = output or f"{Path(carrier).stem}_encoded.png"
+    # Determine output path and format
+    # Default to JPEG for JPEG carriers (preserves DCT mode benefits)
+    carrier_ext = Path(carrier).suffix.lower()
+    if not output:
+        if carrier_ext in ('.jpg', '.jpeg'):
+            output = f"{Path(carrier).stem}_encoded.jpg"
+        else:
+            output = f"{Path(carrier).stem}_encoded.png"
+
+    # Detect output format from extension
+    output_ext = Path(output).suffix.lower()
+    use_dct = output_ext in ('.jpg', '.jpeg')
+
+    from .steganography import EMBED_MODE_DCT, EMBED_MODE_LSB
 
     try:
         if file_payload:
@@ -253,6 +265,8 @@ def encode(
                 carrier_image=carrier_data,
                 passphrase=passphrase,
                 pin=pin,
+                embed_mode=EMBED_MODE_DCT if use_dct else EMBED_MODE_LSB,
+                dct_output_format="jpeg" if use_dct else "png",
             )
         else:
             # Encode message
@@ -262,6 +276,8 @@ def encode(
                 carrier_image=carrier_data,
                 passphrase=passphrase,
                 pin=pin,
+                embed_mode=EMBED_MODE_DCT if use_dct else EMBED_MODE_LSB,
+                dct_output_format="jpeg" if use_dct else "png",
             )
 
         # Write output
