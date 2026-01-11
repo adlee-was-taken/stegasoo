@@ -264,49 +264,25 @@ if [ -n "$STEGASOO_DIR" ] && [ -d "$STEGASOO_DIR/venv" ]; then
         echo "  Venv broken or stegasoo not installed, rebuilding..."
         rm -rf "$STEGASOO_DIR/venv"
 
-        # Find Python 3.12 (prefer pyenv, fall back to system)
-        USER_HOME=$(eval echo "~$STEGASOO_USER")
-        PYENV_PYTHON="$USER_HOME/.pyenv/versions/3.12*/bin/python"
-        if compgen -G "$PYENV_PYTHON" > /dev/null 2>&1; then
-            PYTHON_BIN=$(ls $PYENV_PYTHON 2>/dev/null | head -1)
-            echo "  Using pyenv Python: $PYTHON_BIN"
-        elif command -v python3.12 &>/dev/null; then
-            PYTHON_BIN="python3.12"
-            echo "  Using system Python 3.12"
-        else
-            PYTHON_BIN="python3"
-            echo "  Warning: Python 3.12 not found, using $($PYTHON_BIN --version)"
-        fi
-
-        sudo -u "$STEGASOO_USER" "$PYTHON_BIN" -m venv "$STEGASOO_DIR/venv"
-        sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet --upgrade pip setuptools wheel
-
-        # On ARM64, jpegio needs patching before install
-        ARCH=$(uname -m)
-        if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-            echo "  Building jpegio for ARM64 (this may take a minute)..."
-            # Install build deps
-            sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet cython numpy
-            JPEGIO_DIR="/tmp/jpegio-build-$$"
-            rm -rf "$JPEGIO_DIR"
-            if git clone https://github.com/dwgoon/jpegio.git "$JPEGIO_DIR" 2>/dev/null; then
-                # Apply patch to remove -m64 flag
-                if [ -f "$STEGASOO_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
-                    bash "$STEGASOO_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
-                else
-                    sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
-                fi
-                # Change ownership so user can build
-                chown -R "$STEGASOO_USER:$STEGASOO_USER" "$JPEGIO_DIR"
-                sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install "$JPEGIO_DIR"
-                rm -rf "$JPEGIO_DIR"
-            else
-                echo "  Warning: Failed to clone jpegio, DCT mode may not work"
+        # Find system Python 3.11+ (no pyenv needed)
+        PYTHON_BIN=""
+        for py in python3.14 python3.13 python3.12 python3.11 python3; do
+            if command -v "$py" &>/dev/null; then
+                PYTHON_BIN=$(command -v "$py")
+                break
             fi
-        fi
+        done
 
-        sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet -e "$STEGASOO_DIR[web]"
-        echo "  Venv rebuilt and stegasoo installed"
+        if [ -z "$PYTHON_BIN" ]; then
+            echo "  Error: Python 3.11+ not found"
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+        else
+            echo "  Using: $PYTHON_BIN ($($PYTHON_BIN --version 2>&1))"
+            sudo -u "$STEGASOO_USER" "$PYTHON_BIN" -m venv "$STEGASOO_DIR/venv"
+            sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet --upgrade pip setuptools wheel
+            sudo -u "$STEGASOO_USER" "$STEGASOO_DIR/venv/bin/pip" install --quiet -e "$STEGASOO_DIR[web]"
+            echo "  Venv rebuilt and stegasoo installed"
+        fi
     else
         echo "  Venv OK"
     fi

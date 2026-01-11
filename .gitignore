@@ -97,3 +97,8 @@ rpi/*.tar.zst.zip
 rpi/*.img
 rpi/*.img.zst
 rpi/*.img.zst.zip
+
+# AUR build artifacts
+aur-upload/
+aur/.SRCINFO
+aur/*.pkg.tar.zst

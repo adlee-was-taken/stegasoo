@@ -132,7 +132,7 @@ class SubprocessStego:
     """
     Subprocess-isolated steganography operations.
 
-    All operations run in a separate Python process. If jpegio or scipy
+    All operations run in a separate Python process. If jpeglib or scipy
     crashes, only the subprocess dies - Flask keeps running.
     """
 

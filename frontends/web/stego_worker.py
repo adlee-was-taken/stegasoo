@@ -3,7 +3,7 @@
 Stegasoo Subprocess Worker (v4.0.0)
 
 This script runs in a subprocess and handles encode/decode operations.
-If it crashes due to jpegio/scipy issues, the parent Flask process survives.
+If it crashes due to jpeglib/scipy issues, the parent Flask process survives.
 
 CHANGES in v4.0.0:
 - Added channel_key support for encode/decode operations

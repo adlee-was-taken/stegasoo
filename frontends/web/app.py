@@ -31,7 +31,7 @@ KEY PATTERNS
 ============
 
 1. SUBPROCESS ISOLATION
-   Stegasoo's DCT mode uses scipy/jpegio which can crash on malformed input.
+   Stegasoo's DCT mode uses scipy/jpeglib which can crash on malformed input.
    We run encode/decode in subprocesses so crashes don't take down the server:
 
        subprocess_stego = SubprocessStego(timeout=180)
@@ -213,7 +213,7 @@ except ImportError:
 #
 # This is a critical reliability pattern. Here's the problem:
 #
-# scipy's DCT and jpegio can crash (segfault) on:
+# scipy's DCT and jpeglib can crash (segfault) on:
 # - Malformed JPEG files
 # - Very large images that exhaust memory
 # - Certain edge cases in coefficient manipulation

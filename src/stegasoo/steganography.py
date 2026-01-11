@@ -156,7 +156,7 @@ def has_dct_support() -> bool:
         dct_mod = _get_dct_module()
         return dct_mod.has_dct_support()
     except (ImportError, ValueError):
-        # ValueError: numpy binary incompatibility (e.g., jpegio built against numpy 2.x)
+        # ValueError: numpy binary incompatibility (e.g., jpeglib built against numpy 2.x)
         return False
 
 
@@ -1097,7 +1097,7 @@ def peek_image(image_data: bytes) -> dict:
     except Exception:
         pass
 
-    # Try DCT extraction (requires scipy/jpegio)
+    # Try DCT extraction (requires scipy/jpeglib)
     try:
         from .dct_steganography import HAS_JPEGIO, HAS_SCIPY
 
