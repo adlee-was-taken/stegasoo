@@ -105,7 +105,7 @@ echo ""
 echo -e "${GREEN}[4/6]${NC} Copying pre-built tarball to Pi..."
 echo ""
 
-TARBALL="$SCRIPT_DIR/stegasoo-rpi-runtime-env-arm64.tar.zst"
+TARBALL="$SCRIPT_DIR/stegasoo-rpi-venv-arm64.tar.zst"
 if [[ -f "$TARBALL" ]]; then
     scp_to_pi "$TARBALL" "/opt/stegasoo/rpi/"
     echo -e "  ${GREEN}✓${NC} Tarball copied"
