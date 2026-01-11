@@ -355,27 +355,14 @@ else
     ln -s src/jpeglib jpeglib
 
     # Download libjpeg headers (not included in repo either)
-    # Each version needs its matching headers (APIs changed between versions)
-    echo "    Downloading libjpeg headers..."
+    # Each version needs EXACT matching headers (APIs differ between versions)
+    echo "    Downloading libjpeg headers (all versions)..."
 
-    # 6b
-    curl -sL "https://www.ijg.org/files/jpegsrc.v6b.tar.gz" | tar -xzf -
-    cp jpeg-6b/*.h "$CJPEGLIB/6b/"
-
-    # 7
-    curl -sL "https://www.ijg.org/files/jpegsrc.v7.tar.gz" | tar -xzf -
-    cp jpeg-7/*.h "$CJPEGLIB/7/"
-
-    # 8 series
-    curl -sL "https://www.ijg.org/files/jpegsrc.v8d.tar.gz" | tar -xzf -
-    for v in 8 8a 8b 8c 8d; do
-        cp jpeg-8d/*.h "$CJPEGLIB/$v/"
-    done
-
-    # 9 series
-    curl -sL "https://www.ijg.org/files/jpegsrc.v9f.tar.gz" | tar -xzf -
-    for v in 9 9a 9b 9c 9d 9e 9f; do
-        cp jpeg-9f/*.h "$CJPEGLIB/$v/"
+    # Download each version separately (APIs are incompatible between versions)
+    for v in 6b 7 8 8a 8b 8c 8d 9 9a 9b 9c 9d 9e 9f; do
+        echo "      libjpeg $v..."
+        curl -sL "https://www.ijg.org/files/jpegsrc.v${v}.tar.gz" | tar -xzf -
+        cp jpeg-${v}/*.h "$CJPEGLIB/$v/" 2>/dev/null || cp jpeg-${v//.}/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
     done
 
     echo "    Downloading libjpeg-turbo headers..."
