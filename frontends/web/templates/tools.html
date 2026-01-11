@@ -283,10 +283,8 @@
                                 <span>Drop an image to view metadata</span>
                             </div>
                             <div id="exifData" class="d-none">
-                                <div class="tool-exif-table">
-                                    <table>
-                                        <tbody id="exifTable"></tbody>
-                                    </table>
+                                <div class="exif-grid" id="exifGrid">
+                                    <!-- Cards populated by JS -->
                                 </div>
                                 <div id="exifNoData" class="text-muted text-center py-3 d-none">
                                     <i class="bi bi-inbox d-block mb-2"></i>
@@ -657,20 +655,70 @@ setupDropZone('exifZone', 'exifFile', async (file) => {
         const data = await res.json();
 
         if (data.success) {
-            const tbody = document.getElementById('exifTable');
-            const entries = Object.entries(data.exif).sort((a, b) => a[0].localeCompare(b[0]));
+            const grid = document.getElementById('exifGrid');
+            const entries = Object.entries(data.exif);
 
             if (entries.length === 0) {
-                tbody.innerHTML = '';
+                grid.innerHTML = '';
                 document.getElementById('exifNoData').classList.remove('d-none');
                 document.getElementById('exifNoData').innerHTML = '<i class="bi bi-inbox d-block mb-2"></i>No metadata found';
             } else {
                 document.getElementById('exifNoData').classList.add('d-none');
-                tbody.innerHTML = entries.map(([key, value]) => {
+
+                // Categorize EXIF fields
+                const categories = {
+                    'Camera': ['Make', 'Model', 'Software', 'LensMake', 'LensModel', 'BodySerialNumber'],
+                    'Image': ['ImageWidth', 'ImageLength', 'Orientation', 'ResolutionUnit', 'XResolution', 'YResolution', 'ColorSpace', 'ExifImageWidth', 'ExifImageHeight'],
+                    'Date/Time': ['DateTime', 'DateTimeOriginal', 'DateTimeDigitized', 'SubsecTime', 'SubsecTimeOriginal', 'SubsecTimeDigitized', 'OffsetTime', 'OffsetTimeOriginal'],
+                    'Exposure': ['ExposureTime', 'FNumber', 'ExposureProgram', 'ISOSpeedRatings', 'ExposureBiasValue', 'MaxApertureValue', 'MeteringMode', 'Flash', 'FocalLength', 'FocalLengthIn35mmFilm', 'WhiteBalance', 'ExposureMode', 'DigitalZoomRatio', 'SceneCaptureType', 'Contrast', 'Saturation', 'Sharpness'],
+                    'GPS': ['GPSInfo', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef', 'GPSAltitude', 'GPSAltitudeRef', 'GPSTimeStamp', 'GPSDateStamp'],
+                };
+
+                const categorized = {};
+                const other = [];
+                const allCategoryFields = new Set(Object.values(categories).flat());
+
+                entries.forEach(([key, value]) => {
+                    let found = false;
+                    for (const [cat, fields] of Object.entries(categories)) {
+                        if (fields.includes(key)) {
+                            if (!categorized[cat]) categorized[cat] = [];
+                            categorized[cat].push([key, value]);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) other.push([key, value]);
+                });
+
+                // Render cards
+                let html = '';
+                const renderCard = ([key, value]) => {
                     let displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                    if (displayVal.length > 40) displayVal = displayVal.substring(0, 37) + '...';
-                    return `<tr><th>${key}</th><td title="${String(value)}">${displayVal}</td></tr>`;
-                }).join('');
+                    const needsTruncate = displayVal.length > 60;
+                    if (needsTruncate) displayVal = displayVal.substring(0, 57) + '...';
+                    const fullVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                    return `<div class="exif-card" title="${fullVal.replace(/"/g, '&quot;')}">
+                        <div class="exif-card-label">${key}</div>
+                        <div class="exif-card-value${needsTruncate ? ' truncated' : ''}">${displayVal}</div>
+                    </div>`;
+                };
+
+                // Render each category
+                for (const [cat, fields] of Object.entries(categories)) {
+                    if (categorized[cat] && categorized[cat].length > 0) {
+                        html += `<div class="exif-category"><i class="bi bi-${cat === 'Camera' ? 'camera' : cat === 'Image' ? 'image' : cat === 'Date/Time' ? 'clock' : cat === 'Exposure' ? 'aperture' : cat === 'GPS' ? 'geo-alt' : 'tag'} me-1"></i>${cat}</div>`;
+                        html += categorized[cat].map(renderCard).join('');
+                    }
+                }
+
+                // Render other fields
+                if (other.length > 0) {
+                    html += `<div class="exif-category"><i class="bi bi-three-dots me-1"></i>Other</div>`;
+                    html += other.map(renderCard).join('');
+                }
+
+                grid.innerHTML = html;
             }
 
             document.getElementById('exifEmpty').classList.add('d-none');

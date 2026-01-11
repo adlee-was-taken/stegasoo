@@ -1,7 +1,9 @@
 # Stegasoo 4.2.1 Plan
 
 ## Bugs
-- [ ] Fix EXIF viewer panel not loading metadata in Web UI
+- [x] Fix EXIF viewer panel not loading metadata in Web UI
+  - Redesigned with card-based grid layout and categories
+  - Compact styling for better space usage
 - [x] DCT mode: portrait photos export rotated 90° (EXIF orientation not handled)
   - Added `_apply_exif_orientation()` to apply EXIF rotation before embedding
 - [x] DCT mode: add rotation fallback (try as-is, rotate 90°, retry on failure)
@@ -12,7 +14,10 @@
   - Dynamic UI shows "DCT Safe" for JPEGs, warning for other formats
 
 ## Tools Audit
-- [ ] Web UI tools - full shakedown and fixes
+- [x] Web UI tools - full shakedown and fixes
+  - Compress, Rotate, Strip, EXIF viewer all working
+  - Rotate uses jpegtran for lossless JPEG rotation
+  - Compact UI styling
 - [ ] CLI tools - full shakedown and fixes
 
 ## AUR Packages
