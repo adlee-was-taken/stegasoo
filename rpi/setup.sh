@@ -368,9 +368,17 @@ else
     # Skip turbo/mozjpeg - they need cmake-generated headers
     # Patch setup.py to only build standard libjpeg versions
     echo "    Patching setup.py to skip turbo/mozjpeg (need cmake)..."
-    sed -i "s/libjpeg_versions = {/libjpeg_versions = {\n    # turbo\/mozjpeg disabled - need cmake\n/g" setup.py
-    sed -i "/turbo/d" setup.py
-    sed -i "/mozjpeg/d" setup.py
+    python3 -c "
+import re
+with open('setup.py', 'r') as f:
+    content = f.read()
+# Remove turbo and mozjpeg entries from libjpeg_versions dict
+content = re.sub(r\"\\s*'turbo\\d+':[^,]+,\", '', content)
+content = re.sub(r\"\\s*'mozjpeg\\d+':[^,]+,\", '', content)
+content = re.sub(r\"\\s*#.*turbo.*\\n\", '\\n', content)
+with open('setup.py', 'w') as f:
+    f.write(content)
+"
 
     # Build and install
     echo "    Building jpeglib (this takes a few minutes)..."
