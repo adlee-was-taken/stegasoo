@@ -340,9 +340,49 @@ else
     # Upgrade pip and install build tools
     pip install --upgrade pip setuptools wheel
 
-    # Install stegasoo with all dependencies
-    # jpeglib installs cleanly via pip (no patching needed like jpegio)
-    echo "  Installing dependencies (jpeglib, scipy, etc.)..."
+    # Install jpeglib (has no ARM64 wheel, needs headers fix)
+    echo "  Installing jpeglib for ARM64..."
+    if [ -f "$INSTALL_DIR/rpi/patches/jpeglib/install-jpeglib-arm64.sh" ]; then
+        bash "$INSTALL_DIR/rpi/patches/jpeglib/install-jpeglib-arm64.sh"
+    else
+        # Inline fix: download headers and build
+        JPEGLIB_WORKDIR=$(mktemp -d)
+        cd "$JPEGLIB_WORKDIR"
+        pip download jpeglib==1.0.2 --no-binary :all: --no-deps -d . -q
+        tar -xzf jpeglib-1.0.2.tar.gz
+        cd jpeglib-1.0.2
+        CJPEGLIB="src/jpeglib/cjpeglib"
+
+        # Download and copy libjpeg 6b headers
+        curl -sL "https://www.ijg.org/files/jpegsrc.v6b.tar.gz" | tar -xzf -
+        cp jpeg-6b/*.h "$CJPEGLIB/6b/"
+
+        # Download and copy libjpeg 9f headers (works for 7-9f)
+        curl -sL "https://www.ijg.org/files/jpegsrc.v9f.tar.gz" | tar -xzf -
+        for v in 7 8 8a 8b 8c 8d 9 9a 9b 9c 9d 9e 9f; do
+            cp jpeg-9f/*.h "$CJPEGLIB/$v/"
+        done
+
+        # Download and copy libjpeg-turbo headers
+        curl -sL "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz" | tar -xzf -
+        for v in turbo120 turbo130 turbo140 turbo150 turbo200 turbo210; do
+            cp libjpeg-turbo-2.1.0/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
+        done
+
+        # Download and copy mozjpeg headers
+        curl -sL "https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.0.3.tar.gz" | tar -xzf -
+        for v in mozjpeg101 mozjpeg201 mozjpeg300 mozjpeg403; do
+            cp mozjpeg-4.0.3/*.h "$CJPEGLIB/$v/" 2>/dev/null || true
+        done
+
+        # Build and install
+        pip install .
+        cd "$INSTALL_DIR"
+        rm -rf "$JPEGLIB_WORKDIR"
+    fi
+
+    # Install remaining dependencies
+    echo "  Installing remaining dependencies..."
     pip install -e ".[web]"
 fi
 
