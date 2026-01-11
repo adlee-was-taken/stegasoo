@@ -66,9 +66,15 @@ def read_image_exif(image_data: bytes) -> dict:
                 # Convert bytes to string if possible
                 elif isinstance(value, bytes):
                     try:
-                        result[tag] = value.decode("utf-8", errors="replace").strip("\x00")
-                    except Exception:
-                        result[tag] = f"<{len(value)} bytes>"
+                        # Try to decode as ASCII/UTF-8 text
+                        decoded = value.decode("utf-8", errors="strict").strip("\x00")
+                        # Only keep if it looks like printable text
+                        if decoded.isprintable() or all(c.isspace() or c.isprintable() for c in decoded):
+                            result[tag] = decoded
+                        else:
+                            result[tag] = f"<{len(value)} bytes binary>"
+                    except (UnicodeDecodeError, Exception):
+                        result[tag] = f"<{len(value)} bytes binary>"
                 # Handle tuples of IFDRational
                 elif isinstance(value, tuple) and value and hasattr(value[0], "numerator"):
                     result[tag] = [float(v) for v in value]
