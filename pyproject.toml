@@ -8,7 +8,7 @@ version = "4.2.0"
 description = "Secure steganography with hybrid photo + passphrase + PIN authentication"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Aaron D. Lee" }
 ]
@@ -29,9 +29,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security :: Cryptography",
     "Topic :: Multimedia :: Graphics",
 ]
@@ -48,7 +49,7 @@ dependencies = [
 dct = [
     "numpy>=2.0.0",
     "scipy>=1.10.0",
-    "jpegio>=0.2.0",
+    "jpeglib>=1.0.0",
     "reedsolo>=1.7.0",
 ]
 cli = [
@@ -69,7 +70,7 @@ web = [
     # Include DCT support for web UI
     "numpy>=2.0.0",
     "scipy>=1.10.0",
-    "jpegio>=0.2.0",
+    "jpeglib>=1.0.0",
     "reedsolo>=1.7.0",
 ]
 api = [
@@ -81,7 +82,7 @@ api = [
     # Include DCT support for API
     "numpy>=2.0.0",
     "scipy>=1.10.0",
-    "jpegio>=0.2.0",
+    "jpeglib>=1.0.0",
     "reedsolo>=1.7.0",
 ]
 all = [
@@ -120,7 +121,7 @@ addopts = "-v --cov=stegasoo --cov-report=term-missing"
 
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311", "py312"]
+target-version = ["py311", "py312", "py313"]
 
 [tool.ruff]
 line-length = 100
@@ -137,7 +138,7 @@ ignore = ["E501"]
 "src/stegasoo/__init__.py" = ["E402"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

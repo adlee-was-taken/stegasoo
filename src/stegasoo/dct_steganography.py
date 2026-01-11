@@ -12,7 +12,7 @@ Why is this cool?
 
 Two approaches depending on what you want:
 1. PNG output: We do our own DCT math via scipy (works on any image)
-2. JPEG output: We use jpegio to directly tweak the coefficients (chef's kiss)
+2. JPEG output: We use jpeglib to directly tweak the coefficients (chef's kiss)
 
 v4.1.0 - The "please stop corrupting my data" release:
 - Reed-Solomon error correction (can fix up to 16 byte errors per chunk)
@@ -24,7 +24,7 @@ v3.2.0-patch2 - The "scipy why are you like this" release:
 - Process blocks one at a time with fresh arrays
 - Yes, it's slower. No, I don't care. Correctness > speed.
 
-Requires: scipy (PNG mode), optionally jpegio (JPEG mode), reedsolo (error correction)
+Requires: scipy (PNG mode), optionally jpeglib (JPEG mode), reedsolo (error correction)
 """
 
 import gc
@@ -55,14 +55,15 @@ except ImportError:
         dctn = None
         idctn = None
 
-# Check for jpegio availability (for proper JPEG mode)
+# Check for jpeglib availability (for proper JPEG mode)
+# jpeglib replaces jpegio for Python 3.13+ compatibility
 try:
-    import jpegio as jio
+    import jpeglib
 
-    HAS_JPEGIO = True
+    HAS_JPEGIO = True  # Keep variable name for compatibility
 except ImportError:
     HAS_JPEGIO = False
-    jio = None
+    jpeglib = None
 
 # Import custom exceptions
 from .exceptions import InvalidMagicBytesError
@@ -742,7 +743,7 @@ def estimate_capacity_comparison(image_data: bytes) -> dict:
         },
         "jpeg_native": {
             "available": HAS_JPEGIO,
-            "note": "Uses jpegio for proper JPEG coefficient embedding",
+            "note": "Uses jpeglib for proper JPEG coefficient embedding",
         },
     }
 
@@ -1082,7 +1083,7 @@ def _embed_jpegio(
     flags = FLAG_COLOR_MODE if color_mode == "color" else 0
 
     try:
-        jpeg = jio.read(input_path)
+        jpeg = jpeglib.to_jpegio(jpeglib.read_dct(input_path))
         coef_array = jpeg.coef_arrays[JPEGIO_EMBED_CHANNEL]
 
         all_positions = _jpegio_get_usable_positions(coef_array)
@@ -1144,7 +1145,7 @@ def _embed_jpegio(
         if progress_file:
             _write_progress(progress_file, total_bits, total_bits, "saving")
 
-        jio.write(jpeg, output_path)
+        jpeg.write(output_path)
 
         with open(output_path, "rb") as f:
             stego_bytes = f.read()
@@ -1392,7 +1393,7 @@ def _extract_jpegio(
     temp_path = _jpegio_bytes_to_file(stego_image, suffix=".jpg")
 
     try:
-        jpeg = jio.read(temp_path)
+        jpeg = jpeglib.to_jpegio(jpeglib.read_dct(temp_path))
         coef_array = jpeg.coef_arrays[JPEGIO_EMBED_CHANNEL]
 
         all_positions = _jpegio_get_usable_positions(coef_array)
