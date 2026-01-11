@@ -10,8 +10,8 @@
 #
 # What this script does:
 #   1. Installs system dependencies
-#   2. Installs Python 3.11+ (uses system Python or pyenv)
-#   3. Installs jpeglib for DCT steganography (Python 3.13+ compatible)
+#   2. Verifies Python 3.11+ (uses system Python)
+#   3. Installs jpeglib for DCT steganography (Python 3.11-3.14 compatible)
 #   4. Installs Stegasoo with web UI
 #   5. Creates systemd service for auto-start
 #   6. Enables the service
@@ -75,7 +75,6 @@ show_help() {
     echo ""
     echo "  Available variables:"
     echo "    INSTALL_DIR       Install location (default: /opt/stegasoo)"
-    echo "    PYTHON_VERSION    Python version (default: 3.12)"
     echo "    STEGASOO_REPO     Git repo URL"
     echo "    STEGASOO_BRANCH   Git branch (default: 4.2)"
     echo ""
@@ -95,7 +94,6 @@ done
 
 # Default configuration
 INSTALL_DIR="${INSTALL_DIR:-/opt/stegasoo}"
-PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 STEGASOO_REPO="${STEGASOO_REPO:-https://github.com/adlee-was-taken/stegasoo.git}"
 STEGASOO_BRANCH="${STEGASOO_BRANCH:-4.2}"
 
@@ -111,7 +109,7 @@ clear
 print_banner "Raspberry Pi Setup"
 echo ""
 echo "  This will install Stegasoo with full DCT support"
-echo "  Estimated time: ~2 minutes (pre-built) or 15-20 min (from source)"
+echo "  Estimated time: ~2 minutes (pre-built) or 5-10 min (from source)"
 echo ""
 
 # Check if running on ARM
@@ -121,6 +119,63 @@ if [[ "$ARCH" != "aarch64" && "$ARCH" != "arm64" ]]; then
     echo "Detected architecture: $ARCH"
     exit 1
 fi
+
+# =============================================================================
+# Python Version Check
+# =============================================================================
+echo -e "${GREEN}Checking Python version...${NC}"
+
+# Find system Python
+SYSTEM_PYTHON=""
+for py in python3.14 python3.13 python3.12 python3.11 python3; do
+    if command -v "$py" &>/dev/null; then
+        SYSTEM_PYTHON=$(command -v "$py")
+        break
+    fi
+done
+
+if [ -z "$SYSTEM_PYTHON" ]; then
+    echo -e "${RED}Error: Python 3 not found.${NC}"
+    echo "Please install Python 3.11 or later:"
+    echo "  sudo apt-get install python3"
+    exit 1
+fi
+
+# Get version numbers
+PY_VERSION=$("$SYSTEM_PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+PY_MAJOR=$("$SYSTEM_PYTHON" -c 'import sys; print(sys.version_info.major)')
+PY_MINOR=$("$SYSTEM_PYTHON" -c 'import sys; print(sys.version_info.minor)')
+
+echo "  Found: $SYSTEM_PYTHON (Python $PY_VERSION)"
+
+# Check version range (3.11 <= version <= 3.14)
+if [ "$PY_MAJOR" -ne 3 ]; then
+    echo -e "${RED}Error: Python 3 required, found Python $PY_MAJOR${NC}"
+    exit 1
+fi
+
+if [ "$PY_MINOR" -lt 11 ]; then
+    echo -e "${RED}Error: Python 3.11+ required, found Python $PY_VERSION${NC}"
+    echo ""
+    echo "Raspberry Pi OS Bookworm ships with Python 3.11."
+    echo "Raspberry Pi OS Trixie ships with Python 3.13."
+    echo ""
+    echo "Please upgrade your Raspberry Pi OS or install Python 3.11+."
+    exit 1
+fi
+
+if [ "$PY_MINOR" -gt 14 ]; then
+    echo -e "${YELLOW}Warning: Python $PY_VERSION detected.${NC}"
+    echo "Stegasoo is tested with Python 3.11-3.14."
+    echo "Newer versions may work but are not officially supported."
+    read -p "Continue anyway? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+echo -e "  ${GREEN}✓${NC} Python $PY_VERSION supported"
 
 # Check available memory
 TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
@@ -135,8 +190,11 @@ if [ "$TOTAL_MEM" -lt 2000 ]; then
     fi
 fi
 
-# Create /opt/stegasoo with proper permissions
-echo -e "${GREEN}[1/12]${NC} Setting up install directory..."
+# =============================================================================
+# Installation
+# =============================================================================
+
+echo -e "${GREEN}[1/9]${NC} Setting up install directory..."
 if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p "$INSTALL_DIR"
     sudo chown "$USER:$USER" "$INSTALL_DIR"
@@ -147,7 +205,7 @@ else
     echo "  $INSTALL_DIR exists, updated ownership"
 fi
 
-echo -e "${GREEN}[2/12]${NC} Installing system dependencies..."
+echo -e "${GREEN}[2/9]${NC} Installing system dependencies..."
 sudo apt-get update
 sudo apt-get install -y \
     build-essential \
@@ -169,9 +227,11 @@ sudo apt-get install -y \
     libzbar0 \
     libjpeg-dev \
     python3-dev \
+    python3-venv \
+    python3-pip \
     btop
 
-echo -e "${GREEN}[3/12]${NC} Installing gum (TUI toolkit)..."
+echo -e "${GREEN}[3/9]${NC} Installing gum (TUI toolkit)..."
 # Add Charm repo for gum
 if ! command -v gum &>/dev/null; then
     sudo mkdir -p /etc/apt/keyrings
@@ -197,7 +257,7 @@ else
     echo "  mkcert already installed"
 fi
 
-echo -e "${GREEN}[4/12]${NC} Cloning Stegasoo..."
+echo -e "${GREEN}[4/9]${NC} Cloning Stegasoo..."
 
 # Clone Stegasoo first (needed to check for pre-built tarball)
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -211,17 +271,16 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Pre-built environment tarball (skips compile time)
-# Includes venv with all dependencies
-PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-rpi-runtime-env-arm64.tar.zst"
-PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.2.0/stegasoo-rpi-runtime-env-arm64.tar.zst}"
+# Pre-built venv tarball (skips pip compile time)
+PREBUILT_TARBALL="$INSTALL_DIR/rpi/stegasoo-rpi-venv-arm64.tar.zst"
+PREBUILT_URL="${PREBUILT_URL:-https://github.com/adlee-was-taken/stegasoo/releases/download/v4.2.0/stegasoo-rpi-venv-arm64.tar.zst}"
 USE_PREBUILT=true
 
 # Use local tarball if present, otherwise will download
 if [ -f "$PREBUILT_TARBALL" ]; then
-    echo -e "${GREEN}Found local pre-built environment - fast install mode${NC}"
+    echo -e "${GREEN}Found local pre-built venv - fast install mode${NC}"
 else
-    echo -e "${GREEN}Will download pre-built environment - fast install mode${NC}"
+    echo -e "${GREEN}Will download pre-built venv - fast install mode${NC}"
 fi
 
 # Allow --no-prebuilt flag to force from-source build
@@ -230,44 +289,30 @@ if [[ " $* " =~ " --no-prebuilt " ]] || [[ " $* " =~ " --from-source " ]]; then
     echo -e "${YELLOW}Building from source (--no-prebuilt specified)${NC}"
 fi
 
-# Fast path: use pre-built environment if available
+echo -e "${GREEN}[5/9]${NC} Setting up Python environment..."
+
 if [ "$USE_PREBUILT" = true ]; then
-    echo -e "${GREEN}[5/8]${NC} Installing pre-built Python environment..."
+    # Fast path: use pre-built venv
 
     # Download if local file doesn't exist
     if [ ! -f "$PREBUILT_TARBALL" ]; then
-        echo "  Downloading pre-built environment (~50MB)..."
+        echo "  Downloading pre-built venv (~50MB)..."
         curl -L -o "$PREBUILT_TARBALL" "$PREBUILT_URL"
     fi
 
-    # Extract pre-built environment (includes pyenv Python + venv)
-    echo "  Extracting pre-built environment..."
-    zstd -d "$PREBUILT_TARBALL" --stdout | tar -xf - -C "$HOME"
+    # Extract pre-built venv
+    echo "  Extracting pre-built venv..."
+    zstd -d "$PREBUILT_TARBALL" --stdout | tar -xf - -C "$INSTALL_DIR"
 
-    # Setup pyenv in current shell
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-    pyenv global $PYTHON_VERSION
+    # Fix venv Python symlinks to point to system Python
+    echo "  Updating venv to use system Python..."
+    rm -f "$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/venv/bin/python3"
+    ln -s "$SYSTEM_PYTHON" "$INSTALL_DIR/venv/bin/python"
+    ln -s "$SYSTEM_PYTHON" "$INSTALL_DIR/venv/bin/python3"
 
-    # Add to .bashrc if not already there
-    if ! grep -q 'PYENV_ROOT' ~/.bashrc; then
-        echo '' >> ~/.bashrc
-        echo '# pyenv' >> ~/.bashrc
-        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-        echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-        echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
-    fi
-
-    # Verify Python
-    INSTALLED_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-    echo -e "  ${GREEN}✓${NC} Python: $INSTALLED_PY"
-
-    # Extract venv to install dir
-    echo -e "${GREEN}[6/8]${NC} Setting up virtual environment..."
-    if [ -f "$HOME/stegasoo-venv.tar.zst" ]; then
-        zstd -d "$HOME/stegasoo-venv.tar.zst" --stdout | tar -xf - -C "$INSTALL_DIR"
-        rm "$HOME/stegasoo-venv.tar.zst"
+    # Update pip shebang if needed
+    if [ -f "$INSTALL_DIR/venv/bin/pip" ]; then
+        sed -i "1s|^#!.*|#!$INSTALL_DIR/venv/bin/python|" "$INSTALL_DIR/venv/bin/pip" 2>/dev/null || true
     fi
 
     # Activate and verify
@@ -276,103 +321,34 @@ if [ "$USE_PREBUILT" = true ]; then
     echo -e "  ${GREEN}✓${NC} venv Python: $VENV_PY"
 
     # Install stegasoo package in editable mode (quick, no compile)
-    echo -e "${GREEN}[7/8]${NC} Installing Stegasoo package..."
+    echo "  Installing Stegasoo package..."
     pip install -e "." --quiet
-
-    # Adjust step numbers for rest of script
-    STEP_OFFSET=-4
 else
-    echo -e "${GREEN}[5/12]${NC} Installing pyenv and Python $PYTHON_VERSION..."
+    # Build from source
+    echo -e "  ${YELLOW}Building from source (this takes 5-10 minutes)${NC}"
 
-    # Install pyenv if not present
-    if [ ! -d "$HOME/.pyenv" ]; then
-        curl https://pyenv.run | bash
-
-        # Add pyenv to current shell
-        export PYENV_ROOT="$HOME/.pyenv"
-        export PATH="$PYENV_ROOT/bin:$PATH"
-        eval "$(pyenv init -)"
-
-        # Add to .bashrc if not already there
-        if ! grep -q 'PYENV_ROOT' ~/.bashrc; then
-            echo '' >> ~/.bashrc
-            echo '# pyenv' >> ~/.bashrc
-            echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-            echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-            echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
-        fi
-    else
-        echo "  pyenv already installed"
-        export PYENV_ROOT="$HOME/.pyenv"
-        export PATH="$PYENV_ROOT/bin:$PATH"
-        eval "$(pyenv init -)"
+    # Create venv with system Python
+    if [ ! -d "$INSTALL_DIR/venv" ]; then
+        "$SYSTEM_PYTHON" -m venv "$INSTALL_DIR/venv"
     fi
-
-    # Install Python 3.12 if not present
-    if ! pyenv versions | grep -q "$PYTHON_VERSION"; then
-        echo "  Building Python $PYTHON_VERSION (this takes ~10 minutes)..."
-        pyenv install $PYTHON_VERSION
-    else
-        echo "  Python $PYTHON_VERSION already installed"
-    fi
-    pyenv global $PYTHON_VERSION
-
-    # Verify Python version
-    INSTALLED_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-    if [ "$INSTALLED_PY" != "$PYTHON_VERSION" ]; then
-        echo -e "${RED}Error: Python $PYTHON_VERSION not active. Got: $INSTALLED_PY${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}[6/12]${NC} Creating Python virtual environment..."
-    echo -e "  ${YELLOW}Note: No pre-built venv found. Building from source (20+ min)${NC}"
-    echo -e "  ${YELLOW}To speed up future installs, add stegasoo-venv-pi-arm64.tar.gz to rpi/${NC}"
-
-    # Create venv with pyenv Python (not system Python)
-    # Use pyenv which to get actual path (handles 3.12 -> 3.12.12 mapping)
-    PYENV_PYTHON=$(pyenv which python)
-    echo "  Using Python: $PYENV_PYTHON"
-    if [ ! -d "venv" ]; then
-        "$PYENV_PYTHON" -m venv venv
-    fi
-    source venv/bin/activate
+    source "$INSTALL_DIR/venv/bin/activate"
 
     # Verify we're using the right Python
     VENV_PY=$(python --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
     echo "  venv Python: $VENV_PY"
 
-    echo -e "${GREEN}[7/12]${NC} Building jpegio for ARM..."
+    # Upgrade pip and install build tools
+    pip install --upgrade pip setuptools wheel
 
-    # Clone jpegio
-    JPEGIO_DIR="/tmp/jpegio-build"
-    rm -rf "$JPEGIO_DIR"
-    git clone "$JPEGIO_REPO" "$JPEGIO_DIR"
-
-    # Apply ARM64 patch
-    if [ -f "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" ]; then
-        bash "$INSTALL_DIR/rpi/patches/jpegio/apply-patch.sh" "$JPEGIO_DIR"
-    else
-        echo "  Applying inline ARM64 patch..."
-        sed -i "s/cargs.append('-m64')/pass  # ARM64 fix/g" "$JPEGIO_DIR/setup.py"
-    fi
-
-    cd "$JPEGIO_DIR"
-
-    # Build jpegio into venv
-    pip install --upgrade pip setuptools wheel cython numpy
-    pip install .
-
-    cd "$INSTALL_DIR"
-    rm -rf "$JPEGIO_DIR"
-
-    echo -e "${GREEN}[8/12]${NC} Installing Stegasoo..."
-
-    # Install dependencies (jpegio already in venv, won't re-download)
+    # Install stegasoo with all dependencies
+    # jpeglib installs cleanly via pip (no patching needed like jpegio)
+    echo "  Installing dependencies (jpeglib, scipy, etc.)..."
     pip install -e ".[web]"
-
-    STEP_OFFSET=0
 fi
 
-echo -e "${GREEN}[9/12]${NC} Creating systemd services..."
+echo -e "  ${GREEN}✓${NC} Stegasoo installed"
+
+echo -e "${GREEN}[6/9]${NC} Creating systemd services..."
 
 # Create systemd service file for Web UI
 sudo tee /etc/systemd/system/stegasoo.service > /dev/null <<EOF
@@ -416,7 +392,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo -e "${GREEN}[10/12]${NC} Enabling services..."
+echo -e "${GREEN}[7/9]${NC} Enabling services..."
 
 sudo systemctl daemon-reload
 sudo systemctl enable stegasoo.service
@@ -442,7 +418,7 @@ else
     echo "    Can enable later with: sudo systemctl enable --now stegasoo-api"
 fi
 
-echo -e "${GREEN}[11/12]${NC} Setting up user environment..."
+echo -e "${GREEN}[8/9]${NC} Setting up user environment..."
 
 # Add stegasoo venv and rpi scripts to PATH for all users
 sudo tee /etc/profile.d/stegasoo-path.sh > /dev/null <<'PATHEOF'
@@ -476,7 +452,7 @@ if [ -f "$INSTALL_DIR/docs/stegasoo.1" ]; then
     echo "  Installed man page (man stegasoo)"
 fi
 
-echo -e "${GREEN}[12/12]${NC} Setting up login banner..."
+echo -e "${GREEN}[9/9]${NC} Setting up login banner..."
 
 # Create dynamic MOTD script
 sudo tee /etc/profile.d/stegasoo-motd.sh > /dev/null <<'MOTDEOF'

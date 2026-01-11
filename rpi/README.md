@@ -4,7 +4,7 @@ Scripts and resources for deploying Stegasoo on Raspberry Pi.
 
 ## Quick Install
 
-On a fresh Raspberry Pi OS Lite (64-bit) installation:
+On a fresh Raspberry Pi OS (64-bit) installation:
 
 ```bash
 # Pre-setup (git not included in Lite image)
@@ -20,9 +20,9 @@ cd stegasoo
 
 ## What the Setup Script Does
 
-1. **Installs system dependencies** - build tools, libraries
-2. **Installs Python 3.12** - via pyenv (Pi OS ships with 3.13 which is incompatible)
-3. **Builds jpegio for ARM** - patches x86-specific flags
+1. **Verifies Python 3.11+** - uses system Python (no pyenv needed)
+2. **Installs system dependencies** - build tools, libraries
+3. **Installs jpeglib** - DCT steganography (Python 3.11-3.14 compatible)
 4. **Installs Stegasoo** - with web UI and all dependencies
 5. **Creates systemd service** - auto-starts on boot
 6. **Enables the service** - ready to start
@@ -30,10 +30,17 @@ cd stegasoo
 ## Requirements
 
 - Raspberry Pi 4 or 5
-- Raspberry Pi OS Lite (64-bit) - Bookworm or later
+- Raspberry Pi OS (64-bit) - Bookworm (Python 3.11) or Trixie (Python 3.13)
 - 4GB+ RAM recommended (2GB minimum)
 - 16GB+ SD card (pre-built images are 16GB)
 - Internet connection
+
+### Python Compatibility
+
+| Raspberry Pi OS | Python | Supported |
+|-----------------|--------|-----------|
+| Bookworm        | 3.11   | Yes       |
+| Trixie          | 3.13   | Yes       |
 
 ### Performance
 

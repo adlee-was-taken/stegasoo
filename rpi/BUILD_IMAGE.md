@@ -26,11 +26,11 @@ ssh admin@stegasoo.local
 ## Step 3: Pre-Setup
 
 ```bash
-# Take ownership of /opt (for pyenv, jpegio builds)
+# Take ownership of /opt
 sudo chown admin:admin /opt
 
-# Install git and zstd (not included in Lite image)
-sudo apt-get update && sudo apt-get install -y git zstd jq
+# Install git (not included in Lite image)
+sudo apt-get update && sudo apt-get install -y git
 ```
 
 ## Step 4: Clone Repo
@@ -40,37 +40,36 @@ cd /opt
 git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 ```
 
-## Step 5: Copy Pre-built Tarball (from host)
-
-> **Dev-only asset:** This tarball is for building Pi images, not for end users.
-> It's available on [Releases](https://github.com/adlee-was-taken/stegasoo/releases) for image builders.
-
-```bash
-# On your host machine:
-scp rpi/stegasoo-rpi-runtime-env-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
-```
-
-This tarball contains:
-- pyenv with Python 3.12 (pre-compiled for ARM64)
-- venv with all dependencies (jpegio, scipy, etc.)
-
-Install time: **~2 minutes** (vs 20+ min from source)
-
-## Step 6: Run Setup
+## Step 5: Run Setup
 
 ```bash
 cd /opt/stegasoo
-./rpi/setup.sh  # Detects local tarball, skips download
+./rpi/setup.sh
 ```
 
-### From-Source Build (optional)
+The setup script:
+- Verifies Python 3.11+ (system Python, no pyenv needed)
+- Installs dependencies via apt and pip
+- jpeglib installs cleanly (no ARM patching like jpegio)
+- Creates and enables systemd service
 
-To build without the pre-built tarball:
+Install time: **5-10 minutes** (from source)
+
+### Pre-built Venv (optional)
+
+For faster installs, you can provide a pre-built venv tarball:
+
 ```bash
-./rpi/setup.sh --no-prebuilt  # Takes 15-20 minutes
+# On your host machine:
+scp rpi/stegasoo-rpi-venv-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
+
+# Then on Pi:
+cd /opt/stegasoo && ./rpi/setup.sh  # Detects local tarball, skips pip build
 ```
 
-## Step 7: Test It Works
+Install time with pre-built: **~2 minutes**
+
+## Step 6: Test It Works
 
 ```bash
 sudo systemctl start stegasoo
@@ -78,7 +77,7 @@ curl -k https://localhost:5000
 # Should return HTML
 ```
 
-## Step 8: Sanitize for Distribution
+## Step 7: Sanitize for Distribution
 
 ```bash
 # Full sanitize (for final image - removes WiFi, shuts down)
@@ -98,7 +97,7 @@ This removes:
 
 The script validates all cleanup steps before finishing.
 
-## Step 9: Pull the Image
+## Step 8: Pull the Image
 
 Remove SD card, insert into your Linux machine:
 
@@ -112,7 +111,7 @@ sudo ./rpi/pull-image.sh /dev/sdX stegasoo-rpi-4.2.0.img.zst
 
 The script automatically resizes rootfs to 16GB (for smaller download), preserves auto-expand, and compresses.
 
-## Step 10: Distribute
+## Step 9: Distribute
 
 Upload `.img.zst` to GitHub Releases.
 
@@ -130,36 +129,31 @@ zstdcat stegasoo-rpi-*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress
 
 ---
 
-## Creating the Pre-built Tarball
+## Creating the Pre-built Venv Tarball
 
 After a successful from-source build, create the pre-built tarball for future installs:
 
 ```bash
 # On the Pi after successful setup:
-cd ~
+cd /opt/stegasoo
 
-# Strip caches and tests from venv (295MB → 208MB)
-find /opt/stegasoo/venv/ -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null
-find /opt/stegasoo/venv/ -type d -name 'tests' -exec rm -rf {} + 2>/dev/null
-find /opt/stegasoo/venv/ -type d -name 'test' -exec rm -rf {} + 2>/dev/null
+# Strip caches and tests from venv (saves ~100MB)
+find venv/ -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null
+find venv/ -type d -name 'tests' -exec rm -rf {} + 2>/dev/null
+find venv/ -type d -name 'test' -exec rm -rf {} + 2>/dev/null
 
 # Create venv tarball
-cd /opt/stegasoo
-tar -cf - venv/ | zstd -19 -T0 > ~/stegasoo-venv.tar.zst
+tar -cf - venv/ | zstd -19 -T0 > /tmp/stegasoo-rpi-venv-arm64.tar.zst
 
-# Create combined tarball (pyenv + venv pointer)
-cd ~
-tar -cf - .pyenv stegasoo-venv.tar.zst | zstd -19 -T0 > /tmp/stegasoo-rpi-runtime-env-arm64.tar.zst
-
-# Check size (should be ~50-60MB)
-ls -lh /tmp/stegasoo-rpi-runtime-env-arm64.tar.zst
+# Check size (should be ~40-50MB)
+ls -lh /tmp/stegasoo-rpi-venv-arm64.tar.zst
 ```
 
 Pull to host and upload to GitHub releases:
 ```bash
 # On host:
-scp admin@stegasoo.local:/tmp/stegasoo-rpi-runtime-env-arm64.tar.zst ./
-# Upload to GitHub releases as stegasoo-rpi-runtime-env-arm64.tar.zst
+scp admin@stegasoo.local:/tmp/stegasoo-rpi-venv-arm64.tar.zst ./rpi/
+# Upload to GitHub releases as stegasoo-rpi-venv-arm64.tar.zst
 ```
 
 ---
@@ -169,13 +163,10 @@ scp admin@stegasoo.local:/tmp/stegasoo-rpi-runtime-env-arm64.tar.zst ./
 ```bash
 # On Pi (after SSH):
 sudo chown admin:admin /opt
-sudo apt-get update && sudo apt-get install -y git zstd jq
+sudo apt-get update && sudo apt-get install -y git
 cd /opt && git clone -b 4.2 https://github.com/adlee-was-taken/stegasoo.git stegasoo
 
-# On host (copy tarball):
-scp rpi/stegasoo-rpi-runtime-env-arm64.tar.zst admin@stegasoo.local:/opt/stegasoo/rpi/
-
-# On Pi (run setup):
+# Run setup:
 cd /opt/stegasoo && ./rpi/setup.sh
 sudo systemctl start stegasoo
 curl -k https://localhost:5000
