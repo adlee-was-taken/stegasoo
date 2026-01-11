@@ -2100,8 +2100,11 @@ def api_tools_exif_clear():
 @app.route("/api/tools/rotate", methods=["POST"])
 @login_required
 def api_tools_rotate():
-    """Rotate and/or flip an image."""
+    """Rotate and/or flip an image, using lossless jpegtran for JPEGs."""
     from PIL import Image
+    import shutil
+    import subprocess
+    import tempfile
 
     image_file = request.files.get("image")
     if not image_file:
@@ -2112,22 +2115,115 @@ def api_tools_rotate():
     flip_v = request.form.get("flip_v", "false").lower() == "true"
 
     try:
-        img = Image.open(io.BytesIO(image_file.read()))
+        image_data = image_file.read()
+        img = Image.open(io.BytesIO(image_data))
+        original_format = img.format  # JPEG, PNG, etc.
+        img.close()
 
-        # Apply rotation (PIL rotates counter-clockwise, so negate)
-        if rotation:
-            img = img.rotate(-rotation, expand=True)
+        # For JPEGs, use jpegtran for lossless rotation/flip (preserves DCT stego)
+        has_jpegtran = shutil.which("jpegtran") is not None
+        use_jpegtran = original_format == "JPEG" and has_jpegtran and (rotation or flip_h or flip_v)
 
-        # Apply flips
-        if flip_h:
-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-        if flip_v:
-            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        if use_jpegtran:
+            # Chain jpegtran operations for lossless transformation
+            current_data = image_data
 
-        # Output as PNG (lossless)
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
+            # Apply rotation first
+            if rotation in (90, 180, 270):
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(current_data)
+                    input_path = f.name
+                output_path = tempfile.mktemp(suffix=".jpg")
+                try:
+                    result = subprocess.run(
+                        ["jpegtran", "-rotate", str(rotation), "-copy", "all", "-trim",
+                         "-outfile", output_path, input_path],
+                        capture_output=True, timeout=30
+                    )
+                    if result.returncode == 0:
+                        with open(output_path, "rb") as f:
+                            current_data = f.read()
+                finally:
+                    for p in [input_path, output_path]:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+
+            # Apply horizontal flip
+            if flip_h:
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(current_data)
+                    input_path = f.name
+                output_path = tempfile.mktemp(suffix=".jpg")
+                try:
+                    result = subprocess.run(
+                        ["jpegtran", "-flip", "horizontal", "-copy", "all", "-trim",
+                         "-outfile", output_path, input_path],
+                        capture_output=True, timeout=30
+                    )
+                    if result.returncode == 0:
+                        with open(output_path, "rb") as f:
+                            current_data = f.read()
+                finally:
+                    for p in [input_path, output_path]:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+
+            # Apply vertical flip
+            if flip_v:
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(current_data)
+                    input_path = f.name
+                output_path = tempfile.mktemp(suffix=".jpg")
+                try:
+                    result = subprocess.run(
+                        ["jpegtran", "-flip", "vertical", "-copy", "all", "-trim",
+                         "-outfile", output_path, input_path],
+                        capture_output=True, timeout=30
+                    )
+                    if result.returncode == 0:
+                        with open(output_path, "rb") as f:
+                            current_data = f.read()
+                finally:
+                    for p in [input_path, output_path]:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+
+            buffer = io.BytesIO(current_data)
+            mimetype = "image/jpeg"
+            ext = "jpg"
+        else:
+            # Fallback to PIL for non-JPEGs or when jpegtran unavailable
+            img = Image.open(io.BytesIO(image_data))
+
+            # Apply rotation (PIL rotates counter-clockwise, so negate)
+            if rotation:
+                img = img.rotate(-rotation, expand=True)
+
+            # Apply flips
+            if flip_h:
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            if flip_v:
+                img = img.transpose(Image.FLIP_TOP_BOTTOM)
+
+            # Preserve original format
+            buffer = io.BytesIO()
+            if original_format == "JPEG":
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                img.save(buffer, format="JPEG", quality=95)
+                mimetype = "image/jpeg"
+                ext = "jpg"
+            else:
+                img.save(buffer, format="PNG")
+                mimetype = "image/png"
+                ext = "png"
+            buffer.seek(0)
 
         stem = (
             image_file.filename.rsplit(".", 1)[0]
@@ -2136,9 +2232,9 @@ def api_tools_rotate():
         )
         return send_file(
             buffer,
-            mimetype="image/png",
+            mimetype=mimetype,
             as_attachment=True,
-            download_name=f"{stem}_transformed.png",
+            download_name=f"{stem}_transformed.{ext}",
         )
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

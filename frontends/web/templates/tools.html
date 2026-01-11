@@ -22,17 +22,17 @@
                 <div class="tools-ribbon-divider"></div>
 
                 <div class="tools-ribbon-group">
-                    <button class="tool-icon-btn" data-tool="strip" title="Strip Metadata">
-                        <i class="bi bi-eraser"></i>
-                        <span>Strip</span>
+                    <button class="tool-icon-btn" data-tool="compress" title="JPEG Compression">
+                        <i class="bi bi-file-zip"></i>
+                        <span>Compress</span>
                     </button>
                     <button class="tool-icon-btn" data-tool="rotate" title="Rotate / Flip">
                         <i class="bi bi-arrow-repeat"></i>
                         <span>Rotate</span>
                     </button>
-                    <button class="tool-icon-btn" data-tool="compress" title="JPEG Compression">
-                        <i class="bi bi-file-zip"></i>
-                        <span>Compress</span>
+                    <button class="tool-icon-btn" data-tool="strip" title="Strip Metadata">
+                        <i class="bi bi-eraser"></i>
+                        <span>Strip</span>
                     </button>
                     <button class="tool-icon-btn" data-tool="convert" title="Format Convert">
                         <i class="bi bi-arrow-left-right"></i>
@@ -368,6 +368,14 @@
                                     <span class="tool-result-label">Flipped</span>
                                     <span class="tool-result-value" id="rotateFlip">None</span>
                                 </div>
+                                <div class="alert alert-success small mt-3 mb-0" id="rotateJpegSafe" style="display: none;">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <strong>DCT Safe:</strong> Uses jpegtran for lossless JPEG rotation. Your stego data will be preserved.
+                                </div>
+                                <div class="alert alert-warning small mt-3 mb-0" id="rotateNonJpegWarn" style="display: none;">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>Note:</strong> Non-JPEG images are re-encoded during rotation.
+                                </div>
                             </div>
                         </div>
                         <div class="tool-results-actions d-none" id="rotateActions">
@@ -634,6 +642,18 @@ setupDropZone('exifZone', 'exifFile', async (file) => {
 
     try {
         const res = await fetch('/api/tools/exif', { method: 'POST', body: formData });
+
+        // Check for auth redirect or non-JSON response
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.error('EXIF API returned non-JSON:', res.status, contentType);
+            document.getElementById('exifNoData').classList.remove('d-none');
+            document.getElementById('exifNoData').innerHTML = '<i class="bi bi-exclamation-triangle d-block mb-2"></i>Session expired - please refresh';
+            document.getElementById('exifEmpty').classList.add('d-none');
+            document.getElementById('exifData').classList.remove('d-none');
+            return;
+        }
+
         const data = await res.json();
 
         if (data.success) {
@@ -643,6 +663,7 @@ setupDropZone('exifZone', 'exifFile', async (file) => {
             if (entries.length === 0) {
                 tbody.innerHTML = '';
                 document.getElementById('exifNoData').classList.remove('d-none');
+                document.getElementById('exifNoData').innerHTML = '<i class="bi bi-inbox d-block mb-2"></i>No metadata found';
             } else {
                 document.getElementById('exifNoData').classList.add('d-none');
                 tbody.innerHTML = entries.map(([key, value]) => {
@@ -655,9 +676,20 @@ setupDropZone('exifZone', 'exifFile', async (file) => {
             document.getElementById('exifEmpty').classList.add('d-none');
             document.getElementById('exifData').classList.remove('d-none');
             document.getElementById('exifActions').classList.remove('d-none');
+        } else {
+            // API returned success: false
+            console.error('EXIF API error:', data.error);
+            document.getElementById('exifNoData').classList.remove('d-none');
+            document.getElementById('exifNoData').innerHTML = `<i class="bi bi-exclamation-triangle d-block mb-2"></i>${data.error || 'Error reading metadata'}`;
+            document.getElementById('exifEmpty').classList.add('d-none');
+            document.getElementById('exifData').classList.remove('d-none');
         }
     } catch (err) {
-        console.error(err);
+        console.error('EXIF fetch error:', err);
+        document.getElementById('exifNoData').classList.remove('d-none');
+        document.getElementById('exifNoData').innerHTML = '<i class="bi bi-exclamation-triangle d-block mb-2"></i>Error loading metadata';
+        document.getElementById('exifEmpty').classList.add('d-none');
+        document.getElementById('exifData').classList.remove('d-none');
     }
 });
 
@@ -796,6 +828,11 @@ setupDropZone('rotateZone', 'rotateFile', async (file) => {
     document.getElementById('rotateData').classList.remove('d-none');
     document.getElementById('rotateActions').classList.remove('d-none');
 
+    // Show appropriate DCT warning based on file type
+    const isJpeg = file.type === 'image/jpeg' || file.name.toLowerCase().match(/\.jpe?g$/);
+    document.getElementById('rotateJpegSafe').style.display = isJpeg ? 'block' : 'none';
+    document.getElementById('rotateNonJpegWarn').style.display = isJpeg ? 'none' : 'block';
+
     // Load image to get dimensions, then show preview
     const thumb = document.getElementById('rotateThumb');
     const objectUrl = URL.createObjectURL(file);
@@ -889,6 +926,8 @@ function clearRotate() {
         document.getElementById('rotateData').classList.add('d-none');
         document.getElementById('rotateActions').classList.add('d-none');
         document.getElementById('rotateFileInfo').classList.add('d-none');
+        document.getElementById('rotateJpegSafe').style.display = 'none';
+        document.getElementById('rotateNonJpegWarn').style.display = 'none';
         const thumb = document.getElementById('rotateThumb');
         thumb.style.transform = '';
         thumb.style.width = '';
@@ -920,8 +959,7 @@ document.getElementById('rotateDownload')?.addEventListener('click', async funct
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const baseName = rotateCurrentFile?.name?.replace(/\.[^.]+$/, '') || 'rotated';
-            a.download = `${baseName}_transformed.png`;
+            a.download = res.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'rotated.jpg';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
