@@ -369,15 +369,12 @@ else
     # Patch setup.py to only build standard libjpeg versions
     echo "    Patching setup.py to skip turbo/mozjpeg (need cmake)..."
     python3 -c "
-import re
 with open('setup.py', 'r') as f:
-    content = f.read()
-# Remove turbo and mozjpeg entries from libjpeg_versions dict
-content = re.sub(r\"\\s*'turbo\\d+':[^,]+,\", '', content)
-content = re.sub(r\"\\s*'mozjpeg\\d+':[^,]+,\", '', content)
-content = re.sub(r\"\\s*#.*turbo.*\\n\", '\\n', content)
+    lines = f.readlines()
+# Filter out lines containing turbo or mozjpeg
+filtered = [l for l in lines if 'turbo' not in l and 'mozjpeg' not in l]
 with open('setup.py', 'w') as f:
-    f.write(content)
+    f.writelines(filtered)
 "
 
     # Build and install
