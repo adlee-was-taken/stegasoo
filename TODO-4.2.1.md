@@ -29,7 +29,11 @@
   - Created aur-cli/PKGBUILD with [cli,dct,compression] extras only
   - No flask/gunicorn/fastapi/uvicorn/pyzbar deps
   - 68MB vs 79MB for full package
-- [ ] `stegasoo-api` - REST API package (needs auth overhaul first)
+- [x] `stegasoo-api` - REST API package
+  - Created aur-api/PKGBUILD with [api,cli,compression] extras
+  - Has fastapi/uvicorn, no flask/gunicorn
+  - 74MB package size
+  - Includes systemd service with TLS
 
 ## API Auth Work
 - [x] API key authentication (simpler than OAuth2 for personal use)
@@ -47,5 +51,4 @@
   - `stegasoo api serve` (starts with TLS by default)
 
 ## API Documentation
-- [ ] Postman collection
-- [ ] Environment variable templates
+- [ ] Postman collection (with environment templates)
