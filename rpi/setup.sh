@@ -366,16 +366,25 @@ else
     done
 
     # Skip turbo/mozjpeg - they need cmake-generated headers
-    # Patch setup.py to only build standard libjpeg versions
+    # Only remove dict entries (lines 49-59), keep if blocks (they're safe when is_turbo=False)
     echo "    Patching setup.py to skip turbo/mozjpeg (need cmake)..."
-    python3 -c "
+    python3 << 'PYPATCH'
 with open('setup.py', 'r') as f:
     lines = f.readlines()
-# Filter out lines containing turbo or mozjpeg
-filtered = [l for l in lines if 'turbo' not in l and 'mozjpeg' not in l]
+filtered = []
+for line in lines:
+    # Only skip dict entries like "'turbo120': ..." or "'mozjpeg101': ..."
+    stripped = line.strip()
+    if stripped.startswith("'turbo") and ':' in stripped:
+        continue
+    if stripped.startswith("'mozjpeg") and ':' in stripped:
+        continue
+    if stripped.startswith("# 'turbo"):  # commented turbo line
+        continue
+    filtered.append(line)
 with open('setup.py', 'w') as f:
     f.writelines(filtered)
-"
+PYPATCH
 
     # Build and install
     echo "    Building jpeglib (this takes a few minutes)..."
