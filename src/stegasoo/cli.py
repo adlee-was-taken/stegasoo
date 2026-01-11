@@ -1673,6 +1673,26 @@ def admin_generate_key(show_qr):
 # =============================================================================
 
 
+def _setup_frontends_path():
+    """Add frontends directory to sys.path for importing API/web modules."""
+    import sys
+
+    # Try multiple possible locations
+    possible_paths = [
+        # Development: stegasoo/frontends
+        Path(__file__).parent.parent.parent / "frontends",
+        # Installed package: site-packages/frontends
+        Path(__file__).parent.parent / "frontends",
+    ]
+
+    for path in possible_paths:
+        if path.exists() and str(path) not in sys.path:
+            sys.path.insert(0, str(path))
+            return True
+
+    return False
+
+
 @cli.group()
 @click.pass_context
 def api(ctx):
@@ -1699,8 +1719,7 @@ def api_keys_list(location):
         stegasoo api keys list
         stegasoo api keys list --location user
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+    _setup_frontends_path()
 
     try:
         from api.auth import list_api_keys, get_api_key_status
@@ -1740,8 +1759,7 @@ def api_keys_create(name, location):
         stegasoo api keys create laptop
         stegasoo api keys create automation --location project
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+    _setup_frontends_path()
 
     try:
         from api.auth import add_api_key
@@ -1772,8 +1790,7 @@ def api_keys_delete(name, location):
         stegasoo api keys delete laptop
         stegasoo api keys delete automation --location project
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+    _setup_frontends_path()
 
     try:
         from api.auth import remove_api_key
@@ -1811,8 +1828,7 @@ def api_tls_generate(hostname, days, output):
         stegasoo api tls generate --hostname myserver --days 730
         stegasoo api tls generate -o /etc/stegasoo/certs
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+    _setup_frontends_path()
 
     try:
         from web.ssl_utils import generate_self_signed_cert, get_cert_paths
@@ -1906,8 +1922,7 @@ def api_serve(host, port, ssl, cert, key, do_reload):
         stegasoo api serve --no-ssl
         stegasoo api serve --cert /path/to/cert.pem --key /path/to/key.pem
     """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+    _setup_frontends_path()
 
     # Determine cert paths
     if ssl:
