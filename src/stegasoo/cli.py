@@ -1313,6 +1313,203 @@ def tools_exif(image, clear, set_fields, output, as_json):
             raise click.UsageError(str(e))
 
 
+@tools.command("compress")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("-q", "--quality", type=int, default=75, help="JPEG quality (1-100, default: 75)")
+@click.option("-o", "--output", type=click.Path(), help="Output file (default: <name>_q<quality>.jpg)")
+def tools_compress(image, quality, output):
+    """Compress a JPEG image.
+
+    DCT steganography survives JPEG compression! Use this to reduce file size
+    while preserving hidden data.
+
+    Examples:
+
+        stegasoo tools compress photo.jpg -q 60
+        stegasoo tools compress photo.jpg -q 80 -o smaller.jpg
+    """
+    from PIL import Image
+    import io
+
+    if not 1 <= quality <= 100:
+        raise click.UsageError("Quality must be between 1 and 100")
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    img = Image.open(io.BytesIO(image_data))
+
+    # Convert to RGB if needed (JPEG doesn't support alpha)
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=quality)
+    compressed_data = buffer.getvalue()
+
+    if not output:
+        stem = Path(image).stem
+        output = f"{stem}_q{quality}.jpg"
+
+    with open(output, "wb") as f:
+        f.write(compressed_data)
+
+    orig_size = len(image_data)
+    new_size = len(compressed_data)
+    reduction = (1 - new_size / orig_size) * 100
+
+    click.echo(f"Compressed to: {output}")
+    click.echo(f"  Original: {orig_size:,} bytes")
+    click.echo(f"  Compressed: {new_size:,} bytes ({reduction:.1f}% smaller)")
+
+
+@tools.command("rotate")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("-r", "--rotation", type=click.Choice(["90", "180", "270"]), help="Rotation degrees clockwise")
+@click.option("--flip-h", is_flag=True, help="Flip horizontally")
+@click.option("--flip-v", is_flag=True, help="Flip vertically")
+@click.option("-o", "--output", type=click.Path(), help="Output file")
+def tools_rotate(image, rotation, flip_h, flip_v, output):
+    """Rotate and/or flip an image.
+
+    For JPEGs, uses lossless jpegtran rotation which preserves DCT steganography.
+    For other formats, uses PIL (re-encodes the image).
+
+    Examples:
+
+        stegasoo tools rotate photo.jpg -r 90
+        stegasoo tools rotate photo.jpg -r 180 --flip-h -o rotated.jpg
+    """
+    from PIL import Image
+    import io
+    import shutil
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    # Must have rotation or flip
+    if not rotation and not flip_h and not flip_v:
+        raise click.UsageError("Must specify at least one of -r/--rotation, --flip-h, or --flip-v")
+
+    img = Image.open(io.BytesIO(image_data))
+    is_jpeg = img.format == "JPEG"
+    img.close()
+
+    rotation_deg = int(rotation) if rotation else 0
+
+    # For JPEGs, use lossless jpegtran
+    if is_jpeg and shutil.which("jpegtran"):
+        from .dct_steganography import _jpegtran_rotate
+
+        result_data = image_data
+
+        # Apply rotation
+        if rotation_deg in (90, 180, 270):
+            result_data = _jpegtran_rotate(result_data, rotation_deg)
+
+        # Apply flips using jpegtran
+        if flip_h or flip_v:
+            import subprocess
+            import tempfile
+            import os
+
+            for flip_type in (["horizontal"] if flip_h else []) + (["vertical"] if flip_v else []):
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(result_data)
+                    input_path = f.name
+                output_path = tempfile.mktemp(suffix=".jpg")
+                try:
+                    subprocess.run(
+                        ["jpegtran", "-flip", flip_type, "-copy", "all",
+                         "-outfile", output_path, input_path],
+                        capture_output=True, timeout=30, check=True
+                    )
+                    with open(output_path, "rb") as f:
+                        result_data = f.read()
+                finally:
+                    for p in [input_path, output_path]:
+                        try:
+                            os.unlink(p)
+                        except OSError:
+                            pass
+
+        ext = "jpg"
+        click.echo("  (Used lossless jpegtran - DCT stego preserved)")
+    else:
+        # Use PIL for non-JPEGs
+        img = Image.open(io.BytesIO(image_data))
+
+        # PIL rotation is counter-clockwise, we want clockwise
+        if rotation_deg:
+            pil_rotation = {90: 270, 180: 180, 270: 90}[rotation_deg]
+            img = img.rotate(pil_rotation, expand=True)
+
+        if flip_h:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if flip_v:
+            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        result_data = buffer.getvalue()
+        ext = "png"
+
+    if not output:
+        stem = Path(image).stem
+        suffix = "rotated" if rotation_deg else "flipped"
+        output = f"{stem}_{suffix}.{ext}"
+
+    with open(output, "wb") as f:
+        f.write(result_data)
+
+    click.echo(f"Saved to: {output}")
+
+
+@tools.command("convert")
+@click.argument("image", type=click.Path(exists=True))
+@click.option("-f", "--format", "fmt", type=click.Choice(["png", "jpg", "bmp", "webp"]), required=True, help="Output format")
+@click.option("-q", "--quality", type=int, default=95, help="Quality for lossy formats (default: 95)")
+@click.option("-o", "--output", type=click.Path(), help="Output file")
+def tools_convert(image, fmt, quality, output):
+    """Convert image to a different format.
+
+    Examples:
+
+        stegasoo tools convert photo.png -f jpg
+        stegasoo tools convert photo.jpg -f png -o lossless.png
+    """
+    from PIL import Image
+    import io
+
+    with open(image, "rb") as f:
+        image_data = f.read()
+
+    img = Image.open(io.BytesIO(image_data))
+
+    # Handle format-specific conversions
+    save_format = {"jpg": "JPEG", "png": "PNG", "bmp": "BMP", "webp": "WEBP"}[fmt]
+
+    if save_format == "JPEG" and img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    buffer = io.BytesIO()
+    if save_format in ("JPEG", "WEBP"):
+        img.save(buffer, format=save_format, quality=quality)
+    else:
+        img.save(buffer, format=save_format)
+
+    result_data = buffer.getvalue()
+
+    if not output:
+        stem = Path(image).stem
+        output = f"{stem}.{fmt}"
+
+    with open(output, "wb") as f:
+        f.write(result_data)
+
+    click.echo(f"Converted to: {output}")
+
+
 # =============================================================================
 # ADMIN COMMANDS (Web UI administration)
 # =============================================================================

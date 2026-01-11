@@ -18,7 +18,11 @@
   - Compress, Rotate, Strip, EXIF viewer all working
   - Rotate uses jpegtran for lossless JPEG rotation
   - Compact UI styling
-- [ ] CLI tools - full shakedown and fixes
+- [x] CLI tools - full shakedown and fixes
+  - Fixed encode to output JPEG when carrier is JPEG (was always PNG)
+  - Fixed jpegtran -trim flag destroying DCT stego data
+  - Added compress, rotate, convert tools (matching Web UI)
+  - Rotate uses jpegtran for JPEGs, supports flip-only operations
 
 ## AUR Packages
 - [ ] `stegasoo-cli` - standalone CLI package (no web dependencies)
