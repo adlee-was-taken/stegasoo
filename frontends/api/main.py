@@ -32,9 +32,30 @@ from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
+
+# API Key Authentication
+try:
+    from .auth import (
+        require_api_key,
+        get_api_key_status,
+        add_api_key,
+        remove_api_key,
+        list_api_keys,
+        is_auth_enabled,
+    )
+except ImportError:
+    # When running directly (not as package)
+    from auth import (
+        require_api_key,
+        get_api_key_status,
+        add_api_key,
+        remove_api_key,
+        list_api_keys,
+        is_auth_enabled,
+    )
 
 # Add parent to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -357,6 +378,23 @@ class ChannelSetRequest(BaseModel):
     location: str = Field(default="user", description="'user' or 'project'")
 
 
+class AuthStatusResponse(BaseModel):
+    """Response for API key authentication status."""
+
+    enabled: bool = Field(description="Whether API key auth is enabled")
+    total_keys: int = Field(description="Total number of configured API keys")
+    user_keys: int = Field(description="Keys in user config")
+    project_keys: int = Field(description="Keys in project config")
+    env_configured: bool = Field(description="Whether env var key is set")
+
+
+class AuthKeyInfo(BaseModel):
+    """Info about a single API key (not the actual key)."""
+
+    name: str
+    created: str
+
+
 class ModesResponse(BaseModel):
     """Response showing available embedding modes."""
 
@@ -614,6 +652,7 @@ async def api_channel_status(
 
 @app.post("/channel/generate", response_model=ChannelGenerateResponse)
 async def api_channel_generate(
+    _: str = Depends(require_api_key),
     save: bool = Query(False, description="Save to user config"),
     save_project: bool = Query(False, description="Save to project config"),
 ):
@@ -652,7 +691,7 @@ async def api_channel_generate(
 
 
 @app.post("/channel/set")
-async def api_channel_set(request: ChannelSetRequest):
+async def api_channel_set(request: ChannelSetRequest, _: str = Depends(require_api_key)):
     """
     Set/save a channel key to config.
 
@@ -678,6 +717,7 @@ async def api_channel_set(request: ChannelSetRequest):
 
 @app.delete("/channel")
 async def api_channel_clear(
+    _: str = Depends(require_api_key),
     location: str = Query("user", description="'user', 'project', or 'all'")
 ):
     """
@@ -704,8 +744,98 @@ async def api_channel_clear(
     }
 
 
+# ============================================================================
+# ROUTES - AUTHENTICATION (v4.2.1)
+# ============================================================================
+
+
+@app.get("/auth/status", response_model=AuthStatusResponse)
+async def api_auth_status():
+    """
+    Get API key authentication status.
+
+    v4.2.1: New endpoint for auth status.
+    Returns whether auth is enabled and key counts.
+    """
+    status = get_api_key_status()
+    return AuthStatusResponse(
+        enabled=status["enabled"],
+        total_keys=status["total_keys"],
+        user_keys=status["user_keys"],
+        project_keys=status["project_keys"],
+        env_configured=status["env_configured"],
+    )
+
+
+@app.get("/auth/keys", response_model=list[AuthKeyInfo])
+async def api_auth_list_keys(
+    location: str = Query("user", description="'user' or 'project'"),
+    _: str = Depends(require_api_key),
+):
+    """
+    List configured API keys (names only, not actual keys).
+
+    v4.2.1: New endpoint for auth management.
+    Requires authentication.
+    """
+    if location not in ("user", "project"):
+        raise HTTPException(400, "location must be 'user' or 'project'")
+
+    keys = list_api_keys(location)
+    return [AuthKeyInfo(name=k["name"], created=k["created"]) for k in keys]
+
+
+@app.post("/auth/keys")
+async def api_auth_create_key(
+    name: str = Query(..., description="Name for the new API key"),
+    location: str = Query("user", description="'user' or 'project'"),
+    _: str = Depends(require_api_key),
+):
+    """
+    Create a new API key.
+
+    v4.2.1: New endpoint for auth management.
+    Returns the key ONCE - it cannot be retrieved again!
+    Requires authentication (or no keys configured yet).
+    """
+    if location not in ("user", "project"):
+        raise HTTPException(400, "location must be 'user' or 'project'")
+
+    try:
+        key = add_api_key(name, location)
+        return {
+            "success": True,
+            "name": name,
+            "key": key,
+            "warning": "Save this key now! It cannot be retrieved again.",
+        }
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/auth/keys")
+async def api_auth_delete_key(
+    name: str = Query(..., description="Name of key to delete"),
+    location: str = Query("user", description="'user' or 'project'"),
+    _: str = Depends(require_api_key),
+):
+    """
+    Delete an API key by name.
+
+    v4.2.1: New endpoint for auth management.
+    Requires authentication.
+    """
+    if location not in ("user", "project"):
+        raise HTTPException(400, "location must be 'user' or 'project'")
+
+    if remove_api_key(name, location):
+        return {"success": True, "deleted": name}
+    else:
+        raise HTTPException(404, f"Key '{name}' not found in {location} config")
+
+
 @app.post("/compare", response_model=CompareModesResponse)
-async def api_compare_modes(request: CompareModesRequest):
+async def api_compare_modes(request: CompareModesRequest, _: str = Depends(require_api_key)):
     """
     Compare LSB and DCT embedding modes for a carrier image.
 
@@ -763,7 +893,7 @@ async def api_compare_modes(request: CompareModesRequest):
 
 
 @app.post("/will-fit", response_model=WillFitResponse)
-async def api_will_fit(request: WillFitRequest):
+async def api_will_fit(request: WillFitRequest, _: str = Depends(require_api_key)):
     """
     Check if a payload of given size will fit in the carrier image.
 
@@ -799,6 +929,7 @@ async def api_will_fit(request: WillFitRequest):
 
 @app.post("/extract-key-from-qr", response_model=QrExtractResponse)
 async def api_extract_key_from_qr(
+    _: str = Depends(require_api_key),
     qr_image: UploadFile = File(..., description="QR code image containing RSA key")
 ):
     """
@@ -823,7 +954,7 @@ async def api_extract_key_from_qr(
 
 
 @app.post("/generate-key-qr", response_model=QrGenerateResponse)
-async def api_generate_key_qr(request: QrGenerateRequest):
+async def api_generate_key_qr(request: QrGenerateRequest, _: str = Depends(require_api_key)):
     """
     Generate QR code from an RSA private key.
 
@@ -873,7 +1004,7 @@ async def api_generate_key_qr(request: QrGenerateRequest):
 
 
 @app.post("/generate", response_model=GenerateResponse)
-async def api_generate(request: GenerateRequest):
+async def api_generate(request: GenerateRequest, _: str = Depends(require_api_key)):
     """
     Generate credentials for encoding/decoding.
 
@@ -955,7 +1086,7 @@ def _get_output_info(embed_mode: str, dct_output_format: str, dct_color_mode: st
 
 
 @app.post("/encode", response_model=EncodeResponse)
-async def api_encode(request: EncodeRequest):
+async def api_encode(request: EncodeRequest, _: str = Depends(require_api_key)):
     """
     Encode a text message into an image.
 
@@ -1027,7 +1158,7 @@ async def api_encode(request: EncodeRequest):
 
 
 @app.post("/encode/file", response_model=EncodeResponse)
-async def api_encode_file(request: EncodeFileRequest):
+async def api_encode_file(request: EncodeFileRequest, _: str = Depends(require_api_key)):
     """
     Encode a file into an image (JSON with base64).
 
@@ -1109,7 +1240,7 @@ async def api_encode_file(request: EncodeFileRequest):
 
 
 @app.post("/decode", response_model=DecodeResponse)
-async def api_decode(request: DecodeRequest):
+async def api_decode(request: DecodeRequest, _: str = Depends(require_api_key)):
     """
     Decode a message or file from a stego image.
 
@@ -1172,6 +1303,7 @@ async def api_decode(request: DecodeRequest):
 
 @app.post("/encode/multipart")
 async def api_encode_multipart(
+    _: str = Depends(require_api_key),
     passphrase: str = Form(..., description="Passphrase (v3.2.0: renamed from day_phrase)"),
     reference_photo: UploadFile = File(...),
     carrier: UploadFile = File(...),
@@ -1313,6 +1445,7 @@ async def api_encode_multipart(
 
 @app.post("/decode/multipart", response_model=DecodeResponse)
 async def api_decode_multipart(
+    _: str = Depends(require_api_key),
     passphrase: str = Form(..., description="Passphrase (v3.2.0: renamed from day_phrase)"),
     reference_photo: UploadFile = File(...),
     stego_image: UploadFile = File(...),
@@ -1418,6 +1551,7 @@ async def api_decode_multipart(
 
 @app.post("/image/info", response_model=ImageInfoResponse)
 async def api_image_info(
+    _: str = Depends(require_api_key),
     image: UploadFile = File(...),
     include_modes: bool = Query(True, description="Include capacity by mode (v3.0+)"),
 ):

@@ -1668,6 +1668,286 @@ def admin_generate_key(show_qr):
     click.echo("go to Account > Recovery Key > Regenerate")
 
 
+# =============================================================================
+# API COMMANDS (REST API management)
+# =============================================================================
+
+
+@cli.group()
+@click.pass_context
+def api(ctx):
+    """REST API management commands."""
+    pass
+
+
+@api.group("keys")
+def api_keys():
+    """Manage API keys for authentication."""
+    pass
+
+
+@api_keys.command("list")
+@click.option("--location", type=click.Choice(["user", "project", "all"]), default="all",
+              help="Config location to list keys from")
+def api_keys_list(location):
+    """List configured API keys.
+
+    Shows key names and creation dates (not actual keys).
+
+    Examples:
+
+        stegasoo api keys list
+        stegasoo api keys list --location user
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+
+    try:
+        from api.auth import list_api_keys, get_api_key_status
+    except ImportError:
+        raise click.ClickException("API frontend not available")
+
+    status = get_api_key_status()
+
+    click.echo(f"\nAPI Key Authentication: {'Enabled' if status['enabled'] else 'Disabled'}")
+    click.echo(f"Total keys: {status['total_keys']}")
+    click.echo(f"Environment variable: {'Set' if status['env_configured'] else 'Not set'}")
+
+    locations = ["user", "project"] if location == "all" else [location]
+
+    for loc in locations:
+        keys = list_api_keys(loc)
+        click.echo(f"\n{loc.title()} keys ({len(keys)}):")
+        if keys:
+            for k in keys:
+                click.echo(f"  - {k['name']} (created: {k['created'][:10]})")
+        else:
+            click.echo("  (none)")
+
+
+@api_keys.command("create")
+@click.argument("name")
+@click.option("--location", type=click.Choice(["user", "project"]), default="user",
+              help="Where to store the key")
+def api_keys_create(name, location):
+    """Create a new API key.
+
+    The key is shown ONCE and cannot be retrieved again.
+    Save it immediately!
+
+    Examples:
+
+        stegasoo api keys create laptop
+        stegasoo api keys create automation --location project
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+
+    try:
+        from api.auth import add_api_key
+    except ImportError:
+        raise click.ClickException("API frontend not available")
+
+    try:
+        key = add_api_key(name, location)
+        click.echo(f"\nAPI Key created: {name}")
+        click.echo("─" * 60)
+        click.echo(f"  {key}")
+        click.echo("─" * 60)
+        click.echo("\nSave this key NOW! It cannot be retrieved again.")
+        click.echo(f"Stored in: {location} config")
+    except ValueError as e:
+        raise click.ClickException(str(e))
+
+
+@api_keys.command("delete")
+@click.argument("name")
+@click.option("--location", type=click.Choice(["user", "project"]), default="user",
+              help="Config location")
+def api_keys_delete(name, location):
+    """Delete an API key by name.
+
+    Examples:
+
+        stegasoo api keys delete laptop
+        stegasoo api keys delete automation --location project
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+
+    try:
+        from api.auth import remove_api_key
+    except ImportError:
+        raise click.ClickException("API frontend not available")
+
+    if remove_api_key(name, location):
+        click.echo(f"Deleted API key: {name}")
+    else:
+        raise click.ClickException(f"Key '{name}' not found in {location} config")
+
+
+@api.group("tls")
+def api_tls():
+    """Manage TLS certificates for HTTPS."""
+    pass
+
+
+@api_tls.command("generate")
+@click.option("--hostname", default="localhost", help="Server hostname for certificate")
+@click.option("--days", default=365, help="Certificate validity in days")
+@click.option("--output", "-o", type=click.Path(), help="Output directory (default: ~/.stegasoo/certs)")
+def api_tls_generate(hostname, days, output):
+    """Generate self-signed TLS certificate.
+
+    Creates a certificate valid for:
+    - The specified hostname
+    - localhost / 127.0.0.1
+    - hostname.local (for mDNS)
+    - All detected local network IPs
+
+    Examples:
+
+        stegasoo api tls generate
+        stegasoo api tls generate --hostname myserver --days 730
+        stegasoo api tls generate -o /etc/stegasoo/certs
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+
+    try:
+        from web.ssl_utils import generate_self_signed_cert, get_cert_paths
+    except ImportError:
+        raise click.ClickException("Web frontend not available (ssl_utils required)")
+
+    if output:
+        base_dir = Path(output)
+    else:
+        base_dir = Path.home() / ".stegasoo"
+
+    click.echo(f"Generating TLS certificate for: {hostname}")
+    click.echo(f"Validity: {days} days")
+
+    cert_path, key_path = generate_self_signed_cert(base_dir, hostname, days)
+
+    click.echo(f"\nCertificate: {cert_path}")
+    click.echo(f"Private Key: {key_path}")
+    click.echo("\nTo use with the API:")
+    click.echo(f"  uvicorn main:app --ssl-certfile {cert_path} --ssl-keyfile {key_path}")
+
+
+@api_tls.command("info")
+@click.option("--cert", "-c", type=click.Path(exists=True), help="Certificate file (default: ~/.stegasoo/certs/server.crt)")
+def api_tls_info(cert):
+    """Show information about a TLS certificate.
+
+    Examples:
+
+        stegasoo api tls info
+        stegasoo api tls info --cert /path/to/server.crt
+    """
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+
+    if not cert:
+        cert = Path.home() / ".stegasoo" / "certs" / "server.crt"
+        if not cert.exists():
+            raise click.ClickException(f"No certificate found at {cert}. Generate one with: stegasoo api tls generate")
+
+    cert_data = Path(cert).read_bytes()
+    certificate = x509.load_pem_x509_certificate(cert_data)
+
+    click.echo(f"\nCertificate: {cert}")
+    click.echo("─" * 50)
+    click.echo(f"Subject: {certificate.subject.rfc4514_string()}")
+    click.echo(f"Issuer: {certificate.issuer.rfc4514_string()}")
+    click.echo(f"Serial: {certificate.serial_number}")
+    click.echo(f"Valid from: {certificate.not_valid_before_utc}")
+    click.echo(f"Valid until: {certificate.not_valid_after_utc}")
+
+    # Check expiry
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if certificate.not_valid_after_utc < now:
+        click.echo("\nStatus: EXPIRED")
+    elif certificate.not_valid_after_utc < now + datetime.timedelta(days=30):
+        days_left = (certificate.not_valid_after_utc - now).days
+        click.echo(f"\nStatus: Expires in {days_left} days (consider renewal)")
+    else:
+        days_left = (certificate.not_valid_after_utc - now).days
+        click.echo(f"\nStatus: Valid ({days_left} days remaining)")
+
+    # Show SANs
+    try:
+        san_ext = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        click.echo("\nSubject Alternative Names:")
+        for name in san_ext.value:
+            click.echo(f"  - {name.value}")
+    except x509.ExtensionNotFound:
+        pass
+
+
+@api.command("serve")
+@click.option("--host", default="127.0.0.1", help="Host to bind to")
+@click.option("--port", default=8000, help="Port to bind to")
+@click.option("--ssl/--no-ssl", default=True, help="Enable/disable TLS")
+@click.option("--cert", type=click.Path(exists=True), help="TLS certificate file")
+@click.option("--key", type=click.Path(exists=True), help="TLS private key file")
+@click.option("--reload", "do_reload", is_flag=True, help="Enable auto-reload for development")
+def api_serve(host, port, ssl, cert, key, do_reload):
+    """Start the REST API server.
+
+    By default starts with TLS using certificates from ~/.stegasoo/certs/.
+    If no certificates exist, they are generated automatically.
+
+    Examples:
+
+        stegasoo api serve
+        stegasoo api serve --host 0.0.0.0 --port 8443
+        stegasoo api serve --no-ssl
+        stegasoo api serve --cert /path/to/cert.pem --key /path/to/key.pem
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "frontends"))
+
+    # Determine cert paths
+    if ssl:
+        if cert and key:
+            cert_path, key_path = cert, key
+        else:
+            try:
+                from web.ssl_utils import ensure_certs
+                base_dir = Path.home() / ".stegasoo"
+                cert_path, key_path = ensure_certs(base_dir, host if host != "0.0.0.0" else "localhost")
+            except ImportError:
+                raise click.ClickException("ssl_utils not available")
+
+        click.echo(f"Starting API server with TLS on https://{host}:{port}")
+        click.echo(f"Certificate: {cert_path}")
+    else:
+        cert_path = key_path = None
+        click.echo(f"Starting API server on http://{host}:{port}")
+        click.echo("WARNING: TLS disabled - connections are not encrypted!")
+
+    # Import and run uvicorn
+    try:
+        import uvicorn
+    except ImportError:
+        raise click.ClickException("uvicorn not installed. Install with: pip install uvicorn")
+
+    uvicorn_kwargs = {
+        "app": "api.main:app",
+        "host": host,
+        "port": port,
+        "reload": do_reload,
+    }
+
+    if ssl and cert_path and key_path:
+        uvicorn_kwargs["ssl_certfile"] = str(cert_path)
+        uvicorn_kwargs["ssl_keyfile"] = str(key_path)
+
+    uvicorn.run(**uvicorn_kwargs)
+
+
 def main():
     """Entry point for CLI."""
     cli(obj={})

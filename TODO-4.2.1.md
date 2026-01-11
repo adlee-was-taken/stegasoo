@@ -31,10 +31,20 @@
   - 68MB vs 79MB for full package
 - [ ] `stegasoo-api` - REST API package (needs auth overhaul first)
 
-## API Auth Work (blocking stegasoo-api)
-- [ ] Implement OAuth2 authentication
-- [ ] TLS 1.3 support with self-signed certificates
-- [ ] Figure out cert trust/distribution for clients
+## API Auth Work
+- [x] API key authentication (simpler than OAuth2 for personal use)
+  - `frontends/api/auth.py` - key generation, hashing, validation
+  - Keys stored in `~/.stegasoo/api_keys.json` (hashed)
+  - `X-API-Key` header for authentication
+  - Auth disabled when no keys configured
+- [x] TLS with self-signed certificates
+  - Auto-generates certs on first run
+  - CLI: `stegasoo api tls generate`
+  - Certs stored in `~/.stegasoo/certs/`
+- [x] CLI commands for API management
+  - `stegasoo api keys list/create/delete`
+  - `stegasoo api tls generate/info`
+  - `stegasoo api serve` (starts with TLS by default)
 
 ## API Documentation
 - [ ] Postman collection
