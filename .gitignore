@@ -102,3 +102,6 @@ rpi/*.img.zst.zip
 aur-upload/
 aur/.SRCINFO
 aur/*.pkg.tar.zst
+
+# Docker pre-built images and deps (release assets, too large for git)
+docker/*.tar.zst
