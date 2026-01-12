@@ -1,6 +1,6 @@
 pkgbase = stegasoo-api-git
 	pkgdesc = Stegasoo REST API with TLS and API key authentication
-	pkgver = 4.2.0.r6.g34ede38
+	pkgver = 4.2.1
 	pkgrel = 1
 	url = https://github.com/adlee-was-taken/stegasoo
 	install = stegasoo-api-git.install
