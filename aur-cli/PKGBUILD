@@ -1,6 +1,6 @@
 # Maintainer: Aaron D. Lee <your-email@example.com>
 pkgname=stegasoo-cli-git
-pkgver=4.2.0.r4.g525bcec
+pkgver=4.2.1
 pkgrel=1
 pkgdesc="Secure steganography CLI with hybrid photo + passphrase + PIN authentication"
 arch=('x86_64')

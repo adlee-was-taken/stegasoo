@@ -1,6 +1,6 @@
 # Maintainer: Aaron D. Lee <your-email@example.com>
 pkgname=stegasoo-api-git
-pkgver=4.2.0.r6.g34ede38
+pkgver=4.2.1
 pkgrel=1
 pkgdesc="Stegasoo REST API with TLS and API key authentication"
 arch=('x86_64')
