@@ -2,82 +2,68 @@
 
 ### API Security
 
-#### API Key Authentication
-- All protected endpoints now require `X-API-Key` header
+**API Key Authentication**
+- All protected endpoints require `X-API-Key` header
 - Keys stored hashed (SHA-256) in `~/.stegasoo/api_keys.json`
 - Auth disabled when no keys configured (easy onboarding)
-- Public endpoints remain open: `/`, `/docs`, `/modes`, `/auth/status`
 
-#### TLS Support
+**TLS Support**
 - Self-signed certificates auto-generated on first run
 - Certs valid for localhost, all local IPs, hostname.local
-- Stored in `~/.stegasoo/certs/`
 - CLI: `stegasoo api tls generate` to pre-generate
 
 ### CLI Improvements
 
-#### New API Management Commands
+**New API Management Commands**
 ```bash
+stegasoo api keys create NAME    # Create new key
 stegasoo api keys list           # List API keys
-stegasoo api keys create NAME    # Create new key (shown once!)
-stegasoo api keys delete NAME    # Delete key
 stegasoo api tls generate        # Generate TLS cert
-stegasoo api tls info            # Show cert info
-stegasoo api serve               # Start with TLS (default)
+stegasoo api serve               # Start server with TLS
 ```
 
-#### New Image Tools
+**New Image Tools**
 ```bash
 stegasoo tools compress IMG -q 75   # JPEG compression
-stegasoo tools rotate IMG -r 90     # Rotation (jpegtran for JPEGs)
-stegasoo tools rotate IMG --flip-h  # Flip-only
+stegasoo tools rotate IMG -r 90     # Lossless rotation
 stegasoo tools convert IMG -f png   # Format conversion
 ```
 
 ### Bug Fixes
 
-- **DCT rotation**: Portrait photos no longer export rotated 90 degrees
+- **DCT rotation**: Portrait photos no longer export rotated 90°
 - **jpegtran**: Removed `-trim` flag that destroyed DCT stego data
 - **CLI encode**: Now outputs JPEG when carrier is JPEG (was always PNG)
-- **EXIF viewer**: Redesigned with card-based grid layout
+- **Import paths**: Fixed for installed packages (AUR/pip)
 
-### AUR Packages
+### Installation
 
-Three package options now available:
-
-| Package | Size | Contents |
-|---------|------|----------|
-| `stegasoo-git` | 79MB | Full (Web UI + API + CLI) |
-| `stegasoo-api-git` | 74MB | REST API + CLI only |
-| `stegasoo-cli-git` | 68MB | CLI only |
-
-### Quick Start
-
+**AUR (Arch Linux)**
 ```bash
-# Create API key
-stegasoo api keys create mykey
-
-# Start API server (TLS by default)
-stegasoo api serve
-
-# Use API
-curl -k -H "X-API-Key: stegasoo_xxxx_..." https://localhost:8000/
+yay -S stegasoo-git       # Full (Web + API + CLI)
+yay -S stegasoo-cli-git   # CLI only
 ```
 
-### Raspberry Pi Image
-Download `stegasoo-rpi-4.2.1.img.zst` from Releases.
-
-```bash
-# Flash (auto-detects SD card)
-sudo ./rpi/flash-image.sh stegasoo-rpi-4.2.1.img.zst
-```
-
-Default login: `admin` / `stegasoo`
-
-### Docker
+**Docker**
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
+
+**Raspberry Pi**
+Flash `stegasoo-rpi-4.2.1.img.zst.zip` to SD card.
+Default login: `admin` / `stegasoo`
+
+### Requirements
+
+- Python 3.11 - 3.14 (dropped 3.10 support)
+
+### Release Assets
+
+| File | Description |
+|------|-------------|
+| `stegasoo-rpi-4.2.1.img.zst.zip` | Raspberry Pi SD card image |
+| `stegasoo-docker-base-4.2.1.tar.zst` | Docker base image |
+| Source code (zip/tar.gz) | Auto-generated |
 
 ---
 
