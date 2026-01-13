@@ -4,7 +4,7 @@ A secure steganography system for hiding encrypted messages in images using hybr
 
 [![Tests](https://github.com/adlee-was-taken/stegasoo/actions/workflows/test.yml/badge.svg)](https://github.com/adlee-was-taken/stegasoo/actions/workflows/test.yml)
 [![Lint](https://github.com/adlee-was-taken/stegasoo/actions/workflows/lint.yml/badge.svg)](https://github.com/adlee-was-taken/stegasoo/actions/workflows/lint.yml)
-![Python](https://img.shields.io/badge/Python-3.10--3.12-blue)
+![Python](https://img.shields.io/badge/Python-3.11--3.14-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Security](https://img.shields.io/badge/Security-AES--256--GCM-red)
 

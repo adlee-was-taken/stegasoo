@@ -20,22 +20,23 @@ Complete installation instructions for all platforms and deployment methods.
 
 ## Requirements
 
-### ⚠️ Python Version Requirements
+### Python Version Requirements
 
 | Python Version | Status | Notes |
 |----------------|--------|-------|
-| 3.10 | ✅ Supported | |
-| 3.11 | ✅ Supported | Recommended |
+| 3.10 | ❌ Not Supported | Dropped in v4.2.1 |
+| 3.11 | ✅ Supported | Minimum version |
 | 3.12 | ✅ Supported | Recommended |
-| 3.13 | ❌ **Not Supported** | jpegio C extension incompatible |
+| 3.13 | ✅ Supported | |
+| 3.14 | ✅ Supported | Tested on Arch |
 
-**Important:** Python 3.13 (released October 2024) is **not compatible** with jpegio due to C extension ABI changes. Use Python 3.12 or earlier.
+**Note:** v4.2.1 switched from `jpegio` to `jpeglib` for DCT steganography, enabling Python 3.11-3.14 support.
 
 ### Minimum Requirements
 
 | Requirement | Value |
 |-------------|-------|
-| Python | 3.10-3.12 |
+| Python | 3.11-3.14 |
 | RAM | 512 MB minimum (256MB for Argon2) |
 | Disk | ~100 MB |
 
@@ -423,15 +424,60 @@ pip install jpegio
 
 ### Windows
 
-1. Install Python 3.12 from [python.org](https://python.org) (NOT 3.13!)
-2. Install Visual Studio Build Tools
+Windows users have three options, listed from easiest to most complex:
+
+#### Option 1: Docker Desktop (Recommended)
+
+The easiest way to run Stegasoo on Windows. No Python installation needed.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+2. Enable WSL2 backend when prompted
+3. Clone and run:
+
+```powershell
+git clone https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo
+docker-compose -f docker/docker-compose.yml up -d web
+```
+
+Access at http://localhost:5000
+
+#### Option 2: WSL2 (Windows Subsystem for Linux)
+
+Run the Linux version natively on Windows.
+
+```powershell
+# Install WSL2 with Ubuntu
+wsl --install -d Ubuntu
+
+# Open Ubuntu terminal, then follow Linux instructions:
+sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv libzbar0 libjpeg-dev
+git clone https://github.com/adlee-was-taken/stegasoo.git
+cd stegasoo
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -e ".[all]"
+stegasoo --version
+```
+
+#### Option 3: Native Windows (Advanced)
+
+Native Windows installation requires Visual Studio Build Tools for compiling C extensions.
+
+1. Install Python 3.11 or 3.12 from [python.org](https://python.org)
+2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with "Desktop development with C++"
 3. Install from pip:
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\activate
-pip install stegasoo[all]
+pip install stegasoo[cli]  # CLI only (easiest)
+# or
+pip install stegasoo[all]  # Full install (may require additional setup)
 ```
+
+**Note:** Native Windows installation may have issues with `jpegio` (DCT mode). Docker or WSL2 is recommended for full functionality.
 
 ### Raspberry Pi
 
