@@ -37,7 +37,8 @@ jobs:
   publish:
     needs: test  # Only run if tests pass
     runs-on: ubuntu-latest
-    
+    environment: pypi
+
     # Required for PyPI trusted publishing (recommended)
     permissions:
       id-token: write
