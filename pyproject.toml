@@ -114,6 +114,13 @@ include = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/stegasoo", "frontends"]
 
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+# Include data files in the wheel
+[tool.hatch.build.targets.wheel.force-include]
+"src/stegasoo/data/bip39-words.txt" = "stegasoo/data/bip39-words.txt"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

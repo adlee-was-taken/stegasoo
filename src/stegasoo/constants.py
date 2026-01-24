@@ -25,6 +25,7 @@ BREAKING CHANGES in v3.2.0:
 - Renamed day_phrase → passphrase throughout codebase
 """
 
+import importlib.resources
 from pathlib import Path
 
 # ============================================================================
@@ -177,15 +178,32 @@ BATCH_OUTPUT_SUFFIX = "_encoded"
 
 
 def get_data_dir() -> Path:
-    """Get the data directory path."""
-    # Check multiple locations
+    """Get the data directory path.
+
+    Checks locations in order:
+    1. Package data (installed via pip/wheel) using importlib.resources
+    2. Development layout (src/stegasoo -> project root/data)
+    3. Docker container (/app/data)
+    4. Current working directory fallbacks
+    """
+    # Try package data first (works when installed via pip)
+    try:
+        pkg_data = importlib.resources.files("stegasoo.data")
+        # Check if the package data directory exists and has our files
+        if (pkg_data / "bip39-words.txt").is_file():
+            # Return as Path - importlib.resources.files returns a Traversable
+            return Path(str(pkg_data))
+    except (ModuleNotFoundError, TypeError):
+        pass
+
+    # Fallback to file-based locations
     # From src/stegasoo/constants.py:
     #   .parent = src/stegasoo/
     #   .parent.parent = src/
     #   .parent.parent.parent = project root (where data/ lives)
     candidates = [
+        Path(__file__).parent / "data",  # Installed package (stegasoo/data/)
         Path(__file__).parent.parent.parent / "data",  # Development: src/stegasoo -> project root
-        Path(__file__).parent / "data",  # Installed package
         Path("/app/data"),  # Docker
         Path.cwd() / "data",  # Current directory
         Path.cwd().parent / "data",  # One level up from cwd
@@ -196,8 +214,8 @@ def get_data_dir() -> Path:
         if path.exists():
             return path
 
-    # Default to first candidate
-    return candidates[0]
+    # Default to package data path for clearer error messages
+    return Path(__file__).parent / "data"
 
 
 def get_bip39_words() -> list[str]:
