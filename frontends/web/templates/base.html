@@ -16,11 +16,11 @@
                 <img src="{{ url_for('static', filename='logo.svg') }}" alt="Stegasoo" height="28">
             </a>
             {% if channel_configured %}
-            <span class="badge bg-success bg-opacity-25 small" style="padding-left: 0.35rem;" title="Private Channel: {{ channel_fingerprint }}">
+            <span class="badge bg-success bg-opacity-25 small me-auto" style="padding-left: 0.35rem;" title="Private Channel: {{ channel_fingerprint }}">
                 <i class="bi bi-shield-lock me-2" style="color: #6ee7b7;"></i><code style="font-size: 0.7rem; font-weight: 300; color: #c9a860;">{{ channel_fingerprint[:4] }}-••••-{{ channel_fingerprint[-4:] }}</code>
             </span>
             {% else %}
-            <span class="badge bg-secondary bg-opacity-25 small text-muted" style="padding-left: 0.35rem;" title="Public Channel: No shared channel key configured. Messages use only passphrase and PIN for encryption.">
+            <span class="badge bg-secondary bg-opacity-25 small text-muted me-auto" style="padding-left: 0.35rem;" title="Public Channel: No shared channel key configured. Messages use only passphrase and PIN for encryption.">
                 <i class="bi bi-globe me-1"></i>Public Channel
             </span>
             {% endif %}
